@@ -1,0 +1,1 @@
+"""Detector strategy package."""

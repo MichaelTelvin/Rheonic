@@ -1,8 +1,4 @@
----
 
-## `scope.md` (Codex task list)
-
-```md
 # LLMTokenBurnGuard — Scope (Codex Tasks) v1
 
 ## Guiding principles

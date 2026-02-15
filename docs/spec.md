@@ -43,7 +43,8 @@ Body (Event):
     "input_cost_usd": 0.0123,
     "output_cost_usd": 0.0456,
     "total_cost_usd": 0.0579,
-    "pricing_version": "2026-02-01"
+    "pricing_version": "2026-02-01",
+    "source": "estimate|authoritative|null"
   },
   "guard": {
     "mode": "observe|protect",
@@ -75,10 +76,13 @@ Returns:
 ```
 {
   "ts": "2026-02-12T10:22:40Z",
-  "burn_usd_per_min": 1.32,
-  "burn_usd_per_hour": 56.4,
+  "burn_estimated_usd_per_min": 1.32,
+  "burn_authoritative_usd_per_min": 1.28,
+  "burn_estimated_usd_per_hour": 56.4,
+  "burn_authoritative_usd_per_hour": 55.1,
   "requests_per_min": 88,
   "retry_rate_60s": 0.14,
+  "token_rate_60s": 12000,
   "top_endpoints": [{"endpoint":"/chat","burn_usd_per_min":0.72}],
   "top_tenants": [{"tenant_id":"tenant_123","burn_usd_per_min":0.58}],
   "open_incidents": 2
@@ -221,6 +225,8 @@ Protect action semantics (SDK side)
 Channels:
 	•	Slack webhook (MVP)
 	•	generic webhook (MVP)
+	•	Teams Incoming Webhook / Power Automate
+
 
 Triggers:
 	•	incident opened or escalated (severity >= med)
@@ -230,11 +236,88 @@ Triggers:
 Payload includes:
 	•	incident type, scope, evidence, recommended actions, dashboard link
 
-
-
 ## 6) Pricing tables
 
+### 6.1 Estimated pricing table (estimator only)
 Server hosts a pricing table versioned by date.
 SDK syncs periodically.
-Events record pricing_version used for cost computation.    
+Events record `pricing_version` used for cost estimation.
 
+Pricing table schema (server-side):
+- provider
+- model
+- input_price_per_1m_tokens
+- output_price_per_1m_tokens
+- currency
+- effective_from
+- version
+
+Notes:
+- Pricing table is used for **estimated** cost only.
+- Table updates are manual and infrequent (only when provider pricing changes).
+
+### 6.2 Authoritative cost reconciliation (preferred)
+Where available, we periodically pull authoritative usage/cost from provider reporting APIs and reconcile against estimates.
+
+Stored fields (per project, per interval):
+- authoritative_cost_usd
+- authoritative_source (provider_api | billing_export)
+- reconciled_at
+
+### 6.3 Pricing drift detection
+If the difference between estimated and authoritative totals exceeds a threshold, create a warning incident and optionally alert.
+
+Example drift rule:
+- abs(estimated_usd - authoritative_usd) / max(authoritative_usd, 0.01) > 0.15
+
+On drift:
+- create `CONFIG_WARNING` incident with reason_code `PRICING_DRIFT`
+- include evidence (estimated vs authoritative and interval)
+- suggest updating pricing table and/or model mapping
+
+### 6.4 Null cost handling
+If token usage or pricing is unavailable, cost may be null.
+
+Consequences:
+- Risk detection (storms/loops/spikes) still works using requests/tokens where available.
+- Dollar-based budget alerts may be suppressed until authoritative cost is available.
+
+---
+
+## 7) Risk Model vs Cost Model
+
+### 7.1 Risk units (realtime)
+Risk detection is based on:
+- requests per minute
+- retry rate
+- input/output token rate (when available)
+- slope/acceleration vs baseline
+- repetition patterns (job_id/trace_id/prompt_hash)
+
+Risk detection does **not** depend on dollar accuracy.
+
+### 7.2 Cost units (estimated vs authoritative)
+Two levels:
+- **Estimated**: computed by SDK using pricing table (fast, best-effort).
+- **Authoritative**: reconciled from provider reporting (preferred for budgets and accurate totals).
+
+UI rules:
+- Always label estimated cost as estimated.
+- Prefer authoritative totals when available.
+- If both exist, show both and highlight drift when meaningful.
+
+---
+
+## 8) Reconciliation job (worker)
+
+A worker job runs periodically (recommended: every 5–15 minutes):
+
+1. Fetch usage/cost from provider reporting APIs (where available).
+2. Map provider account → project.
+3. Store authoritative totals for the interval.
+4. Compare to estimated totals (if present).
+5. Emit drift warnings and/or budget alerts as configured.
+
+Budget enforcement semantics:
+- Observe mode: alert when authoritative (or estimated fallback) crosses thresholds.
+- Protect mode: may trigger cooldown_block/downgrade actions based on realtime risk and/or budget signals (configurable).

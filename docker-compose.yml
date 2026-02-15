@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    # TODO: Add environment, ports, and depends_on.
+
+  frontend:
+    build: ./frontend
+    # TODO: Add frontend runtime configuration.
