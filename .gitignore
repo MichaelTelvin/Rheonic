@@ -1,0 +1,70 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+build/
+dist/
+.env
+.env.*
+.venv/
+venv/
+pip-wheel-metadata/
+.pytest_cache/
+htmlcov/
+coverage/
+
+# =========================
+# Node / Frontend
+# =========================
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+
+# =========================
+# Docker volumes
+# =========================
+postgres-data/
+redis-data/
+docker-data/
+
+# =========================
+# Local databases
+# =========================
+*.sqlite3
+
+# =========================
+# Local-only project control files
+# =========================
+PROJECT_BRIEF.md
+RULES.md
