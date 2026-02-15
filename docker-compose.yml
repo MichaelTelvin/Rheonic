@@ -1,10 +1,91 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: llmtbg_postgres
+    environment:
+      POSTGRES_DB: llmtbg
+      POSTGRES_USER: llmtbg
+      POSTGRES_PASSWORD: llmtbg
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U llmtbg -d llmtbg" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: llmtbg_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: [ "redis-server", "--appendonly", "yes" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   backend:
     build: ./backend
-    # TODO: Add environment, ports, and depends_on.
+    container_name: llmtbg_backend
+    environment:
+      # Use service names "postgres" and "redis" for internal networking
+      DATABASE_URL: postgresql+psycopg://llmtbg:llmtbg@postgres:5432/llmtbg
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: dev
+      JWT_SECRET: change-me-dev
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  worker:
+    build: ./backend
+    container_name: llmtbg_worker
+    environment:
+      DATABASE_URL: postgresql+psycopg://llmtbg:llmtbg@postgres:5432/llmtbg
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "rq worker --url $REDIS_URL llmtbg"
 
   frontend:
     build: ./frontend
-    # TODO: Add frontend runtime configuration.
+    container_name: llmtbg_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: >
+      sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres-data:
+  redis-data:

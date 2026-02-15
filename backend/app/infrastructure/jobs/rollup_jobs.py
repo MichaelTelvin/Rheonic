@@ -1,8 +1,8 @@
-"""Rollup worker scaffold."""
+"""Rollup job scaffold."""
 
 
 class RollupWorker:
-    """Background worker for metrics rollup tasks."""
+    """Background job for metrics rollup tasks."""
 
     def run(self) -> None:
         """Execute metrics rollup process."""

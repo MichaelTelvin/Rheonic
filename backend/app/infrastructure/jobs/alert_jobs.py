@@ -1,8 +1,8 @@
-"""Alert worker scaffold."""
+"""Alert job scaffold."""
 
 
 class AlertWorker:
-    """Background worker for outbound incident alerts."""
+    """Background job for outbound incident alerts."""
 
     def run(self) -> None:
         """Dispatch pending alert notifications."""
