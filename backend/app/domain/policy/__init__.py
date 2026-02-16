@@ -1,1 +1,1 @@
-"""Policy action strategy package."""
+# Policy action strategy package.

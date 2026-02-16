@@ -1,1 +1,1 @@
-"""External provider integration package."""
+# External provider integration package.

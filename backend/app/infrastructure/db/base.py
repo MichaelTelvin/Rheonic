@@ -1,10 +1,60 @@
-"""Database base configuration scaffolding."""
+# Database base configuration scaffolding.
+from collections.abc import Generator
+import os
+
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class DatabaseSessionFactory:
-    """Factory abstraction for creating database sessions."""
+    # Factory abstraction for creating database sessions.
 
-    def create_session(self) -> object:
-        """Create and return a new database session object."""
-        # TODO: Configure SQLAlchemy engine and scoped sessions.
-        return object()
+    def __init__(self, database_url: str | None = None) -> None:
+        # Create a session factory for the configured database URL.
+        try:
+            self._database_url = database_url or os.getenv(
+                "DATABASE_URL",
+                "postgresql+psycopg://postgres:postgres@localhost:5432/llmtokenburnguard",
+            )
+            self._engine: Engine = create_engine(self._database_url, future=True)
+            self._session_factory = sessionmaker(
+                bind=self._engine,
+                autoflush=False,
+                autocommit=False,
+                expire_on_commit=False,
+                class_=Session,
+            )
+            logger.info("DatabaseSessionFactory initialized")
+        except Exception:
+            logger.exception("Failed to initialize DatabaseSessionFactory")
+            raise
+
+    @property
+    def engine(self) -> Engine:
+        # Return the SQLAlchemy engine.
+        return self._engine
+
+    def create_session(self) -> Session:
+        # Create and return a new database session object.
+        try:
+            return self._session_factory()
+        except Exception:
+            logger.exception("Failed to create database session")
+            raise
+
+    def session_scope(self) -> Generator[Session, None, None]:
+        # Provide a managed session scope for repository operations.
+        session = self.create_session()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            logger.exception("Database session scope failed")
+            session.rollback()
+            raise
+        finally:
+            session.close()

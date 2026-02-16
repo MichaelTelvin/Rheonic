@@ -38,6 +38,7 @@ pnpm-debug.log*
 .idea/
 *.swp
 *.swo
+api.http
 
 # =========================
 # OS Files

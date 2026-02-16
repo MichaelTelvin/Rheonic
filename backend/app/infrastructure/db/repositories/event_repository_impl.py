@@ -1,17 +1,77 @@
-"""Concrete event repository implementation scaffold."""
-
+# Concrete event repository implementation scaffold.
 from app.application.interfaces.event_repository import EventRepository
 from app.domain.models.event import Event
+from app.infrastructure.db.base import DatabaseSessionFactory
+from app.infrastructure.db.models import EventRecord
+from app.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class EventRepositoryImpl(EventRepository):
-    """Database-backed implementation for event persistence."""
+    # Database-backed implementation for event persistence.
+
+    def __init__(self, session_factory: DatabaseSessionFactory) -> None:
+        # Initialize repository dependencies.
+        self._session_factory = session_factory
 
     def add(self, event: Event) -> None:
-        _ = event
-        # TODO: Persist event using ORM/session.
+        # Persist a domain event record.
+        try:
+            with self._session_factory.create_session() as session:
+                record = EventRecord(
+                    id=event.id,
+                    ts=event.ts,
+                    project_id=event.project_id,
+                    provider=event.provider,
+                    model=event.model,
+                    environment=event.environment,
+                    input_tokens=event.input_tokens,
+                    output_tokens=event.output_tokens,
+                    total_tokens=event.total_tokens,
+                    latency_ms=event.latency_ms,
+                    status=event.status,
+                    error_type=event.error_type,
+                    http_status=event.http_status,
+                    created_at=event.created_at,
+                )
+                session.add(record)
+                session.commit()
+                logger.debug("Event persisted", extra={"project_id": event.project_id, "event_id": event.id})
+        except Exception:
+            logger.exception("Failed to persist event", extra={"project_id": event.project_id})
+            raise
 
     def list_recent(self, project_id: str, limit: int = 100) -> list[Event]:
-        _ = (project_id, limit)
-        # TODO: Query recent events efficiently.
-        return []
+        # Fetch recent events for a project.
+        try:
+            with self._session_factory.create_session() as session:
+                records = (
+                    session.query(EventRecord)
+                    .filter(EventRecord.project_id == project_id)
+                    .order_by(EventRecord.created_at.desc())
+                    .limit(limit)
+                    .all()
+                )
+            return [
+                Event(
+                    id=record.id,
+                    ts=record.ts,
+                    project_id=record.project_id,
+                    provider=record.provider,
+                    model=record.model,
+                    environment=record.environment,
+                    input_tokens=record.input_tokens,
+                    output_tokens=record.output_tokens,
+                    total_tokens=record.total_tokens,
+                    latency_ms=record.latency_ms,
+                    status=record.status,
+                    error_type=record.error_type,
+                    http_status=record.http_status,
+                    created_at=record.created_at,
+                )
+                for record in records
+            ]
+        except Exception:
+            logger.exception("Failed to list recent events", extra={"project_id": project_id})
+            raise

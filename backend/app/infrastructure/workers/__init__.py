@@ -1,1 +1,1 @@
-"""Background workers package."""
+# Background workers package.

@@ -1,1 +1,1 @@
-"""Database infrastructure package."""
+# Database infrastructure package.

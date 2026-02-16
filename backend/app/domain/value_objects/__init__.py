@@ -1,1 +1,1 @@
-"""Domain value object package."""
+# Domain value object package.

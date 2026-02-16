@@ -1,16 +1,88 @@
-"""Dependency wiring for API routes."""
+# Dependency wiring for API routes.
+from functools import lru_cache
 
 from app.application.services.detect_incidents_service import DetectIncidentsService
 from app.application.services.ingest_event_service import IngestEventService
+from app.application.services.metrics_service import MetricsService
+from app.infrastructure.db.base import DatabaseSessionFactory
+from app.infrastructure.db.models import Base
+from app.infrastructure.db.repositories.event_repository_impl import EventRepositoryImpl
+from app.infrastructure.redis.redis_client import RedisClient
+from app.infrastructure.redis.rolling_window import RollingWindow
+from app.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+@lru_cache
+def get_db_session_factory() -> DatabaseSessionFactory:
+    # Provide a shared database session factory.
+    try:
+        session_factory = DatabaseSessionFactory()
+        Base.metadata.create_all(bind=session_factory.engine)
+        logger.info("Database session factory initialized")
+        return session_factory
+    except Exception:
+        logger.exception("Failed to initialize database session factory")
+        raise
+
+
+@lru_cache
+def get_redis_client() -> RedisClient:
+    # Provide a shared Redis client.
+    try:
+        client = RedisClient()
+        logger.info("Redis client initialized")
+        return client
+    except Exception:
+        logger.exception("Failed to initialize Redis client")
+        raise
+
+
+@lru_cache
+def get_rolling_window() -> RollingWindow:
+    # Provide a shared Redis rolling window adapter.
+    try:
+        adapter = RollingWindow(client=get_redis_client())
+        logger.debug("Rolling window adapter initialized")
+        return adapter
+    except Exception:
+        logger.exception("Failed to initialize rolling window adapter")
+        raise
 
 
 def get_ingest_event_service() -> IngestEventService:
-    """Provide an ingest event service instance."""
-    # TODO: Inject repository and provider implementations.
-    return IngestEventService()
+    # Provide an ingest event service instance.
+    try:
+        service = IngestEventService(
+            event_repository=EventRepositoryImpl(session_factory=get_db_session_factory()),
+            realtime_counters=get_rolling_window(),
+        )
+        logger.debug("Ingest event service provided")
+        return service
+    except Exception:
+        logger.exception("Failed to construct ingest event service")
+        raise
+
+
+def get_metrics_service() -> MetricsService:
+    # Provide a metrics service instance.
+    try:
+        service = MetricsService(realtime_counters=get_rolling_window())
+        logger.debug("Metrics service provided")
+        return service
+    except Exception:
+        logger.exception("Failed to construct metrics service")
+        raise
 
 
 def get_detect_incidents_service() -> DetectIncidentsService:
-    """Provide an incident detection service instance."""
+    # Provide an incident detection service instance.
     # TODO: Inject detector and repository dependencies.
-    return DetectIncidentsService()
+    try:
+        service = DetectIncidentsService()
+        logger.debug("Detect incidents service provided")
+        return service
+    except Exception:
+        logger.exception("Failed to construct detect incidents service")
+        raise

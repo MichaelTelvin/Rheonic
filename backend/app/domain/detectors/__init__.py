@@ -1,1 +1,1 @@
-"""Detector strategy package."""
+# Detector strategy package.

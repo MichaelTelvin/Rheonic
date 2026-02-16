@@ -16,7 +16,8 @@ RUN pip install --no-cache-dir -U pip \
     rq \
     redis \
     "psycopg[binary]" \
-    pydantic-settings
+    pydantic-settings \
+    sqlalchemy
 
 # Copy project (useful for non-mounted runs; in dev you'll mount via compose)
 COPY . .

@@ -1,1 +1,1 @@
-"""Domain model package."""
+# Domain model package.

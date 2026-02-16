@@ -1,16 +1,22 @@
-"""Domain model for SDK usage events."""
-
+# Domain model for SDK usage events.
 from dataclasses import dataclass
 from datetime import datetime
 
 
 @dataclass(slots=True)
 class Event:
-    """Represents a normalized usage event from an SDK."""
-
+    # Represents a normalized usage event from an SDK.
     id: str
+    ts: datetime
     project_id: str
     provider: str
-    created_at: datetime
+    model: str | None
+    environment: str | None
     input_tokens: int
     output_tokens: int
+    total_tokens: int
+    latency_ms: int | None
+    status: str | None
+    error_type: str | None
+    http_status: int | None
+    created_at: datetime

@@ -1,1 +1,1 @@
-"""Backend app package for LLMTokenBurnGuard."""
+# Backend app package for LLMTokenBurnGuard.

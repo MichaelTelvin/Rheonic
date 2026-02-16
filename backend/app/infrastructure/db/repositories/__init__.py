@@ -1,1 +1,1 @@
-"""Database repository implementations package."""
+# Database repository implementations package.

@@ -1,1 +1,1 @@
-"""Redis infrastructure package."""
+# Redis infrastructure package.

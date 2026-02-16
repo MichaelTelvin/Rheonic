@@ -1,1 +1,1 @@
-"""Provider adapters package."""
+# Provider adapters package.
