@@ -2,16 +2,18 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: llmtbg_postgres
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: llmtbg
-      POSTGRES_USER: llmtbg
-      POSTGRES_PASSWORD: llmtbg
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U llmtbg -d llmtbg" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -19,8 +21,10 @@ services:
   redis:
     image: redis:7-alpine
     container_name: llmtbg_redis
+    env_file:
+      - .env
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
     volumes:
       - redis-data:/data
     command: [ "redis-server", "--appendonly", "yes" ]
@@ -33,14 +37,16 @@ services:
   backend:
     build: ./backend
     container_name: llmtbg_backend
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql+psycopg://llmtbg:llmtbg@postgres:5432/llmtbg
-      REDIS_URL: redis://redis:6379/0
-      APP_ENV: dev
-      JWT_SECRET: change-me-dev
-      CORS_ORIGINS: http://localhost:5173
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      APP_ENV: ${APP_ENV}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,10 +60,12 @@ services:
   worker:
     build: ./backend
     container_name: llmtbg_worker
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql+psycopg://llmtbg:llmtbg@postgres:5432/llmtbg
-      REDIS_URL: redis://redis:6379/0
-      APP_ENV: dev
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      APP_ENV: ${APP_ENV}
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,10 +79,12 @@ services:
   frontend:
     build: ./frontend
     container_name: llmtbg_frontend
+    env_file:
+      - .env
     environment:
-      VITE_API_BASE_URL: http://localhost:8000
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT}:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules

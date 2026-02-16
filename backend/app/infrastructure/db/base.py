@@ -16,10 +16,9 @@ class DatabaseSessionFactory:
     def __init__(self, database_url: str | None = None) -> None:
         # Create a session factory for the configured database URL.
         try:
-            self._database_url = database_url or os.getenv(
-                "DATABASE_URL",
-                "postgresql+psycopg://postgres:postgres@localhost:5432/llmtokenburnguard",
-            )
+            self._database_url = database_url or os.getenv("DATABASE_URL")
+            if not self._database_url:
+                raise ValueError("DATABASE_URL is not set")
             self._engine: Engine = create_engine(self._database_url, future=True)
             self._session_factory = sessionmaker(
                 bind=self._engine,

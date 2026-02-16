@@ -14,7 +14,10 @@ class RedisClient:
     def __init__(self, redis_url: str | None = None) -> None:
         # Create a Redis client wrapper.
         try:
-            self._redis = Redis.from_url(redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+            resolved_redis_url = redis_url or os.getenv("REDIS_URL")
+            if not resolved_redis_url:
+                raise ValueError("REDIS_URL is not set")
+            self._redis = Redis.from_url(resolved_redis_url)
             logger.info("Redis client initialized")
         except Exception:
             logger.exception("Failed to initialize Redis client")
