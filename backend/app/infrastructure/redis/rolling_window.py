@@ -1,22 +1,26 @@
 # Rolling window helper scaffolding.
+import time
+from collections.abc import Callable
 from typing import Protocol
+from uuid import uuid4
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.logger import get_logger
 
 logger = get_logger(__name__)
 WINDOW_SECONDS = 60
-COUNTER_TTL_SECONDS = 120
+WINDOW_MS = WINDOW_SECONDS * 1000
+COUNTER_TTL_SECONDS = 600
 
 
 def requests_60s_key(project_id: str) -> str:
-    # Return the Redis key for request count in the 60s window.
-    return f"rt:{project_id}:req:60s"
+    # Return the Redis key for request ZSET in the 60s window.
+    return f"rt:{project_id}:req:z"
 
 
 def tokens_60s_key(project_id: str) -> str:
-    # Return the Redis key for token count in the 60s window.
-    return f"rt:{project_id}:tok:60s"
+    # Return the Redis key for token ZSET in the 60s window.
+    return f"rt:{project_id}:tok:z"
 
 
 def incident_open_lock_key(project_id: str, incident_type: str) -> str:
@@ -34,12 +38,20 @@ def normalize_total_tokens(total_tokens: int | None) -> int:
 class RedisCounterClient(Protocol):
     # Protocol for minimal Redis counter commands used by this adapter.
 
-    def incr(self, key: str) -> int:
-        # Increment a key by one.
+    def zadd(self, key: str, mapping: dict[str, int]) -> int:
+        # Add a scored member to a sorted set.
         ...
 
-    def incrby(self, key: str, amount: int) -> int:
-        # Increment a key by the provided amount.
+    def zremrangebyscore(self, key: str, min_score: int | float, max_score: int | float) -> int:
+        # Remove members in score range.
+        ...
+
+    def zcard(self, key: str) -> int:
+        # Return sorted set cardinality.
+        ...
+
+    def zrangebyscore(self, key: str, min_score: int | float, max_score: int | float) -> list[object]:
+        # Return sorted set members in score range.
         ...
 
     def expire(self, key: str, ttl_seconds: int) -> bool:
@@ -62,34 +74,57 @@ class RedisCounterClient(Protocol):
 class RollingWindow(RealtimeCounterStore):
     # Tracks time-windowed counters for anomaly detection and limits.
 
-    def __init__(self, client: RedisCounterClient) -> None:
+    def __init__(
+        self,
+        client: RedisCounterClient,
+        now_ms_provider: Callable[[], int] | None = None,
+        member_id_provider: Callable[[], str] | None = None,
+    ) -> None:
         # Initialize rolling-window adapter.
         self._client = client
+        self._now_ms_provider = now_ms_provider or _default_now_ms
+        self._member_id_provider = member_id_provider or _default_member_id
 
     def increment_project_60s(self, project_id: str, total_tokens: int) -> None:
-        # Increment request/token counters and refresh TTL for project keys.
+        # Add request/token points to rolling ZSETs and trim older-than-60s data.
         try:
             req_key = requests_60s_key(project_id)
             tok_key = tokens_60s_key(project_id)
             normalized_tokens = normalize_total_tokens(total_tokens)
+            now_ms = self._now_ms_provider()
+            cutoff_ms = now_ms - WINDOW_MS
+            member_id = self._member_id_provider()
+            req_member = f"{now_ms}:{member_id}:1"
+            tok_member = f"{now_ms}:{member_id}:{normalized_tokens}"
 
-            self._client.incr(req_key)
+            self._client.zadd(req_key, {req_member: now_ms})
+            self._client.zremrangebyscore(req_key, 0, cutoff_ms)
             self._client.expire(req_key, COUNTER_TTL_SECONDS)
-            self._client.incrby(tok_key, normalized_tokens)
+
+            self._client.zadd(tok_key, {tok_member: now_ms})
+            self._client.zremrangebyscore(tok_key, 0, cutoff_ms)
             self._client.expire(tok_key, COUNTER_TTL_SECONDS)
+
             logger.debug("Realtime counters incremented", extra={"project_id": project_id})
         except Exception:
             logger.exception("Failed incrementing realtime counters", extra={"project_id": project_id})
             raise
 
     def get_project_60s(self, project_id: str) -> tuple[int, int]:
-        # Return request and token counters for the last 60s project window.
+        # Return request and token rolling-window aggregates for the last 60s.
         try:
             req_key = requests_60s_key(project_id)
             tok_key = tokens_60s_key(project_id)
-            request_value = self._client.get(req_key)
-            token_value = self._client.get(tok_key)
-            counters = _coerce_redis_int(request_value), _coerce_redis_int(token_value)
+            now_ms = self._now_ms_provider()
+            cutoff_ms = now_ms - WINDOW_MS
+
+            self._client.zremrangebyscore(req_key, 0, cutoff_ms)
+            self._client.zremrangebyscore(tok_key, 0, cutoff_ms)
+
+            requests_60s = self._client.zcard(req_key)
+            token_members = self._client.zrangebyscore(tok_key, cutoff_ms, float("inf"))
+            tokens_60s = sum(_member_tokens(member) for member in token_members)
+            counters = requests_60s, tokens_60s
             logger.debug("Realtime counters fetched", extra={"project_id": project_id})
             return counters
         except Exception:
@@ -121,10 +156,19 @@ class RollingWindow(RealtimeCounterStore):
             raise
 
 
-def _coerce_redis_int(value: object | None) -> int:
-    # Convert Redis values to integers with a zero fallback.
-    if value is None:
-        return 0
-    if isinstance(value, bytes):
-        value = value.decode("utf-8")
-    return int(value)
+def _member_tokens(member: object) -> int:
+    # Parse tokens from member format "{now_ms}:{uuid}:{tokens}".
+    if isinstance(member, bytes):
+        member = member.decode("utf-8")
+    parts = str(member).split(":")
+    return int(parts[-1]) if parts else 0
+
+
+def _default_now_ms() -> int:
+    # Return current unix time in milliseconds.
+    return int(time.time() * 1000)
+
+
+def _default_member_id() -> str:
+    # Return unique member identifier component.
+    return uuid4().hex

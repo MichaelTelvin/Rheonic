@@ -47,6 +47,38 @@ class RedisClient:
             logger.exception("Redis SET NX EX failed", extra={"key": key, "ttl_seconds": ttl_seconds})
             raise
 
+    def zadd(self, key: str, mapping: dict[str, int]) -> int:
+        # Add scored members to sorted set.
+        try:
+            return int(self._redis.zadd(key, mapping))
+        except Exception:
+            logger.exception("Redis ZADD failed", extra={"key": key})
+            raise
+
+    def zremrangebyscore(self, key: str, min_score: int | float, max_score: int | float) -> int:
+        # Remove sorted set members by score range.
+        try:
+            return int(self._redis.zremrangebyscore(key, min_score, max_score))
+        except Exception:
+            logger.exception("Redis ZREMRANGEBYSCORE failed", extra={"key": key})
+            raise
+
+    def zcard(self, key: str) -> int:
+        # Return sorted set cardinality.
+        try:
+            return int(self._redis.zcard(key))
+        except Exception:
+            logger.exception("Redis ZCARD failed", extra={"key": key})
+            raise
+
+    def zrangebyscore(self, key: str, min_score: int | float, max_score: int | float) -> list[object]:
+        # Return sorted set members by score range.
+        try:
+            return list(self._redis.zrangebyscore(key, min_score, max_score))
+        except Exception:
+            logger.exception("Redis ZRANGEBYSCORE failed", extra={"key": key})
+            raise
+
     def incr(self, key: str) -> int:
         # Increment a key by one and return its value.
         try:
