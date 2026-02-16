@@ -1,179 +1,182 @@
+LLMTokenBurnGuard — Scope
 
-# LLMTokenBurnGuard — Scope (Codex Tasks) v1
+Overview
 
-## Guiding principles
-- Do NOT build a proxy.
-- Observe mode must be “incident-first”.
-- Protect mode is opt-in, deterministic, safe.
-- No prompt rewriting.
-- Providers: OpenAI, Anthropic, Gemini (Gemini can be v1.1 if needed).
-- SDKs: Python + Node (Python first, Node immediately after core is stable).
+LLMTokenBurnGuard is a realtime observability and guardrail platform for LLM API usage.
 
----
+It monitors:
+	•	Token burn
+	•	Request rates
+	•	Rolling 60s usage windows
+	•	Incidents (burn spikes / request storms)
 
-## Milestone 0 — Repo skeleton (Day 1)
-- [ ] Create structure:
-  - backend/
-  - frontend/
-  - sdk-python/
-  - sdk-node/
-  - docs/
-- [ ] docker-compose.yml for:
-  - postgres
-  - redis
-  - backend
-  - worker
-  - frontend
-- [ ] .env.example files for each component
-- [ ] Formatting & lint:
-  - backend: ruff + black
-  - sdk-python: ruff + black
-  - sdk-node: eslint + prettier
-  - frontend: eslint + prettier
-- [ ] CI: lint + unit tests
+It provides:
+	•	Realtime dashboard
+	•	Incident tracking
+	•	Resolve workflow
+	•	Clean dark SaaS UI
+	•	True rolling window implementation (Redis ZSET)
 
----
+⸻
 
-## Milestone 1 — Auth + Projects + Billing shell (Week 1)
+Milestone 0 — Foundation & Infrastructure ✅ DONE
+
 Backend
-- [ ] User auth (email/password) + JWT
-- [ ] Org + Project models
-- [ ] Project ingest key creation/rotation/revoke
-- [ ] RBAC minimal: owner/admin/viewer
-- [ ] Stripe placeholders: store customer_id + subscription_status
+	•	FastAPI project skeleton
+	•	Layered architecture (API → Service → Repository → Infrastructure)
+	•	SQLAlchemy integration
+	•	Postgres containerized
+	•	Redis containerized
+	•	RQ worker container
+	•	Docker Compose working end-to-end
+	•	Health endpoint
 
 Frontend
-- [ ] Landing placeholder + docs placeholder
-- [ ] Auth pages: login/signup
-- [ ] App shell: projects list, project settings
-- [ ] Display ingest key & install snippet
+	•	Vite + React + TypeScript setup
+	•	Dockerized frontend
+	•	Dev proxy via Vite for backend
+	•	CORS resolved properly
 
----
+⸻
 
-## Milestone 2 — Event ingest + storage + realtime counters (Week 1–2)
+Milestone 1 — Events Ingest + Realtime Metrics ✅ DONE
+
 Backend
-- [ ] POST /v1/events (ingest key auth)
-- [ ] Postgres schema for events (start simple)
-- [ ] Redis rolling counters (per project):
-  - requests/min
-  - burn/min
-  - retry counts
-  - token sums
-- [ ] GET /v1/metrics/realtime
-- [ ] Pricing table module + versioning
+	•	POST /api/v1/events
+	•	Persist event to Postgres
+	•	Redis true rolling window (ZSET-based, last 60 seconds)
+	•	GET /api/v1/metrics/realtime
+	•	Unit tests for rolling window logic
 
-SDK Python (v1)
-- [ ] Provide wrapper API:
-  - `guard_openai(client, config)`
-  - `guard_anthropic(client, config)`
-- [ ] Extract token usage and compute cost
-- [ ] Async event sender (non-blocking, fire-and-forget)
-- [ ] Support tags: endpoint, feature, tenant_id, user_id, job_id, trace_id, env
-- [ ] Default prompt_hash behavior (sha256 of normalized content) + allow disable
+Realtime Semantics
+	•	ZSET per project for:
+	•	requests
+	•	tokens
+	•	Score = timestamp (ms)
+	•	Trim older than 60 seconds
+	•	True rolling window (not TTL bucket)
 
----
+⸻
 
-## Milestone 3 — Incidents (anomaly-first) (Week 2)
+Milestone 2 — Incident Engine (Backend) ✅ DONE
+
+Incident Triggering
+	•	Burn spike detection (tokens_60s > threshold)
+	•	Request storm detection (requests_60s > threshold)
+	•	Evidence stored in JSON
+	•	Deduplication via Redis lock key
+
+Incident Model
+	•	id
+	•	type
+	•	severity
+	•	status (open / resolved)
+	•	created_at
+	•	resolved_at
+	•	evidence JSON
+
+API
+	•	GET /api/v1/incidents
+	•	POST /api/v1/incidents/{id}/resolve
+
+⸻
+
+Milestone 3 — Projects Support (Minimal Multi-Project) ✅ DONE
+
 Backend
-- [ ] Incident table/model
-- [ ] Detectors:
-  - burn spike
-  - retry storm
-  - loop suspect (job_id/trace_id/prompt_hash)
-  - token explosion
-- [ ] Incident dedupe + update logic
-- [ ] GET /v1/incidents
-- [ ] POST /v1/incidents/{id}/close
+	•	projects table
+	•	Seed demo project if empty
+	•	GET /api/v1/projects
 
 Frontend
-- [ ] Incidents-first dashboard page:
-  - open incidents list
-  - severity badges
-  - scope + evidence
-  - drilldown modal/page
-- [ ] Realtime snapshot widget (small)
+	•	Replace free-text project input with dropdown
+	•	Persist selected project in localStorage
+	•	Poll only when project selected
 
----
+⸻
 
-## Milestone 4 — Alerts (Week 2–3)
-Backend
-- [ ] Slack webhook configuration per project
-- [ ] Generic webhook configuration per project
-- [ ] Alert dispatch worker with retries
-- [ ] Trigger on incident open/escalate + budget thresholds
+Milestone 4 — Dashboard UI (Dark SaaS) ✅ DONE
 
-Frontend
-- [ ] Alerts settings UI
+Core UI
+	•	Dark mode default
+	•	Pastel accent palette
+	•	Clean layout, centered container
+	•	Responsive grid
+	•	Sparkline SVG (no external libs)
 
----
+Metrics Cards
+	•	Large formatted numbers
+	•	Subtext (“Last 60 seconds”)
+	•	Updated timestamp
+	•	Realtime sparkline
 
-## Milestone 5 — Protect Mode v1 (Week 3–4)
-Backend
-- [ ] Policy table/model
-- [ ] GET /v1/policy/config
-- [ ] Budget threshold computation (daily/monthly)
-- [ ] Optional decision log table
+Status Strip
+	•	Connected / Disconnected indicator
+	•	Metrics last updated
+	•	Incidents last updated
 
-SDK Python
-- [ ] Protect mode toggle
-- [ ] Model downgrade (fallback chain per provider)
-- [ ] Output token cap enforcement
-- [ ] Local rate limiting:
-  - project RPM
-  - optional tenant RPM
-  - behavior: cooldown_block (typed error)
-- [ ] Cooldown soft-block:
-  - return/raise structured error with retry_after
-- [ ] Cached fallback (local in-process TTL cache)
-- [ ] Emit guard.action + reason_code in events
+Incidents
+	•	Severity badge (styled)
+	•	Relative time display
+	•	Details toggle
+	•	Resolve button
+	•	Optimistic UI update
+	•	Empty state
 
-Frontend
-- [ ] Protect Mode UI:
-  - enable toggle
-  - budgets
-  - fallback chain editor
-  - output cap
-  - rate limit settings
-  - cooldown seconds
-  - cache TTL
+Responsiveness
+	•	2-column → 1-column metrics grid
+	•	Flexible header layout
+	•	Safe JSON overflow
+	•	No horizontal scroll on mobile
 
----
+⸻
 
-## Milestone 6 — Node SDK (ship right after Python core is stable)
-SDK Node (v1)
-- [ ] TS package structure + types
-- [ ] Wrap OpenAI + Anthropic client calls
-- [ ] Same event schema + async sender
-- [ ] Same Protect actions (downgrade/cap/rate-limit/cooldown/cache)
+Milestone 5 — SDK (Not Started)
 
----
+Goal:
+Provide lightweight SDKs for auto-reporting events.
 
-## Milestone 7 — Gemini support (v1.1 if needed)
-- [ ] SDK Python: Gemini wrapper (usage extraction + cost)
-- [ ] SDK Node: Gemini wrapper
-- [ ] Pricing tables + model mapping updates
+Planned
+	•	Python SDK
+	•	Node.js SDK
+	•	Middleware wrapper
+	•	Auto-capture provider usage (OpenAI, Anthropic, Gemini)
 
----
+⸻
 
-## Testing (must-have)
-Backend
-- [ ] Unit tests for each detector using synthetic streams
-- [ ] Integration tests for events → incidents creation
-SDKs
-- [ ] Provider stub tests (no real spend)
-- [ ] Protect action deterministic tests
-- [ ] Load simulator:
-  - normal traffic
-  - retry storm
-  - loop
-  - token explosion
+Milestone 6 — Guardrail Mode (Not Started)
 
----
+Goal:
+Optional protection layer beyond monitoring.
 
-## Definition of Done (MVP)
-- Auth + project + ingest key
-- Python SDK sends events for OpenAI + Anthropic
-- Dashboard shows realtime + incidents
-- Slack/webhook alerts fire
-- Protect mode works (downgrade/cap/rate-limit/cooldown/cache)
-- Docker-compose runs full stack locally
+Planned
+	•	Policy model
+	•	Soft blocking
+	•	Model downgrade
+	•	Token caps per request
+	•	Retry storm detection
+	•	Dry-run mode
+	•	Alert webhooks (Slack / MS Teams)
+
+⸻
+
+Milestone 7 — Advanced Intelligence (Not Started)
+
+Planned
+	•	Adaptive thresholds
+	•	Rate-of-change anomaly detection
+	•	Burn projection (runway estimation)
+	•	Cost attribution by feature
+	•	Alert rules engine
+
+⸻
+
+Definition of Done (Current State)
+
+The product currently provides:
+	•	True rolling 60-second metrics
+	•	Incident detection engine
+	•	Multi-project support (basic)
+	•	Production-grade architecture
+	•	Dockerized full stack
+	•	Polished responsive dark SaaS UI

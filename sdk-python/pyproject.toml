@@ -3,6 +3,10 @@ name = "llmtokenburnguard"
 version = "0.1.0"
 description = "Python SDK for LLMTokenBurnGuard"
 requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27.0",
+  "typing-extensions>=4.8.0"
+]
 
 [build-system]
 requires = ["setuptools>=68.0"]

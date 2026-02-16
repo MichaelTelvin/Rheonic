@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.application.services.ingest_event_service import IngestEventService
@@ -34,7 +34,6 @@ class EventIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     ts: datetime
-    project_id: str
     provider: str
     model: str | None = None
     environment: str | None = None
@@ -74,9 +73,13 @@ def _resolve_tokens(payload: EventIn) -> tuple[int, int, int]:
 def ingest_event(
     payload: EventIn,
     service: IngestEventService = Depends(get_ingest_event_service),
+    ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
 ) -> dict[str, str]:
     # Receive an SDK event and delegate processing to application services.
     try:
+        if not ingest_key:
+            raise HTTPException(status_code=401, detail="missing ingest key")
+
         # normalize token values from payload
         input_tokens, output_tokens, total_tokens = _resolve_tokens(payload)
 
@@ -84,7 +87,7 @@ def ingest_event(
         event = Event(
             id=str(uuid4()),
             ts=payload.ts,
-            project_id=payload.project_id,
+            project_id=ingest_key,
             provider=payload.provider,
             model=payload.model,
             environment=payload.environment,
@@ -100,10 +103,10 @@ def ingest_event(
 
         # execute ingest use-case
         service.ingest(event)
-        logger.info("Event accepted", extra={"project_id": payload.project_id, "provider": payload.provider})
+        logger.info("Event accepted", extra={"project_id": ingest_key, "provider": payload.provider})
         return {"status": "accepted"}
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Event ingest failed", extra={"project_id": payload.project_id})
+        logger.exception("Event ingest failed", extra={"project_id": ingest_key})
         raise HTTPException(status_code=500, detail="Failed to ingest event")
