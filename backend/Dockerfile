@@ -2,24 +2,15 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Minimal OS deps (kept small)
+# Keep image slim while allowing package builds when needed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install runtime deps explicitly so uvicorn/rq exist in the image
-# (Even if your pyproject is incomplete right now, the container will run.)
+# Install backend dependencies from pyproject for reproducible builds.
+COPY pyproject.toml ./
+COPY app ./app
 RUN pip install --no-cache-dir -U pip \
-    && pip install --no-cache-dir \
-    fastapi \
-    "uvicorn[standard]" \
-    rq \
-    redis \
-    "psycopg[binary]" \
-    pydantic-settings \
-    sqlalchemy
-
-# Copy project (useful for non-mounted runs; in dev you'll mount via compose)
-COPY . .
+    && pip install --no-cache-dir ".[dev]"
 
 EXPOSE 8000

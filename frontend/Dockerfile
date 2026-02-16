@@ -2,11 +2,11 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install deps first for better layer caching
-COPY package.json package-lock.json* ./
-RUN npm install
+# Copy package manifests first for cache-friendly dependency install.
+COPY package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# Copy app
+# Copy application sources.
 COPY . .
 
 EXPOSE 5173

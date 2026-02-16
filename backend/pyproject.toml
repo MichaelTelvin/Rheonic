@@ -6,10 +6,17 @@ requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115.0",
   "pydantic>=2.0.0",
+  "pydantic-settings>=2.0.0",
   "sqlalchemy>=2.0.0",
-  "rq",
-  "redis",
-  "psycopg[binary]"
+  "psycopg[binary]>=3.1.0",
+  "redis>=5.0.0",
+  "rq>=1.16.0",
+  "uvicorn[standard]>=0.30.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0"
 ]
 
 [build-system]
