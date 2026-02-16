@@ -4,11 +4,13 @@ from functools import lru_cache
 from app.application.services.detect_incidents_service import DetectIncidentsService
 from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.metrics_service import MetricsService
+from app.application.services.project_service import ProjectService
 from app.config import Settings
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base
 from app.infrastructure.db.repositories.event_repository_impl import EventRepositoryImpl
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
+from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.redis.redis_client import RedisClient
 from app.infrastructure.redis.rolling_window import RollingWindow
 from app.logger import get_logger
@@ -106,4 +108,17 @@ def get_detect_incidents_service() -> DetectIncidentsService:
         return service
     except Exception:
         logger.exception("Failed to construct detect incidents service")
+        raise
+
+
+def get_project_service() -> ProjectService:
+    # Provide a project service instance.
+    try:
+        service = ProjectService(
+            project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
+        )
+        logger.debug("Project service provided")
+        return service
+    except Exception:
+        logger.exception("Failed to construct project service")
         raise

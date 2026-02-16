@@ -1,19 +1,57 @@
-export interface ApiClient {
-  get<T>(path: string): Promise<T>;
-  post<TRequest, TResponse>(path: string, payload: TRequest): Promise<TResponse>;
+export interface RealtimeMetrics {
+  requests_60s: number;
+  tokens_60s: number;
 }
 
-export class HttpApiClient implements ApiClient {
-  public async get<T>(_path: string): Promise<T> {
-    // TODO: Implement typed GET request handling.
-    throw new Error("Not implemented");
+export interface IncidentItem {
+  id: string;
+  type: string;
+  severity: "low" | "medium" | "high" | string;
+  status: "open" | "resolved" | string;
+  created_at: string;
+  resolved_at: string | null;
+  evidence: Record<string, unknown>;
+}
+
+export interface ProjectItem {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+const BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "");
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
   }
 
-  public async post<TRequest, TResponse>(
-    _path: string,
-    _payload: TRequest,
-  ): Promise<TResponse> {
-    // TODO: Implement typed POST request handling.
-    throw new Error("Not implemented");
-  }
+  return (await response.json()) as T;
+}
+
+export async function fetchMetrics(projectId: string): Promise<RealtimeMetrics> {
+  return request<RealtimeMetrics>(`/api/v1/metrics/realtime?project_id=${encodeURIComponent(projectId)}`);
+}
+
+export async function fetchIncidents(projectId: string): Promise<IncidentItem[]> {
+  return request<IncidentItem[]>(`/api/v1/incidents?project_id=${encodeURIComponent(projectId)}`);
+}
+
+export async function resolveIncident(id: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/v1/incidents/${encodeURIComponent(id)}/resolve`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function fetchProjects(): Promise<ProjectItem[]> {
+  return request<ProjectItem[]>("/api/v1/projects");
 }
