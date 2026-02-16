@@ -10,5 +10,7 @@ class Incident:
     project_id: str
     incident_type: str
     severity: str
+    status: str
     created_at: datetime
+    resolved_at: datetime | None
     evidence: dict[str, object]

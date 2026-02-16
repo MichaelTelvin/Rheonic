@@ -4,9 +4,11 @@ from functools import lru_cache
 from app.application.services.detect_incidents_service import DetectIncidentsService
 from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.metrics_service import MetricsService
+from app.config import Settings
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base
 from app.infrastructure.db.repositories.event_repository_impl import EventRepositoryImpl
+from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
 from app.infrastructure.redis.redis_client import RedisClient
 from app.infrastructure.redis.rolling_window import RollingWindow
 from app.logger import get_logger
@@ -51,12 +53,28 @@ def get_rolling_window() -> RollingWindow:
         raise
 
 
+@lru_cache
+def get_settings() -> Settings:
+    # Provide runtime settings.
+    try:
+        settings = Settings()
+        logger.debug("Settings initialized")
+        return settings
+    except Exception:
+        logger.exception("Failed to initialize settings")
+        raise
+
+
 def get_ingest_event_service() -> IngestEventService:
     # Provide an ingest event service instance.
     try:
         service = IngestEventService(
             event_repository=EventRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
+            incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
+            threshold_tokens_60s=get_settings().threshold_tokens_60s,
+            threshold_req_60s=get_settings().threshold_req_60s,
+            incident_lock_ttl_seconds=get_settings().incident_lock_ttl_seconds,
         )
         logger.debug("Ingest event service provided")
         return service
@@ -80,7 +98,10 @@ def get_detect_incidents_service() -> DetectIncidentsService:
     # Provide an incident detection service instance.
     # TODO: Inject detector and repository dependencies.
     try:
-        service = DetectIncidentsService()
+        service = DetectIncidentsService(
+            incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
+            realtime_counters=get_rolling_window(),
+        )
         logger.debug("Detect incidents service provided")
         return service
     except Exception:

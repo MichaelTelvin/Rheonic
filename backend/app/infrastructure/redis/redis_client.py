@@ -36,6 +36,14 @@ class RedisClient:
             logger.exception("Redis SET failed", extra={"key": key, "ttl_seconds": ttl_seconds})
             raise
 
+    def set_nx_ex(self, key: str, value: object, ttl_seconds: int) -> bool:
+        # Set key only when absent and apply TTL.
+        try:
+            return bool(self._redis.set(key, value, nx=True, ex=ttl_seconds))
+        except Exception:
+            logger.exception("Redis SET NX EX failed", extra={"key": key, "ttl_seconds": ttl_seconds})
+            raise
+
     def incr(self, key: str) -> int:
         # Increment a key by one and return its value.
         try:
@@ -58,4 +66,12 @@ class RedisClient:
             return bool(self._redis.expire(key, ttl_seconds))
         except Exception:
             logger.exception("Redis EXPIRE failed", extra={"key": key, "ttl_seconds": ttl_seconds})
+            raise
+
+    def delete(self, key: str) -> int:
+        # Delete key and return deletion count.
+        try:
+            return int(self._redis.delete(key))
+        except Exception:
+            logger.exception("Redis DELETE failed", extra={"key": key})
             raise

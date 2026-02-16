@@ -19,6 +19,11 @@ def tokens_60s_key(project_id: str) -> str:
     return f"rt:{project_id}:tok:60s"
 
 
+def incident_open_lock_key(project_id: str, incident_type: str) -> str:
+    # Return the redis lock key used to dedupe incidents.
+    return f"inc:{project_id}:{incident_type}:open"
+
+
 def normalize_total_tokens(total_tokens: int | None) -> int:
     # Normalize token values, defaulting missing values to zero.
     if total_tokens is None:
@@ -43,6 +48,14 @@ class RedisCounterClient(Protocol):
 
     def get(self, key: str) -> object | None:
         # Read a key value.
+        ...
+
+    def set_nx_ex(self, key: str, value: object, ttl_seconds: int) -> bool:
+        # Set key with NX and expiration semantics.
+        ...
+
+    def delete(self, key: str) -> int:
+        # Delete a key.
         ...
 
 
@@ -81,6 +94,30 @@ class RollingWindow(RealtimeCounterStore):
             return counters
         except Exception:
             logger.exception("Failed fetching realtime counters", extra={"project_id": project_id})
+            raise
+
+    def acquire_incident_lock(self, project_id: str, incident_type: str, ttl_seconds: int) -> bool:
+        # Acquire incident dedupe lock.
+        try:
+            key = incident_open_lock_key(project_id, incident_type)
+            acquired = self._client.set_nx_ex(key, "1", ttl_seconds)
+            logger.debug(
+                "Incident dedupe lock attempt",
+                extra={"project_id": project_id, "incident_type": incident_type, "acquired": acquired},
+            )
+            return acquired
+        except Exception:
+            logger.exception("Failed acquiring incident lock", extra={"project_id": project_id, "incident_type": incident_type})
+            raise
+
+    def release_incident_lock(self, project_id: str, incident_type: str) -> None:
+        # Release incident dedupe lock.
+        try:
+            key = incident_open_lock_key(project_id, incident_type)
+            self._client.delete(key)
+            logger.debug("Incident dedupe lock released", extra={"project_id": project_id, "incident_type": incident_type})
+        except Exception:
+            logger.exception("Failed releasing incident lock", extra={"project_id": project_id, "incident_type": incident_type})
             raise
 
 

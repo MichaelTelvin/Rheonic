@@ -28,3 +28,13 @@ class RealtimeCounterStore(ABC):
     def get_project_60s(self, project_id: str) -> tuple[int, int]:
         # Return request and token counters for the project 60s window.
         raise NotImplementedError
+
+    @abstractmethod
+    def acquire_incident_lock(self, project_id: str, incident_type: str, ttl_seconds: int) -> bool:
+        # Acquire incident dedupe lock with NX semantics.
+        raise NotImplementedError
+
+    @abstractmethod
+    def release_incident_lock(self, project_id: str, incident_type: str) -> None:
+        # Release incident dedupe lock.
+        raise NotImplementedError
