@@ -14,13 +14,14 @@ npm install
 - Required: `ingestKey`
 - Optional: `baseUrl` (defaults to `LLMTBG_BASE_URL` env var, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
+- Demo env var: `LLMTBG_INGEST_KEY`
 
 ## Integration Path 1: Manual Capture (generic)
 
 ```ts
 import { buildEvent, captureEvent, createClient } from "./src/index";
 
-createClient({ ingestKey: "p1" });
+createClient({ ingestKey: process.env.LLMTBG_INGEST_KEY! });
 
 await captureEvent(
   buildEvent({
@@ -38,7 +39,7 @@ await captureEvent(
 import OpenAI from "openai";
 import { createClient, instrumentOpenAI } from "./src/index";
 
-const burnguard = createClient({ ingestKey: "p1" });
+const burnguard = createClient({ ingestKey: process.env.LLMTBG_INGEST_KEY! });
 const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
   client: burnguard,
   endpoint: "/chat/completions",
@@ -50,6 +51,7 @@ const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY 
 
 ```bash
 npm run build
+export LLMTBG_INGEST_KEY="<copy from Keys modal>"
 node dist/demo.js
 ```
 
@@ -61,4 +63,9 @@ Backend-down smoke test (must exit cleanly and show failures):
 LLMTBG_BASE_URL=http://127.0.0.1:59999 node dist/demo.js
 ```
 
-Then check dashboard metrics for project `p1` (project id equals ingest key by convention in this MVP).
+Before running the demo:
+1. Create/select a project in the dashboard.
+2. Open `Keys` modal and create a key.
+3. Copy the plaintext key once and export `LLMTBG_INGEST_KEY`.
+
+Then check dashboard metrics for the selected project.

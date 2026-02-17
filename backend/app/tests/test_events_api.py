@@ -1,9 +1,14 @@
-# Unit tests for ingest endpoint header behavior.
+# API tests for ingest key authentication behavior.
 from datetime import datetime, timezone
 
-from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
-from app.api.v1.events import EventIn, ingest_event
+from app.api.v1.events import EventIn
+from app.config import Settings
+from app.dependencies import get_ingest_event_service, get_ingest_key_service, get_settings
+from app.domain.models.ingest_key import IngestKey
+from app.main import app
+from app.security.ingest_keys import hash_key, last4
 
 
 class FakeIngestService:
@@ -16,35 +21,122 @@ class FakeIngestService:
         self.ingested.append(event)
 
 
-def _payload() -> EventIn:
+class FakeIngestKeyService:
+    # In-memory ingest key lookup service for endpoint auth tests.
+
+    def __init__(self) -> None:
+        now = datetime.now(timezone.utc)
+        active_plaintext = "active-test-key"
+        revoked_plaintext = "revoked-test-key"
+        self._hash_to_project = {
+            hash_key(active_plaintext): "p1",
+        }
+        self._revoked_hashes = {
+            hash_key(revoked_plaintext),
+        }
+        self._records = [
+            IngestKey(
+                id="k-active",
+                project_id="p1",
+                name="dev",
+                key_hash=hash_key(active_plaintext),
+                last4=last4(active_plaintext),
+                status="active",
+                created_at=now,
+                revoked_at=None,
+            ),
+            IngestKey(
+                id="k-revoked",
+                project_id="p1",
+                name="old",
+                key_hash=hash_key(revoked_plaintext),
+                last4=last4(revoked_plaintext),
+                status="revoked",
+                created_at=now,
+                revoked_at=now,
+            ),
+        ]
+        _ = self._records
+
+    def resolve_project_id(self, plaintext_key: str) -> str | None:
+        key_hash = hash_key(plaintext_key)
+        if key_hash in self._revoked_hashes:
+            return None
+        return self._hash_to_project.get(key_hash)
+
+
+def _payload() -> dict[str, object]:
     # Build a minimal valid ingest payload.
-    return EventIn(
+    payload = EventIn(
         ts=datetime.now(timezone.utc),
         provider="openai",
         model="gpt-4o-mini",
         environment="dev",
         response={"total_tokens": 10},
     )
+    return payload.model_dump(mode="json")
 
 
 def test_ingest_event_requires_ingest_key_header() -> None:
     # Missing ingest key must return 401.
-    service = FakeIngestService()
+    ingest_service = FakeIngestService()
+    key_service = FakeIngestKeyService()
+    app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
+    app.dependency_overrides[get_ingest_key_service] = lambda: key_service
+    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev")
 
-    try:
-        ingest_event(payload=_payload(), service=service, ingest_key=None)
-        assert False, "Expected HTTPException"
-    except HTTPException as exc:
-        assert exc.status_code == 401
-        assert exc.detail == "missing ingest key"
+    client = TestClient(app)
+    response = client.post("/api/v1/events", json=_payload())
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "missing ingest key"}
+    app.dependency_overrides.clear()
 
 
-def test_ingest_event_maps_ingest_key_to_project_id() -> None:
-    # Ingest key should be mapped into event.project_id for persistence.
-    service = FakeIngestService()
+def test_ingest_event_rejects_invalid_and_revoked_key() -> None:
+    # Invalid and revoked keys must return 401.
+    ingest_service = FakeIngestService()
+    key_service = FakeIngestKeyService()
+    app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
+    app.dependency_overrides[get_ingest_key_service] = lambda: key_service
+    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev")
+    client = TestClient(app)
 
-    response = ingest_event(payload=_payload(), service=service, ingest_key="p1-key")
+    invalid = client.post(
+        "/api/v1/events",
+        json=_payload(),
+        headers={"X-Project-Ingest-Key": "not-a-real-key"},
+    )
+    revoked = client.post(
+        "/api/v1/events",
+        json=_payload(),
+        headers={"X-Project-Ingest-Key": "revoked-test-key"},
+    )
 
-    assert response == {"status": "accepted"}
-    assert len(service.ingested) == 1
-    assert getattr(service.ingested[0], "project_id") == "p1-key"
+    assert invalid.status_code == 401
+    assert invalid.json() == {"detail": "invalid ingest key"}
+    assert revoked.status_code == 401
+    assert revoked.json() == {"detail": "invalid ingest key"}
+    app.dependency_overrides.clear()
+
+
+def test_ingest_event_accepts_active_key_and_maps_to_project() -> None:
+    # Active key should resolve and map into event.project_id.
+    ingest_service = FakeIngestService()
+    key_service = FakeIngestKeyService()
+    app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
+    app.dependency_overrides[get_ingest_key_service] = lambda: key_service
+    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev")
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/events",
+        json=_payload(),
+        headers={"X-Project-Ingest-Key": "active-test-key"},
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {"status": "accepted"}
+    assert len(ingest_service.ingested) == 1
+    assert getattr(ingest_service.ingested[0], "project_id") == "p1"
+    app.dependency_overrides.clear()

@@ -21,3 +21,8 @@ class ProjectRepository(ABC):
     def create_project(self, project: Project) -> Project:
         # Persist a new project record.
         raise NotImplementedError
+
+    @abstractmethod
+    def get_project_by_name(self, name: str) -> Project | None:
+        # Return project by exact name if it exists.
+        raise NotImplementedError

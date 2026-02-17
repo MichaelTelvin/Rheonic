@@ -10,6 +10,8 @@
   --warn: #fbbf24;
   --bad: #fda4af;
   --req: #7dd3fc;
+  --control-bg: rgba(148, 163, 184, 0.14);
+  --control-border: rgba(148, 163, 184, 0.32);
 }
 
 * {
@@ -32,7 +34,7 @@ body {
 .dashboard {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 44px 24px 28px;
 }
 
 .header-row {
@@ -40,7 +42,7 @@ body {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
-  margin-bottom: 18px;
+  margin-bottom: 34px;
 }
 
 .title {
@@ -60,7 +62,7 @@ body {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 34px;
 }
 
 label {
@@ -79,11 +81,26 @@ select {
   max-width: 320px;
 }
 
+.text-input {
+  background: var(--control-bg);
+  color: var(--text);
+  border: 1px solid var(--control-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: rgba(167, 139, 250, 0.8);
+  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.15);
+}
+
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 18px;
+  margin-bottom: 26px;
 }
 
 .card {
@@ -126,8 +143,9 @@ select {
 
 .status-panel {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   text-align: right;
+  min-width: 260px;
 }
 
 .status-pill {
@@ -138,6 +156,24 @@ select {
   font-size: 0.8rem;
   border: 1px solid transparent;
   margin-left: auto;
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: 132px max-content;
+  justify-content: end;
+  column-gap: 8px;
+}
+
+.status-label {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.status-value {
+  text-align: left;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .status-pill.connected {
@@ -164,7 +200,7 @@ select {
 }
 
 .incidents-section {
-  margin-top: 26px;
+  margin-top: 34px;
   padding-top: 18px;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
@@ -229,7 +265,7 @@ select {
 }
 
 button {
-  background: transparent;
+  background: var(--control-bg);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -244,8 +280,9 @@ button:hover:enabled {
 }
 
 button.resolve {
-  border-color: rgba(167, 139, 250, 0.55);
-  color: #ddd6fe;
+  border-color: rgba(167, 139, 250, 0.65);
+  color: #ede9fe;
+  background: rgba(167, 139, 250, 0.2);
 }
 
 button:disabled {
@@ -273,6 +310,182 @@ pre {
   background: rgba(15, 23, 42, 0.5);
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 13, 20, 0.75);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 5vh 16px 16px;
+  z-index: 20;
+}
+
+.modal {
+  width: min(520px, 100%);
+  background: linear-gradient(180deg, rgba(21, 28, 43, 0.98), rgba(17, 24, 39, 0.96));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+  display: grid;
+  gap: 14px;
+}
+
+.modal-keys {
+  width: min(760px, 100%);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.modal-actions-left {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.modal-actions button {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+}
+
+.keys-create-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.keys-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.key-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 0.6fr 0.8fr 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.key-row-header {
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.key-row-data {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.key-name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.key-actions-col {
+  justify-self: end;
+  text-align: right;
+}
+
+.key-row .badge {
+  justify-self: start;
+  width: auto;
+}
+
+.secret-box {
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  border-radius: 12px;
+  background: rgba(167, 139, 250, 0.08);
+}
+
+.secret-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.use-it {
+  display: grid;
+  gap: 8px;
+}
+
+.use-it .modal-button,
+.secret-actions .modal-button {
+  justify-self: start;
+  width: auto;
+}
+
+.use-it pre {
+  margin: 0;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.key-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.key-action-btn {
+  min-width: 84px;
+}
+
+.toolbar-button {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  color: #dbeafe;
+}
+
+.toolbar-button:hover:enabled {
+  border-color: rgba(167, 139, 250, 0.62);
+  background: rgba(167, 139, 250, 0.24);
+}
+
+.modal-button {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+}
+
+.modal-button.modal-primary {
+  border-color: rgba(167, 139, 250, 0.65);
+  color: #ede9fe;
+  background: rgba(167, 139, 250, 0.2);
+}
+
+.modal-button.copied {
+  border-color: rgba(134, 239, 172, 0.55);
+  background: rgba(134, 239, 172, 0.18);
+  color: #d1fae5;
+}
+
+.copy-feedback {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: #86efac;
+  min-height: 18px;
+  visibility: hidden;
+}
+
+.copy-feedback.visible {
+  visibility: visible;
+}
+
+.key-input {
+  width: min(420px, 100%);
+}
+
 .sparkline {
   margin-top: 8px;
   max-width: 220px;
@@ -280,7 +493,7 @@ pre {
 
 @media (max-width: 780px) {
   .dashboard {
-    padding: 16px;
+    padding: 28px 16px 18px;
   }
 
   .header-row {
@@ -290,13 +503,33 @@ pre {
   .status-panel {
     text-align: left;
     width: 100%;
+    min-width: 0;
   }
 
   .status-pill {
     margin-left: 0;
   }
 
+  .status-row {
+    grid-template-columns: 132px max-content;
+    justify-content: start;
+  }
+
   .metrics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .key-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .key-actions-col {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .key-actions {
+    justify-content: flex-start;
   }
 }

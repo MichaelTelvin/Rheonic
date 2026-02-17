@@ -13,11 +13,16 @@ from llmtokenburnguard import build_event, capture_event, create_client
 
 def main() -> None:
     """Send one demo event and flush the queue."""
+    ingest_key = os.getenv("LLMTBG_INGEST_KEY")
+    if not ingest_key:
+        print("LLMTBG_INGEST_KEY is required. Create a key in the dashboard Keys modal first.")
+        return
+
     client = None
     try:
         client = create_client(
             base_url=os.getenv("LLMTBG_BASE_URL"),
-            ingest_key="p1",
+            ingest_key=ingest_key,
             environment="dev",
             debug=os.getenv("LLMTBG_DEBUG", "").lower() in {"1", "true", "yes"},
         )

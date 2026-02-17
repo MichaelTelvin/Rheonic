@@ -2,6 +2,7 @@
 from functools import lru_cache
 
 from app.application.services.detect_incidents_service import DetectIncidentsService
+from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.metrics_service import MetricsService
 from app.application.services.project_service import ProjectService
@@ -9,6 +10,7 @@ from app.config import Settings
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base
 from app.infrastructure.db.repositories.event_repository_impl import EventRepositoryImpl
+from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.redis.redis_client import RedisClient
@@ -121,4 +123,18 @@ def get_project_service() -> ProjectService:
         return service
     except Exception:
         logger.exception("Failed to construct project service")
+        raise
+
+
+def get_ingest_key_service() -> IngestKeyService:
+    # Provide an ingest key service instance.
+    try:
+        service = IngestKeyService(
+            ingest_key_repository=IngestKeyRepositoryImpl(session_factory=get_db_session_factory()),
+            project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
+        )
+        logger.debug("Ingest key service provided")
+        return service
+    except Exception:
+        logger.exception("Failed to construct ingest key service")
         raise

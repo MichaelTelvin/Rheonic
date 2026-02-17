@@ -14,13 +14,16 @@ pip install -e .
 - Required: `ingest_key`
 - Optional: `base_url` (defaults to `LLMTBG_BASE_URL` env var, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
+- Demo env var: `LLMTBG_INGEST_KEY`
 
 ## Integration Path 1: Manual Capture (generic)
 
 ```python
+import os
+
 from llmtokenburnguard import build_event, capture_event, create_client
 
-create_client(ingest_key="p1")
+create_client(ingest_key=os.environ["LLMTBG_INGEST_KEY"])
 
 capture_event(
     build_event(
@@ -35,10 +38,12 @@ capture_event(
 ## Integration Path 2: OpenAI instrumentation (convenience wrapper)
 
 ```python
+import os
+
 from openai import OpenAI
 from llmtokenburnguard import create_client, instrument_openai
 
-burnguard = create_client(ingest_key="p1")
+burnguard = create_client(ingest_key=os.environ["LLMTBG_INGEST_KEY"])
 openai_client = instrument_openai(
     OpenAI(api_key="..."),
     client=burnguard,
@@ -50,6 +55,7 @@ openai_client = instrument_openai(
 ## Verify it works
 
 ```bash
+export LLMTBG_INGEST_KEY="<copy from Keys modal>"
 python demo.py
 ```
 
@@ -64,6 +70,7 @@ LLMTBG_BASE_URL=http://127.0.0.1:59999 python demo.py
 ## Check dashboard metrics
 
 After running `python demo.py` with backend/frontend up:
+- create/select project in dashboard
+- create key in Keys modal, copy it once, and export `LLMTBG_INGEST_KEY`
 - open the dashboard (default `http://localhost:5173`)
-- select project `p1`
 - confirm metrics changed after ingest

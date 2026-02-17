@@ -1,4 +1,9 @@
 # Application service for project listing.
+from datetime import datetime, timezone
+from uuid import uuid4
+
+from fastapi import HTTPException
+
 from app.application.interfaces.project_repository import ProjectRepository
 from app.domain.models.project import Project
 from app.logger import get_logger
@@ -21,4 +26,26 @@ class ProjectService:
             return projects
         except Exception:
             logger.exception("Project service list failed")
+            raise
+
+    def create_project(self, name: str) -> Project:
+        # Create a new project after validation and duplicate check.
+        try:
+            normalized_name = name.strip()
+            if not normalized_name:
+                raise HTTPException(status_code=422, detail="project name is required")
+            if self._project_repository.get_project_by_name(normalized_name) is not None:
+                raise HTTPException(status_code=409, detail="project name already exists")
+            project = Project(
+                id=str(uuid4()),
+                name=normalized_name,
+                created_at=datetime.now(timezone.utc),
+            )
+            created = self._project_repository.create_project(project)
+            logger.info("Project created via service", extra={"project_id": created.id})
+            return created
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Project service create failed")
             raise

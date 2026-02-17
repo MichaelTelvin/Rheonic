@@ -54,6 +54,16 @@ class ProjectRepositoryImpl(ProjectRepository):
             logger.exception("Failed creating project", extra={"project_id": project.id})
             raise
 
+    def get_project_by_name(self, name: str) -> Project | None:
+        # Return a single project by exact name.
+        try:
+            with self._session_factory.create_session() as session:
+                record = session.query(ProjectRecord).filter(ProjectRecord.name == name).first()
+            return _to_domain(record) if record is not None else None
+        except Exception:
+            logger.exception("Failed fetching project by name", extra={"name": name})
+            raise
+
 
 def _to_domain(record: ProjectRecord) -> Project:
     # Convert SQLAlchemy project record to domain model.
