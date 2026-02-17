@@ -3,8 +3,8 @@ import { buildEvent, createClient, type Client } from "./index.js";
 async function runDemo(): Promise<void> {
   const client: Client = createClient({
     ingestKey: process.env.LLMTBG_INGEST_KEY ?? "p1",
-    baseUrl: process.env.LLMTBG_BASE_URL ?? "http://localhost:8000",
     environment: process.env.LLMTBG_ENV ?? "dev",
+    debug: process.env.LLMTBG_DEBUG === "1" || process.env.LLMTBG_DEBUG === "true",
   });
 
   await client.captureEvent(
@@ -25,7 +25,12 @@ async function runDemo(): Promise<void> {
   );
 
   await client.flush();
+  console.log(client.getStats());
   client.close();
+  console.log("done");
 }
 
-void runDemo();
+runDemo().catch((err: unknown) => {
+  console.error(err);
+  process.exitCode = 1;
+});

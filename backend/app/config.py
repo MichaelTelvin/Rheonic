@@ -1,5 +1,18 @@
 # Application configuration objects.
+from dataclasses import dataclass
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+@dataclass(frozen=True)
+class AppConfig:
+    default_log_format: str = "%(asctime)s %(levelname)s %(name)s %(message)s"
+    rolling_window_seconds: int = 60
+    rolling_window_ms: int = rolling_window_seconds * 1000
+    rolling_counter_ttl_seconds: int = 600
+
+
+app_config = AppConfig()
 
 
 class Settings(BaseSettings):

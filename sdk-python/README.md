@@ -1,59 +1,69 @@
 # LLMTokenBurnGuard Python SDK
 
-Minimal Python SDK for async event ingest (fire-and-forget) with OpenAI instrumentation.
+This SDK runs inside your app process and sends telemetry events to this LLMTokenBurnGuard service.
 
-## Local install
+## Install
 
 ```bash
 cd sdk-python
 pip install -e .
 ```
 
-## Quickstart
+## Configuration
+
+- Required: `ingest_key`
+- Optional: `base_url` (defaults to `LLMTBG_BASE_URL` env var, else `http://localhost:8000`)
+- Optional: `environment` (default `dev`)
+
+## Integration Path 1: Manual Capture (generic)
 
 ```python
-from llmtokenburnguard import create_client, build_event, capture_event
+from llmtokenburnguard import build_event, capture_event, create_client
 
-client = create_client(
-    ingest_key="p1",
-    base_url="http://localhost:8000",
-    environment="dev",
-)
+create_client(ingest_key="p1")
 
 capture_event(
     build_event(
         provider="openai",
         model="gpt-4o-mini",
-        environment="dev",
         request={"endpoint": "/chat", "input_tokens": 12},
         response={"total_tokens": 32, "latency_ms": 140, "http_status": 200},
     )
 )
 ```
 
-## OpenAI instrumentation
+## Integration Path 2: OpenAI instrumentation (convenience wrapper)
 
 ```python
 from openai import OpenAI
 from llmtokenburnguard import create_client, instrument_openai
 
-burnguard = create_client(ingest_key="p1", base_url="http://localhost:8000")
+burnguard = create_client(ingest_key="p1")
 openai_client = instrument_openai(
     OpenAI(api_key="..."),
     client=burnguard,
     endpoint="/chat/completions",
     feature="assistant",
 )
-
-openai_client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[{"role": "user", "content": "Hello"}],
-)
 ```
 
-## Notes
+## Verify it works
 
-- Ingest is async fire-and-forget by default.
-- Events are queued and flushed periodically in a background thread.
-- Best-effort flush is registered with `atexit`.
-- For controlled shutdowns, call `client.flush()`.
+```bash
+python demo.py
+```
+
+The demo sends one event, flushes, prints stats, and exits.
+
+Backend-down smoke test (must exit cleanly and show failures):
+
+```bash
+LLMTBG_BASE_URL=http://127.0.0.1:59999 python demo.py
+```
+
+## Check dashboard metrics
+
+After running `python demo.py` with backend/frontend up:
+- open the dashboard (default `http://localhost:5173`)
+- select project `p1`
+- confirm metrics changed after ingest

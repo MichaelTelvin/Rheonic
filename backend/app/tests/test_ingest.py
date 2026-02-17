@@ -2,9 +2,9 @@
 from datetime import datetime, timezone
 
 from app.application.services.ingest_event_service import IngestEventService
+from app.config import app_config
 from app.domain.models.event import Event
 from app.infrastructure.redis.rolling_window import (
-    COUNTER_TTL_SECONDS,
     RollingWindow,
     incident_open_lock_key,
     normalize_total_tokens,
@@ -143,8 +143,8 @@ def test_increment_project_60s_updates_rolling_count_sum_and_ttls() -> None:
 
     assert requests_60s == 2
     assert tokens_60s == 50
-    assert client.ttls["rt:p1:req:z"] == COUNTER_TTL_SECONDS
-    assert client.ttls["rt:p1:tok:z"] == COUNTER_TTL_SECONDS
+    assert client.ttls["rt:p1:req:z"] == app_config.rolling_counter_ttl_seconds
+    assert client.ttls["rt:p1:tok:z"] == app_config.rolling_counter_ttl_seconds
 
 
 def test_get_project_60s_excludes_points_older_than_60s() -> None:

@@ -1,58 +1,64 @@
 # LLMTokenBurnGuard Node SDK
 
-Minimal Node SDK for async event ingest (fire-and-forget) with OpenAI instrumentation.
+This SDK runs inside your app process and sends telemetry events to this LLMTokenBurnGuard service.
 
-## Local install
+## Install
 
 ```bash
 cd sdk-node
 npm install
 ```
 
-## Quickstart
+## Configuration
+
+- Required: `ingestKey`
+- Optional: `baseUrl` (defaults to `LLMTBG_BASE_URL` env var, else `http://localhost:8000`)
+- Optional: `environment` (default `dev`)
+
+## Integration Path 1: Manual Capture (generic)
 
 ```ts
-import { createClient, captureEvent, buildEvent } from "./src/index";
+import { buildEvent, captureEvent, createClient } from "./src/index";
 
-const client = createClient({
-  ingestKey: "p1",
-  baseUrl: "http://localhost:8000",
-  environment: "dev",
-});
+createClient({ ingestKey: "p1" });
 
 await captureEvent(
   buildEvent({
     provider: "openai",
     model: "gpt-4o-mini",
-    environment: "dev",
     request: { endpoint: "/chat", input_tokens: 12 },
     response: { total_tokens: 32, latency_ms: 140, http_status: 200 },
   }),
 );
 ```
 
-## OpenAI instrumentation
+## Integration Path 2: OpenAI instrumentation (convenience wrapper)
 
 ```ts
 import OpenAI from "openai";
 import { createClient, instrumentOpenAI } from "./src/index";
 
-const burnguard = createClient({ ingestKey: "p1", baseUrl: "http://localhost:8000" });
+const burnguard = createClient({ ingestKey: "p1" });
 const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
   client: burnguard,
   endpoint: "/chat/completions",
   feature: "assistant",
 });
-
-await openai.chat.completions.create({
-  model: "gpt-4o-mini",
-  messages: [{ role: "user", content: "Hello" }],
-});
 ```
 
-## Notes
+## Verify it works
 
-- Ingest is async fire-and-forget by default.
-- Events are queued and flushed in the background.
-- Best-effort flush runs on exit (`beforeExit`, `SIGINT`, `SIGTERM`).
-- For controlled shutdowns, call `await client.flush()`.
+```bash
+npm run build
+node dist/demo.js
+```
+
+The demo sends one event, flushes, and prints SDK stats.
+
+Backend-down smoke test (must exit cleanly and show failures):
+
+```bash
+LLMTBG_BASE_URL=http://127.0.0.1:59999 node dist/demo.js
+```
+
+Then check dashboard metrics for project `p1` (project id equals ingest key by convention in this MVP).

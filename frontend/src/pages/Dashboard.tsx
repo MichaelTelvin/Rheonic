@@ -5,10 +5,8 @@ import { Card } from "../components/Card";
 import { IncidentItem as IncidentRow } from "../components/IncidentItem";
 import { Sparkline } from "../components/Sparkline";
 import { StatusPill } from "../components/StatusPill";
+import { frontendConfig } from "../config";
 import { formatNumber, formatTime } from "./dashboardUtils";
-
-const SELECTED_PROJECT_STORAGE_KEY = "selected_project_id";
-const MAX_SERIES_POINTS = 60;
 
 export function Dashboard(): JSX.Element {
   const [projects, setProjects] = useState<ProjectItem[]>([]);
@@ -57,7 +55,7 @@ export function Dashboard(): JSX.Element {
         setProjects(items);
         setProjectWarning(null);
 
-        const storedProjectId = window.localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY);
+        const storedProjectId = window.localStorage.getItem(frontendConfig.dashboardSelectedProjectStorageKey);
         if (storedProjectId && items.some((item) => item.id === storedProjectId)) {
           setProjectId(storedProjectId);
         } else {
@@ -92,11 +90,11 @@ export function Dashboard(): JSX.Element {
     setIncidentsWarning(null);
 
     if (!projectId) {
-      window.localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY);
+      window.localStorage.removeItem(frontendConfig.dashboardSelectedProjectStorageKey);
       return;
     }
 
-    window.localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, projectId);
+    window.localStorage.setItem(frontendConfig.dashboardSelectedProjectStorageKey, projectId);
   }, [projectId]);
 
   useEffect(() => {
@@ -120,8 +118,8 @@ export function Dashboard(): JSX.Element {
         setMetricsFetchFailed(false);
         const timestamp = new Date().toISOString();
         setLastMetricsSuccessAt(timestamp);
-        setRequestsSeries((values) => [...values.slice(-(MAX_SERIES_POINTS - 1)), data.requests_60s]);
-        setTokensSeries((values) => [...values.slice(-(MAX_SERIES_POINTS - 1)), data.tokens_60s]);
+        setRequestsSeries((values) => [...values.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.requests_60s]);
+        setTokensSeries((values) => [...values.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.tokens_60s]);
       } catch {
         if (!cancelled) {
           setMetricsWarning("Metrics polling failed. Showing last successful values.");

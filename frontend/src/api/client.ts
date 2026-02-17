@@ -1,3 +1,5 @@
+import { frontendConfig } from "../config";
+
 export interface RealtimeMetrics {
   requests_60s: number;
   tokens_60s: number;
@@ -19,10 +21,8 @@ export interface ProjectItem {
   created_at: string;
 }
 
-const BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "");
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${frontendConfig.apiBaseUrl}${path}`, {
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),

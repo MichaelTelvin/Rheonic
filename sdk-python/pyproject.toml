@@ -8,6 +8,11 @@ dependencies = [
   "typing-extensions>=4.8.0"
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0.0"
+]
+
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"

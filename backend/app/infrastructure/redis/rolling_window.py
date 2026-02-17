@@ -5,12 +5,10 @@ from typing import Protocol
 from uuid import uuid4
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
+from app.config import app_config
 from app.logger import get_logger
 
 logger = get_logger(__name__)
-WINDOW_SECONDS = 60
-WINDOW_MS = WINDOW_SECONDS * 1000
-COUNTER_TTL_SECONDS = 600
 
 
 def requests_60s_key(project_id: str) -> str:
@@ -92,18 +90,18 @@ class RollingWindow(RealtimeCounterStore):
             tok_key = tokens_60s_key(project_id)
             normalized_tokens = normalize_total_tokens(total_tokens)
             now_ms = self._now_ms_provider()
-            cutoff_ms = now_ms - WINDOW_MS
+            cutoff_ms = now_ms - app_config.rolling_window_ms
             member_id = self._member_id_provider()
             req_member = f"{now_ms}:{member_id}:1"
             tok_member = f"{now_ms}:{member_id}:{normalized_tokens}"
 
             self._client.zadd(req_key, {req_member: now_ms})
             self._client.zremrangebyscore(req_key, 0, cutoff_ms)
-            self._client.expire(req_key, COUNTER_TTL_SECONDS)
+            self._client.expire(req_key, app_config.rolling_counter_ttl_seconds)
 
             self._client.zadd(tok_key, {tok_member: now_ms})
             self._client.zremrangebyscore(tok_key, 0, cutoff_ms)
-            self._client.expire(tok_key, COUNTER_TTL_SECONDS)
+            self._client.expire(tok_key, app_config.rolling_counter_ttl_seconds)
 
             logger.debug("Realtime counters incremented", extra={"project_id": project_id})
         except Exception:
@@ -116,7 +114,7 @@ class RollingWindow(RealtimeCounterStore):
             req_key = requests_60s_key(project_id)
             tok_key = tokens_60s_key(project_id)
             now_ms = self._now_ms_provider()
-            cutoff_ms = now_ms - WINDOW_MS
+            cutoff_ms = now_ms - app_config.rolling_window_ms
 
             self._client.zremrangebyscore(req_key, 0, cutoff_ms)
             self._client.zremrangebyscore(tok_key, 0, cutoff_ms)

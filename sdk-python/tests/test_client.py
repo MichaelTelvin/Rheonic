@@ -13,6 +13,25 @@ class FakeHttpClient:
     def post(self, url: str, json: dict[str, Any], headers: dict[str, str]) -> None:
         self.calls.append({"url": url, "json": json, "headers": headers})
 
+    def close(self) -> None:
+        return
+
+
+class FlakyHttpClient:
+    # Fails first attempt with 5xx, then succeeds.
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def post(self, url: str, json: dict[str, Any], headers: dict[str, str]) -> Any:
+        self.calls += 1
+        if self.calls == 1:
+            return type("Response", (), {"status_code": 503})()
+        return type("Response", (), {"status_code": 200})()
+
+    def close(self) -> None:
+        return
+
 
 def test_client_flush_sends_header_and_payload() -> None:
     # Flush should send queued events with ingest-key header.
@@ -33,14 +52,15 @@ def test_client_flush_sends_header_and_payload() -> None:
     assert fake_http.calls[0]["headers"]["X-Project-Ingest-Key"] == "p1"
 
 
-def test_client_drops_when_queue_is_full() -> None:
-    # Queue should drop new events when max size is reached.
+def test_queue_overflow_drop_newest_policy() -> None:
+    # Queue should keep oldest event when overflow policy is drop_newest.
     fake_http = FakeHttpClient()
     client = Client(
         ingest_key="p1",
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         max_queue_size=1,
+        overflow_policy="drop_newest",
         http_client=fake_http,  # type: ignore[arg-type]
     )
 
@@ -51,3 +71,25 @@ def test_client_drops_when_queue_is_full() -> None:
 
     assert len(fake_http.calls) == 1
     assert fake_http.calls[0]["json"]["response"]["total_tokens"] == 1
+    assert client.stats()["dropped"] == 1
+
+
+def test_retry_runs_exactly_once_for_transient_failure() -> None:
+    # One retry should occur for 5xx before succeeding.
+    flaky_http = FlakyHttpClient()
+    client = Client(
+        ingest_key="p1",
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        max_queue_size=10,
+        http_client=flaky_http,  # type: ignore[arg-type]
+    )
+
+    client.capture_event({"provider": "openai", "environment": "dev", "request": {}, "response": {}})
+    client.flush(timeout_s=1.0)
+    stats = client.stats()
+    client.close()
+
+    assert flaky_http.calls == 2
+    assert stats["sent"] == 1
+    assert stats["failed"] == 0
