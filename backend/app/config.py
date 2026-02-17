@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     app_env: str = "dev"
     jwt_secret: str = ""
+    jwt_alg: str = "HS256"
+    jwt_expires_min: int = 60
     cors_origins: str = ""
     database_url: str = ""
     redis_url: str = ""

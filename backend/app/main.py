@@ -2,8 +2,9 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 
+from app.api.error_responses import build_error_response, default_code_for_status
 from app.api.routers import api_router
 from app.config import Settings
 from app.dependencies import get_db_session_factory
@@ -27,6 +28,7 @@ def _seed_demo_project() -> None:
             Project(
                 id="p1",
                 name="Demo Project",
+                user_id=None,
                 created_at=datetime.now(timezone.utc),
             )
         )
@@ -53,6 +55,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging()
     _settings = settings or Settings()
     app = FastAPI(title=_settings.app_name, lifespan=lifespan)
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(_: Request, exc: HTTPException):
+        # Return standardized error payloads for known API failures.
+        if isinstance(exc.detail, dict) and "error" in exc.detail:
+            payload = exc.detail["error"]
+            code = str(payload.get("code") or default_code_for_status(exc.status_code))
+            message = str(payload.get("message") or "request failed")
+            return build_error_response(exc.status_code, code, message)
+        message = str(exc.detail) if exc.detail else "request failed"
+        return build_error_response(exc.status_code, default_code_for_status(exc.status_code), message)
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(_: Request, exc: Exception):
+        # Hide unexpected exception internals from clients.
+        logger.exception("Unhandled application exception")
+        _ = exc
+        return build_error_response(500, "internal_error", "Internal server error")
 
     # all the routes go here
     @app.get("/health")

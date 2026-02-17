@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.project_service import ProjectService
-from app.config import Settings
-from app.dependencies import get_ingest_event_service, get_ingest_key_service, get_project_service, get_settings
+from app.dependencies import get_current_user, get_ingest_event_service, get_ingest_key_service, get_project_service
+from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base, IngestKeyRecord
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
@@ -25,7 +25,7 @@ class FakeIngestService:
         self.ingested.append(event)
 
 
-def _make_client(tmp_path, app_env: str = "dev") -> tuple[TestClient, DatabaseSessionFactory, FakeIngestService]:
+def _make_client(tmp_path, current_user: User | None = None) -> tuple[TestClient, DatabaseSessionFactory, FakeIngestService]:
     # Build app client with real project/key services against temporary sqlite DB.
     db_url = f"sqlite:///{tmp_path}/api_test.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
@@ -41,7 +41,12 @@ def _make_client(tmp_path, app_env: str = "dev") -> tuple[TestClient, DatabaseSe
     app.dependency_overrides[get_project_service] = lambda: project_service
     app.dependency_overrides[get_ingest_key_service] = lambda: ingest_key_service
     app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
-    app.dependency_overrides[get_settings] = lambda: Settings(app_env=app_env)
+    app.dependency_overrides[get_current_user] = lambda: current_user or User(
+        id="u1",
+        email="u1@example.com",
+        password_hash="hashed",
+        created_at=datetime.now(timezone.utc),
+    )
     return TestClient(app), session_factory, ingest_service
 
 
@@ -72,7 +77,7 @@ def test_project_create_duplicate_and_list(tmp_path) -> None:
     assert created.status_code == 200
     assert created.json()["name"] == "Demo"
     assert duplicate.status_code == 409
-    assert duplicate.json() == {"detail": "project name already exists"}
+    assert duplicate.json() == {"error": {"code": "conflict", "message": "project name already exists"}}
     assert any(item["name"] == "Demo" for item in listed.json())
     _cleanup_overrides()
 
@@ -123,7 +128,7 @@ def test_key_create_list_revoke_rotate_and_ingest_mapping(tmp_path) -> None:
         headers={"X-Project-Ingest-Key": plaintext_key},
     )
     assert revoked_ingest.status_code == 401
-    assert revoked_ingest.json() == {"detail": "invalid ingest key"}
+    assert revoked_ingest.json() == {"error": {"code": "unauthorized", "message": "invalid ingest key"}}
 
     rotated = client.post(f"/api/v1/keys/{key_id}/rotate")
     assert rotated.status_code == 200
@@ -139,22 +144,28 @@ def test_key_create_list_revoke_rotate_and_ingest_mapping(tmp_path) -> None:
     _cleanup_overrides()
 
 
-def test_management_endpoints_blocked_when_not_dev(tmp_path) -> None:
-    # Mutating management endpoints should be blocked outside dev mode.
-    client, _, _ = _make_client(tmp_path, app_env="prod")
+def test_key_routes_are_scoped_to_project_owner(tmp_path) -> None:
+    # A user cannot manage keys for another user's project.
+    owner = User(
+        id="u1",
+        email="u1@example.com",
+        password_hash="hashed",
+        created_at=datetime.now(timezone.utc),
+    )
+    client, _, _ = _make_client(tmp_path, current_user=owner)
+    project = client.post("/api/v1/projects", json={"name": "Owner Project"}).json()
+    project_id = project["id"]
 
-    create_project = client.post("/api/v1/projects", json={"name": "Prod Blocked"})
-    assert create_project.status_code == 403
-    assert create_project.json() == {"detail": "not enabled"}
+    other_user = User(
+        id="u2",
+        email="u2@example.com",
+        password_hash="hashed",
+        created_at=datetime.now(timezone.utc),
+    )
+    app.dependency_overrides[get_current_user] = lambda: other_user
 
-    project_list = client.get("/api/v1/projects")
-    assert project_list.status_code == 200
-
-    # ids are placeholders since request should be blocked before lookup
-    create_key = client.post("/api/v1/projects/p1/keys", json={"name": "prod"})
-    revoke = client.post("/api/v1/keys/k1/revoke")
-    rotate = client.post("/api/v1/keys/k1/rotate")
-    assert create_key.status_code == 403
-    assert revoke.status_code == 403
-    assert rotate.status_code == 403
+    list_response = client.get(f"/api/v1/projects/{project_id}/keys")
+    create_response = client.post(f"/api/v1/projects/{project_id}/keys", json={"name": "prod"})
+    assert list_response.status_code == 404
+    assert create_response.status_code == 404
     _cleanup_overrides()

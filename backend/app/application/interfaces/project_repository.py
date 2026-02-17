@@ -13,6 +13,11 @@ class ProjectRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def list_projects_for_user(self, user_id: str) -> list[Project]:
+        # Return projects owned by a user.
+        raise NotImplementedError
+
+    @abstractmethod
     def get_project(self, project_id: str) -> Project | None:
         # Return project by id if it exists.
         raise NotImplementedError

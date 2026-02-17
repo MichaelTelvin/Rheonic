@@ -31,18 +31,104 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(36px, 10vh, 110px) 24px 24px;
+}
+
+.auth-card {
+  width: min(440px, 100%);
+  background: linear-gradient(180deg, rgba(21, 28, 43, 0.98), rgba(17, 24, 39, 0.96));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+  display: grid;
+  gap: 8px;
+}
+
+.auth-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 64px;
+}
+
+.auth-brand {
+  margin: 0;
+  letter-spacing: 0.03em;
+  text-align: right;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auth-brand.subtle {
+  font-size: 1.15rem;
+  color: rgba(229, 231, 235, 0.32);
+}
+
+.auth-brand-icon {
+  width: 15px;
+  height: 15px;
+  fill: rgba(245, 199, 93, 0.72);
+  flex: 0 0 auto;
+}
+
+.auth-brand-icon-cutout {
+  fill: rgba(21, 28, 43, 0.95);
+}
+
+.auth-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
 .dashboard {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 44px 24px 28px;
+  padding: 10px 24px 28px;
 }
 
 .header-row {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
   align-items: flex-start;
+  gap: 16px;
+  margin-top: 10px;
   margin-bottom: 34px;
+}
+
+.top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  min-height: 60px;
+  margin: 0 0 36px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.brand-cluster {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+}
+
+.top-brand {
+  letter-spacing: 0.02em;
+  font-weight: 500;
 }
 
 .title {
@@ -54,7 +140,6 @@ body {
 .subtle {
   color: var(--muted);
   font-size: 0.9rem;
-  margin: 2px 0 0;
 }
 
 .toolbar {
@@ -148,6 +233,40 @@ select {
   min-width: 260px;
 }
 
+.status-strip {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 34px;
+}
+
+.user-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.user-chip-label {
+  color: rgba(229, 231, 235, 0.58);
+  font-size: 0.82rem;
+}
+
+.user-chip-email {
+  color: rgba(229, 231, 235, 0.88);
+  font-size: 0.9rem;
+}
+
+.auth-signout {
+  padding: 6px 10px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -156,6 +275,7 @@ select {
   font-size: 0.8rem;
   border: 1px solid transparent;
   margin-left: auto;
+  margin-bottom: 4px;
 }
 
 .status-row {
@@ -191,6 +311,29 @@ select {
 .warning-text {
   margin: 6px 0;
   color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.input-error {
+  border-color: rgba(248, 113, 113, 0.6);
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.16);
+}
+
+.input-error-slot {
+  margin: -3px 0 2px;
+  min-height: 20px;
+  font-size: 0.79rem;
+  line-height: 1.2;
+  color: rgba(252, 165, 165, 0.92);
+}
+
+.banner {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  color: #fde68a;
+  background: rgba(251, 191, 36, 0.1);
   font-size: 0.86rem;
 }
 
@@ -498,12 +641,32 @@ pre {
 
   .header-row {
     flex-direction: column;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .top-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 0 18px;
+    padding: 10px 12px;
+    min-height: 0;
   }
 
   .status-panel {
     text-align: left;
     width: 100%;
     min-width: 0;
+  }
+
+  .user-menu {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .status-strip {
+    justify-items: start;
   }
 
   .status-pill {

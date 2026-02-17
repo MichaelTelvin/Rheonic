@@ -4,8 +4,12 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from app.application.services.detect_incidents_service import DetectIncidentsService
-from app.dependencies import get_detect_incidents_service
+from fastapi import HTTPException
+
+from app.dependencies import get_current_user, get_detect_incidents_service, get_project_service
 from app.domain.models.incident import Incident
+from app.domain.models.project import Project
+from app.domain.models.user import User
 from app.main import app
 from app.infrastructure.redis.rolling_window import incident_open_lock_key
 
@@ -30,6 +34,11 @@ class FakeIncidentRepository:
             return [self.incident]
         return []
 
+    def get_by_id(self, incident_id: str) -> Incident | None:
+        if incident_id == self.incident.id:
+            return self.incident
+        return None
+
     def resolve_incident(self, incident_id: str) -> Incident | None:
         if incident_id != self.incident.id:
             return None
@@ -48,6 +57,19 @@ class FakeRealtimeStore:
         self.locks.discard(key)
 
 
+class FakeProjectService:
+    # Minimal ownership verifier for resolve endpoint tests.
+    def ensure_project_owned_by_user(self, project_id: str, user_id: str) -> Project:
+        if project_id != "p1" or user_id != "u1":
+            raise HTTPException(status_code=404, detail="project not found")
+        return Project(
+            id="p1",
+            name="Demo",
+            user_id="u1",
+            created_at=datetime.now(timezone.utc),
+        )
+
+
 def test_resolve_endpoint_marks_resolved_and_deletes_lock() -> None:
     # Resolve endpoint should update incident status and remove dedupe key.
     repo = FakeIncidentRepository()
@@ -58,6 +80,13 @@ def test_resolve_endpoint_marks_resolved_and_deletes_lock() -> None:
     )
 
     app.dependency_overrides[get_detect_incidents_service] = lambda: service
+    app.dependency_overrides[get_project_service] = lambda: FakeProjectService()
+    app.dependency_overrides[get_current_user] = lambda: User(
+        id="u1",
+        email="u1@example.com",
+        password_hash="hashed",
+        created_at=datetime.now(timezone.utc),
+    )
     client = TestClient(app)
 
     response = client.post("/api/v1/incidents/inc-1/resolve")

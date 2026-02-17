@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  ApiError,
   createKey,
   createProject,
   fetchIncidents,
@@ -24,8 +25,15 @@ import { frontendConfig } from "../config";
 import { formatNumber, formatRelative, formatTime } from "./dashboardUtils";
 
 type KeysModalView = "list" | "create" | "success";
+const NAME_REGEX = /^[A-Za-z0-9 _.-]+$/;
+const NAME_MAX = 80;
 
-export function Dashboard(): JSX.Element {
+interface DashboardProps {
+  userEmail?: string | null;
+  onSignOut?: () => void;
+}
+
+export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.Element {
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<RealtimeMetrics | null>(null);
@@ -43,6 +51,7 @@ export function Dashboard(): JSX.Element {
   const [lastIncidentsSuccessAt, setLastIncidentsSuccessAt] = useState<string | null>(null);
   const [metricsFetchFailed, setMetricsFetchFailed] = useState<boolean>(false);
   const [clockTick, setClockTick] = useState<number>(0);
+  const [globalBanner, setGlobalBanner] = useState<string | null>(null);
 
   const [showCreateProjectModal, setShowCreateProjectModal] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>("");
@@ -87,6 +96,38 @@ export function Dashboard(): JSX.Element {
     return items;
   };
 
+  const validateProjectName = (value: string): string | null => {
+    if (!value) {
+      return "Project name is required.";
+    }
+    if (value.length > NAME_MAX) {
+      return `Project name must be ${NAME_MAX} characters or less.`;
+    }
+    if (/[\r\n\t]/.test(value)) {
+      return "Project name contains invalid characters.";
+    }
+    if (!NAME_REGEX.test(value)) {
+      return "Project name may include letters, numbers, spaces, underscore, dash, and dot.";
+    }
+    return null;
+  };
+
+  const validateKeyLabel = (value: string): string | null => {
+    if (!value) {
+      return "Key label is required.";
+    }
+    if (value.length > NAME_MAX) {
+      return `Key label must be ${NAME_MAX} characters or less.`;
+    }
+    if (/[\r\n\t]/.test(value)) {
+      return "Key label contains invalid characters.";
+    }
+    if (!NAME_REGEX.test(value)) {
+      return "Key label may include letters, numbers, spaces, underscore, dash, and dot.";
+    }
+    return null;
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -100,17 +141,17 @@ export function Dashboard(): JSX.Element {
         setProjects(items);
         setProjectWarning(null);
 
-        const storedProjectId = window.localStorage.getItem(frontendConfig.dashboardSelectedProjectStorageKey);
-        if (storedProjectId && items.some((item) => item.id === storedProjectId)) {
-          setProjectId(storedProjectId);
+        if (items.length === 1) {
+          setProjectId(items[0].id);
         } else {
-          setProjectId(items.length > 0 ? items[0].id : null);
+          setProjectId(null);
+          window.localStorage.removeItem(frontendConfig.dashboardSelectedProjectStorageKey);
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
           setProjects([]);
           setProjectId(null);
-          setProjectWarning("Could not load projects from API.");
+          setProjectWarning(error instanceof Error ? error.message : "Could not load projects from API.");
         }
       } finally {
         if (!cancelled) {
@@ -133,6 +174,7 @@ export function Dashboard(): JSX.Element {
     setTokensSeries([]);
     setMetricsWarning(null);
     setIncidentsWarning(null);
+    setGlobalBanner(null);
 
     if (!projectId) {
       window.localStorage.removeItem(frontendConfig.dashboardSelectedProjectStorageKey);
@@ -168,14 +210,20 @@ export function Dashboard(): JSX.Element {
 
         setMetrics(data);
         setMetricsWarning(null);
+        setGlobalBanner(null);
         setMetricsFetchFailed(false);
         const timestamp = new Date().toISOString();
         setLastMetricsSuccessAt(timestamp);
         setRequestsSeries((values) => [...values.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.requests_60s]);
         setTokensSeries((values) => [...values.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.tokens_60s]);
-      } catch {
+      } catch (error) {
         if (!cancelled) {
-          setMetricsWarning("Metrics polling failed. Showing last successful values.");
+          if (error instanceof ApiError && error.status === 403) {
+            setGlobalBanner("You do not have access to this project's metrics.");
+            setMetricsWarning("Metrics request was forbidden.");
+          } else {
+            setMetricsWarning("Metrics polling failed. Showing last successful values.");
+          }
           setMetricsFetchFailed(true);
         }
       } finally {
@@ -214,10 +262,16 @@ export function Dashboard(): JSX.Element {
 
         setIncidents(data);
         setIncidentsWarning(null);
+        setGlobalBanner(null);
         setLastIncidentsSuccessAt(new Date().toISOString());
-      } catch {
+      } catch (error) {
         if (!cancelled) {
-          setIncidentsWarning("Incidents polling failed. Showing last successful values.");
+          if (error instanceof ApiError && error.status === 403) {
+            setGlobalBanner("You do not have access to this project's incidents.");
+            setIncidentsWarning("Incidents request was forbidden.");
+          } else {
+            setIncidentsWarning("Incidents polling failed. Showing last successful values.");
+          }
         }
       } finally {
         if (!cancelled) {
@@ -254,9 +308,9 @@ export function Dashboard(): JSX.Element {
           return;
         }
         setKeys(items);
-      } catch {
+      } catch (error) {
         if (!cancelled) {
-          setKeysError("Could not load keys for this project.");
+          setKeysError(error instanceof Error ? error.message : "Could not load keys for this project.");
         }
       } finally {
         if (!cancelled) {
@@ -300,8 +354,9 @@ export function Dashboard(): JSX.Element {
 
   const onCreateProject = async (): Promise<void> => {
     const normalized = newProjectName.trim();
-    if (!normalized) {
-      setCreateProjectError("Project name is required.");
+    const validationError = validateProjectName(normalized);
+    if (validationError) {
+      setCreateProjectError(validationError);
       return;
     }
     setCreatingProject(true);
@@ -314,12 +369,7 @@ export function Dashboard(): JSX.Element {
       setShowCreateProjectModal(false);
       setNewProjectName("");
     } catch (error) {
-      const detail = error instanceof Error ? error.message : "Failed to create project";
-      if (detail.includes("409")) {
-        setCreateProjectError("Project name already exists");
-      } else {
-        setCreateProjectError("Failed to create project");
-      }
+      setCreateProjectError(error instanceof Error ? error.message : "Failed to create project");
     } finally {
       setCreatingProject(false);
     }
@@ -347,8 +397,9 @@ export function Dashboard(): JSX.Element {
       return;
     }
     const normalized = newKeyName.trim();
-    if (!normalized) {
-      setKeysError("Key name is required.");
+    const validationError = validateKeyLabel(normalized);
+    if (validationError) {
+      setKeysError(validationError);
       return;
     }
     setCreatingKey(true);
@@ -359,8 +410,8 @@ export function Dashboard(): JSX.Element {
       setNewKeyName("");
       await reloadKeys();
       setKeysModalView("success");
-    } catch {
-      setKeysError("Failed to create key.");
+    } catch (error) {
+      setKeysError(error instanceof Error ? error.message : "Failed to create key.");
     } finally {
       setCreatingKey(false);
     }
@@ -375,8 +426,8 @@ export function Dashboard(): JSX.Element {
     try {
       await revokeKey(keyId);
       await reloadKeys();
-    } catch {
-      setKeysError("Failed to revoke key.");
+    } catch (error) {
+      setKeysError(error instanceof Error ? error.message : "Failed to revoke key.");
     } finally {
       setProcessingKeyId(null);
     }
@@ -392,8 +443,8 @@ export function Dashboard(): JSX.Element {
       const rotated = await rotateKey(keyId);
       setLatestPlaintextKey(rotated);
       await reloadKeys();
-    } catch {
-      setKeysError("Failed to rotate key.");
+    } catch (error) {
+      setKeysError(error instanceof Error ? error.message : "Failed to rotate key.");
     } finally {
       setProcessingKeyId(null);
     }
@@ -441,13 +492,29 @@ export function Dashboard(): JSX.Element {
 
   return (
     <main className="dashboard">
+      <header className="top-header">
+        <div className="brand-cluster">
+          <p className="subtle top-brand">LLMTokenBurnGuard</p>
+        </div>
+        {userEmail ? (
+          <div className="user-menu">
+            <span className="user-chip">
+              <span className="user-chip-label">Signed in as</span>{" "}
+              <span className="user-chip-email">{userEmail}</span>
+            </span>
+            <button type="button" className="modal-button auth-signout" onClick={onSignOut}>
+              Sign out
+            </button>
+          </div>
+        ) : null}
+      </header>
+
       <header className="header-row">
         <div>
           <h1 className="title">LLMTokenBurnGuard Dashboard</h1>
           <p className="subtle">Incident-first runtime safety overview</p>
         </div>
-
-        <div className="status-panel">
+        <section className="status-strip">
           <StatusPill connected={isApiConnected} />
           <div className="status-row subtle">
             <span className="status-label">Metrics updated:</span>
@@ -457,7 +524,7 @@ export function Dashboard(): JSX.Element {
             <span className="status-label">Incidents updated:</span>
             <span className="status-value">{formatTime(lastIncidentsSuccessAt)}</span>
           </div>
-        </div>
+        </section>
       </header>
 
       <section className="toolbar">
@@ -486,10 +553,12 @@ export function Dashboard(): JSX.Element {
       {projectWarning ? <p className="warning-text">{projectWarning}</p> : null}
       {metricsWarning ? <p className="warning-text">{metricsWarning}</p> : null}
       {incidentsWarning ? <p className="warning-text">{incidentsWarning}</p> : null}
+      {globalBanner ? <section className="banner">{globalBanner}</section> : null}
       {projectId && hasLocalDemoKey ? <p className="subtle">Demo key set locally (no secret shown).</p> : null}
 
       {!projectId ? (
         <section className="empty">
+          <p>Select a project to see realtime metrics.</p>
           {projects.length === 0 ? (
             <>
               <p>Create your first project to start collecting metrics.</p>

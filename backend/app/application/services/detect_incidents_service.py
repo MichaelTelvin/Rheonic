@@ -37,6 +37,14 @@ class DetectIncidentsService:
             logger.exception("List incidents service failed", extra={"project_id": project_id, "status": status})
             raise
 
+    def get_incident(self, incident_id: str) -> Incident | None:
+        # Fetch an incident by id.
+        try:
+            return self._incident_repository.get_by_id(incident_id=incident_id)
+        except Exception:
+            logger.exception("Get incident service failed", extra={"incident_id": incident_id})
+            raise
+
     def resolve_incident(self, incident_id: str) -> Incident | None:
         # Resolve incident and release dedupe lock.
         try:

@@ -25,6 +25,21 @@ class ProjectRepositoryImpl(ProjectRepository):
             logger.exception("Failed listing projects")
             raise
 
+    def list_projects_for_user(self, user_id: str) -> list[Project]:
+        # Return user-owned projects ordered by creation time.
+        try:
+            with self._session_factory.create_session() as session:
+                records = (
+                    session.query(ProjectRecord)
+                    .filter(ProjectRecord.user_id == user_id)
+                    .order_by(ProjectRecord.created_at.asc())
+                    .all()
+                )
+            return [_to_domain(record) for record in records]
+        except Exception:
+            logger.exception("Failed listing projects for user", extra={"user_id": user_id})
+            raise
+
     def get_project(self, project_id: str) -> Project | None:
         # Return a single project by id.
         try:
@@ -44,6 +59,7 @@ class ProjectRepositoryImpl(ProjectRepository):
                 record = ProjectRecord(
                     id=project.id,
                     name=project.name,
+                    user_id=project.user_id,
                     created_at=project.created_at,
                 )
                 session.add(record)
@@ -70,5 +86,6 @@ def _to_domain(record: ProjectRecord) -> Project:
     return Project(
         id=record.id,
         name=record.name,
+        user_id=record.user_id,
         created_at=record.created_at,
     )

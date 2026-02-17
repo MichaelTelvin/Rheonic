@@ -4,8 +4,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from app.application.services.project_service import ProjectService
 from app.application.services.detect_incidents_service import DetectIncidentsService
-from app.dependencies import get_detect_incidents_service
+from app.dependencies import get_current_user, get_detect_incidents_service, get_project_service
+from app.domain.models.user import User
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,9 +30,12 @@ def list_incidents(
     project_id: str = Query(..., min_length=1),
     status: str = Query("open"),
     service: DetectIncidentsService = Depends(get_detect_incidents_service),
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
 ) -> list[IncidentOut]:
     # List incidents for the active project context.
     try:
+        project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
         incidents = service.list_incidents(project_id=project_id, status=status)
         logger.debug("Incidents list endpoint called", extra={"project_id": project_id, "status": status})
         return [
@@ -56,9 +61,15 @@ def list_incidents(
 def resolve_incident(
     incident_id: str,
     service: DetectIncidentsService = Depends(get_detect_incidents_service),
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
 ) -> dict[str, str]:
     # Resolve an incident and clear its dedupe lock.
     try:
+        incident = service.get_incident(incident_id=incident_id)
+        if incident is None:
+            raise HTTPException(status_code=404, detail="Incident not found")
+        project_service.ensure_project_owned_by_user(project_id=incident.project_id, user_id=current_user.id)
         resolved = service.resolve_incident(incident_id=incident_id)
         if resolved is None:
             raise HTTPException(status_code=404, detail="Incident not found")

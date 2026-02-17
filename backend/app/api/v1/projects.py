@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.application.services.project_service import ProjectService
-from app.config import Settings
-from app.dependencies import get_project_service, get_settings
+from app.dependencies import get_current_user, get_project_service
+from app.domain.models.user import User
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,10 +28,11 @@ class CreateProjectIn(BaseModel):
 @router.get("", response_model=list[ProjectOut])
 def list_projects(
     service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
 ) -> list[ProjectOut]:
     # List projects for selector population.
     try:
-        projects = service.list_projects()
+        projects = service.list_projects(user_id=current_user.id)
         logger.debug("Projects list endpoint called", extra={"count": len(projects)})
         return [
             ProjectOut(
@@ -52,13 +53,11 @@ def list_projects(
 def create_project(
     payload: CreateProjectIn,
     service: ProjectService = Depends(get_project_service),
-    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
 ) -> ProjectOut:
-    # Create a new project in dev-only management mode.
+    # Create a new project for the authenticated user.
     try:
-        if settings.app_env != "dev":
-            raise HTTPException(status_code=403, detail="not enabled")
-        project = service.create_project(name=payload.name)
+        project = service.create_project(name=payload.name, user_id=current_user.id)
         return ProjectOut(id=project.id, name=project.name, created_at=project.created_at)
     except HTTPException:
         raise

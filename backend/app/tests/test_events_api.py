@@ -58,7 +58,8 @@ class FakeIngestKeyService:
         ]
         _ = self._records
 
-    def resolve_project_id(self, plaintext_key: str) -> str | None:
+    def resolve_project_id(self, plaintext_key: str, allow_unowned_project: bool = False) -> str | None:
+        _ = allow_unowned_project
         key_hash = hash_key(plaintext_key)
         if key_hash in self._revoked_hashes:
             return None
@@ -89,7 +90,7 @@ def test_ingest_event_requires_ingest_key_header() -> None:
     response = client.post("/api/v1/events", json=_payload())
 
     assert response.status_code == 401
-    assert response.json() == {"detail": "missing ingest key"}
+    assert response.json() == {"error": {"code": "unauthorized", "message": "missing ingest key"}}
     app.dependency_overrides.clear()
 
 
@@ -114,9 +115,9 @@ def test_ingest_event_rejects_invalid_and_revoked_key() -> None:
     )
 
     assert invalid.status_code == 401
-    assert invalid.json() == {"detail": "invalid ingest key"}
+    assert invalid.json() == {"error": {"code": "unauthorized", "message": "invalid ingest key"}}
     assert revoked.status_code == 401
-    assert revoked.json() == {"detail": "invalid ingest key"}
+    assert revoked.json() == {"error": {"code": "unauthorized", "message": "invalid ingest key"}}
     app.dependency_overrides.clear()
 
 

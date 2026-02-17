@@ -7,7 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.ingest_event_service import IngestEventService
-from app.dependencies import get_ingest_event_service, get_ingest_key_service
+from app.config import Settings
+from app.dependencies import get_ingest_event_service, get_ingest_key_service, get_settings
 from app.domain.models.event import Event
 from app.logger import get_logger
 
@@ -75,13 +76,17 @@ def ingest_event(
     payload: EventIn,
     service: IngestEventService = Depends(get_ingest_event_service),
     ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
+    settings: Settings = Depends(get_settings),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
 ) -> dict[str, str]:
     # Receive an SDK event and delegate processing to application services.
     try:
         if not ingest_key:
             raise HTTPException(status_code=401, detail="missing ingest key")
-        project_id = ingest_key_service.resolve_project_id(ingest_key)
+        project_id = ingest_key_service.resolve_project_id(
+            ingest_key,
+            allow_unowned_project=settings.app_env == "dev",
+        )
         if project_id is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
 

@@ -38,20 +38,91 @@ export interface CreateKeyResponse {
   created_at: string;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+}
+
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(status: number, message: string, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = window.localStorage.getItem(frontendConfig.authTokenStorageKey);
+  const headers = new Headers(init?.headers ?? {});
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
   const response = await fetch(`${frontendConfig.apiBaseUrl}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
     ...init,
   });
 
+  let responseMessage = `Request failed: ${response.status}`;
+  let responseCode: string | undefined;
+  try {
+    const errorBody = (await response.clone().json()) as {
+      error?: { code?: string; message?: string };
+      detail?: string;
+    };
+    if (errorBody.error?.message) {
+      responseMessage = errorBody.error.message;
+      responseCode = errorBody.error.code;
+    } else if (typeof errorBody.detail === "string" && errorBody.detail) {
+      responseMessage = errorBody.detail;
+    }
+  } catch {
+    // ignore non-json error payloads
+  }
+
+  if (response.status === 401) {
+    unauthorizedHandler?.();
+    throw new ApiError(response.status, responseMessage, responseCode);
+  }
+
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    throw new ApiError(response.status, responseMessage, responseCode);
   }
 
   return (await response.json()) as T;
+}
+
+export async function register(email: string, password: string): Promise<AuthUser> {
+  return request<AuthUser>("/api/v1/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function login(email: string, password: string): Promise<LoginResponse> {
+  return request<LoginResponse>("/api/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
 }
 
 export async function fetchMetrics(projectId: string): Promise<RealtimeMetrics> {

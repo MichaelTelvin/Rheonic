@@ -1,23 +1,32 @@
 # Dependency wiring for API routes.
 from functools import lru_cache
 
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import inspect, text
+
+from app.application.services.auth_service import AuthService
 from app.application.services.detect_incidents_service import DetectIncidentsService
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.metrics_service import MetricsService
 from app.application.services.project_service import ProjectService
 from app.config import Settings
+from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base
 from app.infrastructure.db.repositories.event_repository_impl import EventRepositoryImpl
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
+from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
 from app.infrastructure.redis.redis_client import RedisClient
 from app.infrastructure.redis.rolling_window import RollingWindow
 from app.logger import get_logger
+from app.security.jwt_tokens import decode_access_token
 
 logger = get_logger(__name__)
+_bearer = HTTPBearer(auto_error=False)
 
 
 @lru_cache
@@ -26,6 +35,7 @@ def get_db_session_factory() -> DatabaseSessionFactory:
     try:
         session_factory = DatabaseSessionFactory()
         Base.metadata.create_all(bind=session_factory.engine)
+        _ensure_legacy_schema(session_factory)
         logger.info("Database session factory initialized")
         return session_factory
     except Exception:
@@ -138,3 +148,49 @@ def get_ingest_key_service() -> IngestKeyService:
     except Exception:
         logger.exception("Failed to construct ingest key service")
         raise
+
+
+def get_auth_service() -> AuthService:
+    # Provide an auth service instance.
+    try:
+        return AuthService(
+            user_repository=UserRepositoryImpl(session_factory=get_db_session_factory()),
+            settings=get_settings(),
+        )
+    except Exception:
+        logger.exception("Failed to construct auth service")
+        raise
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> User:
+    # Validate bearer token and load user.
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=401, detail="not authenticated")
+    token_payload = decode_access_token(
+        token=credentials.credentials,
+        secret=get_settings().jwt_secret,
+        algorithm=get_settings().jwt_alg,
+    )
+    if token_payload is None:
+        raise HTTPException(status_code=401, detail="invalid token")
+    user_id = str(token_payload.get("sub") or "")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="invalid token")
+    user = UserRepositoryImpl(session_factory=get_db_session_factory()).get_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="invalid token")
+    return user
+
+
+def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
+    # Add backward-compatible columns for dev databases created before tenancy/auth.
+    inspector = inspect(session_factory.engine)
+    if "projects" not in inspector.get_table_names():
+        return
+    project_columns = {column["name"] for column in inspector.get_columns("projects")}
+    if "user_id" in project_columns:
+        return
+    with session_factory.engine.begin() as connection:
+        connection.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR(64)"))
