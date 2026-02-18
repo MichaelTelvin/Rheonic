@@ -68,13 +68,29 @@ body {
   padding: 76px 24px 28px;
 }
 
+.dashboard-content {
+  width: 100%;
+}
+
 .header-row {
-  margin-top: 8px;
-  margin-bottom: 16px;
+  margin-top: 10px;
+  margin-bottom: 18px;
+}
+
+.dashboard-top {
+  display: grid;
+  grid-template-columns: 1fr clamp(240px, 24vw, 360px);
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 18px;
 }
 
 .header-subtitle {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
+}
+
+.title-section {
+  padding-bottom: 18px;
 }
 
 .title-status-row {
@@ -86,17 +102,28 @@ body {
 }
 
 .status-block {
-  display: grid;
-  justify-items: end;
-  gap: 3px;
+  width: clamp(240px, 24vw, 360px);
+  justify-self: end;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
   margin-top: 10px;
 }
 
-.status-detail {
-  display: inline-flex;
-  align-items: baseline;
+.status-block .badge-row {
+  width: 100%;
+  display: flex;
   justify-content: flex-end;
-  gap: 6px;
+}
+
+.status-detail {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 10px;
+  align-items: baseline;
   font-size: 0.8rem;
   margin: 0;
   white-space: nowrap;
@@ -104,15 +131,45 @@ body {
 }
 
 .status-label {
-  display: inline-block;
-  min-width: 108px;
+  min-width: 0;
   text-align: right;
 }
 
 .status-value {
-  display: inline-block;
-  min-width: 96px;
-  text-align: left;
+  min-width: 0;
+  text-align: right;
+  justify-self: end;
+}
+
+.time-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-header {
+  display: grid;
+  grid-auto-rows: auto;
+  row-gap: 10px;
+  margin-bottom: 18px;
+}
+
+.dashboard-header-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+  align-items: start;
+}
+
+.title-block .page-title {
+  margin: 0;
+}
+
+.title-block .page-subtitle {
+  margin: 10px 0 0;
+  color: rgba(229, 231, 235, 0.88);
+}
+
+.dashboard-header-status .status-block {
+  justify-self: end;
 }
 
 .app-header {
@@ -668,13 +725,10 @@ pre {
     flex-wrap: wrap;
   }
 
-  .title-status-row {
-    justify-content: space-between;
-    gap: 10px;
-  }
-
   .status-block {
-    justify-items: start;
+    justify-self: start;
+    text-align: left;
+    align-items: flex-start;
     gap: 3px;
     margin-top: 8px;
   }
@@ -684,14 +738,13 @@ pre {
     white-space: normal;
   }
 
-  .title-status-row {
-    flex-direction: column;
-    align-items: flex-start;
+  .dashboard-top {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
-  .status-block .status-pill {
+  .status-block .badge-row {
     justify-content: flex-start;
-    margin: 0 0 5px;
   }
 
   .status-label {

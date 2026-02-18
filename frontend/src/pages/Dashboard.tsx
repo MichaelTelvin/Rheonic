@@ -495,112 +495,122 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     <>
       <AppHeader userEmail={userEmail} onSignOut={onSignOut} />
       <main className="dashboard">
+        <div className="dashboard-content">
+          <div className="dashboard-header">
+            <div className="dashboard-header-row dashboard-header-title">
+              <div className="title-block">
+                <h1 className="page-title">Runtime Safety Dashboard</h1>
+                <p className="page-subtitle">Real-time usage and incident monitoring</p>
+              </div>
+              <div />
+            </div>
 
-        <header className="header-row">
-          <h1 className="title">Runtime Safety Dashboard</h1>
-          <div className="title-status-row">
-            <p className="subtle header-subtitle">Real-time usage and incident monitoring</p>
-            <div className="status-block">
-              <StatusPill connected={isApiConnected} />
-              <p className="subtle status-detail">
-                <span className="status-label">Metrics updated:</span>
-                <span className="status-value">{formatTime(lastMetricsSuccessAt)}</span>
-              </p>
-              <p className="subtle status-detail">
-                <span className="status-label">Incidents updated:</span>
-                <span className="status-value">{formatTime(lastIncidentsSuccessAt)}</span>
-              </p>
+            <div className="dashboard-header-row dashboard-header-status">
+              <div />
+              <div className="status-block">
+                <div className="badge-row">
+                  <StatusPill connected={isApiConnected} />
+                </div>
+                <div className="subtle status-detail">
+                  <span className="status-label">Metrics updated:</span>
+                  <span className="status-value time-value">{formatTime(lastMetricsSuccessAt)}</span>
+                </div>
+                <div className="subtle status-detail">
+                  <span className="status-label">Incidents updated:</span>
+                  <span className="status-value time-value">{formatTime(lastIncidentsSuccessAt)}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </header>
 
-      <section className="toolbar">
-        <label htmlFor="project-select">Project</label>
-        <select
-          id="project-select"
-          value={projectId ?? ""}
-          onChange={(event) => setProjectId(event.target.value || null)}
-          disabled={loadingProjects || projects.length === 0}
-        >
-          {projectId ? null : <option value="">Select project</option>}
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
-        <button type="button" className="toolbar-button" onClick={() => setShowCreateProjectModal(true)}>
-          New Project
-        </button>
-        <button type="button" className="toolbar-button" onClick={() => setShowKeysModal(true)} disabled={!projectId}>
-          Keys
-        </button>
-      </section>
-
-      {projectWarning ? <p className="warning-text">{projectWarning}</p> : null}
-      {metricsWarning ? <p className="warning-text">{metricsWarning}</p> : null}
-      {incidentsWarning ? <p className="warning-text">{incidentsWarning}</p> : null}
-      {globalBanner ? <section className="banner">{globalBanner}</section> : null}
-      {projectId && hasLocalDemoKey ? <p className="subtle">Demo key set locally (no secret shown).</p> : null}
-
-      {!projectId ? (
-        <section className="empty">
-          <p>Select a project to see realtime metrics.</p>
-          {projects.length === 0 ? (
-            <>
-              <p>Create your first project to start collecting metrics.</p>
-              <button type="button" onClick={() => setShowCreateProjectModal(true)}>
-                Create your first project
-              </button>
-            </>
-          ) : (
-            <p>Select a project to view metrics.</p>
-          )}
-        </section>
-      ) : null}
-
-      {projectId ? (
-        <>
-          <section className="metrics-grid">
-            <Card>
-              <h2 className="card-title">Requests (60s)</h2>
-              <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.requests_60s ?? 0)}</p>
-              <div className="meta-row">
-                <span className="metric-subtitle">Last 60 seconds</span>
-              </div>
-              <Sparkline values={requestsSeries} stroke="var(--req)" />
-            </Card>
-
-            <Card>
-              <h2 className="card-title">Tokens (60s)</h2>
-              <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.tokens_60s ?? 0)}</p>
-              <div className="meta-row">
-                <span className="metric-subtitle">Last 60 seconds</span>
-              </div>
-              <Sparkline values={tokensSeries} stroke="var(--accent)" />
-            </Card>
-          </section>
-
-          <section className="incidents-section">
-            <h2 className="section-title">Open Incidents</h2>
-            {loadingIncidents && sortedIncidents.length === 0 ? <p className="subtle">Loading incidents...</p> : null}
-            {!loadingIncidents && sortedIncidents.length === 0 ? (
-              <section className="empty">No open incidents right now. This project looks stable.</section>
-            ) : null}
-
-            <div className="list">
-              {sortedIncidents.map((incident) => (
-                <IncidentRow
-                  key={incident.id}
-                  incident={incident}
-                  resolving={resolvingIds.has(incident.id)}
-                  onResolve={onResolve}
-                />
+          <section className="toolbar">
+            <label htmlFor="project-select">Project</label>
+            <select
+              id="project-select"
+              value={projectId ?? ""}
+              onChange={(event) => setProjectId(event.target.value || null)}
+              disabled={loadingProjects || projects.length === 0}
+            >
+              {projectId ? null : <option value="">Select project</option>}
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
               ))}
-            </div>
+            </select>
+            <button type="button" className="toolbar-button" onClick={() => setShowCreateProjectModal(true)}>
+              New Project
+            </button>
+            <button type="button" className="toolbar-button" onClick={() => setShowKeysModal(true)} disabled={!projectId}>
+              Keys
+            </button>
           </section>
-        </>
-      ) : null}
+
+          {projectWarning ? <p className="warning-text">{projectWarning}</p> : null}
+          {metricsWarning ? <p className="warning-text">{metricsWarning}</p> : null}
+          {incidentsWarning ? <p className="warning-text">{incidentsWarning}</p> : null}
+          {globalBanner ? <section className="banner">{globalBanner}</section> : null}
+          {projectId && hasLocalDemoKey ? <p className="subtle">Demo key set locally (no secret shown).</p> : null}
+
+          {!projectId ? (
+            <section className="empty">
+              <p>Select a project to see realtime metrics.</p>
+              {projects.length === 0 ? (
+                <>
+                  <p>Create your first project to start collecting metrics.</p>
+                  <button type="button" onClick={() => setShowCreateProjectModal(true)}>
+                    Create your first project
+                  </button>
+                </>
+              ) : (
+                <p>Select a project to view metrics.</p>
+              )}
+            </section>
+          ) : null}
+
+          {projectId ? (
+            <>
+              <section className="metrics-grid">
+                <Card>
+                  <h2 className="card-title">Requests (60s)</h2>
+                  <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.requests_60s ?? 0)}</p>
+                  <div className="meta-row">
+                    <span className="metric-subtitle">Last 60 seconds</span>
+                  </div>
+                  <Sparkline values={requestsSeries} stroke="var(--req)" />
+                </Card>
+
+                <Card>
+                  <h2 className="card-title">Tokens (60s)</h2>
+                  <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.tokens_60s ?? 0)}</p>
+                  <div className="meta-row">
+                    <span className="metric-subtitle">Last 60 seconds</span>
+                  </div>
+                  <Sparkline values={tokensSeries} stroke="var(--accent)" />
+                </Card>
+              </section>
+
+              <section className="incidents-section">
+                <h2 className="section-title">Open Incidents</h2>
+                {loadingIncidents && sortedIncidents.length === 0 ? <p className="subtle">Loading incidents...</p> : null}
+                {!loadingIncidents && sortedIncidents.length === 0 ? (
+                  <section className="empty">No open incidents right now. This project looks stable.</section>
+                ) : null}
+
+                <div className="list">
+                  {sortedIncidents.map((incident) => (
+                    <IncidentRow
+                      key={incident.id}
+                      incident={incident}
+                      resolving={resolvingIds.has(incident.id)}
+                      onResolve={onResolve}
+                    />
+                  ))}
+                </div>
+              </section>
+            </>
+          ) : null}
+        </div>
 
       {showCreateProjectModal ? (
         <div className="modal-overlay" role="dialog" aria-modal="true">
