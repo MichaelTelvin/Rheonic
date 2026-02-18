@@ -80,6 +80,21 @@ class ProjectRepositoryImpl(ProjectRepository):
             logger.exception("Failed fetching project by name", extra={"name": name})
             raise
 
+    def get_project_by_name_for_user(self, name: str, user_id: str) -> Project | None:
+        # Return a single project by exact name scoped to a user.
+        try:
+            with self._session_factory.create_session() as session:
+                record = (
+                    session.query(ProjectRecord)
+                    .filter(ProjectRecord.name == name)
+                    .filter(ProjectRecord.user_id == user_id)
+                    .first()
+                )
+            return _to_domain(record) if record is not None else None
+        except Exception:
+            logger.exception("Failed fetching project by name for user", extra={"name": name, "user_id": user_id})
+            raise
+
 
 def _to_domain(record: ProjectRecord) -> Project:
     # Convert SQLAlchemy project record to domain model.

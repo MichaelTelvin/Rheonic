@@ -1,5 +1,6 @@
 # Event ingest endpoints.
 from datetime import datetime, timezone
+import time
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Header, status
@@ -8,9 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.ingest_event_service import IngestEventService
 from app.config import Settings
-from app.dependencies import get_ingest_event_service, get_ingest_key_service, get_settings
+from app.dependencies import get_ingest_event_service, get_ingest_key_service, get_redis_client, get_settings
 from app.domain.models.event import Event
+from app.infrastructure.redis.redis_client import RedisClient
 from app.logger import get_logger
+from app.security.ingest_keys import hash_key
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -71,13 +74,25 @@ def _resolve_tokens(payload: EventIn) -> tuple[int, int, int]:
     return input_tokens, output_tokens, 0
 
 
+def _idempotency_key(project_id: str, idempotency_key: str) -> str:
+    # Build Redis idempotency key with hashed input key.
+    return f"idem:{project_id}:{hash_key(idempotency_key)}"
+
+
+def _rate_limit_key(ingest_key: str, window_epoch_minute: int) -> str:
+    # Build Redis rate-limit key for the current minute window.
+    return f"rl:{hash_key(ingest_key)}:{window_epoch_minute}"
+
+
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
 def ingest_event(
     payload: EventIn,
     service: IngestEventService = Depends(get_ingest_event_service),
     ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
+    redis_client: RedisClient = Depends(get_redis_client),
     settings: Settings = Depends(get_settings),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> dict[str, str]:
     # Receive an SDK event and delegate processing to application services.
     try:
@@ -89,6 +104,37 @@ def ingest_event(
         )
         if project_id is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
+
+        if idempotency_key:
+            try:
+                accepted = redis_client.set_nx_ex(
+                    _idempotency_key(project_id=project_id, idempotency_key=idempotency_key),
+                    "1",
+                    settings.idempotency_ttl_seconds,
+                )
+                if not accepted:
+                    logger.info(
+                        "Duplicate ingest skipped by idempotency key",
+                        extra={"project_id": project_id},
+                    )
+                    return {"status": "accepted"}
+            except Exception:
+                logger.warning("Idempotency Redis unavailable; processing ingest in fail-open mode")
+
+        try:
+            window_epoch_minute = int(time.time()) // 60
+            rate_limit_counter = redis_client.incr(_rate_limit_key(ingest_key=ingest_key, window_epoch_minute=window_epoch_minute))
+            if rate_limit_counter == 1:
+                redis_client.expire(
+                    _rate_limit_key(ingest_key=ingest_key, window_epoch_minute=window_epoch_minute),
+                    60,
+                )
+            if rate_limit_counter > settings.ingest_rate_limit_per_minute:
+                raise HTTPException(status_code=429, detail="rate limit exceeded")
+        except HTTPException:
+            raise
+        except Exception:
+            logger.warning("Rate-limit Redis unavailable; processing ingest in fail-open mode")
 
         # normalize token values from payload
         input_tokens, output_tokens, total_tokens = _resolve_tokens(payload)

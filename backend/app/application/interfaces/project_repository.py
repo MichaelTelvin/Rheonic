@@ -31,3 +31,8 @@ class ProjectRepository(ABC):
     def get_project_by_name(self, name: str) -> Project | None:
         # Return project by exact name if it exists.
         raise NotImplementedError
+
+    @abstractmethod
+    def get_project_by_name_for_user(self, name: str, user_id: str) -> Project | None:
+        # Return project by exact name scoped to user if it exists.
+        raise NotImplementedError

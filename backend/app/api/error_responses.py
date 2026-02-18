@@ -22,6 +22,7 @@ def default_code_for_status(status_code: int) -> str:
         401: "unauthorized",
         403: "forbidden",
         404: "not_found",
+        429: "too_many_requests",
         409: "conflict",
         500: "internal_error",
     }.get(status_code, "request_error")

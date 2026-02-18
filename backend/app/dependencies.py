@@ -214,3 +214,26 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
                     "ON incidents (project_id, status, fingerprint)"
                 )
             )
+    try:
+        with session_factory.engine.begin() as connection:
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_events_project_id_ts ON events (project_id, ts)"))
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_incidents_project_status_created_at "
+                    "ON incidents (project_id, status, created_at)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_ingest_keys_project_status "
+                    "ON ingest_keys (project_id, status)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_projects_user_id_name "
+                    "ON projects (user_id, name)"
+                )
+            )
+    except Exception:
+        logger.warning("Skipping one or more legacy index backfills; dev DB may require reset")

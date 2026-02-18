@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     cors_origins: str = ""
     database_url: str = ""
     redis_url: str = ""
+    idempotency_ttl_seconds: int = 120
+    ingest_rate_limit_per_minute: int = 600
     baseline_window_count: int = 30
     incident_dedup_window_seconds: int = 300
 

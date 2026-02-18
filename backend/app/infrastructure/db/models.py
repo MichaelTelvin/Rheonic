@@ -13,6 +13,9 @@ class Base(DeclarativeBase):
 class EventRecord(Base):
     # Persistence record for events.
     __tablename__ = "events"
+    __table_args__ = (
+        Index("ix_events_project_id_ts", "project_id", "ts"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -39,6 +42,7 @@ class IncidentRecord(Base):
     __tablename__ = "incidents"
     __table_args__ = (
         Index("ix_incidents_project_status_fingerprint", "project_id", "status", "fingerprint"),
+        Index("ix_incidents_project_status_created_at", "project_id", "status", "created_at"),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -60,9 +64,12 @@ class IncidentRecord(Base):
 class ProjectRecord(Base):
     # Persistence record for projects.
     __tablename__ = "projects"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_projects_user_id_name"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
     user_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("users.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -76,6 +83,7 @@ class IngestKeyRecord(Base):
     __tablename__ = "ingest_keys"
     __table_args__ = (
         UniqueConstraint("key_hash", name="uq_ingest_keys_key_hash"),
+        Index("ix_ingest_keys_project_status", "project_id", "status"),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

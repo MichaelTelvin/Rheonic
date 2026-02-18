@@ -33,7 +33,7 @@ class ProjectService:
         # Create a new project after validation and duplicate check.
         try:
             normalized_name = sanitize_project_name(name)
-            if self._project_repository.get_project_by_name(normalized_name) is not None:
+            if self._project_repository.get_project_by_name_for_user(normalized_name, user_id=user_id) is not None:
                 raise HTTPException(status_code=409, detail="project name already exists")
             project = Project(
                 id=str(uuid4()),

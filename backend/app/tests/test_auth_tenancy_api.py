@@ -1,9 +1,12 @@
 # API tests for auth and tenant scoping.
 import os
+from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 from app.dependencies import get_db_session_factory, get_settings
+from app.infrastructure.db.models import IncidentRecord
 from app.main import app
 
 
@@ -71,6 +74,68 @@ def test_tenant_scoping_blocks_cross_user_project_access(tmp_path) -> None:
         other_headers = _auth_headers(client, "other@example.com", "password123")
         other_list = client.get(f"/api/v1/projects/{project_id}/keys", headers=other_headers)
         assert other_list.status_code == 404
+
+
+def test_tenant_scoping_blocks_cross_user_key_revoke(tmp_path) -> None:
+    # User B must not revoke User A key.
+    with _make_client(tmp_path) as client:
+        owner_headers = _auth_headers(client, "owner_revoke@example.com", "password123")
+        create_project = client.post("/api/v1/projects", json={"name": "Owner Revoke Project"}, headers=owner_headers)
+        assert create_project.status_code == 200
+        project_id = create_project.json()["id"]
+        create_key = client.post(f"/api/v1/projects/{project_id}/keys", json={"name": "prod"}, headers=owner_headers)
+        assert create_key.status_code == 200
+        key_id = create_key.json()["key_id"]
+
+        other_headers = _auth_headers(client, "other_revoke@example.com", "password123")
+        revoke_response = client.post(f"/api/v1/keys/{key_id}/revoke", headers=other_headers)
+        assert revoke_response.status_code == 404
+
+
+def test_tenant_scoping_blocks_cross_user_incident_resolve(tmp_path) -> None:
+    # User B must not resolve User A incident.
+    with _make_client(tmp_path) as client:
+        owner_headers = _auth_headers(client, "owner_inc@example.com", "password123")
+        create_project = client.post("/api/v1/projects", json={"name": "Owner Incident Project"}, headers=owner_headers)
+        assert create_project.status_code == 200
+        project_id = create_project.json()["id"]
+
+        incident_id = str(uuid4())
+        now = datetime.now(timezone.utc)
+        session_factory = get_db_session_factory()
+        with session_factory.create_session() as session:
+            session.add(
+                IncidentRecord(
+                    id=incident_id,
+                    project_id=project_id,
+                    type="burn_spike",
+                    severity="low",
+                    status="open",
+                    evidence={"count": 1},
+                    created_at=now,
+                    resolved_at=None,
+                    fingerprint=None,
+                    last_seen_at=now,
+                )
+            )
+            session.commit()
+
+        other_headers = _auth_headers(client, "other_inc@example.com", "password123")
+        resolve_response = client.post(f"/api/v1/incidents/{incident_id}/resolve", headers=other_headers)
+        assert resolve_response.status_code == 404
+
+
+def test_tenant_scoping_blocks_cross_user_metrics_read(tmp_path) -> None:
+    # User B must not read realtime metrics for User A project.
+    with _make_client(tmp_path) as client:
+        owner_headers = _auth_headers(client, "owner_metrics@example.com", "password123")
+        create_project = client.post("/api/v1/projects", json={"name": "Owner Metrics Project"}, headers=owner_headers)
+        assert create_project.status_code == 200
+        project_id = create_project.json()["id"]
+
+        other_headers = _auth_headers(client, "other_metrics@example.com", "password123")
+        metrics_response = client.get(f"/api/v1/metrics/realtime?project_id={project_id}", headers=other_headers)
+        assert metrics_response.status_code == 404
 
 
 def test_sanitization_rejects_invalid_email_project_and_key_label(tmp_path) -> None:
