@@ -1,5 +1,6 @@
 # Application service for event ingestion.
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
@@ -11,6 +12,12 @@ from app.logger import get_logger
 
 logger = get_logger(__name__)
 
+INCIDENT_TYPE_BURN_SPIKE = "burn_spike"
+INCIDENT_TYPE_REQUEST_SPIKE = "request_spike"
+LOW_SEVERITY_RATIO = 2.0
+MEDIUM_SEVERITY_RATIO = 5.0
+HIGH_SEVERITY_RATIO = 10.0
+
 
 class IngestEventService:
     # Orchestrates ingest flow without transport or persistence details.
@@ -20,17 +27,17 @@ class IngestEventService:
         event_repository: EventRepository,
         realtime_counters: RealtimeCounterStore,
         incident_repository: IncidentRepository,
-        threshold_tokens_60s: int,
-        threshold_req_60s: int,
-        incident_lock_ttl_seconds: int,
+        baseline_window_count: int,
+        incident_dedup_window_seconds: int,
+        now_provider: Callable[[], datetime] | None = None,
     ) -> None:
         # Initialize service dependencies.
         self._event_repository = event_repository
         self._realtime_counters = realtime_counters
         self._incident_repository = incident_repository
-        self._threshold_tokens_60s = threshold_tokens_60s
-        self._threshold_req_60s = threshold_req_60s
-        self._incident_lock_ttl_seconds = incident_lock_ttl_seconds
+        self._baseline_window_count = baseline_window_count
+        self._incident_dedup_window_seconds = incident_dedup_window_seconds
+        self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
 
     def ingest(self, event: Event) -> None:
         # Persist a single event and update realtime counters.
@@ -44,63 +51,155 @@ class IngestEventService:
                 total_tokens=event.total_tokens,
             )
             requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=event.project_id)
-            self._create_incidents_if_needed(event=event, requests_60s=requests_60s, tokens_60s=tokens_60s)
+            try:
+                baseline_req_60s, baseline_tok_60s = self._realtime_counters.record_baseline_snapshot(
+                    project_id=event.project_id,
+                    requests_60s=requests_60s,
+                    tokens_60s=tokens_60s,
+                    max_windows=self._baseline_window_count,
+                )
+                self._create_incident_if_needed(
+                    event=event,
+                    requests_60s=requests_60s,
+                    tokens_60s=tokens_60s,
+                    baseline_req_60s=baseline_req_60s,
+                    baseline_tok_60s=baseline_tok_60s,
+                )
+            except Exception:
+                logger.exception("Anomaly evaluation failed during ingest", extra={"project_id": event.project_id})
             logger.info("Event ingested", extra={"project_id": event.project_id, "event_id": event.id})
         except Exception:
             logger.exception("Ingest service failed", extra={"project_id": event.project_id})
             raise
 
-    def _create_incidents_if_needed(self, event: Event, requests_60s: int, tokens_60s: int) -> None:
-        # Evaluate simple threshold rules and create deduped incidents.
-        now = datetime.now(timezone.utc)
-        rules = [
-            ("burn_spike", tokens_60s, self._threshold_tokens_60s),
-            ("request_storm", requests_60s, self._threshold_req_60s),
-        ]
-        for incident_type, value, threshold in rules:
-            if value < threshold:
-                continue
-            severity = _severity_for_value(value=value, threshold=threshold)
-            lock_acquired = self._realtime_counters.acquire_incident_lock(
-                project_id=event.project_id,
-                incident_type=incident_type,
-                ttl_seconds=self._incident_lock_ttl_seconds,
+    def _create_incident_if_needed(
+        self,
+        event: Event,
+        requests_60s: int,
+        tokens_60s: int,
+        baseline_req_60s: float,
+        baseline_tok_60s: float,
+    ) -> None:
+        # Evaluate baseline-ratio anomaly and create or dedupe the incident.
+        req_ratio = requests_60s / max(baseline_req_60s, 1.0)
+        tok_ratio = tokens_60s / max(baseline_tok_60s, 1.0)
+        max_ratio = max(req_ratio, tok_ratio)
+        if max_ratio < LOW_SEVERITY_RATIO:
+            return
+
+        token_spike = tok_ratio >= LOW_SEVERITY_RATIO
+        request_spike = req_ratio >= LOW_SEVERITY_RATIO
+        incident_type = INCIDENT_TYPE_BURN_SPIKE if token_spike else INCIDENT_TYPE_REQUEST_SPIKE
+        if not token_spike and not request_spike:
+            return
+
+        severity = _severity_for_ratio(max_ratio=max_ratio)
+        now = self._now_provider()
+        fingerprint = _build_incident_fingerprint(
+            project_id=event.project_id,
+            incident_type=incident_type,
+            provider=event.provider,
+            model=event.model,
+            environment=event.environment,
+        )
+        evidence = {
+            "current_requests_60s": requests_60s,
+            "current_tokens_60s": tokens_60s,
+            "baseline_req_60s": baseline_req_60s,
+            "baseline_tok_60s": baseline_tok_60s,
+            "req_ratio": req_ratio,
+            "tok_ratio": tok_ratio,
+            "provider": event.provider,
+            "model": event.model,
+            "environment": event.environment,
+            "count": 1,
+            "last_seen": now.isoformat(),
+            "max_ratio_seen": max_ratio,
+        }
+        dedup_after = now - timedelta(seconds=self._incident_dedup_window_seconds)
+        open_incident = self._incident_repository.get_open_incident_by_fingerprint(
+            project_id=event.project_id,
+            fingerprint=fingerprint,
+            created_after=dedup_after,
+        )
+        if open_incident is not None:
+            current_count = _int_evidence_value(open_incident.evidence.get("count"), default=1)
+            existing_max_ratio = _float_evidence_value(open_incident.evidence.get("max_ratio_seen"), default=max_ratio)
+            evidence["count"] = current_count + 1
+            evidence["max_ratio_seen"] = max(existing_max_ratio, max_ratio)
+            updated_severity = _max_severity(severity, open_incident.severity)
+            self._incident_repository.update_open_incident_activity(
+                incident_id=open_incident.id,
+                evidence=evidence,
+                last_seen_at=now,
+                severity=updated_severity,
             )
-            if not lock_acquired:
-                logger.debug(
-                    "Incident deduped by lock",
-                    extra={"project_id": event.project_id, "incident_type": incident_type},
-                )
-                continue
-            incident = Incident(
-                id=str(uuid4()),
-                project_id=event.project_id,
-                incident_type=incident_type,
-                severity=severity,
-                status="open",
-                created_at=now,
-                resolved_at=None,
-                evidence={
-                    "requests_60s": requests_60s,
-                    "tokens_60s": tokens_60s,
-                    "threshold_req_60s": self._threshold_req_60s,
-                    "threshold_tokens_60s": self._threshold_tokens_60s,
-                    "provider": event.provider,
-                    "model": event.model,
-                    "timestamp": now.isoformat(),
-                },
-            )
-            self._incident_repository.create_incident(incident=incident)
             logger.info(
-                "Incident created from ingest",
-                extra={"project_id": event.project_id, "incident_type": incident_type, "severity": severity},
+                "Incident deduped and updated",
+                extra={"project_id": event.project_id, "incident_id": open_incident.id, "incident_type": incident_type},
             )
+            return
+
+        incident = Incident(
+            id=str(uuid4()),
+            project_id=event.project_id,
+            incident_type=incident_type,
+            severity=severity,
+            status="open",
+            created_at=now,
+            resolved_at=None,
+            evidence=evidence,
+            fingerprint=fingerprint,
+            last_seen_at=now,
+        )
+        self._incident_repository.create_incident(incident=incident)
+        logger.info(
+            "Incident created from ingest",
+            extra={"project_id": event.project_id, "incident_type": incident_type, "severity": severity},
+        )
 
 
-def _severity_for_value(value: int, threshold: int) -> str:
-    # Map threshold breach multipliers to incident severity.
-    if value >= threshold * 4:
+def _severity_for_ratio(max_ratio: float) -> str:
+    # Map baseline ratio breach to incident severity.
+    if max_ratio >= HIGH_SEVERITY_RATIO:
         return "high"
-    if value >= threshold * 2:
+    if max_ratio >= MEDIUM_SEVERITY_RATIO:
         return "medium"
     return "low"
+
+
+def _max_severity(left: str, right: str) -> str:
+    # Return the higher-priority severity.
+    ordering = {"low": 1, "medium": 2, "high": 3}
+    return left if ordering.get(left, 0) >= ordering.get(right, 0) else right
+
+
+def _build_incident_fingerprint(
+    project_id: str,
+    incident_type: str,
+    provider: str | None,
+    model: str | None,
+    environment: str | None,
+) -> str:
+    # Build deterministic dedupe fingerprint for open incidents.
+    return f"{project_id}:{incident_type}:{provider or 'na'}:{model or 'na'}:{environment or 'na'}"
+
+
+def _int_evidence_value(value: object, default: int) -> int:
+    # Parse integer evidence value with default fallback.
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _float_evidence_value(value: object, default: float) -> float:
+    # Parse float evidence value with default fallback.
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default

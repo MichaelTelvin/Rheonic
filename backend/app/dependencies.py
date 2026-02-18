@@ -86,9 +86,8 @@ def get_ingest_event_service() -> IngestEventService:
             event_repository=EventRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
-            threshold_tokens_60s=get_settings().threshold_tokens_60s,
-            threshold_req_60s=get_settings().threshold_req_60s,
-            incident_lock_ttl_seconds=get_settings().incident_lock_ttl_seconds,
+            baseline_window_count=get_settings().baseline_window_count,
+            incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
         )
         logger.debug("Ingest event service provided")
         return service
@@ -187,10 +186,31 @@ def get_current_user(
 def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
     # Add backward-compatible columns for dev databases created before tenancy/auth.
     inspector = inspect(session_factory.engine)
-    if "projects" not in inspector.get_table_names():
+    table_names = set(inspector.get_table_names())
+    if "projects" not in table_names:
         return
     project_columns = {column["name"] for column in inspector.get_columns("projects")}
     if "user_id" in project_columns:
+        pass
+    else:
+        with session_factory.engine.begin() as connection:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR(64)"))
+
+    if "incidents" not in table_names:
         return
+    incident_columns = {column["name"] for column in inspector.get_columns("incidents")}
     with session_factory.engine.begin() as connection:
-        connection.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR(64)"))
+        if "fingerprint" not in incident_columns:
+            connection.execute(text("ALTER TABLE incidents ADD COLUMN fingerprint VARCHAR(255)"))
+        if "last_seen_at" not in incident_columns:
+            connection.execute(text("ALTER TABLE incidents ADD COLUMN last_seen_at TIMESTAMP"))
+
+    incident_indexes = {index["name"] for index in inspector.get_indexes("incidents")}
+    if "ix_incidents_project_status_fingerprint" not in incident_indexes:
+        with session_factory.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_incidents_project_status_fingerprint "
+                    "ON incidents (project_id, status, fingerprint)"
+                )
+            )

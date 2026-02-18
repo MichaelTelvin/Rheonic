@@ -1,7 +1,7 @@
 # Database model placeholders.
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -37,12 +37,16 @@ class EventRecord(Base):
 class IncidentRecord(Base):
     # Persistence record for incidents.
     __tablename__ = "incidents"
+    __table_args__ = (
+        Index("ix_incidents_project_status_fingerprint", "project_id", "status", "fingerprint"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     project_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     type: Mapped[str] = mapped_column(String(32), nullable=False)
     severity: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    fingerprint: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     evidence: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -50,6 +54,7 @@ class IncidentRecord(Base):
         server_default=func.now(),
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ProjectRecord(Base):

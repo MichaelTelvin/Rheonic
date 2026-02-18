@@ -14,3 +14,5 @@ class Incident:
     created_at: datetime
     resolved_at: datetime | None
     evidence: dict[str, object]
+    fingerprint: str | None = None
+    last_seen_at: datetime | None = None

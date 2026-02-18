@@ -79,6 +79,30 @@ class RedisClient:
             logger.exception("Redis ZRANGEBYSCORE failed", extra={"key": key})
             raise
 
+    def lpush(self, key: str, value: object) -> int:
+        # Push value to the head of a list and return the list length.
+        try:
+            return int(self._redis.lpush(key, value))
+        except Exception:
+            logger.exception("Redis LPUSH failed", extra={"key": key})
+            raise
+
+    def ltrim(self, key: str, start: int, stop: int) -> bool:
+        # Trim list to the inclusive start/stop range.
+        try:
+            return bool(self._redis.ltrim(key, start, stop))
+        except Exception:
+            logger.exception("Redis LTRIM failed", extra={"key": key, "start": start, "stop": stop})
+            raise
+
+    def lrange(self, key: str, start: int, stop: int) -> list[object]:
+        # Return list values for inclusive start/stop range.
+        try:
+            return list(self._redis.lrange(key, start, stop))
+        except Exception:
+            logger.exception("Redis LRANGE failed", extra={"key": key, "start": start, "stop": stop})
+            raise
+
     def incr(self, key: str) -> int:
         # Increment a key by one and return its value.
         try:

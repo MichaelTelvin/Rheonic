@@ -27,9 +27,11 @@ class IncidentRepositoryImpl(IncidentRepository):
                     type=incident.incident_type,
                     severity=incident.severity,
                     status=incident.status,
+                    fingerprint=incident.fingerprint,
                     evidence=incident.evidence,
                     created_at=incident.created_at,
                     resolved_at=incident.resolved_at,
+                    last_seen_at=incident.last_seen_at,
                 )
                 session.add(record)
                 session.commit()
@@ -56,6 +58,63 @@ class IncidentRepositoryImpl(IncidentRepository):
             return _to_domain(record)
         except Exception:
             logger.exception("Failed fetching open incident", extra={"project_id": project_id, "incident_type": incident_type})
+            raise
+
+    def get_open_incident_by_fingerprint(
+        self,
+        project_id: str,
+        fingerprint: str,
+        created_after: datetime,
+    ) -> Incident | None:
+        # Return open incident by fingerprint created within dedup window.
+        try:
+            with self._session_factory.create_session() as session:
+                record = (
+                    session.query(IncidentRecord)
+                    .filter(IncidentRecord.project_id == project_id)
+                    .filter(IncidentRecord.status == "open")
+                    .filter(IncidentRecord.fingerprint == fingerprint)
+                    .filter(IncidentRecord.created_at >= created_after)
+                    .order_by(IncidentRecord.created_at.desc())
+                    .first()
+                )
+            if record is None:
+                return None
+            return _to_domain(record)
+        except Exception:
+            logger.exception(
+                "Failed fetching open incident by fingerprint",
+                extra={"project_id": project_id, "fingerprint": fingerprint},
+            )
+            raise
+
+    def update_open_incident_activity(
+        self,
+        incident_id: str,
+        evidence: dict[str, object],
+        last_seen_at: datetime,
+        severity: str,
+    ) -> Incident | None:
+        # Update dedup activity fields for an existing open incident.
+        try:
+            with self._session_factory.create_session() as session:
+                record = (
+                    session.query(IncidentRecord)
+                    .filter(IncidentRecord.id == incident_id)
+                    .filter(IncidentRecord.status == "open")
+                    .first()
+                )
+                if record is None:
+                    return None
+                record.evidence = evidence
+                record.last_seen_at = last_seen_at
+                record.severity = severity
+                session.add(record)
+                session.commit()
+                session.refresh(record)
+            return _to_domain(record)
+        except Exception:
+            logger.exception("Failed updating open incident activity", extra={"incident_id": incident_id})
             raise
 
     def list_by_project(self, project_id: str, status: str = "open") -> list[Incident]:
@@ -116,4 +175,6 @@ def _to_domain(record: IncidentRecord) -> Incident:
         created_at=record.created_at,
         resolved_at=record.resolved_at,
         evidence=record.evidence,
+        fingerprint=record.fingerprint,
+        last_seen_at=record.last_seen_at,
     )

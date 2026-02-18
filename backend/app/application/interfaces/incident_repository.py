@@ -1,5 +1,6 @@
 # Incident repository interface.
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from app.domain.models.incident import Incident
 
@@ -15,6 +16,27 @@ class IncidentRepository(ABC):
     @abstractmethod
     def get_open_incident_by_type(self, project_id: str, incident_type: str) -> Incident | None:
         # Return an open incident for a project/type if one exists.
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_open_incident_by_fingerprint(
+        self,
+        project_id: str,
+        fingerprint: str,
+        created_after: datetime,
+    ) -> Incident | None:
+        # Return an open incident for a project/fingerprint created after timestamp.
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_open_incident_activity(
+        self,
+        incident_id: str,
+        evidence: dict[str, object],
+        last_seen_at: datetime,
+        severity: str,
+    ) -> Incident | None:
+        # Update deduped incident evidence/last_seen/severity and return updated row.
         raise NotImplementedError
 
     @abstractmethod

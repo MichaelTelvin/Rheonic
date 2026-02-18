@@ -10,6 +10,7 @@ class AppConfig:
     rolling_window_seconds: int = 60
     rolling_window_ms: int = rolling_window_seconds * 1000
     rolling_counter_ttl_seconds: int = 600
+    baseline_counter_ttl_seconds: int = 3600
 
 
 app_config = AppConfig()
@@ -28,8 +29,7 @@ class Settings(BaseSettings):
     cors_origins: str = ""
     database_url: str = ""
     redis_url: str = ""
-    threshold_tokens_60s: int = 50_000
-    threshold_req_60s: int = 200
-    incident_lock_ttl_seconds: int = 1800
+    baseline_window_count: int = 30
+    incident_dedup_window_seconds: int = 300
 
     # TODO: Add env-driven database, Redis, auth, and provider settings.
