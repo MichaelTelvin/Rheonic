@@ -36,7 +36,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: clamp(36px, 10vh, 110px) 24px 24px;
+  padding: clamp(56px, 10vh, 140px) 24px 24px;
 }
 
 .auth-card {
@@ -50,39 +50,6 @@ body {
   gap: 8px;
 }
 
-.auth-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 64px;
-}
-
-.auth-brand {
-  margin: 0;
-  letter-spacing: 0.03em;
-  text-align: right;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.auth-brand.subtle {
-  font-size: 1.15rem;
-  color: rgba(229, 231, 235, 0.32);
-}
-
-.auth-brand-icon {
-  width: 15px;
-  height: 15px;
-  fill: rgba(245, 199, 93, 0.72);
-  flex: 0 0 auto;
-}
-
-.auth-brand-icon-cutout {
-  fill: rgba(21, 28, 43, 0.95);
-}
-
 .auth-actions {
   display: flex;
   gap: 8px;
@@ -90,44 +57,98 @@ body {
   margin-top: 4px;
 }
 
+.auth-actions .modal-button {
+  width: 116px;
+  justify-content: center;
+}
+
 .dashboard {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 10px 24px 28px;
+  padding: 24px 24px 28px;
 }
 
 .header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-top: 10px;
-  margin-bottom: 34px;
+  margin-top: 8px;
+  margin-bottom: 16px;
 }
 
-.top-header {
+.header-subtitle {
+  margin: 8px 0 0;
+}
+
+.title-status-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.status-block {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  margin-top: 10px;
+}
+
+.status-detail {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+  font-size: 0.8rem;
+  margin: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-label {
+  display: inline-block;
+  min-width: 108px;
+  text-align: right;
+}
+
+.status-value {
+  display: inline-block;
+  min-width: 96px;
+  text-align: left;
+}
+
+.app-header {
+  background: rgba(255, 255, 255, 0.015);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(4px);
+}
+
+.app-header-inner {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  min-height: 60px;
-  margin: 0 0 36px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.018);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  min-height: 50px;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .brand-cluster {
   display: flex;
   align-items: center;
-  min-height: 34px;
+  min-height: 24px;
 }
 
 .top-brand {
   letter-spacing: 0.02em;
+  font-size: 0.74rem;
+  color: rgba(229, 231, 235, 0.44);
   font-weight: 500;
 }
 
@@ -135,6 +156,23 @@ body {
   margin: 0;
   font-size: 1.9rem;
   line-height: 1.2;
+}
+
+.auth-card .title {
+  margin-bottom: 40px;
+}
+
+.auth-card form {
+  display: grid;
+}
+
+.auth-card form label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.auth-card form .text-input {
+  margin-bottom: 8px;
 }
 
 .subtle {
@@ -147,7 +185,7 @@ body {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  margin-bottom: 34px;
+  margin-bottom: 16px;
 }
 
 label {
@@ -226,19 +264,6 @@ select {
   font-size: 0.78rem;
 }
 
-.status-panel {
-  display: grid;
-  gap: 6px;
-  text-align: right;
-  min-width: 260px;
-}
-
-.status-strip {
-  display: grid;
-  gap: 6px;
-  justify-items: end;
-}
-
 .user-menu {
   display: flex;
   align-items: center;
@@ -267,42 +292,22 @@ select {
   padding: 6px 10px;
 }
 
-.status-pill {
+.status-block .status-pill {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 0.8rem;
+  padding: 4px 9px;
+  font-size: 0.75rem;
   border: 1px solid transparent;
-  margin-left: auto;
-  margin-bottom: 4px;
+  margin: 0 0 6px;
 }
-
-.status-row {
-  display: grid;
-  grid-template-columns: 132px max-content;
-  justify-content: end;
-  column-gap: 8px;
-}
-
-.status-label {
-  text-align: right;
-  white-space: nowrap;
-}
-
-.status-value {
-  text-align: left;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.status-pill.connected {
+.status-block .status-pill.connected {
   color: #d1fae5;
   background: rgba(134, 239, 172, 0.12);
   border-color: rgba(134, 239, 172, 0.35);
 }
 
-.status-pill.disconnected {
+.status-block .status-pill.disconnected {
   color: #ffe4e6;
   background: rgba(253, 164, 175, 0.12);
   border-color: rgba(253, 164, 175, 0.35);
@@ -320,7 +325,7 @@ select {
 }
 
 .input-error-slot {
-  margin: -3px 0 2px;
+  margin: 2px 0 10px;
   min-height: 20px;
   font-size: 0.79rem;
   line-height: 1.2;
@@ -607,6 +612,10 @@ pre {
   background: rgba(167, 139, 250, 0.2);
 }
 
+.auth-submit-button {
+  width: 116px;
+}
+
 .modal-button.copied {
   border-color: rgba(134, 239, 172, 0.55);
   background: rgba(134, 239, 172, 0.18);
@@ -636,28 +645,16 @@ pre {
 
 @media (max-width: 780px) {
   .dashboard {
-    padding: 28px 16px 18px;
+    padding: 20px 16px 18px;
   }
 
   .header-row {
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 18px;
+    margin-bottom: 12px;
   }
 
-  .top-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-    margin: 0 0 18px;
-    padding: 10px 12px;
-    min-height: 0;
-  }
-
-  .status-panel {
-    text-align: left;
-    width: 100%;
-    min-width: 0;
+  .app-header-inner {
+    padding: 0 16px;
+    min-height: 48px;
   }
 
   .user-menu {
@@ -665,17 +662,39 @@ pre {
     flex-wrap: wrap;
   }
 
-  .status-strip {
+  .title-status-row {
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .status-block {
     justify-items: start;
+    gap: 3px;
+    margin-top: 8px;
   }
 
-  .status-pill {
-    margin-left: 0;
+  .status-detail {
+    justify-content: flex-start;
+    white-space: normal;
   }
 
-  .status-row {
-    grid-template-columns: 132px max-content;
-    justify-content: start;
+  .title-status-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .status-block .status-pill {
+    justify-content: flex-start;
+    margin: 0 0 5px;
+  }
+
+  .status-label {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .status-value {
+    min-width: 0;
   }
 
   .metrics-grid {

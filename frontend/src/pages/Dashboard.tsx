@@ -18,6 +18,7 @@ import {
   type RealtimeMetrics,
 } from "../api/client";
 import { Card } from "../components/Card";
+import { AppHeader } from "../components/AppHeader";
 import { IncidentItem as IncidentRow } from "../components/IncidentItem";
 import { Sparkline } from "../components/Sparkline";
 import { StatusPill } from "../components/StatusPill";
@@ -491,41 +492,27 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   void clockTick;
 
   return (
-    <main className="dashboard">
-      <header className="top-header">
-        <div className="brand-cluster">
-          <p className="subtle top-brand">LLMTokenBurnGuard</p>
-        </div>
-        {userEmail ? (
-          <div className="user-menu">
-            <span className="user-chip">
-              <span className="user-chip-label">Signed in as</span>{" "}
-              <span className="user-chip-email">{userEmail}</span>
-            </span>
-            <button type="button" className="modal-button auth-signout" onClick={onSignOut}>
-              Sign out
-            </button>
-          </div>
-        ) : null}
-      </header>
+    <>
+      <AppHeader userEmail={userEmail} onSignOut={onSignOut} />
+      <main className="dashboard">
 
-      <header className="header-row">
-        <div>
-          <h1 className="title">LLMTokenBurnGuard Dashboard</h1>
-          <p className="subtle">Incident-first runtime safety overview</p>
-        </div>
-        <section className="status-strip">
-          <StatusPill connected={isApiConnected} />
-          <div className="status-row subtle">
-            <span className="status-label">Metrics updated:</span>
-            <span className="status-value">{formatTime(lastMetricsSuccessAt)}</span>
+        <header className="header-row">
+          <h1 className="title">Runtime Safety Dashboard</h1>
+          <div className="title-status-row">
+            <p className="subtle header-subtitle">Real-time usage and incident monitoring</p>
+            <div className="status-block">
+              <StatusPill connected={isApiConnected} />
+              <p className="subtle status-detail">
+                <span className="status-label">Metrics updated:</span>
+                <span className="status-value">{formatTime(lastMetricsSuccessAt)}</span>
+              </p>
+              <p className="subtle status-detail">
+                <span className="status-label">Incidents updated:</span>
+                <span className="status-value">{formatTime(lastIncidentsSuccessAt)}</span>
+              </p>
+            </div>
           </div>
-          <div className="status-row subtle">
-            <span className="status-label">Incidents updated:</span>
-            <span className="status-value">{formatTime(lastIncidentsSuccessAt)}</span>
-          </div>
-        </section>
-      </header>
+        </header>
 
       <section className="toolbar">
         <label htmlFor="project-select">Project</label>
@@ -580,7 +567,6 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
               <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.requests_60s ?? 0)}</p>
               <div className="meta-row">
                 <span className="metric-subtitle">Last 60 seconds</span>
-                <span>Updated {formatTime(lastMetricsSuccessAt)}</span>
               </div>
               <Sparkline values={requestsSeries} stroke="var(--req)" />
             </Card>
@@ -590,7 +576,6 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
               <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.tokens_60s ?? 0)}</p>
               <div className="meta-row">
                 <span className="metric-subtitle">Last 60 seconds</span>
-                <span>Updated {formatTime(lastMetricsSuccessAt)}</span>
               </div>
               <Sparkline values={tokensSeries} stroke="var(--accent)" />
             </Card>
@@ -830,6 +815,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
           </div>
         </div>
       ) : null}
-    </main>
+      </main>
+    </>
   );
 }
