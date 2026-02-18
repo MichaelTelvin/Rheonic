@@ -65,7 +65,7 @@ body {
 .dashboard {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 24px 24px 28px;
+  padding: 76px 24px 28px;
 }
 
 .header-row {
@@ -116,6 +116,12 @@ body {
 }
 
 .app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 30;
   background: rgba(255, 255, 255, 0.015);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   backdrop-filter: blur(4px);
