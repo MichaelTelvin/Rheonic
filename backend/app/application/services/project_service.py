@@ -56,3 +56,31 @@ class ProjectService:
         if project is None or project.user_id != user_id:
             raise HTTPException(status_code=404, detail="project not found")
         return project
+
+    def get_project_protect_settings(self, project_id: str, user_id: str) -> Project:
+        # Return protect settings for an owned project.
+        return self.ensure_project_owned_by_user(project_id=project_id, user_id=user_id)
+
+    def update_project_protect_settings(
+        self,
+        project_id: str,
+        user_id: str,
+        protect_enabled: bool,
+        protect_fail_mode: str,
+        protect_max_req_per_min: int | None,
+        protect_max_tok_per_min: int | None,
+        protect_decision_timeout_ms: int,
+    ) -> Project:
+        # Update protect settings for an owned project.
+        self.ensure_project_owned_by_user(project_id=project_id, user_id=user_id)
+        updated = self._project_repository.update_project_protect_settings(
+            project_id=project_id,
+            protect_enabled=protect_enabled,
+            protect_fail_mode=protect_fail_mode,
+            protect_max_req_per_min=protect_max_req_per_min,
+            protect_max_tok_per_min=protect_max_tok_per_min,
+            protect_decision_timeout_ms=protect_decision_timeout_ms,
+        )
+        if updated is None:
+            raise HTTPException(status_code=404, detail="project not found")
+        return updated

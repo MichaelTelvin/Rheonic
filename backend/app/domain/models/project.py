@@ -10,3 +10,8 @@ class Project:
     name: str
     user_id: str | None
     created_at: datetime
+    protect_enabled: bool = False
+    protect_fail_mode: str = "open"
+    protect_max_req_per_min: int | None = None
+    protect_max_tok_per_min: int | None = None
+    protect_decision_timeout_ms: int = 100

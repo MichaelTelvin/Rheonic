@@ -1,5 +1,6 @@
 import type { EventPayload } from "./eventBuilder.js";
 import { sdkNodeConfig } from "./config.js";
+import { ProtectEngine, type ProtectContext, type ProtectEvaluation, type ProtectFailMode } from "./protectEngine.js";
 
 export type OverflowPolicy = "drop_oldest" | "drop_newest";
 
@@ -21,6 +22,8 @@ export interface ClientConfig {
   maxQueueSize?: number;
   overflowPolicy?: OverflowPolicy;
   requestTimeoutMs?: number;
+  protectFailMode?: ProtectFailMode;
+  protectDecisionTimeoutMs?: number;
   debug?: boolean;
 }
 
@@ -33,6 +36,7 @@ export class Client {
   private readonly maxQueueSize: number;
   private readonly overflowPolicy: OverflowPolicy;
   private readonly requestTimeoutMs: number;
+  private readonly protectEngine: ProtectEngine;
   private readonly debug: boolean;
   private queue: EventPayload[] = [];
   private isFlushing = false;
@@ -50,8 +54,17 @@ export class Client {
     this.maxQueueSize = config.maxQueueSize ?? sdkNodeConfig.defaultMaxQueueSize;
     this.overflowPolicy = config.overflowPolicy ?? "drop_oldest";
     this.requestTimeoutMs = config.requestTimeoutMs ?? sdkNodeConfig.defaultRequestTimeoutMs;
+    const initialFailMode = config.protectFailMode ?? sdkNodeConfig.defaultProtectFailMode;
+    const initialProtectTimeoutMs = config.protectDecisionTimeoutMs ?? sdkNodeConfig.defaultProtectDecisionTimeoutMs;
     const envDebug = process.env.LLMTBG_DEBUG === "1" || process.env.LLMTBG_DEBUG === "true";
     this.debug = config.debug ?? envDebug;
+    this.protectEngine = new ProtectEngine({
+      baseUrl: this.baseUrl,
+      ingestKey: this.ingestKey,
+      fallbackRequestTimeoutMs: this.requestTimeoutMs,
+      initialFailMode,
+      initialDecisionTimeoutMs: initialProtectTimeoutMs,
+    });
 
     this.timer = setInterval(() => {
       void this.flush();
@@ -113,6 +126,10 @@ export class Client {
     } finally {
       this.isFlushing = false;
     }
+  }
+
+  public async evaluateProtectDecision(context: ProtectContext): Promise<ProtectEvaluation> {
+    return this.protectEngine.evaluate(context);
   }
 
   public async flushWithTimeout(timeoutMs = sdkNodeConfig.defaultFlushTimeoutMs): Promise<void> {

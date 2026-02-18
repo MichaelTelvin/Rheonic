@@ -16,6 +16,7 @@ except ModuleNotFoundError:  # pragma: no cover
 
 from llmtokenburnguard.logger import configure_logging, get_logger
 from llmtokenburnguard.config import sdk_config
+from llmtokenburnguard.protect_engine import ProtectEngine
 
 logger = get_logger(__name__)
 
@@ -87,6 +88,8 @@ class Client:
         max_queue_size: int = sdk_config.default_max_queue_size,
         overflow_policy: OverflowPolicy = "drop_oldest",
         request_timeout_s: float = sdk_config.default_request_timeout_s,
+        protect_fail_mode: str = sdk_config.default_protect_fail_mode,
+        protect_decision_timeout_ms: int = sdk_config.default_protect_decision_timeout_ms,
         debug: bool = False,
         http_client: HttpTransport | None = None,
     ) -> None:
@@ -104,6 +107,8 @@ class Client:
             self.max_queue_size = max_queue_size
             self.overflow_policy = overflow_policy
             self.request_timeout_s = request_timeout_s
+            self.protect_fail_mode = protect_fail_mode
+            self.protect_decision_timeout_ms = protect_decision_timeout_ms
 
             self._queue: deque[dict[str, Any]] = deque()
             self._lock = threading.Lock()
@@ -118,6 +123,14 @@ class Client:
                 self._http_client = httpx.Client(timeout=self.request_timeout_s)
             else:
                 self._http_client = _UrllibTransport(timeout_s=self.request_timeout_s)
+            self._protect_engine = ProtectEngine(
+                base_url=self.base_url,
+                ingest_key=self.ingest_key,
+                request_timeout_s=self.request_timeout_s,
+                fail_mode=self.protect_fail_mode,
+                decision_timeout_ms=self.protect_decision_timeout_ms,
+                http_client=self._http_client,
+            )
 
             self._worker = threading.Thread(target=self._run_flush_loop, daemon=True)
             self._is_closed = False
@@ -187,6 +200,16 @@ class Client:
                 "failed": self._failed,
             }
 
+    def preflight_protect_decision(self, context: dict[str, object]) -> dict[str, object]:
+        # Evaluate always-on protect decision for provider call preflight.
+        try:
+            return self._protect_engine.evaluate(context)
+        except Exception:
+            logger.exception("protect preflight failed unexpectedly")
+            if self.protect_fail_mode == "closed":
+                return {"decision": "block", "reason": "decision_unavailable"}
+            return {"decision": "allow", "reason": "decision_unavailable"}
+
     def _run_flush_loop(self) -> None:
         # Periodically flush queue until stopped.
         while not self._stop_event.wait(self.flush_interval_s):
@@ -247,6 +270,8 @@ def create_client(
     max_queue_size: int = sdk_config.default_max_queue_size,
     overflow_policy: OverflowPolicy = "drop_oldest",
     request_timeout_s: float = sdk_config.default_request_timeout_s,
+    protect_fail_mode: str = sdk_config.default_protect_fail_mode,
+    protect_decision_timeout_ms: int = sdk_config.default_protect_decision_timeout_ms,
     debug: bool = False,
 ) -> Client:
     # Create and register default client used by module-level helpers.
@@ -261,6 +286,8 @@ def create_client(
         max_queue_size=max_queue_size,
         overflow_policy=overflow_policy,
         request_timeout_s=request_timeout_s,
+        protect_fail_mode=protect_fail_mode,
+        protect_decision_timeout_ms=protect_decision_timeout_ms,
         debug=debug,
     )
     return _default_client

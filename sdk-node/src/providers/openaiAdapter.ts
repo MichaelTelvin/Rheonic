@@ -1,5 +1,6 @@
 import { Client } from "../client.js";
 import { buildEvent } from "../eventBuilder.js";
+import { LLMTBGBlockedError } from "../protectEngine.js";
 
 export interface OpenAIInstrumentationOptions {
   client: Client;
@@ -19,6 +20,16 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
   openaiClient.chat.completions.create = async (...args: unknown[]) => {
     const startedAt = Date.now();
     const model = extractRequestedModel(args);
+    const protectDecision = await options.client.evaluateProtectDecision({
+      provider: "openai",
+      model,
+      feature: options.feature,
+      input_tokens_estimate: extractInputTokensEstimate(args),
+      max_output_tokens: extractMaxOutputTokens(args),
+    });
+    if (protectDecision.decision === "block") {
+      throw new LLMTBGBlockedError(protectDecision.reason);
+    }
 
     try {
       const response = await originalCreate(...args);
@@ -30,6 +41,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
           request: {
             endpoint: options.endpoint,
             feature: options.feature,
+            protect_decision: protectDecision.decision === "warn" ? "warn" : undefined,
           },
           response: {
             latency_ms: Date.now() - startedAt,
@@ -48,6 +60,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
           request: {
             endpoint: options.endpoint,
             feature: options.feature,
+            protect_decision: protectDecision.decision === "warn" ? "warn" : undefined,
           },
           response: {
             latency_ms: Date.now() - startedAt,
@@ -70,6 +83,34 @@ function extractRequestedModel(args: unknown[]): string | null {
     return typeof maybeModel === "string" ? maybeModel : null;
   }
   return null;
+}
+
+function extractInputTokensEstimate(args: unknown[]): number | undefined {
+  const firstArg = args[0];
+  if (!firstArg || typeof firstArg !== "object") {
+    return undefined;
+  }
+  if ("input_tokens" in firstArg && typeof (firstArg as { input_tokens?: unknown }).input_tokens === "number") {
+    return (firstArg as { input_tokens: number }).input_tokens;
+  }
+  if ("max_tokens" in firstArg && typeof (firstArg as { max_tokens?: unknown }).max_tokens === "number") {
+    return (firstArg as { max_tokens: number }).max_tokens;
+  }
+  return undefined;
+}
+
+function extractMaxOutputTokens(args: unknown[]): number | undefined {
+  const firstArg = args[0];
+  if (!firstArg || typeof firstArg !== "object") {
+    return undefined;
+  }
+  if ("max_tokens" in firstArg && typeof (firstArg as { max_tokens?: unknown }).max_tokens === "number") {
+    return (firstArg as { max_tokens: number }).max_tokens;
+  }
+  if ("max_output_tokens" in firstArg && typeof (firstArg as { max_output_tokens?: unknown }).max_output_tokens === "number") {
+    return (firstArg as { max_output_tokens: number }).max_output_tokens;
+  }
+  return undefined;
 }
 
 function extractResponseModel(response: unknown): string | null {

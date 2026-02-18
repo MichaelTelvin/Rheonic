@@ -5,6 +5,8 @@ export const sdkNodeConfig = {
   defaultMaxQueueSize: 1000,
   defaultFlushTimeoutMs: 500,
   defaultRequestTimeoutMs: 1000,
+  defaultProtectDecisionTimeoutMs: 100,
+  defaultProtectFailMode: "open",
   retryDelayMinMs: 200,
   retryDelayMaxMs: 400,
 } as const;

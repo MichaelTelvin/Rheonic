@@ -39,6 +39,14 @@ class RedisClient:
             logger.exception("Redis SET failed", extra={"key": key, "ttl_seconds": ttl_seconds})
             raise
 
+    def set_persistent(self, key: str, value: object) -> None:
+        # Set value without expiration.
+        try:
+            self._redis.set(key, value)
+        except Exception:
+            logger.exception("Redis SET persistent failed", extra={"key": key})
+            raise
+
     def set_nx_ex(self, key: str, value: object, ttl_seconds: int) -> bool:
         # Set key only when absent and apply TTL.
         try:

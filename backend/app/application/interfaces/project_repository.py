@@ -36,3 +36,16 @@ class ProjectRepository(ABC):
     def get_project_by_name_for_user(self, name: str, user_id: str) -> Project | None:
         # Return project by exact name scoped to user if it exists.
         raise NotImplementedError
+
+    @abstractmethod
+    def update_project_protect_settings(
+        self,
+        project_id: str,
+        protect_enabled: bool,
+        protect_fail_mode: str,
+        protect_max_req_per_min: int | None,
+        protect_max_tok_per_min: int | None,
+        protect_decision_timeout_ms: int,
+    ) -> Project | None:
+        # Update and return project protect configuration.
+        raise NotImplementedError

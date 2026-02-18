@@ -370,6 +370,7 @@ def test_dedup_updates_incident_within_window_and_creates_after_window() -> None
         event_repository=FakeEventRepository(),
         realtime_counters=realtime,  # type: ignore[arg-type]
         incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
         baseline_window_count=30,
         incident_dedup_window_seconds=300,
         now_provider=_make_now_provider([t0, t1, t2]),
@@ -399,6 +400,7 @@ def test_both_spikes_create_single_burn_spike_with_both_ratios() -> None:
         event_repository=FakeEventRepository(),
         realtime_counters=realtime,  # type: ignore[arg-type]
         incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
         baseline_window_count=30,
         incident_dedup_window_seconds=300,
         now_provider=_make_now_provider([now]),

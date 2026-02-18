@@ -8,6 +8,7 @@ from app.application.input_validation import sanitize_key_label
 from app.application.interfaces.ingest_key_repository import IngestKeyRepository
 from app.application.interfaces.project_repository import ProjectRepository
 from app.domain.models.ingest_key import IngestKey
+from app.domain.models.project import Project
 from app.logger import get_logger
 from app.security.ingest_keys import generate_ingest_key, hash_key, last4
 
@@ -28,6 +29,13 @@ class IngestKeyService:
 
     def resolve_project_id(self, plaintext_key: str, allow_unowned_project: bool = False) -> str | None:
         # Resolve active key to project id.
+        project = self.resolve_project(plaintext_key=plaintext_key, allow_unowned_project=allow_unowned_project)
+        if project is None:
+            return None
+        return project.id
+
+    def resolve_project(self, plaintext_key: str, allow_unowned_project: bool = False) -> Project | None:
+        # Resolve active key to project.
         key_hash = hash_key(plaintext_key)
         key = self._ingest_key_repository.get_active_by_hash(key_hash)
         if key is None:
@@ -37,7 +45,7 @@ class IngestKeyService:
             return None
         if project.user_id is None and not allow_unowned_project:
             return None
-        return key.project_id
+        return project
 
     def list_keys(self, project_id: str, user_id: str) -> list[IngestKey]:
         # List keys for an existing project.

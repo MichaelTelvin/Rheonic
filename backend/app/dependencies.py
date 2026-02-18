@@ -10,6 +10,7 @@ from app.application.services.detect_incidents_service import DetectIncidentsSer
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.metrics_service import MetricsService
+from app.application.services.protect_service import ProtectService
 from app.application.services.project_service import ProjectService
 from app.config import Settings
 from app.domain.models.user import User
@@ -21,6 +22,7 @@ from app.infrastructure.db.repositories.incident_repository_impl import Incident
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
 from app.infrastructure.redis.redis_client import RedisClient
+from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.infrastructure.redis.rolling_window import RollingWindow
 from app.logger import get_logger
 from app.security.jwt_tokens import decode_access_token
@@ -68,6 +70,18 @@ def get_rolling_window() -> RollingWindow:
 
 
 @lru_cache
+def get_incident_severity_cache() -> IncidentSeverityCache:
+    # Provide a shared Redis incident severity cache adapter.
+    try:
+        adapter = IncidentSeverityCache(redis_client=get_redis_client())
+        logger.debug("Incident severity cache initialized")
+        return adapter
+    except Exception:
+        logger.exception("Failed to initialize incident severity cache")
+        raise
+
+
+@lru_cache
 def get_settings() -> Settings:
     # Provide runtime settings.
     try:
@@ -86,6 +100,7 @@ def get_ingest_event_service() -> IngestEventService:
             event_repository=EventRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
+            incident_severity_cache=get_incident_severity_cache(),
             baseline_window_count=get_settings().baseline_window_count,
             incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
         )
@@ -114,6 +129,7 @@ def get_detect_incidents_service() -> DetectIncidentsService:
         service = DetectIncidentsService(
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
+            incident_severity_cache=get_incident_severity_cache(),
         )
         logger.debug("Detect incidents service provided")
         return service
@@ -146,6 +162,19 @@ def get_ingest_key_service() -> IngestKeyService:
         return service
     except Exception:
         logger.exception("Failed to construct ingest key service")
+        raise
+
+
+def get_protect_service() -> ProtectService:
+    # Provide protect decision service.
+    try:
+        return ProtectService(
+            ingest_key_service=get_ingest_key_service(),
+            realtime_counters=get_rolling_window(),
+            incident_severity_cache=get_incident_severity_cache(),
+        )
+    except Exception:
+        logger.exception("Failed to construct protect service")
         raise
 
 
@@ -195,6 +224,17 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
     else:
         with session_factory.engine.begin() as connection:
             connection.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR(64)"))
+    with session_factory.engine.begin() as connection:
+        if "protect_enabled" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_enabled BOOLEAN DEFAULT 0 NOT NULL"))
+        if "protect_fail_mode" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_fail_mode VARCHAR(16) DEFAULT 'open' NOT NULL"))
+        if "protect_max_req_per_min" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_max_req_per_min INTEGER"))
+        if "protect_max_tok_per_min" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_max_tok_per_min INTEGER"))
+        if "protect_decision_timeout_ms" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_decision_timeout_ms INTEGER DEFAULT 100 NOT NULL"))
 
     if "incidents" not in table_names:
         return

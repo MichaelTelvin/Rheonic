@@ -1,10 +1,20 @@
 import { Client, type ClientConfig, type ClientStats, type OverflowPolicy } from "./client.js";
 import { buildEvent, type BuildEventInput, type EventPayload } from "./eventBuilder.js";
+import { LLMTBGBlockedError } from "./protectEngine.js";
 import { instrumentOpenAI as instrumentOpenAIProvider, type OpenAIInstrumentationOptions } from "./providers/openaiAdapter.js";
 
 let defaultClient: Client | null = null;
 
-export { Client, type ClientConfig, type ClientStats, type OverflowPolicy, buildEvent, type BuildEventInput, type EventPayload };
+export {
+  Client,
+  LLMTBGBlockedError,
+  type ClientConfig,
+  type ClientStats,
+  type OverflowPolicy,
+  buildEvent,
+  type BuildEventInput,
+  type EventPayload,
+};
 
 export function createClient(config: ClientConfig): Client {
   if (defaultClient) {

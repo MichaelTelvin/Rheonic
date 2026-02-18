@@ -60,6 +60,11 @@ class ProjectRepositoryImpl(ProjectRepository):
                     id=project.id,
                     name=project.name,
                     user_id=project.user_id,
+                    protect_enabled=project.protect_enabled,
+                    protect_fail_mode=project.protect_fail_mode,
+                    protect_max_req_per_min=project.protect_max_req_per_min,
+                    protect_max_tok_per_min=project.protect_max_tok_per_min,
+                    protect_decision_timeout_ms=project.protect_decision_timeout_ms,
                     created_at=project.created_at,
                 )
                 session.add(record)
@@ -95,6 +100,34 @@ class ProjectRepositoryImpl(ProjectRepository):
             logger.exception("Failed fetching project by name for user", extra={"name": name, "user_id": user_id})
             raise
 
+    def update_project_protect_settings(
+        self,
+        project_id: str,
+        protect_enabled: bool,
+        protect_fail_mode: str,
+        protect_max_req_per_min: int | None,
+        protect_max_tok_per_min: int | None,
+        protect_decision_timeout_ms: int,
+    ) -> Project | None:
+        # Update and return project protect settings.
+        try:
+            with self._session_factory.create_session() as session:
+                record = session.query(ProjectRecord).filter(ProjectRecord.id == project_id).first()
+                if record is None:
+                    return None
+                record.protect_enabled = protect_enabled
+                record.protect_fail_mode = protect_fail_mode
+                record.protect_max_req_per_min = protect_max_req_per_min
+                record.protect_max_tok_per_min = protect_max_tok_per_min
+                record.protect_decision_timeout_ms = protect_decision_timeout_ms
+                session.add(record)
+                session.commit()
+                session.refresh(record)
+            return _to_domain(record)
+        except Exception:
+            logger.exception("Failed updating project protect settings", extra={"project_id": project_id})
+            raise
+
 
 def _to_domain(record: ProjectRecord) -> Project:
     # Convert SQLAlchemy project record to domain model.
@@ -103,4 +136,9 @@ def _to_domain(record: ProjectRecord) -> Project:
         name=record.name,
         user_id=record.user_id,
         created_at=record.created_at,
+        protect_enabled=bool(getattr(record, "protect_enabled", False)),
+        protect_fail_mode=str(getattr(record, "protect_fail_mode", "open") or "open"),
+        protect_max_req_per_min=getattr(record, "protect_max_req_per_min", None),
+        protect_max_tok_per_min=getattr(record, "protect_max_tok_per_min", None),
+        protect_decision_timeout_ms=int(getattr(record, "protect_decision_timeout_ms", 100) or 100),
     )

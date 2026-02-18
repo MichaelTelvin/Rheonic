@@ -145,6 +145,7 @@ def _make_client(tmp_path, settings: Settings | None = None) -> tuple[TestClient
         event_repository=EventRepositoryImpl(session_factory=session_factory),
         realtime_counters=rolling_window,
         incident_repository=IncidentRepositoryImpl(session_factory=session_factory),
+        incident_severity_cache=None,
         baseline_window_count=30,
         incident_dedup_window_seconds=300,
     )

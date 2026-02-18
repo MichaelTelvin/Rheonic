@@ -6,6 +6,7 @@ from uuid import uuid4
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.event_repository import EventRepository
 from app.application.interfaces.incident_repository import IncidentRepository
+from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.domain.models.incident import Incident
 from app.domain.models.event import Event
 from app.logger import get_logger
@@ -27,6 +28,7 @@ class IngestEventService:
         event_repository: EventRepository,
         realtime_counters: RealtimeCounterStore,
         incident_repository: IncidentRepository,
+        incident_severity_cache: IncidentSeverityCache | None,
         baseline_window_count: int,
         incident_dedup_window_seconds: int,
         now_provider: Callable[[], datetime] | None = None,
@@ -35,6 +37,7 @@ class IngestEventService:
         self._event_repository = event_repository
         self._realtime_counters = realtime_counters
         self._incident_repository = incident_repository
+        self._incident_severity_cache = incident_severity_cache
         self._baseline_window_count = baseline_window_count
         self._incident_dedup_window_seconds = incident_dedup_window_seconds
         self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
@@ -134,6 +137,8 @@ class IngestEventService:
                 last_seen_at=now,
                 severity=updated_severity,
             )
+            if self._incident_severity_cache is not None:
+                self._incident_severity_cache.set(project_id=event.project_id, severity=updated_severity)
             logger.info(
                 "Incident deduped and updated",
                 extra={"project_id": event.project_id, "incident_id": open_incident.id, "incident_type": incident_type},
@@ -153,6 +158,8 @@ class IngestEventService:
             last_seen_at=now,
         )
         self._incident_repository.create_incident(incident=incident)
+        if self._incident_severity_cache is not None:
+            self._incident_severity_cache.set(project_id=event.project_id, severity=severity)
         logger.info(
             "Incident created from ingest",
             extra={"project_id": event.project_id, "incident_type": incident_type, "severity": severity},

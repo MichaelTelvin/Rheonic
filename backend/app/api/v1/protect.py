@@ -1,0 +1,131 @@
+# Protect mode API endpoints.
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, Field
+
+from app.application.services.protect_service import ProtectService
+from app.application.services.project_service import ProjectService
+from app.dependencies import get_current_user, get_project_service, get_protect_service
+from app.domain.models.user import User
+from app.logger import get_logger
+
+logger = get_logger(__name__)
+router = APIRouter()
+
+
+class ProtectDecisionIn(BaseModel):
+    # Preflight decision request payload.
+    provider: str
+    model: str | None = None
+    feature: str | None = None
+    max_output_tokens: int | None = None
+    input_tokens_estimate: int | None = None
+
+
+class ProtectDecisionOut(BaseModel):
+    # Preflight decision response payload.
+    decision: str
+    reason: str
+    fail_mode: str
+    protect_decision_timeout_ms: int
+    snapshot: dict[str, int | str | None]
+
+
+class ProjectProtectOut(BaseModel):
+    # Project protect settings response payload.
+    protect_enabled: bool
+    protect_fail_mode: str
+    protect_max_req_per_min: int | None
+    protect_max_tok_per_min: int | None
+    protect_decision_timeout_ms: int
+
+
+class ProjectProtectIn(BaseModel):
+    # Project protect settings update payload.
+    protect_enabled: bool
+    protect_fail_mode: str = Field(pattern="^(open|closed)$")
+    protect_max_req_per_min: int | None = Field(default=None, ge=1)
+    protect_max_tok_per_min: int | None = Field(default=None, ge=1)
+    protect_decision_timeout_ms: int = Field(default=100, ge=10, le=10_000)
+
+
+@router.post("/protect/decision", response_model=ProtectDecisionOut)
+def protect_decision(
+    payload: ProtectDecisionIn,
+    service: ProtectService = Depends(get_protect_service),
+    ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
+) -> ProtectDecisionOut:
+    # Evaluate preflight decision from project protect configuration and Redis counters.
+    try:
+        _ = payload
+        if not ingest_key:
+            raise HTTPException(status_code=401, detail="missing ingest key")
+        _, decision = service.evaluate_decision(ingest_key=ingest_key)
+        if decision is None:
+            raise HTTPException(status_code=401, detail="invalid ingest key")
+        return ProtectDecisionOut(
+            decision=decision.decision,
+            reason=decision.reason,
+            fail_mode=decision.fail_mode,
+            protect_decision_timeout_ms=decision.decision_timeout_ms,
+            snapshot=decision.snapshot,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Protect decision endpoint failed")
+        raise HTTPException(status_code=500, detail="Failed to evaluate protect decision")
+
+
+@router.get("/projects/{project_id}/protect", response_model=ProjectProtectOut)
+def get_project_protect(
+    project_id: str,
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+) -> ProjectProtectOut:
+    # Return protect settings for an owned project.
+    try:
+        project = project_service.get_project_protect_settings(project_id=project_id, user_id=current_user.id)
+        return ProjectProtectOut(
+            protect_enabled=project.protect_enabled,
+            protect_fail_mode=project.protect_fail_mode,
+            protect_max_req_per_min=project.protect_max_req_per_min,
+            protect_max_tok_per_min=project.protect_max_tok_per_min,
+            protect_decision_timeout_ms=project.protect_decision_timeout_ms,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Get project protect settings failed", extra={"project_id": project_id})
+        raise HTTPException(status_code=500, detail="Failed to fetch project protect settings")
+
+
+@router.put("/projects/{project_id}/protect", response_model=ProjectProtectOut)
+def update_project_protect(
+    project_id: str,
+    payload: ProjectProtectIn,
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+) -> ProjectProtectOut:
+    # Update protect settings for an owned project.
+    try:
+        updated = project_service.update_project_protect_settings(
+            project_id=project_id,
+            user_id=current_user.id,
+            protect_enabled=payload.protect_enabled,
+            protect_fail_mode=payload.protect_fail_mode,
+            protect_max_req_per_min=payload.protect_max_req_per_min,
+            protect_max_tok_per_min=payload.protect_max_tok_per_min,
+            protect_decision_timeout_ms=payload.protect_decision_timeout_ms,
+        )
+        return ProjectProtectOut(
+            protect_enabled=updated.protect_enabled,
+            protect_fail_mode=updated.protect_fail_mode,
+            protect_max_req_per_min=updated.protect_max_req_per_min,
+            protect_max_tok_per_min=updated.protect_max_tok_per_min,
+            protect_decision_timeout_ms=updated.protect_decision_timeout_ms,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Update project protect settings failed", extra={"project_id": project_id})
+        raise HTTPException(status_code=500, detail="Failed to update project protect settings")

@@ -210,6 +210,7 @@ def _make_client(tmp_path) -> tuple[TestClient, FakeRedisClient]:
         event_repository=EventRepositoryImpl(session_factory=session_factory),
         realtime_counters=rolling_window,
         incident_repository=incident_repository,
+        incident_severity_cache=None,
         baseline_window_count=30,
         incident_dedup_window_seconds=300,
         clock=clock,

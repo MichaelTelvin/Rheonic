@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "demo": "node dist/demo.js"
+    "demo": "node dist/demo.js",
+    "test": "npm run build && node --test dist/protectEngine.test.js"
   },
   "devDependencies": {
     "@types/node": "^22.8.7",

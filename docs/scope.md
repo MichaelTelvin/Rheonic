@@ -1,224 +1,154 @@
-# LLMTokenBurnGuard — Scope
+LLMTokenBurnGuard — Scope
 
-## Overview
+Phase 0 — Foundation (Completed)
 
-LLMTokenBurnGuard is a realtime observability and guardrail platform for LLM API usage.
+Infrastructure
+	•	Dockerized backend (FastAPI)
+	•	PostgreSQL + Redis
+	•	RQ workers
+	•	Health endpoint
+	•	Basic project structure (clean architecture layering)
 
-It monitors:
-- Token burn
-- Request rates
-- True rolling 60s usage windows
-- Incidents (burn spikes / request storms)
+Event Ingestion
+	•	POST /api/v1/events
+	•	Redis rolling window (true sliding window)
+	•	Postgres event persistence
+	•	Realtime metrics endpoint
+	•	Incident creation (burn spike detection)
 
-It provides:
-- Realtime dashboard
-- Incident tracking + resolve workflow
-- Projects + ingest keys management
-- Clean dark SaaS UI
-- True rolling window implementation (Redis ZSET)
+Incident Intelligence
+	•	Baseline learning
+	•	Ratio-based spike detection
+	•	Incident deduplication (5-minute merge window)
+	•	Evidence count increment
+	•	Severity escalation
+	•	Rolling window refactor complete
+	•	Full anomaly test coverage (baseline → spike → escalation)
 
----
+Backend Hardening (Completed)
+	•	Idempotency support
+	•	Ingest key rate limiting
+	•	Project ownership checks
+	•	Indexes:
+	•	events(project_id, ts)
+	•	incidents(project_id, status, created_at)
+	•	Error handling + proper HTTP status codes
+	•	Retry/backoff for background jobs
+	•	Failed job logging
 
-## Milestone 0 — Foundation & Infrastructure ✅ DONE
+⸻
 
-### Backend
-- FastAPI project skeleton
-- Layered architecture (API → Service → Repository → Infrastructure)
-- SQLAlchemy integration
-- Postgres containerized
-- Redis containerized
-- RQ worker container
-- Docker Compose working end-to-end
-- Health endpoint
+Phase 1 — SDK (Completed MVP)
 
-### Frontend
-- Vite + React + TypeScript setup
-- Dockerized frontend
-- Dev proxy via Vite for backend
-- CORS resolved properly
+Monorepo Structure
+	•	sdk-node
+	•	sdk-python
 
----
+SDK Capabilities
+	•	Async fire-and-forget ingest
+	•	Flush-on-exit
+	•	OpenAI instrumentation
+	•	Manual event capture
+	•	Backoff + overflow policy
+	•	Production-safe defaults
 
-## Milestone 1 — Events Ingest + Realtime Metrics ✅ DONE
+⸻
 
-### Backend
-- POST /api/v1/events
-- Persist event to Postgres
-- Redis true rolling window (ZSET-based, last 60 seconds)
-- GET /api/v1/metrics/realtime
-- Unit tests for rolling window logic
+Phase 2 — Auth & Key Management (Completed)
 
-### Realtime Semantics
-- ZSET per project for:
-  - requests
-  - tokens
-- Score = timestamp (ms)
-- Trim older than 60 seconds
-- True rolling window (not TTL bucket)
+Authentication
+	•	Users table
+	•	Password hashing
+	•	/auth/register
+	•	/auth/login
+	•	JWT auth middleware
+	•	Route protection (projects + keys)
 
----
+Projects
+	•	Create project
+	•	Project ownership enforced
+	•	Project selection in UI
 
-## Milestone 2 — Incident Engine ✅ DONE
+Ingest Keys
+	•	Create key
+	•	Rotate key
+	•	Revoke key
+	•	Hashed storage in DB
+	•	Key → Project mapping
+	•	UI modal flow implemented
 
-### Incident Triggering
-- Burn spike detection (tokens_60s > threshold)
-- Request storm detection (requests_60s > threshold)
-- Evidence stored in JSON
-- Deduplication via Redis lock key
+⸻
 
-### Incident Model
-- id
-- type
-- severity
-- status (open / resolved)
-- created_at
-- resolved_at
-- evidence JSON
+Phase 3 — Observability Dashboard (Completed)
 
-### API
-- GET /api/v1/incidents
-- POST /api/v1/incidents/{id}/resolve
+Metrics
+	•	Requests (60s)
+	•	Tokens (60s)
+	•	Sparkline charts
+	•	Timestamps (metrics + incidents)
 
----
+Incidents
+	•	Open incidents list
+	•	Resolve action
+	•	Severity badge
+	•	Evidence display
 
-## Milestone 3 — Projects + Ingest Keys ✅ DONE
+UI
+	•	Dark theme
+	•	Responsive layout
+	•	Stable timestamp alignment
+	•	Clean header layout
+	•	Login page
+	•	JWT session handling
 
-### Backend
-- projects table
-- ingest_keys table (hash stored, plaintext returned once)
-- GET /api/v1/projects
-- POST /api/v1/projects
-- GET /api/v1/projects/{project_id}/keys
-- POST /api/v1/projects/{project_id}/keys
-- POST /api/v1/keys/{key_id}/revoke
-- POST /api/v1/keys/{key_id}/rotate
-- Enforced ingest key mapping on POST /api/v1/events via header:
-  - X-Project-Ingest-Key (active key required)
+⸻
 
-### Frontend
-- Project dropdown (no free-text project id)
-- Create Project modal
-- Ingest Keys modal:
-  - Create key (returns plaintext once + copy UX)
-  - List keys (status, last4)
-  - Rotate / revoke actions
-- Persist selected project in localStorage
-- Poll only when project selected
+🔜 Phase 4 — Protect Mode (Next Major Milestone)
 
----
+Goal: Move from passive observability to active runtime protection.
 
-## Milestone 4 — Dashboard UI (Dark SaaS) ✅ DONE
+Protect Mode Objectives
 
-### Core UI
-- Dark mode default
-- Pastel accent palette
-- Clean layout, centered container
-- Responsive grid
-- Sparkline SVG (no external libs)
+1. Soft Guardrails
+	•	Threshold enforcement
+	•	Temporary cooldowns
+	•	Warning-only mode
+	•	Protect mode flag per project
 
-### Metrics Cards
-- Large formatted numbers
-- Subtext (“Last 60 seconds”)
-- Updated timestamp
-- Realtime sparkline
+2. Hard Guardrails
+	•	Block ingest when limits exceeded
+	•	429 responses
+	•	Rate-based enforcement
+	•	Token cap enforcement
 
-### Status Strip
-- Connected / Disconnected indicator
-- Metrics last updated
-- Incidents last updated
+3. Policy System
+	•	Project-level policy configuration:
+	•	Max tokens / minute
+	•	Max requests / minute
+	•	Cooldown duration
+	•	Escalation rules
+	•	Policy stored in DB
+	•	Editable via UI
 
-### Incidents
-- Severity badge (styled)
-- Relative time display
-- Details toggle
-- Resolve button
-- Optimistic UI update
-- Empty state
+4. Protect Engine (Backend)
+	•	Decision engine:
+	•	allow
+	•	warn
+	•	block
+	•	Policy evaluation before ingest persistence
+	•	Clear audit trail
 
-### Responsiveness
-- 2-column → 1-column metrics grid
-- Flexible header layout
-- Safe JSON overflow
-- No horizontal scroll on mobile
+5. Protect Dashboard UI
+	•	Protect mode toggle
+	•	Policy editor panel
+	•	Real-time protect status
+	•	Blocked request counter
 
----
+⸻
 
-## Milestone 5 — SDKs (Node + Python) ✅ DONE
-
-### Node SDK (sdk-node)
-- Async ingest (fire-and-forget) + best-effort flush-on-exit
-- Bounded queue + overflow policy
-- Minimal retry with small backoff (network/5xx only)
-- Debug logging option (off by default)
-- Demo script + README usage
-- Uses header: X-Project-Ingest-Key (via LLMTBG_INGEST_KEY)
-
-### Python SDK (sdk-python)
-- Async ingest + best-effort flush-on-exit
-- Bounded queue + overflow policy
-- Minimal retry with small backoff (network/5xx only)
-- Debug logging option (off by default)
-- Demo script + README usage
-- Uses header: X-Project-Ingest-Key (via LLMTBG_INGEST_KEY)
-
----
-
-## Milestone 6 — Auth + Tenancy (Next) 🚧 NEXT
-
-### Goal
-Turn the system into a true multi-tenant SaaS.
-
-### Planned (MVP Auth)
-- users table (email, password hash, created_at)
-- JWT-based auth:
-  - POST /auth/register
-  - POST /auth/login
-  - auth dependency/middleware
-- Tenant scoping:
-  - projects belong to user_id
-  - ingest_keys belong to project_id (already) → indirectly scoped to user
-  - incidents/events/metrics queries scoped to authenticated user/projects
-- Frontend:
-  - Login page
-  - Authenticated app shell
-  - Store token securely (MVP: decide explicitly; start with localStorage for simplicity)
-
----
-
-## Milestone 7 — Guardrail Mode (Later)
-
-### Goal
-Optional protection layer beyond monitoring.
-
-### Planned
-- Policy model
-- Soft blocking
-- Model downgrade
-- Token caps per request
-- Retry storm detection
-- Dry-run mode
-- Alert webhooks (Slack / MS Teams)
-
----
-
-## Milestone 8 — Advanced Intelligence (Later)
-
-### Planned
-- Adaptive thresholds
-- Rate-of-change anomaly detection
-- Burn projection (runway estimation)
-- Cost attribution by feature
-- Alert rules engine
-
----
-
-## Definition of Done (Current State)
-
-The product currently provides:
-- True rolling 60-second realtime metrics
-- Incident detection + resolve workflow
-- Projects + ingest key management
-- SDKs (Node + Python) that report events to backend
-- Production-grade layered architecture
-- Dockerized full stack
-- Polished responsive dark SaaS UI
+🔜 Phase 5 — Commercialization (After Protect Mode)
+	•	Billing model
+	•	Subscription tiers
+	•	Protect mode as premium feature
+	•	Usage-based pricing
+	•	Stripe integration

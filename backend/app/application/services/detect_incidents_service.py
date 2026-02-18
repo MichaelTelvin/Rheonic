@@ -2,6 +2,7 @@
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.incident_repository import IncidentRepository
 from app.domain.models.incident import Incident
+from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -14,10 +15,12 @@ class DetectIncidentsService:
         self,
         incident_repository: IncidentRepository,
         realtime_counters: RealtimeCounterStore,
+        incident_severity_cache: IncidentSeverityCache | None = None,
     ) -> None:
         # Initialize dependencies.
         self._incident_repository = incident_repository
         self._realtime_counters = realtime_counters
+        self._incident_severity_cache = incident_severity_cache
 
     def detect(self) -> list[object]:
         # Detect incidents and return incident DTOs.
@@ -55,7 +58,23 @@ class DetectIncidentsService:
                 project_id=incident.project_id,
                 incident_type=incident.incident_type,
             )
+            if self._incident_severity_cache is not None:
+                open_incidents = self._incident_repository.list_by_project(project_id=incident.project_id, status="open")
+                self._incident_severity_cache.set(
+                    project_id=incident.project_id,
+                    severity=_highest_severity(open_incidents),
+                )
             return incident
         except Exception:
             logger.exception("Resolve incident service failed", extra={"incident_id": incident_id})
             raise
+
+
+def _highest_severity(incidents: list[Incident]) -> str:
+    # Return highest open incident severity for cache refresh.
+    ranking = {"none": 0, "low": 1, "medium": 2, "high": 3}
+    highest = "none"
+    for incident in incidents:
+        if ranking.get(incident.severity, 0) > ranking.get(highest, 0):
+            highest = incident.severity
+    return highest

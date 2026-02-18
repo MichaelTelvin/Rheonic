@@ -6,6 +6,7 @@ from typing import Any
 from llmtokenburnguard.client import Client, get_default_client
 from llmtokenburnguard.event_builder import build_event
 from llmtokenburnguard.logger import get_logger
+from llmtokenburnguard.protect_engine import LLMTBGBlockedError
 
 logger = get_logger(__name__)
 
@@ -34,6 +35,17 @@ def instrument_openai(
             # Async wrapper for AsyncOpenAI style clients.
             started_at = perf_counter()
             requested_model = _extract_requested_model(args, kwargs)
+            protect_decision = resolved_client.preflight_protect_decision(
+                {
+                    "provider": "openai",
+                    "model": requested_model,
+                    "feature": feature,
+                    "input_tokens_estimate": _extract_input_tokens_estimate(args, kwargs),
+                    "max_output_tokens": _extract_max_output_tokens(args, kwargs),
+                }
+            )
+            if protect_decision.get("decision") == "block":
+                raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
             try:
                 response = await original_create(*args, **kwargs)
                 _capture_success(
@@ -44,6 +56,7 @@ def instrument_openai(
                     environment=environment,
                     endpoint=endpoint,
                     feature=feature,
+                    protect_decision=str(protect_decision.get("decision") or "allow"),
                 )
                 return response
             except Exception as exc:
@@ -55,6 +68,7 @@ def instrument_openai(
                     environment=environment,
                     endpoint=endpoint,
                     feature=feature,
+                    protect_decision=str(protect_decision.get("decision") or "allow"),
                 )
                 raise
 
@@ -65,6 +79,17 @@ def instrument_openai(
         # Sync wrapper for OpenAI client.
         started_at = perf_counter()
         requested_model = _extract_requested_model(args, kwargs)
+        protect_decision = resolved_client.preflight_protect_decision(
+            {
+                "provider": "openai",
+                "model": requested_model,
+                "feature": feature,
+                "input_tokens_estimate": _extract_input_tokens_estimate(args, kwargs),
+                "max_output_tokens": _extract_max_output_tokens(args, kwargs),
+            }
+        )
+        if protect_decision.get("decision") == "block":
+            raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
         try:
             response = original_create(*args, **kwargs)
             _capture_success(
@@ -75,6 +100,7 @@ def instrument_openai(
                 environment=environment,
                 endpoint=endpoint,
                 feature=feature,
+                protect_decision=str(protect_decision.get("decision") or "allow"),
             )
             return response
         except Exception as exc:
@@ -86,6 +112,7 @@ def instrument_openai(
                 environment=environment,
                 endpoint=endpoint,
                 feature=feature,
+                protect_decision=str(protect_decision.get("decision") or "allow"),
             )
             raise
 
@@ -101,6 +128,7 @@ def _capture_success(
     environment: str | None,
     endpoint: str | None,
     feature: str | None,
+    protect_decision: str,
 ) -> None:
     # Emit success event with usage and latency.
     try:
@@ -112,7 +140,11 @@ def _capture_success(
                 provider="openai",
                 model=response_model if isinstance(response_model, str) else requested_model,
                 environment=environment or sdk_client.environment,
-                request={"endpoint": endpoint, "feature": feature},
+                request={
+                    "endpoint": endpoint,
+                    "feature": feature,
+                    "protect_decision": "warn" if protect_decision == "warn" else None,
+                },
                 response={
                     "latency_ms": latency_ms,
                     "total_tokens": total_tokens if isinstance(total_tokens, int) else None,
@@ -132,6 +164,7 @@ def _capture_failure(
     environment: str | None,
     endpoint: str | None,
     feature: str | None,
+    protect_decision: str,
 ) -> None:
     # Emit error event when provider call fails.
     try:
@@ -141,7 +174,11 @@ def _capture_failure(
                 provider="openai",
                 model=requested_model,
                 environment=environment or sdk_client.environment,
-                request={"endpoint": endpoint, "feature": feature},
+                request={
+                    "endpoint": endpoint,
+                    "feature": feature,
+                    "protect_decision": "warn" if protect_decision == "warn" else None,
+                },
                 response={
                     "latency_ms": latency_ms,
                     "error_type": exc.__class__.__name__ or "unknown",
@@ -184,4 +221,36 @@ def _extract_http_status(exc: Exception) -> int | None:
         if isinstance(response_status, int):
             return response_status
 
+    return None
+
+
+def _extract_input_tokens_estimate(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
+    # Best-effort extraction of input token estimate from create arguments.
+    input_tokens = kwargs.get("input_tokens")
+    if isinstance(input_tokens, int):
+        return input_tokens
+    first = args[0] if args else None
+    if isinstance(first, dict):
+        value = first.get("input_tokens")
+        if isinstance(value, int):
+            return value
+    return None
+
+
+def _extract_max_output_tokens(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
+    # Best-effort extraction of output cap from create arguments.
+    max_tokens = kwargs.get("max_tokens")
+    if isinstance(max_tokens, int):
+        return max_tokens
+    max_output = kwargs.get("max_output_tokens")
+    if isinstance(max_output, int):
+        return max_output
+    first = args[0] if args else None
+    if isinstance(first, dict):
+        first_max_tokens = first.get("max_tokens")
+        if isinstance(first_max_tokens, int):
+            return first_max_tokens
+        first_max_output = first.get("max_output_tokens")
+        if isinstance(first_max_output, int):
+            return first_max_output
     return None
