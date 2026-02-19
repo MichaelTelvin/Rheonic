@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime, timezone
 from typing import Any
+from uuid import uuid4
 
 from app.infrastructure.redis.redis_client import RedisClient
 from app.logger import get_logger
@@ -23,6 +25,14 @@ def _block_key(project_id: str) -> str:
 
 def _last_key(project_id: str) -> str:
     return f"pa:{project_id}:last"
+
+
+def _latency_key(project_id: str) -> str:
+    return f"pa:{project_id}:latency:60m"
+
+
+def _timeout_key(project_id: str) -> str:
+    return f"pa:{project_id}:timeout:60m"
 
 
 class ProtectActionStore:
@@ -60,6 +70,39 @@ class ProtectActionStore:
             logger.warning("Failed reading protect decision counters", extra={"project_id": project_id})
             return {"warn_60m": 0, "block_60m": 0, "last": None}
 
+    def record_health(self, project_id: str, latency_ms: int, timed_out: bool = False, ts: datetime | None = None) -> None:
+        # Record preflight latency samples and timeout counters over a 60-minute window.
+        try:
+            now_ms = int((ts or datetime.now(timezone.utc)).timestamp() * 1000)
+            cutoff_ms = now_ms - (_COUNTER_TTL_SECONDS * 1000)
+            normalized_latency = max(int(latency_ms), 0)
+            member = f"{now_ms}:{uuid4().hex[:8]}:{normalized_latency}"
+            latency_key = _latency_key(project_id)
+            self._redis_client.zadd(latency_key, {member: now_ms})
+            self._redis_client.zremrangebyscore(latency_key, 0, cutoff_ms)
+            if timed_out:
+                self._increment_with_ttl(_timeout_key(project_id))
+        except Exception:
+            logger.warning("Failed recording protect health counters", extra={"project_id": project_id})
+
+    def get_health(self, project_id: str) -> dict[str, Any]:
+        # Read 60-minute preflight latency percentiles and timeout counter.
+        try:
+            now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+            cutoff_ms = now_ms - (_COUNTER_TTL_SECONDS * 1000)
+            latency_key = _latency_key(project_id)
+            self._redis_client.zremrangebyscore(latency_key, 0, cutoff_ms)
+            latency_members = self._redis_client.zrangebyscore(latency_key, cutoff_ms, float("inf"))
+            latencies = self._parse_latencies(latency_members)
+            return {
+                "p50_ms": self._percentile(latencies, 50),
+                "p95_ms": self._percentile(latencies, 95),
+                "timeouts_60m": self._read_int(_timeout_key(project_id)),
+            }
+        except Exception:
+            logger.warning("Failed reading protect health counters", extra={"project_id": project_id})
+            return {"p50_ms": None, "p95_ms": None, "timeouts_60m": 0}
+
     def _increment_with_ttl(self, key: str) -> None:
         value = self._redis_client.incr(key)
         if value == 1:
@@ -92,3 +135,24 @@ class ProtectActionStore:
         if not decision or not reason or not ts:
             return None
         return {"decision": decision, "reason": reason, "ts": ts}
+
+    def _parse_latencies(self, members: list[object]) -> list[int]:
+        values: list[int] = []
+        for raw_member in members:
+            member = raw_member.decode("utf-8") if isinstance(raw_member, bytes) else str(raw_member)
+            parts = member.rsplit(":", 1)
+            if len(parts) != 2:
+                continue
+            try:
+                values.append(max(int(parts[1]), 0))
+            except (TypeError, ValueError):
+                continue
+        values.sort()
+        return values
+
+    def _percentile(self, values: list[int], percentile: int) -> int | None:
+        if not values:
+            return None
+        rank = math.ceil((percentile / 100) * len(values)) - 1
+        index = min(max(rank, 0), len(values) - 1)
+        return values[index]

@@ -19,6 +19,13 @@ class ProtectMetricsOut(BaseModel):
     last: dict[str, str] | None
 
 
+class ProtectHealthOut(BaseModel):
+    # Protect preflight health metrics for dashboard visibility.
+    p50_ms: int | None
+    p95_ms: int | None
+    timeouts_60m: int
+
+
 @router.get("/realtime")
 def get_realtime_metrics(
     project_id: str = Query(..., min_length=1),
@@ -60,3 +67,26 @@ def get_protect_metrics(
     except Exception:
         logger.exception("Failed to fetch protect metrics", extra={"project_id": project_id})
         raise HTTPException(status_code=500, detail="Failed to fetch protect metrics")
+
+
+@router.get("/protect/health", response_model=ProtectHealthOut)
+def get_protect_health(
+    project_id: str = Query(..., min_length=1),
+    service: MetricsService = Depends(get_metrics_service),
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+) -> ProtectHealthOut:
+    # Return protect preflight health metrics (latency + timeouts) for one project.
+    try:
+        project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
+        metrics = service.get_protect_health(project_id=project_id)
+        return ProtectHealthOut(
+            p50_ms=int(metrics["p50_ms"]) if isinstance(metrics.get("p50_ms"), int) else None,
+            p95_ms=int(metrics["p95_ms"]) if isinstance(metrics.get("p95_ms"), int) else None,
+            timeouts_60m=int(metrics.get("timeouts_60m", 0)),
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to fetch protect health", extra={"project_id": project_id})
+        raise HTTPException(status_code=500, detail="Failed to fetch protect health")

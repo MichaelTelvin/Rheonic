@@ -41,3 +41,13 @@ class MetricsService:
         except Exception:
             logger.exception("Protect metrics service failed", extra={"project_id": project_id})
             raise
+
+    def get_protect_health(self, project_id: str) -> dict[str, object]:
+        # Return protect preflight health metrics for the project.
+        try:
+            metrics = self._protect_action_store.get_health(project_id=project_id)
+            logger.debug("Protect health read", extra={"project_id": project_id})
+            return metrics
+        except Exception:
+            logger.exception("Protect health service failed", extra={"project_id": project_id})
+            raise

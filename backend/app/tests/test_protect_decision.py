@@ -405,6 +405,37 @@ def test_protect_metrics_increment_on_warn_and_block(tmp_path) -> None:
     _cleanup_overrides()
 
 
+def test_protect_health_metrics_shape_and_values(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Health")
+    _set_protect(client, project_id, protect_enabled=True)
+
+    baseline = client.get(f"/api/v1/metrics/protect/health?project_id={project_id}")
+    assert baseline.status_code == 200
+    assert baseline.json() == {"p50_ms": None, "p95_ms": None, "timeouts_60m": 0}
+
+    _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    response = client.get(f"/api/v1/metrics/protect/health?project_id={project_id}")
+    assert response.status_code == 200
+    payload = response.json()
+    assert set(payload.keys()) == {"p50_ms", "p95_ms", "timeouts_60m"}
+    assert isinstance(payload["timeouts_60m"], int)
+    assert payload["timeouts_60m"] == 0
+    assert isinstance(payload["p50_ms"], int)
+    assert isinstance(payload["p95_ms"], int)
+    _cleanup_overrides()
+
+
+def test_protect_health_requires_auth(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, _ = _create_project_and_key(client, "Protect Health Auth")
+    app.dependency_overrides.pop(get_current_user, None)
+
+    response = client.get(f"/api/v1/metrics/protect/health?project_id={project_id}")
+    assert response.status_code == 401
+    _cleanup_overrides()
+
+
 def test_invalid_ingest_key_returns_401(tmp_path) -> None:
     client, _, _ = _make_client(tmp_path)
     response = client.post(

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
     fetchIncidents: vi.fn(),
     fetchProjectProtect: vi.fn(),
     fetchProtectMetrics: vi.fn(),
+    fetchProtectHealth: vi.fn(),
     resolveIncident: vi.fn(),
     createProject: vi.fn(),
     listKeys: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock("../api/client", () => {
     fetchIncidents: (...args: unknown[]) => mocks.fetchIncidents(...args),
     fetchProjectProtect: (...args: unknown[]) => mocks.fetchProjectProtect(...args),
     fetchProtectMetrics: (...args: unknown[]) => mocks.fetchProtectMetrics(...args),
+    fetchProtectHealth: (...args: unknown[]) => mocks.fetchProtectHealth(...args),
     resolveIncident: (...args: unknown[]) => mocks.resolveIncident(...args),
     createProject: (...args: unknown[]) => mocks.createProject(...args),
     listKeys: (...args: unknown[]) => mocks.listKeys(...args),
@@ -52,6 +54,7 @@ describe("Dashboard", () => {
     mocks.fetchIncidents.mockReset();
     mocks.fetchProjectProtect.mockReset();
     mocks.fetchProtectMetrics.mockReset();
+    mocks.fetchProtectHealth.mockReset();
     mocks.resolveIncident.mockReset();
     mocks.createProject.mockReset();
     mocks.listKeys.mockReset();
@@ -68,6 +71,7 @@ describe("Dashboard", () => {
       protect_decision_timeout_ms: 100,
     });
     mocks.fetchProtectMetrics.mockResolvedValue({ warn_60m: 0, block_60m: 0, last: null });
+    mocks.fetchProtectHealth.mockResolvedValue({ p50_ms: null, p95_ms: null, timeouts_60m: 0 });
   });
 
   it("shows empty onboarding state when no projects exist", async () => {

@@ -1,11 +1,14 @@
 # Protect mode API endpoints.
+from time import perf_counter
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.application.services.protect_service import ProtectDecisionContext, ProtectService
 from app.application.services.project_service import ProjectService
-from app.dependencies import get_current_user, get_project_service, get_protect_service
+from app.dependencies import get_current_user, get_project_service, get_protect_action_store, get_protect_service
 from app.domain.models.user import User
+from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -52,13 +55,15 @@ class ProjectProtectIn(BaseModel):
 def protect_decision(
     payload: ProtectDecisionIn,
     service: ProtectService = Depends(get_protect_service),
+    protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
 ) -> ProtectDecisionOut:
     # Evaluate preflight decision from project protect configuration and Redis counters.
+    start = perf_counter()
     try:
         if not ingest_key:
             raise HTTPException(status_code=401, detail="missing ingest key")
-        _, decision = service.evaluate_decision(
+        project_id, decision = service.evaluate_decision(
             ingest_key=ingest_key,
             context=ProtectDecisionContext(
                 max_output_tokens=payload.max_output_tokens,
@@ -67,6 +72,9 @@ def protect_decision(
         )
         if decision is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
+        latency_ms = int((perf_counter() - start) * 1000)
+        if project_id:
+            protect_action_store.record_health(project_id=project_id, latency_ms=latency_ms, timed_out=False)
         return ProtectDecisionOut(
             decision=decision.decision,
             reason=decision.reason,

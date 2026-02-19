@@ -6,6 +6,8 @@ import {
   createProject,
   fetchIncidents,
   fetchMetrics,
+  fetchProtectHealth,
+  fetchProtectMetrics,
   fetchProjectProtect,
   fetchProjects,
   listKeys,
@@ -16,6 +18,7 @@ import {
   type CreateKeyResponse,
   type IncidentItem,
   type IngestKeyItem,
+  type ProtectMetrics,
   type ProjectItem,
   type ProjectProtectSettings,
   type RealtimeMetrics,
@@ -53,6 +56,16 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   const [lastMetricsSuccessAt, setLastMetricsSuccessAt] = useState<string | null>(null);
   const [lastIncidentsSuccessAt, setLastIncidentsSuccessAt] = useState<string | null>(null);
   const [metricsFetchFailed, setMetricsFetchFailed] = useState<boolean>(false);
+  const [protectDecisionStats, setProtectDecisionStats] = useState<{
+    allow_60m: number | null;
+    warn_60m: number | null;
+    block_60m: number | null;
+  } | null>(null);
+  const [protectHealthStats, setProtectHealthStats] = useState<{
+    p50_ms: number | null;
+    p95_ms: number | null;
+    timeouts_60m: number | null;
+  } | null>(null);
   const [clockTick, setClockTick] = useState<number>(0);
   const [globalBanner, setGlobalBanner] = useState<string | null>(null);
   const [protectSettings, setProtectSettings] = useState<ProjectProtectSettings | null>(null);
@@ -187,6 +200,8 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     setIncidentsWarning(null);
     setGlobalBanner(null);
     setProtectSettings(null);
+    setProtectDecisionStats(null);
+    setProtectHealthStats(null);
 
     if (!projectId) {
       window.localStorage.removeItem(frontendConfig.dashboardSelectedProjectStorageKey);
@@ -194,6 +209,52 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     }
 
     window.localStorage.setItem(frontendConfig.dashboardSelectedProjectStorageKey, projectId);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadProtectStats = async (): Promise<void> => {
+      try {
+        const [data, health] = await Promise.all([fetchProtectMetrics(projectId), fetchProtectHealth(projectId)]);
+        if (cancelled) {
+          return;
+        }
+        const allowCount =
+          typeof (data as ProtectMetrics & { allow_60m?: unknown }).allow_60m === "number"
+            ? (data as ProtectMetrics & { allow_60m?: number }).allow_60m ?? null
+            : null;
+        setProtectDecisionStats({
+          allow_60m: allowCount,
+          warn_60m: data.warn_60m,
+          block_60m: data.block_60m,
+        });
+        setProtectHealthStats({
+          p50_ms: health.p50_ms,
+          p95_ms: health.p95_ms,
+          timeouts_60m: health.timeouts_60m,
+        });
+      } catch {
+        if (!cancelled) {
+          setProtectDecisionStats(null);
+          setProtectHealthStats(null);
+        }
+      }
+    };
+
+    void loadProtectStats();
+    const interval = window.setInterval(() => {
+      void loadProtectStats();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, [projectId]);
 
   useEffect(() => {
@@ -609,18 +670,26 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     lastMetricsSuccessAt && !metricsFetchFailed && Date.now() - new Date(lastMetricsSuccessAt).getTime() <= 10_000,
   );
   const protectEnabled = Boolean(protectSettings?.protect_enabled);
+  const allowCountLabel = protectDecisionStats?.allow_60m ?? "—";
+  const warnCountLabel = protectDecisionStats?.warn_60m ?? "—";
+  const blockCountLabel = protectDecisionStats?.block_60m ?? "—";
+  const p50Label = protectHealthStats?.p50_ms ?? "—";
+  const p95Label = protectHealthStats?.p95_ms ?? "—";
+  const timeoutsLabel = protectHealthStats?.timeouts_60m ?? "—";
+  const timeoutCount = typeof protectHealthStats?.timeouts_60m === "number" ? protectHealthStats.timeouts_60m : null;
 
   void clockTick;
 
   return (
     <>
       <AppHeader userEmail={userEmail} onSignOut={onSignOut} />
-      <main className={`dashboard page-root ${protectEnabled ? "protect-on" : ""}`}>
+      <main className="dashboard">
         <div className="dashboard-content">
           <section className="dashboard-hero">
             <div className="dashboard-hero-left">
               <h1 className="page-title">LLM Control Center</h1>
               <p className="page-subtitle">Real-time monitoring and protection</p>
+              <div className="hero-subtitle-divider" aria-hidden="true" />
             </div>
             <div className="dashboard-hero-right">
               <div className="status-panel status-panel--accent" aria-live="polite">
@@ -633,7 +702,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                 <div className="status-row">
                   <span className="status-row-label">Protection</span>
                   <span className={`status-row-value ${protectSettings?.protect_enabled ? "protect-on" : "protect-off"}`}>
-                    {protectSettings?.protect_enabled ? "Enabled" : "Off"}
+                    {protectSettings?.protect_enabled ? "On" : "Off"}
                   </span>
                 </div>
                 <div className="status-row">
@@ -680,7 +749,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                 onClick={openProtectModal}
                 disabled={!projectId}
               >
-                {protectEnabled ? "Protection Active" : "Enable protection"}
+                {protectEnabled ? "Disable protection" : "Enable protection"}
               </button>
             </div>
           </section>
@@ -726,6 +795,44 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                     <span className="metric-subtitle">Last 60 seconds</span>
                   </div>
                   <Sparkline values={tokensSeries} stroke="var(--accent)" />
+                </Card>
+
+                <Card>
+                  <h2 className="card-title">Protect decisions (60m)</h2>
+                  <div className="protect-decisions-list">
+                    <div className="protect-decisions-row">
+                      <span className="protect-decisions-label">Allowed</span>
+                      <span className="protect-decisions-value">{allowCountLabel}</span>
+                    </div>
+                    <div className="protect-decisions-row">
+                      <span className="protect-decisions-label">Warned</span>
+                      <span className="protect-decisions-value warned">{warnCountLabel}</span>
+                    </div>
+                    <div className="protect-decisions-row">
+                      <span className="protect-decisions-label">Blocked</span>
+                      <span className="protect-decisions-value blocked">{blockCountLabel}</span>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card>
+                  <h2 className="card-title">Decisions latency (60m)</h2>
+                  <div className="protect-decisions-list">
+                    <div className="protect-decisions-row">
+                      <span className="protect-decisions-label">p50 latency (ms)</span>
+                      <span className="protect-decisions-value">{p50Label}</span>
+                    </div>
+                    <div className="protect-decisions-row">
+                      <span className="protect-decisions-label">p95 latency (ms)</span>
+                      <span className="protect-decisions-value">{p95Label}</span>
+                    </div>
+                    <div className="protect-decisions-row">
+                      <span className="protect-decisions-label">timeouts</span>
+                      <span className={`protect-decisions-value ${timeoutCount && timeoutCount > 0 ? "timeouts" : ""}`}>
+                        {timeoutsLabel}
+                      </span>
+                    </div>
+                  </div>
                 </Card>
               </section>
 

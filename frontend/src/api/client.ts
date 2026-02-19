@@ -15,6 +15,12 @@ export interface ProtectMetrics {
   } | null;
 }
 
+export interface ProtectHealthMetrics {
+  p50_ms: number | null;
+  p95_ms: number | null;
+  timeouts_60m: number;
+}
+
 export interface IncidentItem {
   id: string;
   type: string;
@@ -157,6 +163,10 @@ export async function fetchMetrics(projectId: string): Promise<RealtimeMetrics> 
 
 export async function fetchProtectMetrics(projectId: string): Promise<ProtectMetrics> {
   return request<ProtectMetrics>(`/api/v1/metrics/protect?project_id=${encodeURIComponent(projectId)}`);
+}
+
+export async function fetchProtectHealth(projectId: string): Promise<ProtectHealthMetrics> {
+  return request<ProtectHealthMetrics>(`/api/v1/metrics/protect/health?project_id=${encodeURIComponent(projectId)}`);
 }
 
 export async function fetchProjectProtect(projectId: string): Promise<ProjectProtectSettings> {
