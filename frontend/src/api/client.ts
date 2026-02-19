@@ -39,6 +39,14 @@ export interface ProjectProtectSettings {
   protect_decision_timeout_ms: number;
 }
 
+export interface UpdateProjectProtectInput {
+  protect_enabled: boolean;
+  protect_fail_mode: "open" | "closed";
+  protect_max_req_per_min: number | null;
+  protect_max_tok_per_min: number | null;
+  protect_decision_timeout_ms: number;
+}
+
 export interface IngestKeyItem {
   id: string;
   name: string;
@@ -153,6 +161,16 @@ export async function fetchProtectMetrics(projectId: string): Promise<ProtectMet
 
 export async function fetchProjectProtect(projectId: string): Promise<ProjectProtectSettings> {
   return request<ProjectProtectSettings>(`/api/v1/projects/${encodeURIComponent(projectId)}/protect`);
+}
+
+export async function updateProjectProtect(
+  projectId: string,
+  payload: UpdateProjectProtectInput,
+): Promise<ProjectProtectSettings> {
+  return request<ProjectProtectSettings>(`/api/v1/projects/${encodeURIComponent(projectId)}/protect`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function fetchIncidents(projectId: string): Promise<IncidentItem[]> {

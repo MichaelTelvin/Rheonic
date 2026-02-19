@@ -7,16 +7,15 @@ import {
   fetchIncidents,
   fetchMetrics,
   fetchProjectProtect,
-  fetchProtectMetrics,
   fetchProjects,
   listKeys,
   resolveIncident,
   revokeKey,
   rotateKey,
+  updateProjectProtect,
   type CreateKeyResponse,
   type IncidentItem,
   type IngestKeyItem,
-  type ProtectMetrics,
   type ProjectItem,
   type ProjectProtectSettings,
   type RealtimeMetrics,
@@ -25,7 +24,6 @@ import { Card } from "../components/Card";
 import { AppHeader } from "../components/AppHeader";
 import { IncidentItem as IncidentRow } from "../components/IncidentItem";
 import { Sparkline } from "../components/Sparkline";
-import { StatusPill } from "../components/StatusPill";
 import { frontendConfig } from "../config";
 import { formatNumber, formatRelative, formatTime } from "./dashboardUtils";
 
@@ -57,8 +55,14 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   const [metricsFetchFailed, setMetricsFetchFailed] = useState<boolean>(false);
   const [clockTick, setClockTick] = useState<number>(0);
   const [globalBanner, setGlobalBanner] = useState<string | null>(null);
-  const [protectMetrics, setProtectMetrics] = useState<ProtectMetrics | null>(null);
   const [protectSettings, setProtectSettings] = useState<ProjectProtectSettings | null>(null);
+  const [showProtectModal, setShowProtectModal] = useState<boolean>(false);
+  const [savingProtect, setSavingProtect] = useState<boolean>(false);
+  const [protectError, setProtectError] = useState<string | null>(null);
+  const [protectEnabledInput, setProtectEnabledInput] = useState<boolean>(false);
+  const [protectMaxReqInput, setProtectMaxReqInput] = useState<string>("");
+  const [protectMaxTokInput, setProtectMaxTokInput] = useState<string>("");
+  const [protectFailModeInput, setProtectFailModeInput] = useState<"open" | "closed">("open");
 
   const [showCreateProjectModal, setShowCreateProjectModal] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>("");
@@ -182,7 +186,6 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     setMetricsWarning(null);
     setIncidentsWarning(null);
     setGlobalBanner(null);
-    setProtectMetrics(null);
     setProtectSettings(null);
 
     if (!projectId) {
@@ -223,40 +226,6 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     void loadProtectSettings();
     return () => {
       cancelled = true;
-    };
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!projectId) {
-      return;
-    }
-
-    let cancelled = false;
-    const loadProtectMetrics = async (): Promise<void> => {
-      try {
-        const metricsPayload = await fetchProtectMetrics(projectId);
-        if (!cancelled) {
-          setProtectMetrics(metricsPayload);
-        }
-      } catch {
-        if (!cancelled) {
-          setProtectMetrics({
-            warn_60m: 0,
-            block_60m: 0,
-            last: null,
-          });
-        }
-      }
-    };
-
-    void loadProtectMetrics();
-    const interval = window.setInterval(() => {
-      void loadProtectMetrics();
-    }, 10_000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
     };
   }, [projectId]);
 
@@ -443,6 +412,90 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     }
   };
 
+  const openProtectModal = (): void => {
+    setProtectError(null);
+    setProtectEnabledInput(Boolean(protectSettings?.protect_enabled));
+    setProtectMaxReqInput(
+      protectSettings?.protect_max_req_per_min === null || protectSettings?.protect_max_req_per_min === undefined
+        ? ""
+        : String(protectSettings.protect_max_req_per_min),
+    );
+    setProtectMaxTokInput(
+      protectSettings?.protect_max_tok_per_min === null || protectSettings?.protect_max_tok_per_min === undefined
+        ? ""
+        : String(protectSettings.protect_max_tok_per_min),
+    );
+    setProtectFailModeInput(protectSettings?.protect_fail_mode === "closed" ? "closed" : "open");
+    setShowProtectModal(true);
+  };
+
+  const onSaveProtectSettings = async (): Promise<void> => {
+    if (!projectId) {
+      return;
+    }
+    const parseOptionalInt = (value: string): number | null => {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return null;
+      }
+      const parsed = Number(trimmed);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        throw new Error("Values must be a positive integer or empty for unlimited.");
+      }
+      return parsed;
+    };
+
+    try {
+      const protect_max_req_per_min = parseOptionalInt(protectMaxReqInput);
+      const protect_max_tok_per_min = parseOptionalInt(protectMaxTokInput);
+      setSavingProtect(true);
+      setProtectError(null);
+      const updated = await updateProjectProtect(projectId, {
+        protect_enabled: protectEnabledInput,
+        protect_fail_mode: protectFailModeInput,
+        protect_max_req_per_min,
+        protect_max_tok_per_min,
+        protect_decision_timeout_ms: protectSettings?.protect_decision_timeout_ms ?? 100,
+      });
+      setProtectSettings(updated);
+      setShowProtectModal(false);
+    } catch (error) {
+      setProtectError(error instanceof Error ? error.message : "Failed to save protect settings.");
+    } finally {
+      setSavingProtect(false);
+    }
+  };
+
+  const onModeSelect = async (mode: "observe" | "protect"): Promise<void> => {
+    if (!projectId) {
+      return;
+    }
+    if (mode === "protect") {
+      setProtectEnabledInput(true);
+      setShowProtectModal(true);
+      return;
+    }
+    if (!protectSettings?.protect_enabled) {
+      return;
+    }
+    if (!window.confirm("Switch to Observe mode? Protect blocking will be disabled.")) {
+      return;
+    }
+    try {
+      const updated = await updateProjectProtect(projectId, {
+        protect_enabled: false,
+        protect_fail_mode: protectSettings.protect_fail_mode === "closed" ? "closed" : "open",
+        protect_max_req_per_min: protectSettings.protect_max_req_per_min,
+        protect_max_tok_per_min: protectSettings.protect_max_tok_per_min,
+        protect_decision_timeout_ms: protectSettings.protect_decision_timeout_ms ?? 100,
+      });
+      setProtectSettings(updated);
+      setProtectError(null);
+    } catch (error) {
+      setProtectError(error instanceof Error ? error.message : "Failed to update mode.");
+    }
+  };
+
   const closeKeysModal = (): void => {
     setShowKeysModal(false);
     setLatestPlaintextKey(null);
@@ -555,80 +608,81 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   const isApiConnected = Boolean(
     lastMetricsSuccessAt && !metricsFetchFailed && Date.now() - new Date(lastMetricsSuccessAt).getTime() <= 10_000,
   );
+  const protectEnabled = Boolean(protectSettings?.protect_enabled);
 
   void clockTick;
 
   return (
     <>
       <AppHeader userEmail={userEmail} onSignOut={onSignOut} />
-      <main className="dashboard">
+      <main className={`dashboard page-root ${protectEnabled ? "protect-on" : ""}`}>
         <div className="dashboard-content">
-          <div className="dashboard-header">
-            <div className="dashboard-header-row dashboard-header-title">
-              <div className="title-block">
-                <h1 className="page-title">Runtime Safety Dashboard</h1>
-                <p className="page-subtitle">Real-time usage and incident monitoring</p>
-              </div>
-              <div />
+          <section className="dashboard-hero">
+            <div className="dashboard-hero-left">
+              <h1 className="page-title">LLM Control Center</h1>
+              <p className="page-subtitle">Real-time monitoring and protection</p>
             </div>
-
-            <div className="dashboard-header-row dashboard-header-status">
-              <div />
-              <div className="status-block">
-                <div className="badge-row">
-                  <StatusPill connected={isApiConnected} />
-                </div>
-                <div className="subtle status-detail">
-                  <span className="status-label">Mode:</span>
-                  <span className="status-value">
-                    {protectSettings?.protect_enabled ? "Protect" : "Observe"}
+            <div className="dashboard-hero-right">
+              <div className="status-panel status-panel--accent" aria-live="polite">
+                <div className="status-row">
+                  <span className="status-row-label">API</span>
+                  <span className={`status-row-value ${isApiConnected ? "connected" : "disconnected"}`}>
+                    {isApiConnected ? "Connected" : "Disconnected"}
                   </span>
                 </div>
-                <div className="subtle status-detail">
-                  <span className="status-label">Caps:</span>
-                  <span className="status-value">Proactive</span>
+                <div className="status-row">
+                  <span className="status-row-label">Protection</span>
+                  <span className={`status-row-value ${protectSettings?.protect_enabled ? "protect-on" : "protect-off"}`}>
+                    {protectSettings?.protect_enabled ? "Enabled" : "Off"}
+                  </span>
                 </div>
-                {protectSettings?.protect_enabled && protectSettings.protect_max_tok_per_min !== null ? (
-                  <div className="subtle status-detail">
-                    <span className="status-label">Predictive:</span>
-                    <span className="status-value">
-                      <span className="status-mini-badge">ON</span>
-                    </span>
-                  </div>
-                ) : null}
-                <div className="subtle status-detail">
-                  <span className="status-label">Metrics updated:</span>
-                  <span className="status-value time-value">{formatTime(lastMetricsSuccessAt)}</span>
+                <div className="status-row">
+                  <span className="status-row-label">Metrics updated</span>
+                  <span className="status-row-value time-value">{formatTime(lastMetricsSuccessAt)}</span>
                 </div>
-                <div className="subtle status-detail">
-                  <span className="status-label">Incidents updated:</span>
-                  <span className="status-value time-value">{formatTime(lastIncidentsSuccessAt)}</span>
+                <div className="status-row">
+                  <span className="status-row-label">Incidents updated</span>
+                  <span className="status-row-value time-value">{formatTime(lastIncidentsSuccessAt)}</span>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <section className="toolbar">
-            <label htmlFor="project-select">Project</label>
-            <select
-              id="project-select"
-              value={projectId ?? ""}
-              onChange={(event) => setProjectId(event.target.value || null)}
-              disabled={loadingProjects || projects.length === 0}
-            >
-              {projectId ? null : <option value="">Select project</option>}
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-            <button type="button" className="toolbar-button" onClick={() => setShowCreateProjectModal(true)}>
-              New Project
-            </button>
-            <button type="button" className="toolbar-button" onClick={() => setShowKeysModal(true)} disabled={!projectId}>
-              Keys
-            </button>
+          <section className="dashboard-controls">
+            <div className="controls-left">
+              <div className="toolbar">
+                <label htmlFor="project-select">Project</label>
+                <select
+                  id="project-select"
+                  value={projectId ?? ""}
+                  onChange={(event) => setProjectId(event.target.value || null)}
+                  disabled={loadingProjects || projects.length === 0}
+                >
+                  {projectId ? null : <option value="">Select project</option>}
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="toolbar-button" onClick={() => setShowCreateProjectModal(true)}>
+                  New Project
+                </button>
+                <button type="button" className="toolbar-button" onClick={() => setShowKeysModal(true)} disabled={!projectId}>
+                  Keys
+                </button>
+              </div>
+            </div>
+            <div className="controls-right">
+              <button
+                type="button"
+                className={`protection-toggle-btn btn-protect enable-protect-btn ${protectEnabled ? "is-enabled active" : "is-off"}`}
+                onClick={openProtectModal}
+                disabled={!projectId}
+              >
+                {protectEnabled ? "Protection Active" : "Enable protection"}
+              </button>
+            </div>
           </section>
 
           {projectWarning ? <p className="warning-text">{projectWarning}</p> : null}
@@ -673,28 +727,6 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                   </div>
                   <Sparkline values={tokensSeries} stroke="var(--accent)" />
                 </Card>
-              </section>
-
-              <section className="protect-panel">
-                <h3 className="protect-panel-title">Protect actions (60m)</h3>
-                <div className="protect-panel-grid">
-                  <div className="protect-panel-item">
-                    <span className="subtle">Warn</span>
-                    <strong>{formatNumber(protectMetrics?.warn_60m ?? 0)}</strong>
-                  </div>
-                  <div className="protect-panel-item">
-                    <span className="subtle">Blocked</span>
-                    <strong>{formatNumber(protectMetrics?.block_60m ?? 0)}</strong>
-                  </div>
-                  <div className="protect-panel-item protect-panel-last">
-                    <span className="subtle">Last decision</span>
-                    <strong>
-                      {protectMetrics?.last
-                        ? `${protectMetrics.last.decision} (${protectMetrics.last.reason})`
-                        : "none"}
-                    </strong>
-                  </div>
-                </div>
               </section>
 
               <section className="incidents-section">
@@ -929,6 +961,84 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                 </div>
               </>
             ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {showProtectModal ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal">
+            <h2 className="section-title">Protect settings</h2>
+            <label htmlFor="protect-mode-select">Mode</label>
+            <select
+              id="protect-mode-select"
+              value={protectEnabledInput ? "protect" : "observe"}
+              onChange={(event) => setProtectEnabledInput(event.target.value === "protect")}
+            >
+              <option value="observe">Observe</option>
+              <option value="protect">Protect</option>
+            </select>
+
+            <label htmlFor="protect-max-req">Max requests per minute</label>
+            <input
+              id="protect-max-req"
+              className="text-input"
+              type="number"
+              min={1}
+              placeholder="Unlimited"
+              value={protectMaxReqInput}
+              onChange={(event) => setProtectMaxReqInput(event.target.value)}
+            />
+
+            <label htmlFor="protect-max-tok">Max tokens per minute</label>
+            <input
+              id="protect-max-tok"
+              className="text-input"
+              type="number"
+              min={1}
+              placeholder="Unlimited"
+              value={protectMaxTokInput}
+              onChange={(event) => setProtectMaxTokInput(event.target.value)}
+            />
+
+            <fieldset className="protect-fail-mode">
+              <legend>Fail mode</legend>
+              <label>
+                <input
+                  type="radio"
+                  name="protect-fail-mode"
+                  value="open"
+                  checked={protectFailModeInput === "open"}
+                  onChange={() => setProtectFailModeInput("open")}
+                />
+                Fail-open
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="protect-fail-mode"
+                  value="closed"
+                  checked={protectFailModeInput === "closed"}
+                  onChange={() => setProtectFailModeInput("closed")}
+                />
+                Fail-closed
+              </label>
+            </fieldset>
+
+            {protectError ? <p className="warning-text">{protectError}</p> : null}
+            <div className="modal-actions">
+              <button type="button" className="modal-button" onClick={() => setShowProtectModal(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="modal-button modal-primary"
+                onClick={() => void onSaveProtectSettings()}
+                disabled={savingProtect || !projectId}
+              >
+                {savingProtect ? "Saving..." : "Save"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
