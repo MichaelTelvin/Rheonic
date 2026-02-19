@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.services.ingest_key_service import IngestKeyService
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
+from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,7 +17,14 @@ class ProtectDecision:
     reason: str
     fail_mode: str
     decision_timeout_ms: int
-    snapshot: dict[str, int | str | None]
+    snapshot: dict[str, int | str | bool | None | dict[str, int | bool]]
+
+
+@dataclass(slots=True)
+class ProtectDecisionContext:
+    # Optional request context used for proactive predictive blocking.
+    max_output_tokens: int | None = None
+    input_tokens_estimate: int | None = None
 
 
 class ProtectService:
@@ -27,17 +35,24 @@ class ProtectService:
         ingest_key_service: IngestKeyService,
         realtime_counters: RealtimeCounterStore,
         incident_severity_cache: IncidentSeverityCache,
+        protect_action_store: ProtectActionStore,
     ) -> None:
         self._ingest_key_service = ingest_key_service
         self._realtime_counters = realtime_counters
         self._incident_severity_cache = incident_severity_cache
+        self._protect_action_store = protect_action_store
 
-    def evaluate_decision(self, ingest_key: str) -> tuple[str | None, ProtectDecision | None]:
+    def evaluate_decision(
+        self,
+        ingest_key: str,
+        context: ProtectDecisionContext | None = None,
+    ) -> tuple[str | None, ProtectDecision | None]:
         # Resolve project and evaluate protect decision using Redis-backed counters and severity cache.
         project = self._ingest_key_service.resolve_project(plaintext_key=ingest_key)
         if project is None:
             return None, None
 
+        ctx = context or ProtectDecisionContext()
         project_id = project.id
         requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=project_id)
         incident_severity = self._incident_severity_cache.get(project_id=project_id)
@@ -45,6 +60,14 @@ class ProtectService:
         max_tok = project.protect_max_tok_per_min
         fail_mode = project.protect_fail_mode
         decision_timeout_ms = project.protect_decision_timeout_ms
+        predictive_enabled = max_tok is not None and isinstance(ctx.max_output_tokens, int) and ctx.max_output_tokens >= 0
+        estimated_next_tokens = 0
+        if predictive_enabled:
+            input_estimate = ctx.input_tokens_estimate if isinstance(ctx.input_tokens_estimate, int) else 0
+            estimated_next_tokens = max(ctx.max_output_tokens or 0, 0) + max(input_estimate, 0)
+        would_exceed_tokens_cap = bool(
+            max_tok is not None and predictive_enabled and (tokens_60s + estimated_next_tokens > max_tok)
+        )
 
         decision = "allow"
         reason = "ok"
@@ -58,12 +81,17 @@ class ProtectService:
         elif max_tok is not None and tokens_60s >= max_tok:
             decision = "block"
             reason = "tok_limit"
+        elif would_exceed_tokens_cap:
+            decision = "block"
+            reason = "tok_predictive"
         elif incident_severity == "high":
             decision = "block"
             reason = "incident_high"
         elif incident_severity == "medium":
             decision = "warn"
             reason = "incident_medium"
+
+        self._protect_action_store.record(project_id=project_id, decision=decision, reason=reason)
 
         return project_id, ProtectDecision(
             decision=decision,
@@ -73,8 +101,14 @@ class ProtectService:
             snapshot={
                 "requests_60s": requests_60s,
                 "tokens_60s": tokens_60s,
-                "protect_max_req_per_min": max_req,
-                "protect_max_tok_per_min": max_tok,
+                "threshold_req_60s": max_req,
+                "threshold_tok_60s": max_tok,
                 "incident_severity": incident_severity,
+                "decision_timeout_ms": decision_timeout_ms,
+                "predictive": {
+                    "enabled": predictive_enabled,
+                    "estimated_next_tokens": estimated_next_tokens,
+                    "would_exceed_tokens_cap": would_exceed_tokens_cap,
+                },
             },
         )

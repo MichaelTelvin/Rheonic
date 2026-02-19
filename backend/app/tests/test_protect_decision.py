@@ -4,11 +4,13 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from app.application.services.ingest_key_service import IngestKeyService
+from app.application.services.metrics_service import MetricsService
 from app.application.services.project_service import ProjectService
 from app.application.services.protect_service import ProtectService
 from app.dependencies import (
     get_current_user,
     get_ingest_key_service,
+    get_metrics_service,
     get_project_service,
     get_protect_service,
 )
@@ -18,6 +20,7 @@ from app.infrastructure.db.models import Base
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
+from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.infrastructure.redis.rolling_window import RollingWindow
 from app.main import app
 
@@ -29,6 +32,7 @@ class FakeRedisClient:
         self.values: dict[str, object] = {}
         self.zsets: dict[str, dict[str, int]] = {}
         self.lists: dict[str, list[object]] = {}
+        self.ttls: dict[str, int] = {}
 
     def get(self, key: str) -> object | None:
         return self.values.get(key)
@@ -37,9 +41,16 @@ class FakeRedisClient:
         self.values[key] = value
 
     def set(self, key: str, value: object, ex: int | None = None) -> bool:
-        _ = ex
         self.values[key] = value
+        if ex is not None:
+            self.ttls[key] = ex
         return True
+
+    def incr(self, key: str) -> int:
+        current = self.values.get(key, 0)
+        next_value = int(current) + 1
+        self.values[key] = next_value
+        return next_value
 
     def zadd(self, key: str, mapping: dict[str, int]) -> int:
         zset = self.zsets.setdefault(key, {})
@@ -82,8 +93,7 @@ class FakeRedisClient:
         return values[start : stop + 1]
 
     def expire(self, key: str, ttl_seconds: int) -> bool:
-        _ = key
-        _ = ttl_seconds
+        self.ttls[key] = ttl_seconds
         return True
 
 
@@ -109,6 +119,11 @@ def _make_client(tmp_path) -> tuple[TestClient, RollingWindow, IncidentSeverityC
         ingest_key_service=ingest_key_service,
         realtime_counters=rolling_window,
         incident_severity_cache=incident_severity_cache,
+        protect_action_store=ProtectActionStore(redis_client=redis_client),  # type: ignore[arg-type]
+    )
+    metrics_service = MetricsService(
+        realtime_counters=rolling_window,
+        protect_action_store=ProtectActionStore(redis_client=redis_client),  # type: ignore[arg-type]
     )
     current_user = User(
         id="u-protect",
@@ -120,6 +135,7 @@ def _make_client(tmp_path) -> tuple[TestClient, RollingWindow, IncidentSeverityC
     app.dependency_overrides[get_project_service] = lambda: project_service
     app.dependency_overrides[get_ingest_key_service] = lambda: ingest_key_service
     app.dependency_overrides[get_protect_service] = lambda: protect_service
+    app.dependency_overrides[get_metrics_service] = lambda: metrics_service
     app.dependency_overrides[get_current_user] = lambda: current_user
     return TestClient(app), rolling_window, incident_severity_cache
 
@@ -158,11 +174,11 @@ def _set_protect(
     assert response.status_code == 200
 
 
-def _decision(client: TestClient, ingest_key: str) -> dict[str, object]:
+def _decision(client: TestClient, ingest_key: str, body: dict[str, object] | None = None) -> dict[str, object]:
     response = client.post(
         "/api/v1/protect/decision",
         headers={"X-Project-Ingest-Key": ingest_key},
-        json={"provider": "openai", "model": "gpt-4o-mini"},
+        json=body or {"provider": "openai", "model": "gpt-4o-mini"},
     )
     assert response.status_code == 200
     return response.json()
@@ -251,9 +267,141 @@ def test_decision_snapshot_includes_counters_and_thresholds(tmp_path) -> None:
     snapshot = decision["snapshot"]
     assert snapshot["requests_60s"] == 1
     assert snapshot["tokens_60s"] == 120
-    assert snapshot["protect_max_req_per_min"] == 10
-    assert snapshot["protect_max_tok_per_min"] == 500
+    assert snapshot["threshold_req_60s"] == 10
+    assert snapshot["threshold_tok_60s"] == 500
+    assert snapshot["decision_timeout_ms"] == 250
     assert decision["protect_decision_timeout_ms"] == 250
+    assert snapshot["predictive"]["enabled"] is False
+    assert snapshot["predictive"]["estimated_next_tokens"] == 0
+    assert snapshot["predictive"]["would_exceed_tokens_cap"] is False
+    _cleanup_overrides()
+
+
+def test_predictive_tokens_block_when_next_call_would_exceed_cap(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Block")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
+    rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "max_output_tokens": 2_000,
+            "input_tokens_estimate": 0,
+        },
+    )
+
+    assert decision["decision"] == "block"
+    assert decision["reason"] == "tok_predictive"
+    snapshot = decision["snapshot"]
+    assert snapshot["predictive"]["enabled"] is True
+    assert snapshot["predictive"]["estimated_next_tokens"] == 2_000
+    assert snapshot["predictive"]["would_exceed_tokens_cap"] is True
+    _cleanup_overrides()
+
+
+def test_missing_max_output_tokens_skips_predictive_rule(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Missing Max")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
+    rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 1_000},
+    )
+
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
+    snapshot = decision["snapshot"]
+    assert snapshot["predictive"]["enabled"] is False
+    assert snapshot["predictive"]["would_exceed_tokens_cap"] is False
+    _cleanup_overrides()
+
+
+def test_predictive_blocks_when_input_tokens_estimate_is_omitted(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Missing Input Estimate")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
+    rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
+
+    response = client.post(
+        "/api/v1/protect/decision",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "max_output_tokens": 2_000,
+        },
+    )
+    assert response.status_code == 200
+    decision = response.json()
+    assert decision["decision"] == "block"
+    assert decision["reason"] == "tok_predictive"
+    _cleanup_overrides()
+
+
+def test_missing_incident_severity_defaults_to_none(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Severity Missing")
+    _set_protect(client, project_id, protect_enabled=True)
+    decision = _decision(client, ingest_key)
+    assert decision["snapshot"]["incident_severity"] == "none"
+    _cleanup_overrides()
+
+
+def test_protect_metrics_defaults_and_allow_keeps_counters_zero(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Metrics Counter")
+    _set_protect(client, project_id, protect_enabled=True)
+
+    baseline = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
+    assert baseline.status_code == 200
+    assert baseline.json() == {"warn_60m": 0, "block_60m": 0, "last": None}
+
+    _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    after_allow = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
+    assert after_allow.status_code == 200
+    payload = after_allow.json()
+    assert payload["warn_60m"] == 0
+    assert payload["block_60m"] == 0
+    assert payload["last"]["decision"] == "allow"
+    assert payload["last"]["reason"] == "ok"
+    _cleanup_overrides()
+
+
+def test_protect_metrics_increment_on_warn_and_block(tmp_path) -> None:
+    client, _, severity_cache = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Metrics Counter 2")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=1000)
+
+    severity_cache.set(project_id, "medium")
+    warn_decision = _decision(client, ingest_key)
+    assert warn_decision["decision"] == "warn"
+
+    severity_cache.set(project_id, "none")
+    _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "max_output_tokens": 2_000,
+            "input_tokens_estimate": 0,
+        },
+    )
+
+    metrics_response = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
+    assert metrics_response.status_code == 200
+    payload = metrics_response.json()
+    assert payload["warn_60m"] == 1
+    assert payload["block_60m"] == 1
+    assert payload["last"]["decision"] == "block"
+    assert payload["last"]["reason"] in {"tok_predictive", "tok_limit"}
     _cleanup_overrides()
 
 

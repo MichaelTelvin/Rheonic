@@ -141,6 +141,17 @@ body {
   justify-self: end;
 }
 
+.status-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  background: rgba(167, 139, 250, 0.15);
+  color: #e9ddff;
+}
+
 .time-value {
   font-variant-numeric: tabular-nums;
 }
@@ -287,6 +298,39 @@ select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 26px;
+}
+
+.protect-panel {
+  margin-bottom: 26px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(21, 28, 43, 0.84), rgba(21, 28, 43, 0.76));
+}
+
+.protect-panel-title {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+
+.protect-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.protect-panel-item {
+  display: grid;
+  gap: 4px;
+}
+
+.protect-panel-item strong {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.protect-panel-last {
+  text-align: right;
 }
 
 .card {
@@ -758,6 +802,14 @@ pre {
 
   .metrics-grid {
     grid-template-columns: 1fr;
+  }
+
+  .protect-panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .protect-panel-last {
+    text-align: left;
   }
 
   .key-row {

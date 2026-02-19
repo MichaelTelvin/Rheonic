@@ -9,6 +9,9 @@
     "demo": "node dist/demo.js",
     "test": "npm run build && node --test dist/protectEngine.test.js"
   },
+  "dependencies": {
+    "@dqbd/tiktoken": "^1.0.22"
+  },
   "devDependencies": {
     "@types/node": "^22.8.7",
     "typescript": "^5.6.3"

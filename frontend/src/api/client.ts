@@ -5,6 +5,16 @@ export interface RealtimeMetrics {
   tokens_60s: number;
 }
 
+export interface ProtectMetrics {
+  warn_60m: number;
+  block_60m: number;
+  last: {
+    decision: string;
+    reason: string;
+    ts: string;
+  } | null;
+}
+
 export interface IncidentItem {
   id: string;
   type: string;
@@ -19,6 +29,14 @@ export interface ProjectItem {
   id: string;
   name: string;
   created_at: string;
+}
+
+export interface ProjectProtectSettings {
+  protect_enabled: boolean;
+  protect_fail_mode: "open" | "closed" | string;
+  protect_max_req_per_min: number | null;
+  protect_max_tok_per_min: number | null;
+  protect_decision_timeout_ms: number;
 }
 
 export interface IngestKeyItem {
@@ -127,6 +145,14 @@ export async function login(email: string, password: string): Promise<LoginRespo
 
 export async function fetchMetrics(projectId: string): Promise<RealtimeMetrics> {
   return request<RealtimeMetrics>(`/api/v1/metrics/realtime?project_id=${encodeURIComponent(projectId)}`);
+}
+
+export async function fetchProtectMetrics(projectId: string): Promise<ProtectMetrics> {
+  return request<ProtectMetrics>(`/api/v1/metrics/protect?project_id=${encodeURIComponent(projectId)}`);
+}
+
+export async function fetchProjectProtect(projectId: string): Promise<ProjectProtectSettings> {
+  return request<ProjectProtectSettings>(`/api/v1/projects/${encodeURIComponent(projectId)}/protect`);
 }
 
 export async function fetchIncidents(projectId: string): Promise<IncidentItem[]> {

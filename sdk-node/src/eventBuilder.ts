@@ -4,6 +4,7 @@ export interface EventRequest {
   input_tokens?: number;
   max_output_tokens?: number;
   protect_decision?: string;
+  protect_reason?: string;
 }
 
 export interface EventResponse {

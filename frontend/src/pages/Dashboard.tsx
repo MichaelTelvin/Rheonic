@@ -6,6 +6,8 @@ import {
   createProject,
   fetchIncidents,
   fetchMetrics,
+  fetchProjectProtect,
+  fetchProtectMetrics,
   fetchProjects,
   listKeys,
   resolveIncident,
@@ -14,7 +16,9 @@ import {
   type CreateKeyResponse,
   type IncidentItem,
   type IngestKeyItem,
+  type ProtectMetrics,
   type ProjectItem,
+  type ProjectProtectSettings,
   type RealtimeMetrics,
 } from "../api/client";
 import { Card } from "../components/Card";
@@ -53,6 +57,8 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   const [metricsFetchFailed, setMetricsFetchFailed] = useState<boolean>(false);
   const [clockTick, setClockTick] = useState<number>(0);
   const [globalBanner, setGlobalBanner] = useState<string | null>(null);
+  const [protectMetrics, setProtectMetrics] = useState<ProtectMetrics | null>(null);
+  const [protectSettings, setProtectSettings] = useState<ProjectProtectSettings | null>(null);
 
   const [showCreateProjectModal, setShowCreateProjectModal] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>("");
@@ -176,6 +182,8 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     setMetricsWarning(null);
     setIncidentsWarning(null);
     setGlobalBanner(null);
+    setProtectMetrics(null);
+    setProtectSettings(null);
 
     if (!projectId) {
       window.localStorage.removeItem(frontendConfig.dashboardSelectedProjectStorageKey);
@@ -191,6 +199,65 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
       return;
     }
     setHasLocalDemoKey(Boolean(window.localStorage.getItem(`llmtbg_demo_key_${projectId}`)));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadProtectSettings = async (): Promise<void> => {
+      try {
+        const settings = await fetchProjectProtect(projectId);
+        if (!cancelled) {
+          setProtectSettings(settings);
+        }
+      } catch {
+        if (!cancelled) {
+          setProtectSettings(null);
+        }
+      }
+    };
+
+    void loadProtectSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadProtectMetrics = async (): Promise<void> => {
+      try {
+        const metricsPayload = await fetchProtectMetrics(projectId);
+        if (!cancelled) {
+          setProtectMetrics(metricsPayload);
+        }
+      } catch {
+        if (!cancelled) {
+          setProtectMetrics({
+            warn_60m: 0,
+            block_60m: 0,
+            last: null,
+          });
+        }
+      }
+    };
+
+    void loadProtectMetrics();
+    const interval = window.setInterval(() => {
+      void loadProtectMetrics();
+    }, 10_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, [projectId]);
 
   useEffect(() => {
@@ -512,6 +579,24 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                   <StatusPill connected={isApiConnected} />
                 </div>
                 <div className="subtle status-detail">
+                  <span className="status-label">Mode:</span>
+                  <span className="status-value">
+                    {protectSettings?.protect_enabled ? "Protect" : "Observe"}
+                  </span>
+                </div>
+                <div className="subtle status-detail">
+                  <span className="status-label">Caps:</span>
+                  <span className="status-value">Proactive</span>
+                </div>
+                {protectSettings?.protect_enabled && protectSettings.protect_max_tok_per_min !== null ? (
+                  <div className="subtle status-detail">
+                    <span className="status-label">Predictive:</span>
+                    <span className="status-value">
+                      <span className="status-mini-badge">ON</span>
+                    </span>
+                  </div>
+                ) : null}
+                <div className="subtle status-detail">
                   <span className="status-label">Metrics updated:</span>
                   <span className="status-value time-value">{formatTime(lastMetricsSuccessAt)}</span>
                 </div>
@@ -588,6 +673,28 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                   </div>
                   <Sparkline values={tokensSeries} stroke="var(--accent)" />
                 </Card>
+              </section>
+
+              <section className="protect-panel">
+                <h3 className="protect-panel-title">Protect actions (60m)</h3>
+                <div className="protect-panel-grid">
+                  <div className="protect-panel-item">
+                    <span className="subtle">Warn</span>
+                    <strong>{formatNumber(protectMetrics?.warn_60m ?? 0)}</strong>
+                  </div>
+                  <div className="protect-panel-item">
+                    <span className="subtle">Blocked</span>
+                    <strong>{formatNumber(protectMetrics?.block_60m ?? 0)}</strong>
+                  </div>
+                  <div className="protect-panel-item protect-panel-last">
+                    <span className="subtle">Last decision</span>
+                    <strong>
+                      {protectMetrics?.last
+                        ? `${protectMetrics.last.decision} (${protectMetrics.last.reason})`
+                        : "none"}
+                    </strong>
+                  </div>
+                </div>
               </section>
 
               <section className="incidents-section">

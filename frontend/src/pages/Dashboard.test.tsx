@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => {
     fetchProjects: vi.fn(),
     fetchMetrics: vi.fn(),
     fetchIncidents: vi.fn(),
+    fetchProjectProtect: vi.fn(),
+    fetchProtectMetrics: vi.fn(),
     resolveIncident: vi.fn(),
     createProject: vi.fn(),
     listKeys: vi.fn(),
@@ -29,6 +31,8 @@ vi.mock("../api/client", () => {
     fetchProjects: (...args: unknown[]) => mocks.fetchProjects(...args),
     fetchMetrics: (...args: unknown[]) => mocks.fetchMetrics(...args),
     fetchIncidents: (...args: unknown[]) => mocks.fetchIncidents(...args),
+    fetchProjectProtect: (...args: unknown[]) => mocks.fetchProjectProtect(...args),
+    fetchProtectMetrics: (...args: unknown[]) => mocks.fetchProtectMetrics(...args),
     resolveIncident: (...args: unknown[]) => mocks.resolveIncident(...args),
     createProject: (...args: unknown[]) => mocks.createProject(...args),
     listKeys: (...args: unknown[]) => mocks.listKeys(...args),
@@ -46,6 +50,8 @@ describe("Dashboard", () => {
     mocks.fetchProjects.mockReset();
     mocks.fetchMetrics.mockReset();
     mocks.fetchIncidents.mockReset();
+    mocks.fetchProjectProtect.mockReset();
+    mocks.fetchProtectMetrics.mockReset();
     mocks.resolveIncident.mockReset();
     mocks.createProject.mockReset();
     mocks.listKeys.mockReset();
@@ -54,6 +60,14 @@ describe("Dashboard", () => {
     mocks.rotateKey.mockReset();
     mocks.fetchMetrics.mockResolvedValue({ requests_60s: 3, tokens_60s: 42 });
     mocks.fetchIncidents.mockResolvedValue([]);
+    mocks.fetchProjectProtect.mockResolvedValue({
+      protect_enabled: false,
+      protect_fail_mode: "open",
+      protect_max_req_per_min: null,
+      protect_max_tok_per_min: null,
+      protect_decision_timeout_ms: 100,
+    });
+    mocks.fetchProtectMetrics.mockResolvedValue({ warn_60m: 0, block_60m: 0, last: null });
   });
 
   it("shows empty onboarding state when no projects exist", async () => {

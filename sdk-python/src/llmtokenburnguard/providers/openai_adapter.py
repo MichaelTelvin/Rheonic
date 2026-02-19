@@ -7,8 +7,17 @@ from llmtokenburnguard.client import Client, get_default_client
 from llmtokenburnguard.event_builder import build_event
 from llmtokenburnguard.logger import get_logger
 from llmtokenburnguard.protect_engine import LLMTBGBlockedError
+from llmtokenburnguard.token_estimator import estimate_input_tokens
 
 logger = get_logger(__name__)
+
+_token_estimator_override_for_tests: Any | None = None
+
+
+def _set_token_estimator_for_tests(estimator: Any | None) -> None:
+    # Test hook to override token estimator behavior deterministically.
+    global _token_estimator_override_for_tests
+    _token_estimator_override_for_tests = estimator
 
 
 def instrument_openai(
@@ -35,12 +44,18 @@ def instrument_openai(
             # Async wrapper for AsyncOpenAI style clients.
             started_at = perf_counter()
             requested_model = _extract_requested_model(args, kwargs)
+            request_payload = _extract_request_payload(args, kwargs)
+            estimated_input_tokens = _estimate_input_tokens(request_payload)
             protect_decision = resolved_client.preflight_protect_decision(
                 {
                     "provider": "openai",
                     "model": requested_model,
                     "feature": feature,
-                    "input_tokens_estimate": _extract_input_tokens_estimate(args, kwargs),
+                    **(
+                        {"input_tokens_estimate": estimated_input_tokens}
+                        if isinstance(estimated_input_tokens, int)
+                        else {}
+                    ),
                     "max_output_tokens": _extract_max_output_tokens(args, kwargs),
                 }
             )
@@ -57,6 +72,7 @@ def instrument_openai(
                     endpoint=endpoint,
                     feature=feature,
                     protect_decision=str(protect_decision.get("decision") or "allow"),
+                    protect_reason=str(protect_decision.get("reason") or "ok"),
                 )
                 return response
             except Exception as exc:
@@ -69,6 +85,7 @@ def instrument_openai(
                     endpoint=endpoint,
                     feature=feature,
                     protect_decision=str(protect_decision.get("decision") or "allow"),
+                    protect_reason=str(protect_decision.get("reason") or "ok"),
                 )
                 raise
 
@@ -79,12 +96,18 @@ def instrument_openai(
         # Sync wrapper for OpenAI client.
         started_at = perf_counter()
         requested_model = _extract_requested_model(args, kwargs)
+        request_payload = _extract_request_payload(args, kwargs)
+        estimated_input_tokens = _estimate_input_tokens(request_payload)
         protect_decision = resolved_client.preflight_protect_decision(
             {
                 "provider": "openai",
                 "model": requested_model,
                 "feature": feature,
-                "input_tokens_estimate": _extract_input_tokens_estimate(args, kwargs),
+                **(
+                    {"input_tokens_estimate": estimated_input_tokens}
+                    if isinstance(estimated_input_tokens, int)
+                    else {}
+                ),
                 "max_output_tokens": _extract_max_output_tokens(args, kwargs),
             }
         )
@@ -101,6 +124,7 @@ def instrument_openai(
                 endpoint=endpoint,
                 feature=feature,
                 protect_decision=str(protect_decision.get("decision") or "allow"),
+                protect_reason=str(protect_decision.get("reason") or "ok"),
             )
             return response
         except Exception as exc:
@@ -113,6 +137,7 @@ def instrument_openai(
                 endpoint=endpoint,
                 feature=feature,
                 protect_decision=str(protect_decision.get("decision") or "allow"),
+                protect_reason=str(protect_decision.get("reason") or "ok"),
             )
             raise
 
@@ -129,6 +154,7 @@ def _capture_success(
     endpoint: str | None,
     feature: str | None,
     protect_decision: str,
+    protect_reason: str,
 ) -> None:
     # Emit success event with usage and latency.
     try:
@@ -144,6 +170,7 @@ def _capture_success(
                     "endpoint": endpoint,
                     "feature": feature,
                     "protect_decision": "warn" if protect_decision == "warn" else None,
+                    "protect_reason": protect_reason if protect_decision == "warn" else None,
                 },
                 response={
                     "latency_ms": latency_ms,
@@ -165,6 +192,7 @@ def _capture_failure(
     endpoint: str | None,
     feature: str | None,
     protect_decision: str,
+    protect_reason: str,
 ) -> None:
     # Emit error event when provider call fails.
     try:
@@ -178,6 +206,7 @@ def _capture_failure(
                     "endpoint": endpoint,
                     "feature": feature,
                     "protect_decision": "warn" if protect_decision == "warn" else None,
+                    "protect_reason": protect_reason if protect_decision == "warn" else None,
                 },
                 response={
                     "latency_ms": latency_ms,
@@ -235,6 +264,26 @@ def _extract_input_tokens_estimate(args: tuple[Any, ...], kwargs: dict[str, Any]
         if isinstance(value, int):
             return value
     return None
+
+
+def _extract_request_payload(args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
+    # Build payload view for local token estimation.
+    if args and isinstance(args[0], dict):
+        return dict(args[0])
+    return dict(kwargs)
+
+
+def _estimate_input_tokens(payload: dict[str, Any]) -> int | None:
+    # Compute local token count with deterministic test override.
+    try:
+        if callable(_token_estimator_override_for_tests):
+            return _token_estimator_override_for_tests(payload)
+        explicit = payload.get("input_tokens")
+        if isinstance(explicit, int):
+            return explicit
+        return estimate_input_tokens(payload)
+    except Exception:
+        return None
 
 
 def _extract_max_output_tokens(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:

@@ -23,6 +23,7 @@ from app.infrastructure.db.repositories.project_repository_impl import ProjectRe
 from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
 from app.infrastructure.redis.redis_client import RedisClient
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
+from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.infrastructure.redis.rolling_window import RollingWindow
 from app.logger import get_logger
 from app.security.jwt_tokens import decode_access_token
@@ -82,6 +83,18 @@ def get_incident_severity_cache() -> IncidentSeverityCache:
 
 
 @lru_cache
+def get_protect_action_store() -> ProtectActionStore:
+    # Provide a shared Redis protect action counter adapter.
+    try:
+        adapter = ProtectActionStore(redis_client=get_redis_client())
+        logger.debug("Protect action store initialized")
+        return adapter
+    except Exception:
+        logger.exception("Failed to initialize protect action store")
+        raise
+
+
+@lru_cache
 def get_settings() -> Settings:
     # Provide runtime settings.
     try:
@@ -114,7 +127,10 @@ def get_ingest_event_service() -> IngestEventService:
 def get_metrics_service() -> MetricsService:
     # Provide a metrics service instance.
     try:
-        service = MetricsService(realtime_counters=get_rolling_window())
+        service = MetricsService(
+            realtime_counters=get_rolling_window(),
+            protect_action_store=get_protect_action_store(),
+        )
         logger.debug("Metrics service provided")
         return service
     except Exception:
@@ -172,6 +188,7 @@ def get_protect_service() -> ProtectService:
             ingest_key_service=get_ingest_key_service(),
             realtime_counters=get_rolling_window(),
             incident_severity_cache=get_incident_severity_cache(),
+            protect_action_store=get_protect_action_store(),
         )
     except Exception:
         logger.exception("Failed to construct protect service")

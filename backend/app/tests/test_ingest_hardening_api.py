@@ -24,6 +24,7 @@ from app.infrastructure.db.repositories.event_repository_impl import EventReposi
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
+from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.infrastructure.redis.rolling_window import RollingWindow
 from app.main import app
 
@@ -43,6 +44,15 @@ class FakeRedisClient:
         _ = value
         self.values[key] = 1
         self.ttls[key] = ttl_seconds
+        return True
+
+    def get(self, key: str) -> object | None:
+        return self.values.get(key)
+
+    def set(self, key: str, value: object, ex: int | None = None) -> bool:
+        self.values[key] = value if isinstance(value, int) else int(value) if str(value).isdigit() else value  # type: ignore[arg-type]
+        if ex is not None:
+            self.ttls[key] = ex
         return True
 
     def incr(self, key: str) -> int:
@@ -149,7 +159,10 @@ def _make_client(tmp_path, settings: Settings | None = None) -> tuple[TestClient
         baseline_window_count=30,
         incident_dedup_window_seconds=300,
     )
-    metrics_service = MetricsService(realtime_counters=rolling_window)
+    metrics_service = MetricsService(
+        realtime_counters=rolling_window,
+        protect_action_store=ProtectActionStore(redis_client=redis_client),  # type: ignore[arg-type]
+    )
 
     app.dependency_overrides[get_project_service] = lambda: project_service
     app.dependency_overrides[get_ingest_key_service] = lambda: ingest_key_service

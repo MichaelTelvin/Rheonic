@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from app.application.services.protect_service import ProtectService
+from app.application.services.protect_service import ProtectDecisionContext, ProtectService
 from app.application.services.project_service import ProjectService
 from app.dependencies import get_current_user, get_project_service, get_protect_service
 from app.domain.models.user import User
@@ -27,7 +27,7 @@ class ProtectDecisionOut(BaseModel):
     reason: str
     fail_mode: str
     protect_decision_timeout_ms: int
-    snapshot: dict[str, int | str | None]
+    snapshot: dict[str, int | str | bool | None | dict[str, int | bool]]
 
 
 class ProjectProtectOut(BaseModel):
@@ -56,10 +56,15 @@ def protect_decision(
 ) -> ProtectDecisionOut:
     # Evaluate preflight decision from project protect configuration and Redis counters.
     try:
-        _ = payload
         if not ingest_key:
             raise HTTPException(status_code=401, detail="missing ingest key")
-        _, decision = service.evaluate_decision(ingest_key=ingest_key)
+        _, decision = service.evaluate_decision(
+            ingest_key=ingest_key,
+            context=ProtectDecisionContext(
+                max_output_tokens=payload.max_output_tokens,
+                input_tokens_estimate=payload.input_tokens_estimate,
+            ),
+        )
         if decision is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
         return ProtectDecisionOut(

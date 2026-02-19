@@ -123,6 +123,14 @@ services:
       && npm run -s build >/dev/null 2>&1
       && echo 'frontend_build PASSED'"
 
+  provider_stub:
+    image: python:3.12-alpine
+    working_dir: /app
+    volumes:
+      - ./e2e:/app/e2e
+    command: >
+      sh -c "python /app/e2e/provider_stub.py"
+
 volumes:
   postgres-data:
   redis-data:

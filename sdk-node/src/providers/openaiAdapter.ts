@@ -1,12 +1,21 @@
 import { Client } from "../client.js";
 import { buildEvent } from "../eventBuilder.js";
 import { LLMTBGBlockedError } from "../protectEngine.js";
+import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
 
 export interface OpenAIInstrumentationOptions {
   client: Client;
   environment?: string;
   endpoint?: string;
   feature?: string;
+}
+
+let estimatorOverrideForTests: ((payload: unknown) => number | null) | null = null;
+
+export function __setInputTokenEstimatorForTests(
+  estimator: ((payload: unknown) => number | null) | null,
+): void {
+  estimatorOverrideForTests = estimator;
 }
 
 export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T, options: OpenAIInstrumentationOptions): T {
@@ -20,12 +29,29 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
   openaiClient.chat.completions.create = async (...args: unknown[]) => {
     const startedAt = Date.now();
     const model = extractRequestedModel(args);
-    const protectDecision = await options.client.evaluateProtectDecision({
+    const requestPayload = extractRequestPayload(args);
+    const estimatedInputTokens = requestPayload
+      ? (estimatorOverrideForTests
+          ? estimatorOverrideForTests(requestPayload)
+          : estimateInputTokensFromRequest(requestPayload))
+      : null;
+    const protectPayload: {
+      provider: string;
+      model: string | null;
+      feature?: string;
+      max_output_tokens?: number;
+      input_tokens_estimate?: number;
+    } = {
       provider: "openai",
       model,
       feature: options.feature,
-      input_tokens_estimate: extractInputTokensEstimate(args),
       max_output_tokens: extractMaxOutputTokens(args),
+    };
+    if (typeof estimatedInputTokens === "number") {
+      protectPayload.input_tokens_estimate = estimatedInputTokens;
+    }
+    const protectDecision = await options.client.evaluateProtectDecision({
+      ...protectPayload,
     });
     if (protectDecision.decision === "block") {
       throw new LLMTBGBlockedError(protectDecision.reason);
@@ -42,6 +68,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
             endpoint: options.endpoint,
             feature: options.feature,
             protect_decision: protectDecision.decision === "warn" ? "warn" : undefined,
+            protect_reason: protectDecision.decision === "warn" ? protectDecision.reason : undefined,
           },
           response: {
             latency_ms: Date.now() - startedAt,
@@ -61,6 +88,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
             endpoint: options.endpoint,
             feature: options.feature,
             protect_decision: protectDecision.decision === "warn" ? "warn" : undefined,
+            protect_reason: protectDecision.decision === "warn" ? protectDecision.reason : undefined,
           },
           response: {
             latency_ms: Date.now() - startedAt,
@@ -85,18 +113,12 @@ function extractRequestedModel(args: unknown[]): string | null {
   return null;
 }
 
-function extractInputTokensEstimate(args: unknown[]): number | undefined {
+function extractRequestPayload(args: unknown[]): Record<string, unknown> | null {
   const firstArg = args[0];
   if (!firstArg || typeof firstArg !== "object") {
-    return undefined;
+    return null;
   }
-  if ("input_tokens" in firstArg && typeof (firstArg as { input_tokens?: unknown }).input_tokens === "number") {
-    return (firstArg as { input_tokens: number }).input_tokens;
-  }
-  if ("max_tokens" in firstArg && typeof (firstArg as { max_tokens?: unknown }).max_tokens === "number") {
-    return (firstArg as { max_tokens: number }).max_tokens;
-  }
-  return undefined;
+  return firstArg as Record<string, unknown>;
 }
 
 function extractMaxOutputTokens(args: unknown[]): number | undefined {
