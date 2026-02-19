@@ -33,5 +33,6 @@ class Settings(BaseSettings):
     ingest_rate_limit_per_minute: int = 600
     baseline_window_count: int = 30
     incident_dedup_window_seconds: int = 300
+    event_retention_days: int = 30
 
     # TODO: Add env-driven database, Redis, auth, and provider settings.

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 
 import { createClient, instrumentOpenAI, LLMTBGBlockedError } from "../dist/index.js";
 
-const backendBaseUrl = process.env.LLMTBG_E2E_BACKEND_URL ?? "http://backend:8000";
-const providerStubUrl = process.env.LLMTBG_E2E_PROVIDER_URL ?? "http://provider_stub:8099";
+const backendBaseUrl = process.env.LLMTBG_E2E_BACKEND_URL ?? "http://backend_test:8000";
+const providerStubUrl = process.env.LLMTBG_E2E_PROVIDER_URL ?? "http://provider_stub_test:8099";
 
 async function api(path, options = {}) {
   const mergedHeaders = {

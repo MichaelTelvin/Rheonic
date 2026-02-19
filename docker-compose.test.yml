@@ -1,0 +1,84 @@
+services:
+  postgres_test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: llmtbg_test
+      POSTGRES_USER: llmtbg
+      POSTGRES_PASSWORD: llmtbg
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llmtbg -d llmtbg_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis_test:
+    image: redis:7-alpine
+    volumes:
+      - redis-test-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend_test:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://llmtbg:llmtbg@postgres_test:5432/llmtbg_test
+      REDIS_URL: redis://redis_test:6379/0
+      APP_ENV: test
+      JWT_SECRET: test-secret
+      CORS_ORIGINS: http://localhost:5173
+    depends_on:
+      postgres_test:
+        condition: service_healthy
+      redis_test:
+        condition: service_healthy
+    command: >
+      sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  provider_stub_test:
+    image: python:3.12-alpine
+    working_dir: /app
+    volumes:
+      - ./e2e:/app/e2e
+    command: >
+      sh -c "python /app/e2e/provider_stub.py"
+
+  sdk_node_test:
+    image: node:20-alpine
+    working_dir: /app
+    environment:
+      LLMTBG_E2E_BACKEND_URL: http://backend_test:8000
+      LLMTBG_E2E_PROVIDER_URL: http://provider_stub_test:8099
+    volumes:
+      - ./sdk-node:/app
+    command: >
+      sh -c "npm install --silent --no-fund --no-audit --loglevel=error >/dev/null 2>&1
+      && npm run -s build >/dev/null 2>&1
+      && node e2e/protect.e2e.mjs"
+    depends_on:
+      - backend_test
+      - provider_stub_test
+
+  sdk_python_test:
+    image: python:3.12-alpine
+    working_dir: /app
+    environment:
+      LLMTBG_E2E_BACKEND_URL: http://backend_test:8000
+      LLMTBG_E2E_PROVIDER_URL: http://provider_stub_test:8099
+    volumes:
+      - ./sdk-python:/app
+    command: >
+      sh -c "pip install -q -e . >/dev/null 2>&1
+      && python e2e/protect_e2e.py"
+    depends_on:
+      - backend_test
+      - provider_stub_test
+
+volumes:
+  postgres-test-data:
+  redis-test-data:

@@ -116,6 +116,15 @@ class FakeEventRepository:
     def add(self, event: Event) -> None:
         self.events.append(event)
 
+    def list_recent(self, project_id: str, limit: int = 100) -> list[Event]:
+        _ = limit
+        return [event for event in self.events if event.project_id == project_id]
+
+    def purge_older_than(self, cutoff: datetime) -> int:
+        original_count = len(self.events)
+        self.events = [event for event in self.events if event.ts >= cutoff]
+        return original_count - len(self.events)
+
 
 class FakeRealtimeCounterStore:
     # Deterministic realtime counter store for incident logic tests.

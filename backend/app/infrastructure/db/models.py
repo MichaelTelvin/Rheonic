@@ -15,6 +15,7 @@ class EventRecord(Base):
     __tablename__ = "events"
     __table_args__ = (
         Index("ix_events_project_id_ts", "project_id", "ts"),
+        Index("ix_events_ts", "ts"),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

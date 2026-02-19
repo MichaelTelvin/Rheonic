@@ -1,4 +1,6 @@
 # Concrete event repository implementation scaffold.
+from datetime import datetime
+
 from app.application.interfaces.event_repository import EventRepository
 from app.domain.models.event import Event
 from app.infrastructure.db.base import DatabaseSessionFactory
@@ -74,4 +76,19 @@ class EventRepositoryImpl(EventRepository):
             ]
         except Exception:
             logger.exception("Failed to list recent events", extra={"project_id": project_id})
+            raise
+
+    def purge_older_than(self, cutoff: datetime) -> int:
+        # Delete events older than cutoff timestamp and return deleted count.
+        try:
+            with self._session_factory.create_session() as session:
+                deleted = (
+                    session.query(EventRecord)
+                    .filter(EventRecord.ts < cutoff)
+                    .delete(synchronize_session=False)
+                )
+                session.commit()
+                return int(deleted or 0)
+        except Exception:
+            logger.exception("Failed purging old events", extra={"cutoff": cutoff.isoformat()})
             raise

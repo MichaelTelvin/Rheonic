@@ -274,6 +274,7 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
     try:
         with session_factory.engine.begin() as connection:
             connection.execute(text("CREATE INDEX IF NOT EXISTS ix_events_project_id_ts ON events (project_id, ts)"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_events_ts ON events (ts)"))
             connection.execute(
                 text(
                     "CREATE INDEX IF NOT EXISTS ix_incidents_project_status_created_at "

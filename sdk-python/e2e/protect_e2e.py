@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass
 
@@ -8,8 +9,8 @@ import httpx
 from llmtokenburnguard import LLMTBGBlockedError, create_client
 from llmtokenburnguard.providers.openai_adapter import instrument_openai
 
-BACKEND_BASE_URL = "http://backend:8000"
-PROVIDER_STUB_URL = "http://provider_stub:8099"
+BACKEND_BASE_URL = os.getenv("LLMTBG_E2E_BACKEND_URL", "http://backend_test:8000")
+PROVIDER_STUB_URL = os.getenv("LLMTBG_E2E_PROVIDER_URL", "http://provider_stub_test:8099")
 
 
 @dataclass

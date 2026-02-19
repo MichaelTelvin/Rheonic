@@ -152,3 +152,22 @@ Protect Mode Objectives
 	•	Protect mode as premium feature
 	•	Usage-based pricing
 	•	Stripe integration
+
+
+## Deferred / Post-MVP Hardening
+
+### Scheduling & maintenance
+- [ ] Add `rq-scheduler` (or equivalent) to run `purge_old_events` daily inside the stack
+- [ ] Add scheduled rollups/cleanup cadence (if not already automated)
+
+### Data retention & storage
+- [ ] Verify retention job runs automatically in production (not manual)
+- [ ] Decide final retention windows (events vs rollups vs incidents)
+
+### Ops & reliability
+- [ ] Add basic observability for background jobs (failed job visibility, retry policy review)
+- [ ] Add rate limiting for decision endpoint if needed at scale
+
+### Product & docs
+- [ ] Public docs site + in-app “Learn more” links
+- [ ] Billing/subscriptions + entitlements
