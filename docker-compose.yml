@@ -93,6 +93,36 @@ services:
     depends_on:
       - backend
 
+  sdk_node:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./sdk-node:/app
+    command: >
+      sh -c "npm install --silent --no-fund --no-audit --loglevel=error >/dev/null 2>&1
+      && npm run -s build >/dev/null 2>&1
+      && node --test --test-reporter=spec dist/protectEngine.test.js"
+
+  sdk_python:
+    image: python:3.12-alpine
+    working_dir: /app
+    volumes:
+      - ./sdk-python:/app
+    command: >
+      sh -c "pip install -q -e '.[dev]' >/dev/null 2>&1
+      && pytest -v"
+
+  frontend_test:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    command: >
+      sh -c "npm install --silent --no-fund --no-audit --loglevel=error >/dev/null 2>&1
+      && npm run -s test
+      && npm run -s build >/dev/null 2>&1
+      && echo 'frontend_build PASSED'"
+
 volumes:
   postgres-data:
   redis-data:

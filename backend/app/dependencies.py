@@ -226,7 +226,7 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
             connection.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR(64)"))
     with session_factory.engine.begin() as connection:
         if "protect_enabled" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_enabled BOOLEAN DEFAULT 0 NOT NULL"))
+            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_enabled BOOLEAN DEFAULT FALSE NOT NULL"))
         if "protect_fail_mode" not in project_columns:
             connection.execute(text("ALTER TABLE projects ADD COLUMN protect_fail_mode VARCHAR(16) DEFAULT 'open' NOT NULL"))
         if "protect_max_req_per_min" not in project_columns:

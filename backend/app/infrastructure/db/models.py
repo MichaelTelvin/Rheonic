@@ -71,7 +71,7 @@ class ProjectRecord(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     user_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("users.id"), nullable=True, index=True)
-    protect_enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="0")
+    protect_enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
     protect_fail_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="open", server_default="open")
     protect_max_req_per_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     protect_max_tok_per_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
