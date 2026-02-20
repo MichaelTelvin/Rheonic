@@ -54,13 +54,19 @@ async function main() {
     const scenario = (process.env.LLMTBG_SCENARIO ?? "allow").toLowerCase();
     const maxTokens = Number(process.env.LLMTBG_MAX_TOKENS ?? (scenario === "block" ? 2000 : 128));
     const inputTokens = Number(process.env.LLMTBG_INPUT_TOKENS ?? 10);
+    const providerRequest = {
+        model: "gpt-4o-mini",
+        messages: [
+            {
+                role: "user",
+                content: `Protect demo request. scenario=${scenario}; input_tokens_hint=${inputTokens}`,
+            },
+        ],
+        max_tokens: maxTokens,
+    };
 
     try {
-        await (openai as any).chat.completions.create({
-            model: "gpt-4o-mini",
-            max_tokens: maxTokens,
-            input_tokens: inputTokens,
-        });
+        await (openai as any).chat.completions.create(providerRequest);
         console.log(`[OK] Provider call executed (scenario=${scenario}).`);
     } catch (err) {
         if (err instanceof LLMTBGBlockedError) {

@@ -71,7 +71,6 @@ export class ProtectEngine {
     timeout.unref?.();
 
     try {
-      console.log("DECISION BODY", context);
       const response = await fetchFn(`${this.baseUrl}/api/v1/protect/decision`, {
         method: "POST",
         headers: {
