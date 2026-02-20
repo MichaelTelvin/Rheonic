@@ -55,12 +55,18 @@ class IngestEventService:
             )
             requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=event.project_id)
             try:
-                baseline_req_60s, baseline_tok_60s = self._realtime_counters.record_baseline_snapshot(
-                    project_id=event.project_id,
-                    requests_60s=requests_60s,
-                    tokens_60s=tokens_60s,
-                    max_windows=self._baseline_window_count,
-                )
+                if self._has_open_incident_for_dimension(event=event):
+                    baseline_req_60s, baseline_tok_60s = self._realtime_counters.get_baseline_snapshot(
+                        project_id=event.project_id,
+                        max_windows=self._baseline_window_count,
+                    )
+                else:
+                    baseline_req_60s, baseline_tok_60s = self._realtime_counters.record_baseline_snapshot(
+                        project_id=event.project_id,
+                        requests_60s=requests_60s,
+                        tokens_60s=tokens_60s,
+                        max_windows=self._baseline_window_count,
+                    )
                 self._create_incident_if_needed(
                     event=event,
                     requests_60s=requests_60s,
@@ -74,6 +80,26 @@ class IngestEventService:
         except Exception:
             logger.exception("Ingest service failed", extra={"project_id": event.project_id})
             raise
+
+    def _has_open_incident_for_dimension(self, event: Event) -> bool:
+        # Freeze baseline updates while any open anomaly incident exists for this event dimension.
+        created_after = datetime.fromtimestamp(0, tz=timezone.utc)
+        for incident_type in (INCIDENT_TYPE_BURN_SPIKE, INCIDENT_TYPE_REQUEST_SPIKE):
+            fingerprint = _build_incident_fingerprint(
+                project_id=event.project_id,
+                incident_type=incident_type,
+                provider=event.provider,
+                model=event.model,
+                environment=event.environment,
+            )
+            open_incident = self._incident_repository.get_open_incident_by_fingerprint(
+                project_id=event.project_id,
+                fingerprint=fingerprint,
+                created_after=created_after,
+            )
+            if open_incident is not None:
+                return True
+        return False
 
     def _create_incident_if_needed(
         self,

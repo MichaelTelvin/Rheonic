@@ -179,6 +179,18 @@ class RollingWindow(RealtimeCounterStore):
             logger.exception("Failed recording baseline snapshot", extra={"project_id": project_id})
             raise
 
+    def get_baseline_snapshot(self, project_id: str, max_windows: int) -> tuple[float, float]:
+        # Return rolling baseline medians without adding the current sample.
+        try:
+            req_key = baseline_req_60s_key(project_id)
+            tok_key = baseline_tok_60s_key(project_id)
+            req_values = [_coerce_int(value) for value in self._client.lrange(req_key, 0, max_windows - 1)]
+            tok_values = [_coerce_int(value) for value in self._client.lrange(tok_key, 0, max_windows - 1)]
+            return median_or_zero(req_values), median_or_zero(tok_values)
+        except Exception:
+            logger.exception("Failed reading baseline snapshot", extra={"project_id": project_id})
+            raise
+
     def acquire_incident_lock(self, project_id: str, incident_type: str, ttl_seconds: int) -> bool:
         # Acquire incident dedupe lock.
         try:

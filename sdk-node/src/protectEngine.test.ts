@@ -154,6 +154,49 @@ test("messages request includes estimated input_tokens_estimate in protect paylo
   }
 });
 
+test("messages request sends default-on input_tokens_estimate without overrides", async () => {
+  const originalFetch = globalThis.fetch;
+  const decisionBodies: Array<Record<string, unknown>> = [];
+  __setInputTokenEstimatorForTests(null);
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      if (typeof init?.body === "string") {
+        decisionBodies.push(JSON.parse(init.body) as Record<string, unknown>);
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          decision: "allow",
+          reason: "ok",
+          fail_mode: "open",
+          protect_decision_timeout_ms: 100,
+        }),
+      } as Response;
+    }
+    return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { openai } = makeOpenAIStub();
+    instrumentOpenAI(openai, { client });
+    await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "hello world" }],
+      max_tokens: 128,
+    });
+    assert.equal(decisionBodies.length, 1);
+    const estimate = decisionBodies[0].input_tokens_estimate;
+    assert.equal(typeof estimate, "number");
+    assert.ok((estimate as number) > 0);
+    client.close();
+  } finally {
+    __setInputTokenEstimatorForTests(null);
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("token estimation failure omits input_tokens_estimate from protect payload", async () => {
   const originalFetch = globalThis.fetch;
   const decisionBodies: Array<Record<string, unknown>> = [];
@@ -184,6 +227,46 @@ test("token estimation failure omits input_tokens_estimate from protect payload"
     await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: "hello world" }],
+      max_tokens: 128,
+    });
+    assert.equal(decisionBodies.length, 1);
+    assert.equal("input_tokens_estimate" in decisionBodies[0], false);
+    client.close();
+  } finally {
+    __setInputTokenEstimatorForTests(null);
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("request with no messages or prompt omits input_tokens_estimate", async () => {
+  const originalFetch = globalThis.fetch;
+  const decisionBodies: Array<Record<string, unknown>> = [];
+  __setInputTokenEstimatorForTests(null);
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      if (typeof init?.body === "string") {
+        decisionBodies.push(JSON.parse(init.body) as Record<string, unknown>);
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          decision: "allow",
+          reason: "ok",
+          fail_mode: "open",
+          protect_decision_timeout_ms: 100,
+        }),
+      } as Response;
+    }
+    return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { openai } = makeOpenAIStub();
+    instrumentOpenAI(openai, { client });
+    await openai.chat.completions.create({
+      model: "gpt-4o-mini",
       max_tokens: 128,
     });
     assert.equal(decisionBodies.length, 1);

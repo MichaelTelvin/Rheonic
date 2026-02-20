@@ -190,6 +190,12 @@ def _clear_project_redis_state(redis_client: FakeRedisClient, project_id: str) -
         redis_client.delete(key)
 
 
+def _baseline_token_samples(redis_client: FakeRedisClient, project_id: str) -> list[int]:
+    # Return baseline token list values for assertions.
+    values = redis_client.lrange(baseline_tok_60s_key(project_id), 0, -1)
+    return [int(value.decode("utf-8") if isinstance(value, bytes) else value) for value in values]
+
+
 def _make_client(tmp_path) -> tuple[TestClient, FakeRedisClient]:
     # Build app client with deterministic ingest/anomaly dependencies.
     db_url = f"sqlite:///{tmp_path}/anomaly_flow.db"
@@ -357,6 +363,66 @@ def test_anomaly_severity_escalation_updates_or_creates(tmp_path) -> None:
     assert incidents[0]["severity"] == "high"
     assert incidents[0]["evidence"]["count"] == 3
     assert incidents[0]["evidence"]["max_ratio_seen"] >= 10
+
+    _clear_project_redis_state(redis_client, project_id)
+    _cleanup_overrides()
+
+
+def test_baseline_freeze_when_incident_open(tmp_path) -> None:
+    # Baseline snapshots should freeze while matching-dimension incident remains open.
+    client, redis_client = _make_client(tmp_path)
+    base_ts = 1_000_000_000
+
+    project = client.post("/api/v1/projects", json={"name": "Baseline Freeze Project"})
+    assert project.status_code == 200
+    project_id = project.json()["id"]
+    _clear_project_redis_state(redis_client, project_id)
+
+    key_response = client.post(f"/api/v1/projects/{project_id}/keys", json={"name": "freeze"})
+    assert key_response.status_code == 200
+    plaintext_key = key_response.json()["key"]
+
+    for i in range(3):
+        response = client.post(
+            "/api/v1/events",
+            json=_event_payload(ts_seconds=base_ts + i, total_tokens=10),
+            headers={"X-Project-Ingest-Key": plaintext_key},
+        )
+        assert response.status_code == 202
+
+    trigger = client.post(
+        "/api/v1/events",
+        json=_event_payload(ts_seconds=base_ts + 20, total_tokens=200),
+        headers={"X-Project-Ingest-Key": plaintext_key},
+    )
+    assert trigger.status_code == 202
+    incidents = _list_open_incidents(client, project_id)
+    assert len(incidents) == 1
+    incident_id = incidents[0]["id"]
+    assert incidents[0]["status"] == "open"
+    frozen_baseline_samples = _baseline_token_samples(redis_client, project_id)
+    assert frozen_baseline_samples
+
+    for i in range(5):
+        response = client.post(
+            "/api/v1/events",
+            json=_event_payload(ts_seconds=base_ts + 30 + i, total_tokens=50),
+            headers={"X-Project-Ingest-Key": plaintext_key},
+        )
+        assert response.status_code == 202
+
+    assert _baseline_token_samples(redis_client, project_id) == frozen_baseline_samples
+
+    resolve = client.post(f"/api/v1/incidents/{incident_id}/resolve")
+    assert resolve.status_code == 200
+
+    post_resolve = client.post(
+        "/api/v1/events",
+        json=_event_payload(ts_seconds=base_ts + 80, total_tokens=10),
+        headers={"X-Project-Ingest-Key": plaintext_key},
+    )
+    assert post_resolve.status_code == 202
+    assert _baseline_token_samples(redis_client, project_id) != frozen_baseline_samples
 
     _clear_project_redis_state(redis_client, project_id)
     _cleanup_overrides()

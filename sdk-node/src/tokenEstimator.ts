@@ -2,6 +2,7 @@ import { encoding_for_model, get_encoding, type Tiktoken } from "@dqbd/tiktoken"
 
 const encoderCache = new Map<string, Tiktoken>();
 const DEFAULT_ENCODING = "cl100k_base";
+const MAX_INPUT_TOKEN_ESTIMATE = 50_000;
 
 export function estimateInputTokensFromRequest(payload: unknown): number | null {
   if (!payload || typeof payload !== "object") {
@@ -13,42 +14,22 @@ export function estimateInputTokensFromRequest(payload: unknown): number | null 
   if (text === null) {
     return null;
   }
-
   try {
     const encoder = getEncoder(typeof request.model === "string" ? request.model : null);
-    return encoder.encode(text).length;
+    const encodedLength = encoder.encode(text).length;
+    return Math.min(MAX_INPUT_TOKEN_ESTIMATE, encodedLength);
   } catch {
-    return estimateByChars(text);
+    return null;
   }
 }
 
 function extractTextForEstimation(request: { messages?: unknown; prompt?: unknown }): string | null {
   if (Array.isArray(request.messages)) {
-    const parts: string[] = [];
-    for (const message of request.messages) {
-      if (!message || typeof message !== "object") {
-        return null;
-      }
-      const content = (message as { content?: unknown }).content;
-      if (typeof content === "string") {
-        parts.push(content);
-        continue;
-      }
-      if (Array.isArray(content)) {
-        for (const item of content) {
-          if (!item || typeof item !== "object") {
-            return null;
-          }
-          const text = (item as { text?: unknown }).text;
-          if (typeof text === "string") {
-            parts.push(text);
-          }
-        }
-        continue;
-      }
+    try {
+      return JSON.stringify(request.messages);
+    } catch {
       return null;
     }
-    return parts.join("\n");
   }
 
   if (typeof request.prompt === "string") {
@@ -78,11 +59,4 @@ function getEncoder(model: string | null): Tiktoken {
 
   encoderCache.set(cacheKey, encoder);
   return encoder;
-}
-
-function estimateByChars(text: string): number {
-  if (text.length === 0) {
-    return 0;
-  }
-  return Math.max(1, Math.ceil(text.length / 4));
 }

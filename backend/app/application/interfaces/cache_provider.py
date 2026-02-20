@@ -41,6 +41,11 @@ class RealtimeCounterStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_baseline_snapshot(self, project_id: str, max_windows: int) -> tuple[float, float]:
+        # Return request/token median baselines without appending a new sample.
+        raise NotImplementedError
+
+    @abstractmethod
     def acquire_incident_lock(self, project_id: str, incident_type: str, ttl_seconds: int) -> bool:
         # Acquire incident dedupe lock with NX semantics.
         raise NotImplementedError

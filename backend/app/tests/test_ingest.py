@@ -155,6 +155,12 @@ class FakeRealtimeCounterStore:
         _ = project_id, requests_60s, tokens_60s, max_windows
         return self._baselines.pop(0)
 
+    def get_baseline_snapshot(self, project_id: str, max_windows: int) -> tuple[float, float]:
+        _ = project_id, max_windows
+        if not self._baselines:
+            return 0.0, 0.0
+        return self._baselines[0]
+
     def acquire_incident_lock(self, project_id: str, incident_type: str, ttl_seconds: int) -> bool:
         _ = project_id, incident_type, ttl_seconds
         return True

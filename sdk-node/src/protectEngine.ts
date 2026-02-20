@@ -71,6 +71,7 @@ export class ProtectEngine {
     timeout.unref?.();
 
     try {
+      console.log("DECISION BODY", context);
       const response = await fetchFn(`${this.baseUrl}/api/v1/protect/decision`, {
         method: "POST",
         headers: {
@@ -90,10 +91,6 @@ export class ProtectEngine {
 
       const parsed = (await response.json()) as ProtectDecisionResponse;
       const decision = parseDecision(parsed.decision);
-      // Remove after testing
-      console.log("=== PROTECT DECISION RESPONSE ===");
-      console.log(JSON.stringify(parsed, null, 2));
-      console.log("=================================");
 
       const reason = typeof parsed.reason === "string" ? parsed.reason : "ok";
       const failMode = parseFailMode(parsed.fail_mode);
@@ -107,7 +104,7 @@ export class ProtectEngine {
       return { decision, reason };
     } catch (error) {
       clearTimeout(timeout);
-      if (controller.signal.aborted || isTimeoutLikeError(error)) {
+      if (isAbortError(error)) {
         void this.reportDecisionTimeout(fetchFn);
       }
       return this.failMode === "closed"
@@ -127,7 +124,7 @@ export class ProtectEngine {
         body: JSON.stringify({ environment: this.environment }),
       });
     } catch {
-      return;
+      // Swallow timeout reporting errors; protect evaluation must never throw here.
     }
   }
 }
@@ -146,19 +143,8 @@ function parseFailMode(value: unknown): ProtectFailMode | null {
   return null;
 }
 
-function isTimeoutLikeError(error: unknown): boolean {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-  const name = typeof (error as { name?: unknown }).name === "string" ? (error as { name: string }).name : "";
-  if (name === "AbortError" || name === "TimeoutError") {
-    return true;
-  }
-  const message =
-    typeof (error as { message?: unknown }).message === "string"
-      ? (error as { message: string }).message.toLowerCase()
-      : "";
-  return message.includes("timeout") || message.includes("aborted");
+function isAbortError(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "name" in value && (value as { name?: unknown }).name === "AbortError";
 }
 
 async function resolveFetch(): Promise<typeof fetch | null> {
