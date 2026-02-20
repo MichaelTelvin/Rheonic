@@ -112,7 +112,7 @@ async function main() {
   const protectMetrics = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
     headers: authHeaders,
   });
-  assert.ok(Number(protectMetrics.block_60m ?? 0) >= 1);
+  assert.ok(Number(protectMetrics.blocked_60m ?? 0) >= 1);
 
   client.close();
   console.log("node protect e2e PASSED");

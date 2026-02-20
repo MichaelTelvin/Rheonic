@@ -126,7 +126,7 @@ def run() -> None:
     assert _provider_count() == 1
 
     protect_metrics = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
-    assert int(protect_metrics.get("block_60m") or 0) >= 1
+    assert int(protect_metrics.get("blocked_60m") or 0) >= 1
 
     client.close()
     print("python protect e2e PASSED")

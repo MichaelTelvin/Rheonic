@@ -17,7 +17,6 @@ import {
   type CreateKeyResponse,
   type IncidentItem,
   type IngestKeyItem,
-  type ProtectMetrics,
   type ProjectItem,
   type ProjectProtectSettings,
   type RealtimeMetrics,
@@ -56,9 +55,9 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   const [lastIncidentsSuccessAt, setLastIncidentsSuccessAt] = useState<string | null>(null);
   const [metricsFetchFailed, setMetricsFetchFailed] = useState<boolean>(false);
   const [protectDecisionStats, setProtectDecisionStats] = useState<{
-    allow_60m: number | null;
-    warn_60m: number | null;
-    block_60m: number | null;
+    allowed_60m: number | null;
+    warned_60m: number | null;
+    blocked_60m: number | null;
   } | null>(null);
   const [protectHealthStats, setProtectHealthStats] = useState<{
     p50_ms: number | null;
@@ -223,14 +222,10 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
         if (cancelled) {
           return;
         }
-        const allowCount =
-          typeof (data as ProtectMetrics & { allow_60m?: unknown }).allow_60m === "number"
-            ? (data as ProtectMetrics & { allow_60m?: number }).allow_60m ?? null
-            : null;
         setProtectDecisionStats({
-          allow_60m: allowCount,
-          warn_60m: data.warn_60m,
-          block_60m: data.block_60m,
+          allowed_60m: data.allowed_60m,
+          warned_60m: data.warned_60m,
+          blocked_60m: data.blocked_60m,
         });
         setProtectHealthStats({
           p50_ms: data.decision_latency_p50_60m_ms,
@@ -668,13 +663,14 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   const isApiConnected = Boolean(
     lastMetricsSuccessAt && !metricsFetchFailed && Date.now() - new Date(lastMetricsSuccessAt).getTime() <= 10_000,
   );
+  const renderMetric = (value: number | null | undefined): string => (value === null || value === undefined ? "—" : String(value));
   const protectEnabled = Boolean(protectSettings?.protect_enabled);
-  const allowCountLabel = protectDecisionStats?.allow_60m ?? "—";
-  const warnCountLabel = protectDecisionStats?.warn_60m ?? "—";
-  const blockCountLabel = protectDecisionStats?.block_60m ?? "—";
-  const p50Label = protectHealthStats?.p50_ms ?? "—";
-  const p95Label = protectHealthStats?.p95_ms ?? "—";
-  const decisionTimeoutsLabel = protectHealthStats?.decision_timeouts_60m ?? "—";
+  const allowCountLabel = renderMetric(protectDecisionStats?.allowed_60m);
+  const warnCountLabel = renderMetric(protectDecisionStats?.warned_60m);
+  const blockCountLabel = renderMetric(protectDecisionStats?.blocked_60m);
+  const p50Label = renderMetric(protectHealthStats?.p50_ms);
+  const p95Label = renderMetric(protectHealthStats?.p95_ms);
+  const decisionTimeoutsLabel = renderMetric(protectHealthStats?.decision_timeouts_60m);
 
   void clockTick;
 
@@ -756,8 +752,6 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
           {metricsWarning ? <p className="warning-text">{metricsWarning}</p> : null}
           {incidentsWarning ? <p className="warning-text">{incidentsWarning}</p> : null}
           {globalBanner ? <section className="banner">{globalBanner}</section> : null}
-          {projectId && hasLocalDemoKey ? <p className="subtle">Demo key set locally (no secret shown).</p> : null}
-
           {!projectId ? (
             <section className="empty">
               <p>Select a project to see realtime metrics.</p>

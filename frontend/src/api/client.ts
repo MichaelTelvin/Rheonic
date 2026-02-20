@@ -6,8 +6,9 @@ export interface RealtimeMetrics {
 }
 
 export interface ProtectMetrics {
-  warn_60m: number;
-  block_60m: number;
+  allowed_60m: number;
+  warned_60m: number;
+  blocked_60m: number;
   decision_timeouts_60m: number;
   decision_latency_p50_60m_ms: number | null;
   decision_latency_p95_60m_ms: number | null;

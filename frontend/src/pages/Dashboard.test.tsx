@@ -71,8 +71,9 @@ describe("Dashboard", () => {
       protect_decision_timeout_ms: 100,
     });
     mocks.fetchProtectMetrics.mockResolvedValue({
-      warn_60m: 0,
-      block_60m: 0,
+      allowed_60m: 0,
+      warned_60m: 0,
+      blocked_60m: 0,
       decision_timeouts_60m: 0,
       decision_latency_p50_60m_ms: null,
       decision_latency_p95_60m_ms: null,
@@ -111,5 +112,31 @@ describe("Dashboard", () => {
     fireEvent.click(await screen.findByRole("button", { name: "New Project" }));
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
     expect(await screen.findByText("Project name is required.")).toBeDefined();
+  });
+
+  it("renders counters as 0 and percentiles as em-dash when null", async () => {
+    mocks.fetchProjects.mockResolvedValue([{ id: "p1", name: "Demo", created_at: new Date().toISOString() }]);
+    mocks.fetchProtectMetrics.mockResolvedValue({
+      allowed_60m: 0,
+      warned_60m: 0,
+      blocked_60m: 0,
+      decision_timeouts_60m: 0,
+      decision_latency_p50_60m_ms: null,
+      decision_latency_p95_60m_ms: null,
+      last: null,
+    });
+    render(<Dashboard userEmail="user@example.com" onSignOut={vi.fn()} />);
+
+    const allowedLabel = await screen.findByText("Allowed");
+    const allowedRow = allowedLabel.closest(".protect-decisions-row");
+    expect(allowedRow?.querySelector(".protect-decisions-value")?.textContent).toBe("0");
+
+    const timeoutLabel = await screen.findByText("Timeouts");
+    const timeoutRow = timeoutLabel.closest(".protect-decisions-row");
+    expect(timeoutRow?.querySelector(".protect-decisions-value")?.textContent).toBe("0");
+
+    const p50Label = await screen.findByText("P50 latency (ms)");
+    const p50Row = p50Label.closest(".protect-decisions-row");
+    expect(p50Row?.querySelector(".protect-decisions-value")?.textContent).toBe("—");
   });
 });

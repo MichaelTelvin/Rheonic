@@ -23,6 +23,10 @@ def _block_key(project_id: str) -> str:
     return f"pa:{project_id}:block:60m"
 
 
+def _allow_key(project_id: str) -> str:
+    return f"pa:{project_id}:allow:60m"
+
+
 def _last_key(project_id: str) -> str:
     return f"pa:{project_id}:last"
 
@@ -45,7 +49,9 @@ class ProtectActionStore:
         # Record warn/block counters and keep the last decision payload for UI.
         timestamp = (ts or datetime.now(timezone.utc)).isoformat()
         try:
-            if decision == "warn":
+            if decision == "allow":
+                self._increment_with_ttl(_allow_key(project_id))
+            elif decision == "warn":
                 self._increment_with_ttl(_warn_key(project_id))
             elif decision == "block":
                 self._increment_with_ttl(_block_key(project_id))
@@ -58,14 +64,16 @@ class ProtectActionStore:
     def get_metrics(self, project_id: str) -> dict[str, Any]:
         # Read 60-minute protect decision counters and last decision snapshot.
         try:
+            allowed = self._read_int(_allow_key(project_id))
             warn = self._read_int(_warn_key(project_id))
             block = self._read_int(_block_key(project_id))
             decision_timeouts = self._read_int(_timeout_key(project_id))
             last_raw = self._redis_client.get(_last_key(project_id))
             health = self.get_health(project_id=project_id)
             return {
-                "warn_60m": warn,
-                "block_60m": block,
+                "allowed_60m": allowed,
+                "warned_60m": warn,
+                "blocked_60m": block,
                 "decision_timeouts_60m": decision_timeouts,
                 "last": self._parse_last(last_raw),
                 "decision_latency_p50_60m_ms": health.get("p50_ms"),
@@ -74,8 +82,9 @@ class ProtectActionStore:
         except Exception:
             logger.warning("Failed reading protect decision counters", extra={"project_id": project_id})
             return {
-                "warn_60m": 0,
-                "block_60m": 0,
+                "allowed_60m": 0,
+                "warned_60m": 0,
+                "blocked_60m": 0,
                 "decision_timeouts_60m": 0,
                 "last": None,
                 "decision_latency_p50_60m_ms": None,

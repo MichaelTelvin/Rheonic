@@ -365,8 +365,9 @@ def test_protect_metrics_defaults_and_allow_keeps_counters_zero(tmp_path) -> Non
     baseline = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
     assert baseline.status_code == 200
     assert baseline.json() == {
-        "warn_60m": 0,
-        "block_60m": 0,
+        "allowed_60m": 0,
+        "warned_60m": 0,
+        "blocked_60m": 0,
         "decision_timeouts_60m": 0,
         "last": None,
         "decision_latency_p50_60m_ms": None,
@@ -377,8 +378,9 @@ def test_protect_metrics_defaults_and_allow_keeps_counters_zero(tmp_path) -> Non
     after_allow = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
     assert after_allow.status_code == 200
     payload = after_allow.json()
-    assert payload["warn_60m"] == 0
-    assert payload["block_60m"] == 0
+    assert payload["allowed_60m"] == 1
+    assert payload["warned_60m"] == 0
+    assert payload["blocked_60m"] == 0
     assert payload["decision_timeouts_60m"] == 0
     assert payload["last"]["decision"] == "allow"
     assert payload["last"]["reason"] == "ok"
@@ -411,8 +413,9 @@ def test_protect_metrics_increment_on_warn_and_block(tmp_path) -> None:
     metrics_response = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
     assert metrics_response.status_code == 200
     payload = metrics_response.json()
-    assert payload["warn_60m"] == 1
-    assert payload["block_60m"] == 1
+    assert payload["allowed_60m"] == 0
+    assert payload["warned_60m"] == 1
+    assert payload["blocked_60m"] == 1
     assert payload["decision_timeouts_60m"] == 0
     assert payload["last"]["decision"] == "block"
     assert payload["last"]["reason"] in {"tok_predictive", "tok_limit"}

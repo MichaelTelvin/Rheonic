@@ -14,8 +14,9 @@ router = APIRouter()
 
 class ProtectMetricsOut(BaseModel):
     # Protect action counters for dashboard visibility.
-    warn_60m: int
-    block_60m: int
+    allowed_60m: int
+    warned_60m: int
+    blocked_60m: int
     decision_timeouts_60m: int
     last: dict[str, str] | None
     decision_latency_p50_60m_ms: int | None
@@ -61,20 +62,13 @@ def get_protect_metrics(
         project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
         metrics = service.get_protect_metrics(project_id=project_id)
         return ProtectMetricsOut(
-            warn_60m=int(metrics.get("warn_60m", 0)),
-            block_60m=int(metrics.get("block_60m", 0)),
-            decision_timeouts_60m=int(metrics.get("decision_timeouts_60m", 0)),
-            last=metrics.get("last") if isinstance(metrics.get("last"), dict) else None,
-            decision_latency_p50_60m_ms=(
-                int(metrics.get("decision_latency_p50_60m_ms"))
-                if isinstance(metrics.get("decision_latency_p50_60m_ms"), int)
-                else None
-            ),
-            decision_latency_p95_60m_ms=(
-                int(metrics.get("decision_latency_p95_60m_ms"))
-                if isinstance(metrics.get("decision_latency_p95_60m_ms"), int)
-                else None
-            ),
+            allowed_60m=metrics["allowed_60m"],
+            warned_60m=metrics["warned_60m"],
+            blocked_60m=metrics["blocked_60m"],
+            decision_timeouts_60m=metrics["decision_timeouts_60m"],
+            last=metrics["last"],
+            decision_latency_p50_60m_ms=metrics["decision_latency_p50_60m_ms"],
+            decision_latency_p95_60m_ms=metrics["decision_latency_p95_60m_ms"],
         )
     except HTTPException:
         raise
