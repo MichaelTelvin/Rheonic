@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from typing import Any
 
-import tiktoken
+try:
+    import tiktoken  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover - import availability depends on environment
+    tiktoken = None
 
 _ENCODER_CACHE: dict[str, Any] = {}
 _DEFAULT_ENCODING = "cl100k_base"
@@ -50,6 +53,8 @@ def _extract_text(payload: dict[str, Any]) -> str | None:
 
 
 def _get_encoder(model: str | None) -> Any:
+    if tiktoken is None:
+        return None
     key = model or _DEFAULT_ENCODING
     cached = _ENCODER_CACHE.get(key)
     if cached is not None:
