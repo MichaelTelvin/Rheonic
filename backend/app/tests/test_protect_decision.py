@@ -327,6 +327,49 @@ def test_predictive_warn_works_with_input_estimate_only(tmp_path) -> None:
     _cleanup_overrides()
 
 
+def test_predictive_near_cap_warn_regression_case(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Near Cap Regression")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=project_id, total_tokens=168)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "input_tokens_estimate": 21,
+        },
+    )
+
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "predictive_near_cap"
+    assert decision["snapshot"]["predictive"]["estimated_next_tokens"] == 21
+    _cleanup_overrides()
+
+
+def test_predictive_near_cap_warn_does_not_trigger_below_80_percent(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Near Cap Non Trigger")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=project_id, total_tokens=120)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "input_tokens_estimate": 21,
+        },
+    )
+
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
+    _cleanup_overrides()
+
+
 def test_missing_input_tokens_estimate_skips_predictive_warn(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Missing Input Estimate")

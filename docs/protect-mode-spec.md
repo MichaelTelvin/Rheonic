@@ -109,7 +109,7 @@ Rule 3 — Predictive Token Cap (proactive; recommended)
 If protect_max_tok_per_min != null AND max_output_tokens is present:
 	•	Compute:
 	•	estimated_next_tokens = max_output_tokens + (input_tokens_estimate || 0)
-	•	If tokens_60s + estimated_next_tokens > protect_max_tok_per_min → block (reason=tok_predictive)
+	•	If tokens_60s + estimated_next_tokens > protect_max_tok_per_min → warn (reason=tok_predictive)
 
 Non-risk rule: If max_output_tokens is missing, do not attempt prediction; allow unless already over cap (Rule 2).
 

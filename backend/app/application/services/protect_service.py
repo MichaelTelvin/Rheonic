@@ -61,6 +61,7 @@ class ProtectService:
         max_tok = project.protect_max_tok_per_min
         fail_mode = project.protect_fail_mode
         decision_timeout_ms = project.protect_decision_timeout_ms
+        near_cap_threshold = float(max_tok) * 0.8 if max_tok is not None else None
         estimated_next_tokens: int | None = None
         if isinstance(ctx.input_tokens_estimate, int):
             input_estimate = max(ctx.input_tokens_estimate, 0)
@@ -70,6 +71,11 @@ class ProtectService:
                 estimated_next_tokens = input_estimate
 
         predictive_enabled = bool(project.protect_enabled and max_tok is not None and estimated_next_tokens is not None)
+        near_cap_reached = bool(
+            near_cap_threshold is not None
+            and estimated_next_tokens is not None
+            and (tokens_60s + estimated_next_tokens >= near_cap_threshold)
+        )
         would_exceed_tokens_cap = bool(
             max_tok is not None and estimated_next_tokens is not None and (tokens_60s + estimated_next_tokens >= max_tok)
         )
@@ -92,7 +98,7 @@ class ProtectService:
         elif incident_severity == "medium":
             decision = "warn"
             reason = "incident_medium"
-        elif would_exceed_tokens_cap:
+        elif near_cap_reached:
             decision = "warn"
             reason = "predictive_near_cap"
 
