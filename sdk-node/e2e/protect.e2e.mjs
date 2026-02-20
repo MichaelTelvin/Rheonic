@@ -102,17 +102,21 @@ async function main() {
 
   let blocked = false;
   try {
-    await openai.chat.completions.create({ model: "gpt-4o-mini", max_tokens: 2000, input_tokens: 0 });
+    await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: "Predictive warning near cap check for node e2e." }],
+    });
   } catch (error) {
     blocked = error instanceof LLMTBGBlockedError;
   }
-  assert.equal(blocked, true);
-  assert.equal(await providerCount(), 1);
+  assert.equal(blocked, false);
+  assert.equal(await providerCount(), 2);
 
   const protectMetrics = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
     headers: authHeaders,
   });
-  assert.ok(Number(protectMetrics.blocked_60m ?? 0) >= 1);
+  assert.ok(Number(protectMetrics.warned_60m ?? 0) >= 1);
 
   client.close();
   console.log("node protect e2e PASSED");

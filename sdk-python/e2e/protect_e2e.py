@@ -119,14 +119,18 @@ def run() -> None:
 
     blocked = False
     try:
-        openai.chat.completions.create(model="gpt-4o-mini", max_tokens=2000, input_tokens=0)
+        openai.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": "Predictive warning near cap check for python e2e."}],
+        )
     except LLMTBGBlockedError:
         blocked = True
-    assert blocked is True
-    assert _provider_count() == 1
+    assert blocked is False
+    assert _provider_count() == 2
 
     protect_metrics = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
-    assert int(protect_metrics.get("blocked_60m") or 0) >= 1
+    assert int(protect_metrics.get("warned_60m") or 0) >= 1
 
     client.close()
     print("python protect e2e PASSED")

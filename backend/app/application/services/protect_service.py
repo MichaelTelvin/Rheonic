@@ -17,7 +17,7 @@ class ProtectDecision:
     reason: str
     fail_mode: str
     decision_timeout_ms: int
-    snapshot: dict[str, int | str | bool | None | dict[str, int | bool]]
+    snapshot: dict[str, int | str | bool | None | dict[str, int | bool | None]]
 
 
 @dataclass(slots=True)
@@ -25,6 +25,7 @@ class ProtectDecisionContext:
     # Optional request context used for proactive predictive blocking.
     max_output_tokens: int | None = None
     input_tokens_estimate: int | None = None
+    environment: str | None = None
 
 
 class ProtectService:
@@ -60,13 +61,17 @@ class ProtectService:
         max_tok = project.protect_max_tok_per_min
         fail_mode = project.protect_fail_mode
         decision_timeout_ms = project.protect_decision_timeout_ms
-        predictive_enabled = max_tok is not None and isinstance(ctx.max_output_tokens, int) and ctx.max_output_tokens >= 0
-        estimated_next_tokens = 0
-        if predictive_enabled:
-            input_estimate = ctx.input_tokens_estimate if isinstance(ctx.input_tokens_estimate, int) else 0
-            estimated_next_tokens = max(ctx.max_output_tokens or 0, 0) + max(input_estimate, 0)
+        estimated_next_tokens: int | None = None
+        if isinstance(ctx.input_tokens_estimate, int):
+            input_estimate = max(ctx.input_tokens_estimate, 0)
+            if isinstance(ctx.max_output_tokens, int):
+                estimated_next_tokens = input_estimate + max(ctx.max_output_tokens, 0)
+            else:
+                estimated_next_tokens = input_estimate
+
+        predictive_enabled = bool(project.protect_enabled and max_tok is not None and estimated_next_tokens is not None)
         would_exceed_tokens_cap = bool(
-            max_tok is not None and predictive_enabled and (tokens_60s + estimated_next_tokens > max_tok)
+            max_tok is not None and estimated_next_tokens is not None and (tokens_60s + estimated_next_tokens >= max_tok)
         )
 
         decision = "allow"
@@ -81,15 +86,15 @@ class ProtectService:
         elif max_tok is not None and tokens_60s >= max_tok:
             decision = "block"
             reason = "tok_limit"
-        elif would_exceed_tokens_cap:
-            decision = "block"
-            reason = "tok_predictive"
         elif incident_severity == "high":
             decision = "block"
             reason = "incident_high"
         elif incident_severity == "medium":
             decision = "warn"
             reason = "incident_medium"
+        elif would_exceed_tokens_cap:
+            decision = "warn"
+            reason = "predictive_near_cap"
 
         self._protect_action_store.record(project_id=project_id, decision=decision, reason=reason)
 

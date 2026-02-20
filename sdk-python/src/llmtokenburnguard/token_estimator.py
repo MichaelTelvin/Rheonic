@@ -19,9 +19,11 @@ def estimate_input_tokens(payload: dict[str, Any]) -> int | None:
         return None
     try:
         encoder = _get_encoder(payload.get("model") if isinstance(payload.get("model"), str) else None)
+        if encoder is None:
+            return _estimate_by_chars(text)
         return len(encoder.encode(text))
     except Exception:
-        return None
+        return _estimate_by_chars(text)
 
 
 def _extract_text(payload: dict[str, Any]) -> str | None:
@@ -68,3 +70,9 @@ def _get_encoder(model: str | None) -> Any:
         encoder = tiktoken.get_encoding(_DEFAULT_ENCODING)
     _ENCODER_CACHE[key] = encoder
     return encoder
+
+
+def _estimate_by_chars(text: str) -> int:
+    if not text:
+        return 0
+    return max(1, len(text) // 4 + (1 if len(text) % 4 else 0))

@@ -18,7 +18,7 @@ export function estimateInputTokensFromRequest(payload: unknown): number | null 
     const encoder = getEncoder(typeof request.model === "string" ? request.model : null);
     return encoder.encode(text).length;
   } catch {
-    return null;
+    return estimateByChars(text);
   }
 }
 
@@ -78,4 +78,11 @@ function getEncoder(model: string | null): Tiktoken {
 
   encoderCache.set(cacheKey, encoder);
   return encoder;
+}
+
+function estimateByChars(text: string): number {
+  if (text.length === 0) {
+    return 0;
+  }
+  return Math.max(1, Math.ceil(text.length / 4));
 }

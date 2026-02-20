@@ -105,15 +105,15 @@ def test_preflight_block_prevents_provider_call() -> None:
     client.close()
 
 
-def test_preflight_tok_predictive_block_prevents_provider_call() -> None:
+def test_preflight_predictive_near_cap_warn_allows_provider_call() -> None:
     client = Client(
         ingest_key="p1",
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient(  # type: ignore[arg-type]
             {
-                "decision": "block",
-                "reason": "tok_predictive",
+                "decision": "warn",
+                "reason": "predictive_near_cap",
                 "fail_mode": "open",
                 "protect_decision_timeout_ms": 100,
             }
@@ -122,9 +122,8 @@ def test_preflight_tok_predictive_block_prevents_provider_call() -> None:
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
-    with pytest.raises(LLMTBGBlockedError):
-        openai_client.chat.completions.create(model="gpt-4o-mini", max_tokens=1024)
-    assert calls == []
+    openai_client.chat.completions.create(model="gpt-4o-mini", max_tokens=1024)
+    assert len(calls) == 1
     client.close()
 
 

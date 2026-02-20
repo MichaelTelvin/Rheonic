@@ -45,15 +45,15 @@ test("decision block prevents provider call", async () => {
   }
 });
 
-test("tok_predictive decision blocks provider call", async () => {
+test("predictive_near_cap warn allows provider call", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () =>
     ({
       ok: true,
       status: 200,
       json: async () => ({
-        decision: "block",
-        reason: "tok_predictive",
+        decision: "warn",
+        reason: "predictive_near_cap",
         fail_mode: "open",
         protect_decision_timeout_ms: 100,
       }),
@@ -63,11 +63,8 @@ test("tok_predictive decision blocks provider call", async () => {
     const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
-    await assert.rejects(
-      () => openai.chat.completions.create({ model: "gpt-4o-mini", max_tokens: 2048 }),
-      LLMTBGBlockedError,
-    );
-    assert.equal(calls.length, 0);
+    await openai.chat.completions.create({ model: "gpt-4o-mini", max_tokens: 2048 });
+    assert.equal(calls.length, 1);
     client.close();
   } finally {
     globalThis.fetch = originalFetch;

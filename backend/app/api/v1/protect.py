@@ -26,6 +26,7 @@ class ProtectDecisionIn(BaseModel):
     # Preflight decision request payload.
     provider: str
     model: str | None = None
+    environment: str | None = None
     feature: str | None = None
     max_output_tokens: int | None = None
     input_tokens_estimate: int | None = None
@@ -37,7 +38,7 @@ class ProtectDecisionOut(BaseModel):
     reason: str
     fail_mode: str
     protect_decision_timeout_ms: int
-    snapshot: dict[str, int | str | bool | None | dict[str, int | bool]]
+    snapshot: dict[str, int | str | bool | None | dict[str, int | bool | None]]
 
 
 class ProjectProtectOut(BaseModel):
@@ -80,6 +81,7 @@ def protect_decision(
             context=ProtectDecisionContext(
                 max_output_tokens=payload.max_output_tokens,
                 input_tokens_estimate=payload.input_tokens_estimate,
+                environment=payload.environment,
             ),
         )
         if decision is None:

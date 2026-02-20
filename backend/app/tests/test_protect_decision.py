@@ -275,14 +275,14 @@ def test_decision_snapshot_includes_counters_and_thresholds(tmp_path) -> None:
     assert snapshot["decision_timeout_ms"] == 250
     assert decision["protect_decision_timeout_ms"] == 250
     assert snapshot["predictive"]["enabled"] is False
-    assert snapshot["predictive"]["estimated_next_tokens"] == 0
+    assert snapshot["predictive"]["estimated_next_tokens"] is None
     assert snapshot["predictive"]["would_exceed_tokens_cap"] is False
     _cleanup_overrides()
 
 
-def test_predictive_tokens_block_when_next_call_would_exceed_cap(tmp_path) -> None:
+def test_predictive_near_cap_warns_when_next_call_would_reach_cap(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
-    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Block")
+    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Warn")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
     rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
 
@@ -297,8 +297,8 @@ def test_predictive_tokens_block_when_next_call_would_exceed_cap(tmp_path) -> No
         },
     )
 
-    assert decision["decision"] == "block"
-    assert decision["reason"] == "tok_predictive"
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "predictive_near_cap"
     snapshot = decision["snapshot"]
     assert snapshot["predictive"]["enabled"] is True
     assert snapshot["predictive"]["estimated_next_tokens"] == 2_000
@@ -306,9 +306,9 @@ def test_predictive_tokens_block_when_next_call_would_exceed_cap(tmp_path) -> No
     _cleanup_overrides()
 
 
-def test_missing_max_output_tokens_skips_predictive_rule(tmp_path) -> None:
+def test_predictive_warn_works_with_input_estimate_only(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
-    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Missing Max")
+    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Input Only")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
     rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
 
@@ -318,15 +318,16 @@ def test_missing_max_output_tokens_skips_predictive_rule(tmp_path) -> None:
         body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 1_000},
     )
 
-    assert decision["decision"] == "allow"
-    assert decision["reason"] == "ok"
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "predictive_near_cap"
     snapshot = decision["snapshot"]
-    assert snapshot["predictive"]["enabled"] is False
-    assert snapshot["predictive"]["would_exceed_tokens_cap"] is False
+    assert snapshot["predictive"]["enabled"] is True
+    assert snapshot["predictive"]["estimated_next_tokens"] == 1_000
+    assert snapshot["predictive"]["would_exceed_tokens_cap"] is True
     _cleanup_overrides()
 
 
-def test_predictive_blocks_when_input_tokens_estimate_is_omitted(tmp_path) -> None:
+def test_missing_input_tokens_estimate_skips_predictive_warn(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Missing Input Estimate")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
@@ -343,8 +344,57 @@ def test_predictive_blocks_when_input_tokens_estimate_is_omitted(tmp_path) -> No
     )
     assert response.status_code == 200
     decision = response.json()
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
+    assert decision["snapshot"]["predictive"]["enabled"] is False
+    assert decision["snapshot"]["predictive"]["estimated_next_tokens"] is None
+    assert decision["snapshot"]["predictive"]["would_exceed_tokens_cap"] is False
+    _cleanup_overrides()
+
+
+def test_predictive_warn_does_not_override_high_incident_block(tmp_path) -> None:
+    client, rolling_window, severity_cache = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive High Incident")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
+    rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
+    severity_cache.set(project_id, "high")
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "max_output_tokens": 2_000,
+            "input_tokens_estimate": 0,
+        },
+    )
+
     assert decision["decision"] == "block"
-    assert decision["reason"] == "tok_predictive"
+    assert decision["reason"] == "incident_high"
+    _cleanup_overrides()
+
+
+def test_predictive_warn_does_not_override_medium_incident_warn_reason(tmp_path) -> None:
+    client, rolling_window, severity_cache = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Medium Incident")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
+    rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
+    severity_cache.set(project_id, "medium")
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "max_output_tokens": 2_000,
+            "input_tokens_estimate": 0,
+        },
+    )
+
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "incident_medium"
     _cleanup_overrides()
 
 
@@ -390,7 +440,7 @@ def test_protect_metrics_defaults_and_allow_keeps_counters_zero(tmp_path) -> Non
 
 
 def test_protect_metrics_increment_on_warn_and_block(tmp_path) -> None:
-    client, _, severity_cache = _make_client(tmp_path)
+    client, rolling_window, severity_cache = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Metrics Counter 2")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=1000)
 
@@ -399,6 +449,7 @@ def test_protect_metrics_increment_on_warn_and_block(tmp_path) -> None:
     assert warn_decision["decision"] == "warn"
 
     severity_cache.set(project_id, "none")
+    rolling_window.increment_project_60s(project_id=project_id, total_tokens=1000)
     _decision(
         client,
         ingest_key,
@@ -418,7 +469,7 @@ def test_protect_metrics_increment_on_warn_and_block(tmp_path) -> None:
     assert payload["blocked_60m"] == 1
     assert payload["decision_timeouts_60m"] == 0
     assert payload["last"]["decision"] == "block"
-    assert payload["last"]["reason"] in {"tok_predictive", "tok_limit"}
+    assert payload["last"]["reason"] == "tok_limit"
     assert isinstance(payload["decision_latency_p50_60m_ms"], int)
     assert isinstance(payload["decision_latency_p95_60m_ms"], int)
     _cleanup_overrides()

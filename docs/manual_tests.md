@@ -106,3 +106,29 @@ Steps:
 	2.	Set decision timeout very low (e.g. 1–5ms) OR temporarily stop backend decision route (simpler: stop backend container briefly)
 	3.	With fail-open: protected call should proceed (stub count increments)
 	4.	With fail-closed: protected call should block before provider (stub count unchanged)
+
+⸻
+
+8) Predictive near-cap WARN (proactive warning only)
+
+Goal: prove predictive logic warns near cap and never blocks by itself.
+
+Example request:
+
+```bash
+curl -sS -X POST "http://localhost:8000/api/v1/protect/decision" \
+  -H "Content-Type: application/json" \
+  -H "X-Project-Ingest-Key: <INGEST_KEY>" \
+  -d '{
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "environment": "dev",
+    "input_tokens_estimate": 50,
+    "max_output_tokens": 200
+  }'
+```
+
+Expected behavior:
+	1.	If rolling tokens are below cap but `tokens_60s + estimate >= cap`, decision returns `warn` with reason `predictive_near_cap`.
+	2.	Dashboard `Warned (60m)` increments after protected calls that receive this warn decision.
+	3.	Predictive logic does not block. Blocks only happen from hard caps (`req_limit`/`tok_limit`) or high incidents.
