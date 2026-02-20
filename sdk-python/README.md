@@ -74,3 +74,22 @@ After running `python demo.py` with backend/frontend up:
 - create key in Keys modal, copy it once, and export `LLMTBG_INGEST_KEY`
 - open the dashboard (default `http://localhost:5173`)
 - confirm metrics changed after ingest
+
+## Manual protect demo
+
+Runs a local protect preflight + provider-stub call flow against:
+- backend: `http://localhost:8000`
+- provider stub: `http://localhost:8099`
+
+```bash
+export LLMTBG_INGEST_KEY="<copy from Keys modal>"
+export LLMTBG_SCENARIO=allow   # allow | warn | block
+python demo_protect.py
+```
+
+Optional overrides:
+- `LLMTBG_BACKEND_URL`
+- `LLMTBG_PROVIDER_URL`
+- `LLMTBG_MAX_TOKENS`
+- `LLMTBG_MODEL`
+- `LLMTBG_ENVIRONMENT`

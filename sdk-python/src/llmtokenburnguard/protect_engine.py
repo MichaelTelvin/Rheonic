@@ -46,6 +46,7 @@ class ProtectEngine:
         # Return allow/warn/block decision from backend with fail-mode fallback.
         timeout_s = max(self._decision_timeout_ms, 1) / 1000.0
         try:
+            print("Decision request body", context)
             response = self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision",
                 json=context,
@@ -59,6 +60,7 @@ class ProtectEngine:
             if status_code < 200 or status_code >= 300:
                 return self._fallback_decision()
             payload = self._parse_json_payload(response)
+            print("Decision response body", context)
             decision = str(payload.get("decision") or "allow")
             reason = str(payload.get("reason") or "ok")
             fail_mode = str(payload.get("fail_mode") or self._fail_mode)
