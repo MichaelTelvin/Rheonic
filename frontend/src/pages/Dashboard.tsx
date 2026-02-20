@@ -743,7 +743,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                 onClick={openProtectModal}
                 disabled={!projectId}
               >
-                {protectEnabled ? "Disable protection" : "Enable protection"}
+                {protectEnabled ? "Configure protection" : "Enable protection"}
               </button>
             </div>
           </section>
