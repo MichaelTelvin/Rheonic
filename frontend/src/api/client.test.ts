@@ -26,10 +26,18 @@ describe("api client", () => {
   it("attaches auth token and json content type", async () => {
     window.localStorage.setItem(frontendConfig.authTokenStorageKey, "t1");
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ access_token: "t2", token_type: "bearer", user: { id: "u1", email: "a@b.com" } }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+      new Response(
+        JSON.stringify({
+          access_token: "t2",
+          refresh_token: "r2",
+          token_type: "bearer",
+          user: { id: "u1", email: "a@b.com" },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -55,6 +63,43 @@ describe("api client", () => {
 
     await expect(fetchProjects()).rejects.toBeInstanceOf(ApiError);
     expect(handler).toHaveBeenCalled();
+  });
+
+  it("retries once after successful refresh on 401", async () => {
+    window.localStorage.setItem(frontendConfig.authTokenStorageKey, "expired");
+    window.localStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-1");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { code: "unauthorized", message: "expired" } }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: "new-access",
+            refresh_token: "new-refresh",
+            token_type: "bearer",
+            user: { id: "u1", email: "u@example.com", created_at: new Date().toISOString() },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchProjects();
+
+    expect(window.localStorage.getItem(frontendConfig.authTokenStorageKey)).toBe("new-access");
+    expect(window.localStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBe("new-refresh");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("uses structured error payload message and code", async () => {

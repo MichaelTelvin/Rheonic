@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     jwt_alg: str = "HS256"
     jwt_expires_min: int = 60
+    jwt_refresh_expires_min: int = 10080
     cors_origins: str = ""
     database_url: str = ""
     redis_url: str = ""

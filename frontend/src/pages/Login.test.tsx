@@ -48,6 +48,7 @@ describe("Login", () => {
     const onAuthSuccess = vi.fn();
     mockLogin.mockResolvedValue({
       access_token: "token",
+      refresh_token: "refresh",
       token_type: "bearer",
       user: { id: "u1", email: "test@example.com", created_at: new Date().toISOString() },
     });
@@ -68,6 +69,7 @@ describe("Login", () => {
     mockRegister.mockResolvedValue({ id: "u1", email: "new@example.com", created_at: new Date().toISOString() });
     mockLogin.mockResolvedValue({
       access_token: "token",
+      refresh_token: "refresh",
       token_type: "bearer",
       user: { id: "u1", email: "new@example.com", created_at: new Date().toISOString() },
     });
@@ -99,6 +101,7 @@ describe("Login", () => {
     const user = userEvent.setup();
     mockLogin.mockResolvedValue({
       access_token: "token",
+      refresh_token: "refresh",
       token_type: "bearer",
       user: { id: "u1", email: "enter@example.com", created_at: new Date().toISOString() },
     });

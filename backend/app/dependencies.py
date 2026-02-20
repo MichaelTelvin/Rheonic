@@ -220,6 +220,8 @@ def get_current_user(
     )
     if token_payload is None:
         raise HTTPException(status_code=401, detail="invalid token")
+    if str(token_payload.get("typ") or "access") != "access":
+        raise HTTPException(status_code=401, detail="invalid token")
     user_id = str(token_payload.get("sub") or "")
     if not user_id:
         raise HTTPException(status_code=401, detail="invalid token")

@@ -21,6 +21,7 @@ export function App(): JSX.Element {
 
   const signOut = useCallback((): void => {
     window.localStorage.removeItem(frontendConfig.authTokenStorageKey);
+    window.localStorage.removeItem(frontendConfig.authRefreshTokenStorageKey);
     window.localStorage.removeItem(frontendConfig.authUserStorageKey);
     setToken(null);
     setUser(null);
@@ -35,6 +36,7 @@ export function App(): JSX.Element {
 
   const onAuthSuccess = (auth: LoginResponse): void => {
     window.localStorage.setItem(frontendConfig.authTokenStorageKey, auth.access_token);
+    window.localStorage.setItem(frontendConfig.authRefreshTokenStorageKey, auth.refresh_token);
     window.localStorage.setItem(frontendConfig.authUserStorageKey, JSON.stringify(auth.user));
     setToken(auth.access_token);
     setUser(auth.user);

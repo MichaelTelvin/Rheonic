@@ -43,8 +43,34 @@ def test_register_and_login_happy_path_returns_jwt(tmp_path) -> None:
         login_body = login_response.json()
         assert login_body["token_type"] == "bearer"
         assert isinstance(login_body["access_token"], str)
+        assert isinstance(login_body["refresh_token"], str)
         assert len(login_body["access_token"]) > 20
+        assert len(login_body["refresh_token"]) > 20
         assert login_body["user"]["email"] == "user@example.com"
+
+
+def test_refresh_issues_new_tokens(tmp_path) -> None:
+    # Refresh endpoint should exchange a valid refresh token for a new auth pair.
+    with _make_client(tmp_path) as client:
+        client.post("/api/v1/auth/register", json={"email": "refresh@example.com", "password": "password123"})
+        login_response = client.post("/api/v1/auth/login", json={"email": "refresh@example.com", "password": "password123"})
+        assert login_response.status_code == 200
+        refresh_token = login_response.json()["refresh_token"]
+
+        refresh_response = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+        assert refresh_response.status_code == 200
+        payload = refresh_response.json()
+        assert payload["token_type"] == "bearer"
+        assert isinstance(payload["access_token"], str)
+        assert isinstance(payload["refresh_token"], str)
+        assert payload["user"]["email"] == "refresh@example.com"
+
+
+def test_refresh_rejects_invalid_token(tmp_path) -> None:
+    # Refresh endpoint should reject invalid refresh token payloads.
+    with _make_client(tmp_path) as client:
+        response = client.post("/api/v1/auth/refresh", json={"refresh_token": "not-a-token"})
+        assert response.status_code == 401
 
 
 def test_protected_routes_require_token(tmp_path) -> None:

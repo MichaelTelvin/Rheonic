@@ -29,8 +29,14 @@ class UserOut(BaseModel):
 class LoginOut(BaseModel):
     # Login response with access token and user info.
     access_token: str
+    refresh_token: str
     token_type: str
     user: UserOut
+
+
+class RefreshIn(BaseModel):
+    # Refresh request payload.
+    refresh_token: str
 
 
 @router.post("/register", response_model=UserOut)
@@ -50,9 +56,10 @@ async def register(payload: AuthIn, service: AuthService = Depends(get_auth_serv
 async def login(payload: AuthIn, service: AuthService = Depends(get_auth_service)) -> LoginOut:
     # Authenticate a user and issue access token.
     try:
-        token, user = service.login(email=payload.email, password=payload.password)
+        access_token, refresh_token, user = service.login(email=payload.email, password=payload.password)
         return LoginOut(
-            access_token=token,
+            access_token=access_token,
+            refresh_token=refresh_token,
             token_type="bearer",
             user=UserOut(id=user.id, email=user.email, created_at=user.created_at),
         )
@@ -61,3 +68,21 @@ async def login(payload: AuthIn, service: AuthService = Depends(get_auth_service
     except Exception:
         logger.exception("Login endpoint failed")
         raise HTTPException(status_code=500, detail="Login failed")
+
+
+@router.post("/refresh", response_model=LoginOut)
+async def refresh(payload: RefreshIn, service: AuthService = Depends(get_auth_service)) -> LoginOut:
+    # Issue a new access token from a valid refresh token.
+    try:
+        access_token, refresh_token, user = service.refresh(refresh_token=payload.refresh_token)
+        return LoginOut(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="bearer",
+            user=UserOut(id=user.id, email=user.email, created_at=user.created_at),
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Refresh endpoint failed")
+        raise HTTPException(status_code=500, detail="Refresh failed")

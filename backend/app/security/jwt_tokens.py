@@ -16,6 +16,26 @@ def create_access_token(
     payload = {
         "sub": user_id,
         "email": email,
+        "typ": "access",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
+    }
+    return jwt.encode(payload, secret, algorithm=algorithm)
+
+
+def create_refresh_token(
+    user_id: str,
+    email: str,
+    secret: str,
+    algorithm: str,
+    expires_minutes: int,
+) -> str:
+    # Build signed refresh token.
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "typ": "refresh",
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
     }

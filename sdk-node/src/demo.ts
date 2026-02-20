@@ -25,7 +25,7 @@ async function runDemo(): Promise<void> {
       },
       response: {
         latency_ms: 120,
-        total_tokens: 42,
+        total_tokens: 420,
         http_status: 200,
       },
     }),

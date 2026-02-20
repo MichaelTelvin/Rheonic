@@ -13,10 +13,16 @@ vi.mock("./api/client", () => {
 
 vi.mock("./pages/Login", () => {
   return {
-    Login: ({ onAuthSuccess }: { onAuthSuccess: (auth: { access_token: string; user: { email: string } }) => void }) => (
+    Login: ({
+      onAuthSuccess,
+    }: {
+      onAuthSuccess: (auth: { access_token: string; refresh_token: string; user: { email: string } }) => void;
+    }) => (
       <button
         type="button"
-        onClick={() => onAuthSuccess({ access_token: "token-1", user: { email: "user@example.com" } } as any)}
+        onClick={() =>
+          onAuthSuccess({ access_token: "token-1", refresh_token: "refresh-1", user: { email: "user@example.com" } } as any)
+        }
       >
         Mock Login
       </button>
@@ -56,12 +62,14 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mock Login" }));
 
     expect(window.localStorage.getItem(frontendConfig.authTokenStorageKey)).toBe("token-1");
+    expect(window.localStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBe("refresh-1");
     expect(window.localStorage.getItem(frontendConfig.authUserStorageKey)).toContain("user@example.com");
     expect(screen.getByText("Mock Dashboard user@example.com")).toBeDefined();
   });
 
   it("renders dashboard from existing local storage and signs out", () => {
     window.localStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
+    window.localStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
     window.localStorage.setItem(
       frontendConfig.authUserStorageKey,
       JSON.stringify({ id: "u1", email: "persisted@example.com", created_at: new Date().toISOString() }),
@@ -72,6 +80,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Mock Sign Out" }));
     expect(window.localStorage.getItem(frontendConfig.authTokenStorageKey)).toBeNull();
+    expect(window.localStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBeNull();
     expect(screen.getByRole("button", { name: "Mock Login" })).toBeDefined();
   });
 

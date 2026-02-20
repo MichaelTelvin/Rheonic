@@ -78,6 +78,7 @@ export interface AuthUser {
 
 export interface LoginResponse {
   access_token: string;
+  refresh_token: string;
   token_type: string;
   user: AuthUser;
 }
@@ -94,6 +95,7 @@ export class ApiError extends Error {
 }
 
 let unauthorizedHandler: (() => void) | null = null;
+let refreshInFlight: Promise<string | null> | null = null;
 
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
@@ -101,6 +103,7 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = window.localStorage.getItem(frontendConfig.authTokenStorageKey);
+  const isAuthRoute = path.startsWith("/api/v1/auth/");
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -132,6 +135,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (response.status === 401) {
+    if (!isAuthRoute) {
+      const refreshedToken = await refreshAccessToken();
+      if (refreshedToken) {
+        const retryHeaders = new Headers(init?.headers ?? {});
+        if (!retryHeaders.has("Content-Type")) {
+          retryHeaders.set("Content-Type", "application/json");
+        }
+        retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
+        const retryResponse = await fetch(`${frontendConfig.apiBaseUrl}${path}`, {
+          headers: retryHeaders,
+          ...init,
+        });
+        if (retryResponse.ok) {
+          return (await retryResponse.json()) as T;
+        }
+      }
+    }
     unauthorizedHandler?.();
     throw new ApiError(response.status, responseMessage, responseCode);
   }
@@ -141,6 +161,43 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return (await response.json()) as T;
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+  const refreshToken = window.localStorage.getItem(frontendConfig.authRefreshTokenStorageKey);
+  if (!refreshToken) {
+    return null;
+  }
+  refreshInFlight = (async () => {
+    try {
+      const response = await fetch(`${frontendConfig.apiBaseUrl}/api/v1/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!response.ok) {
+        return null;
+      }
+      const payload = (await response.json()) as LoginResponse;
+      if (!payload.access_token || !payload.refresh_token) {
+        return null;
+      }
+      window.localStorage.setItem(frontendConfig.authTokenStorageKey, payload.access_token);
+      window.localStorage.setItem(frontendConfig.authRefreshTokenStorageKey, payload.refresh_token);
+      window.localStorage.setItem(frontendConfig.authUserStorageKey, JSON.stringify(payload.user));
+      return payload.access_token;
+    } catch {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
 }
 
 export async function register(email: string, password: string): Promise<AuthUser> {
