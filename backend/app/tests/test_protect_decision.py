@@ -12,6 +12,7 @@ from app.dependencies import (
     get_ingest_key_service,
     get_metrics_service,
     get_project_service,
+    get_protect_action_store,
     get_protect_service,
 )
 from app.domain.models.user import User
@@ -115,15 +116,16 @@ def _make_client(tmp_path) -> tuple[TestClient, RollingWindow, IncidentSeverityC
         ingest_key_repository=IngestKeyRepositoryImpl(session_factory=session_factory),
         project_repository=project_repository,
     )
+    protect_action_store = ProtectActionStore(redis_client=redis_client)  # type: ignore[arg-type]
     protect_service = ProtectService(
         ingest_key_service=ingest_key_service,
         realtime_counters=rolling_window,
         incident_severity_cache=incident_severity_cache,
-        protect_action_store=ProtectActionStore(redis_client=redis_client),  # type: ignore[arg-type]
+        protect_action_store=protect_action_store,
     )
     metrics_service = MetricsService(
         realtime_counters=rolling_window,
-        protect_action_store=ProtectActionStore(redis_client=redis_client),  # type: ignore[arg-type]
+        protect_action_store=protect_action_store,
     )
     current_user = User(
         id="u-protect",
@@ -135,6 +137,7 @@ def _make_client(tmp_path) -> tuple[TestClient, RollingWindow, IncidentSeverityC
     app.dependency_overrides[get_project_service] = lambda: project_service
     app.dependency_overrides[get_ingest_key_service] = lambda: ingest_key_service
     app.dependency_overrides[get_protect_service] = lambda: protect_service
+    app.dependency_overrides[get_protect_action_store] = lambda: protect_action_store
     app.dependency_overrides[get_metrics_service] = lambda: metrics_service
     app.dependency_overrides[get_current_user] = lambda: current_user
     return TestClient(app), rolling_window, incident_severity_cache
@@ -361,7 +364,14 @@ def test_protect_metrics_defaults_and_allow_keeps_counters_zero(tmp_path) -> Non
 
     baseline = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
     assert baseline.status_code == 200
-    assert baseline.json() == {"warn_60m": 0, "block_60m": 0, "last": None}
+    assert baseline.json() == {
+        "warn_60m": 0,
+        "block_60m": 0,
+        "decision_timeouts_60m": 0,
+        "last": None,
+        "decision_latency_p50_60m_ms": None,
+        "decision_latency_p95_60m_ms": None,
+    }
 
     _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
     after_allow = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
@@ -369,8 +379,11 @@ def test_protect_metrics_defaults_and_allow_keeps_counters_zero(tmp_path) -> Non
     payload = after_allow.json()
     assert payload["warn_60m"] == 0
     assert payload["block_60m"] == 0
+    assert payload["decision_timeouts_60m"] == 0
     assert payload["last"]["decision"] == "allow"
     assert payload["last"]["reason"] == "ok"
+    assert isinstance(payload["decision_latency_p50_60m_ms"], int)
+    assert isinstance(payload["decision_latency_p95_60m_ms"], int)
     _cleanup_overrides()
 
 
@@ -400,8 +413,46 @@ def test_protect_metrics_increment_on_warn_and_block(tmp_path) -> None:
     payload = metrics_response.json()
     assert payload["warn_60m"] == 1
     assert payload["block_60m"] == 1
+    assert payload["decision_timeouts_60m"] == 0
     assert payload["last"]["decision"] == "block"
     assert payload["last"]["reason"] in {"tok_predictive", "tok_limit"}
+    assert isinstance(payload["decision_latency_p50_60m_ms"], int)
+    assert isinstance(payload["decision_latency_p95_60m_ms"], int)
+    _cleanup_overrides()
+
+
+def test_protect_latency_percentiles_are_windowed_and_deterministic(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, _ = _create_project_and_key(client, "Protect Latency Percentiles")
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    redis_client: FakeRedisClient = app.dependency_overrides[get_metrics_service]()._protect_action_store._redis_client  # type: ignore[attr-defined]
+    latency_key = f"pa:{project_id}:latency:60m"
+    redis_client.zadd(
+        latency_key,
+        {
+            f"{now_ms - 60_000}:a:10": now_ms - 60_000,
+            f"{now_ms - 30_000}:b:20": now_ms - 30_000,
+            f"{now_ms - 20_000}:c:30": now_ms - 20_000,
+            f"{now_ms - 10_000}:d:40": now_ms - 10_000,
+            f"{now_ms - 3_700_000}:old:999": now_ms - 3_700_000,
+        },
+    )
+    response = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["decision_latency_p50_60m_ms"] == 20
+    assert payload["decision_latency_p95_60m_ms"] == 40
+    _cleanup_overrides()
+
+
+def test_protect_latency_record_applies_ttl(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Latency TTL")
+    _set_protect(client, project_id, protect_enabled=True)
+    _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+
+    redis_client: FakeRedisClient = app.dependency_overrides[get_metrics_service]()._protect_action_store._redis_client  # type: ignore[attr-defined]
+    assert redis_client.ttls.get(f"pa:{project_id}:latency:60m") == 3600
     _cleanup_overrides()
 
 
@@ -442,6 +493,44 @@ def test_invalid_ingest_key_returns_401(tmp_path) -> None:
         "/api/v1/protect/decision",
         headers={"X-Project-Ingest-Key": "invalid"},
         json={"provider": "openai", "model": "gpt-4o-mini"},
+    )
+    assert response.status_code == 401
+    assert response.json()["error"]["message"] == "invalid ingest key"
+    _cleanup_overrides()
+
+
+def test_decision_timeout_endpoint_increments_counter_and_metrics(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Decision Timeout Counter")
+
+    first = client.post(
+        "/api/v1/protect/decision-timeout",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={"environment": "dev"},
+    )
+    assert first.status_code == 202
+    assert first.json() == {"status": "accepted"}
+
+    second = client.post(
+        "/api/v1/protect/decision-timeout",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={"environment": "dev"},
+    )
+    assert second.status_code == 202
+
+    metrics_response = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
+    assert metrics_response.status_code == 200
+    payload = metrics_response.json()
+    assert payload["decision_timeouts_60m"] == 2
+    _cleanup_overrides()
+
+
+def test_decision_timeout_endpoint_rejects_invalid_ingest_key(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    response = client.post(
+        "/api/v1/protect/decision-timeout",
+        headers={"X-Project-Ingest-Key": "invalid"},
+        json={"environment": "dev"},
     )
     assert response.status_code == 401
     assert response.json()["error"]["message"] == "invalid ingest key"

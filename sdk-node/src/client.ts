@@ -61,6 +61,7 @@ export class Client {
     this.protectEngine = new ProtectEngine({
       baseUrl: this.baseUrl,
       ingestKey: this.ingestKey,
+      environment: this.environment,
       fallbackRequestTimeoutMs: this.requestTimeoutMs,
       initialFailMode,
       initialDecisionTimeoutMs: initialProtectTimeoutMs,

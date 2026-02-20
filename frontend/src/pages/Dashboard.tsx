@@ -6,7 +6,6 @@ import {
   createProject,
   fetchIncidents,
   fetchMetrics,
-  fetchProtectHealth,
   fetchProtectMetrics,
   fetchProjectProtect,
   fetchProjects,
@@ -64,7 +63,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   const [protectHealthStats, setProtectHealthStats] = useState<{
     p50_ms: number | null;
     p95_ms: number | null;
-    timeouts_60m: number | null;
+    decision_timeouts_60m: number | null;
   } | null>(null);
   const [clockTick, setClockTick] = useState<number>(0);
   const [globalBanner, setGlobalBanner] = useState<string | null>(null);
@@ -220,7 +219,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
 
     const loadProtectStats = async (): Promise<void> => {
       try {
-        const [data, health] = await Promise.all([fetchProtectMetrics(projectId), fetchProtectHealth(projectId)]);
+        const data = await fetchProtectMetrics(projectId);
         if (cancelled) {
           return;
         }
@@ -234,9 +233,9 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
           block_60m: data.block_60m,
         });
         setProtectHealthStats({
-          p50_ms: health.p50_ms,
-          p95_ms: health.p95_ms,
-          timeouts_60m: health.timeouts_60m,
+          p50_ms: data.decision_latency_p50_60m_ms,
+          p95_ms: data.decision_latency_p95_60m_ms,
+          decision_timeouts_60m: data.decision_timeouts_60m,
         });
       } catch {
         if (!cancelled) {
@@ -675,8 +674,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   const blockCountLabel = protectDecisionStats?.block_60m ?? "—";
   const p50Label = protectHealthStats?.p50_ms ?? "—";
   const p95Label = protectHealthStats?.p95_ms ?? "—";
-  const timeoutsLabel = protectHealthStats?.timeouts_60m ?? "—";
-  const timeoutCount = typeof protectHealthStats?.timeouts_60m === "number" ? protectHealthStats.timeouts_60m : null;
+  const decisionTimeoutsLabel = protectHealthStats?.decision_timeouts_60m ?? "—";
 
   void clockTick;
 
@@ -819,18 +817,16 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                   <h2 className="card-title">Decisions latency (60m)</h2>
                   <div className="protect-decisions-list">
                     <div className="protect-decisions-row">
-                      <span className="protect-decisions-label">p50 latency (ms)</span>
+                      <span className="protect-decisions-label">P50 latency (ms)</span>
                       <span className="protect-decisions-value">{p50Label}</span>
                     </div>
                     <div className="protect-decisions-row">
-                      <span className="protect-decisions-label">p95 latency (ms)</span>
+                      <span className="protect-decisions-label">P95 latency (ms)</span>
                       <span className="protect-decisions-value">{p95Label}</span>
                     </div>
                     <div className="protect-decisions-row">
-                      <span className="protect-decisions-label">timeouts</span>
-                      <span className={`protect-decisions-value ${timeoutCount && timeoutCount > 0 ? "timeouts" : ""}`}>
-                        {timeoutsLabel}
-                      </span>
+                      <span className="protect-decisions-label">Timeouts</span>
+                      <span className="protect-decisions-value blocked">{decisionTimeoutsLabel}</span>
                     </div>
                   </div>
                 </Card>

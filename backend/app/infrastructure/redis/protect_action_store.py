@@ -60,15 +60,34 @@ class ProtectActionStore:
         try:
             warn = self._read_int(_warn_key(project_id))
             block = self._read_int(_block_key(project_id))
+            decision_timeouts = self._read_int(_timeout_key(project_id))
             last_raw = self._redis_client.get(_last_key(project_id))
+            health = self.get_health(project_id=project_id)
             return {
                 "warn_60m": warn,
                 "block_60m": block,
+                "decision_timeouts_60m": decision_timeouts,
                 "last": self._parse_last(last_raw),
+                "decision_latency_p50_60m_ms": health.get("p50_ms"),
+                "decision_latency_p95_60m_ms": health.get("p95_ms"),
             }
         except Exception:
             logger.warning("Failed reading protect decision counters", extra={"project_id": project_id})
-            return {"warn_60m": 0, "block_60m": 0, "last": None}
+            return {
+                "warn_60m": 0,
+                "block_60m": 0,
+                "decision_timeouts_60m": 0,
+                "last": None,
+                "decision_latency_p50_60m_ms": None,
+                "decision_latency_p95_60m_ms": None,
+            }
+
+    def record_decision_timeout(self, project_id: str) -> None:
+        # Record one SDK-reported decision-timeout in the 60-minute counter.
+        try:
+            self._increment_with_ttl(_timeout_key(project_id))
+        except Exception:
+            logger.warning("Failed recording protect decision timeout", extra={"project_id": project_id})
 
     def record_health(self, project_id: str, latency_ms: int, timed_out: bool = False, ts: datetime | None = None) -> None:
         # Record preflight latency samples and timeout counters over a 60-minute window.
@@ -80,6 +99,7 @@ class ProtectActionStore:
             latency_key = _latency_key(project_id)
             self._redis_client.zadd(latency_key, {member: now_ms})
             self._redis_client.zremrangebyscore(latency_key, 0, cutoff_ms)
+            self._redis_client.expire(latency_key, _COUNTER_TTL_SECONDS)
             if timed_out:
                 self._increment_with_ttl(_timeout_key(project_id))
         except Exception:

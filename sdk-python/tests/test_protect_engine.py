@@ -1,4 +1,5 @@
 # Tests for always-on protect preflight behavior in OpenAI instrumentation.
+import time
 from typing import Any
 
 import pytest
@@ -31,11 +32,15 @@ class FakeHttpClient:
         self.calls: list[str] = []
         self.ingested_events: list[dict[str, Any]] = []
         self.decision_payloads: list[dict[str, Any]] = []
+        self.timeout_reports: list[dict[str, Any]] = []
 
     def post(self, url: str, json: dict[str, Any], headers: dict[str, str], **kwargs: Any) -> FakeResponse:
         _ = headers
         _ = kwargs
         self.calls.append(url)
+        if url.endswith("/api/v1/protect/decision-timeout"):
+            self.timeout_reports.append(json)
+            return FakeResponse(status_code=202, payload={"status": "accepted"})
         if url.endswith("/api/v1/protect/decision"):
             self.decision_payloads.append(json)
             if isinstance(self.decision, Exception):
@@ -50,6 +55,14 @@ class FakeHttpClient:
 
     def close(self) -> None:
         return
+
+
+def _wait_for_timeout_reports(transport: FakeHttpClient, expected: int) -> None:
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        if len(transport.timeout_reports) >= expected:
+            return
+        time.sleep(0.01)
 
 
 def _make_openai_stub() -> tuple[Any, list[dict[str, Any]]]:
@@ -196,28 +209,35 @@ def test_token_estimation_failure_omits_input_tokens_estimate() -> None:
 
 
 def test_preflight_timeout_fail_open_allows_provider_call() -> None:
+    transport = FakeHttpClient(TimeoutError("timeout"))  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
         base_url="http://localhost:8000",
+        environment="dev",
         flush_interval_s=30.0,
         protect_fail_mode="open",
-        http_client=FakeHttpClient(TimeoutError("timeout")),  # type: ignore[arg-type]
+        http_client=transport,
     )
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
     openai_client.chat.completions.create(model="gpt-4o-mini")
     assert len(calls) == 1
+    _wait_for_timeout_reports(transport, expected=1)
+    assert len(transport.timeout_reports) == 1
+    assert transport.timeout_reports[0]["environment"] == "dev"
     client.close()
 
 
 def test_preflight_timeout_fail_closed_blocks_provider_call() -> None:
+    transport = FakeHttpClient(TimeoutError("timeout"))  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
         base_url="http://localhost:8000",
+        environment="staging",
         flush_interval_s=30.0,
         protect_fail_mode="closed",
-        http_client=FakeHttpClient(TimeoutError("timeout")),  # type: ignore[arg-type]
+        http_client=transport,
     )
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
@@ -225,6 +245,9 @@ def test_preflight_timeout_fail_closed_blocks_provider_call() -> None:
     with pytest.raises(LLMTBGBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
     assert calls == []
+    _wait_for_timeout_reports(transport, expected=1)
+    assert len(transport.timeout_reports) == 1
+    assert transport.timeout_reports[0]["environment"] == "staging"
     client.close()
 
 

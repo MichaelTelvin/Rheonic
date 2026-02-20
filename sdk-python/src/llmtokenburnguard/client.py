@@ -126,6 +126,7 @@ class Client:
             self._protect_engine = ProtectEngine(
                 base_url=self.base_url,
                 ingest_key=self.ingest_key,
+                environment=self.environment,
                 request_timeout_s=self.request_timeout_s,
                 fail_mode=self.protect_fail_mode,
                 decision_timeout_ms=self.protect_decision_timeout_ms,

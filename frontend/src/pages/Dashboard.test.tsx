@@ -70,7 +70,14 @@ describe("Dashboard", () => {
       protect_max_tok_per_min: null,
       protect_decision_timeout_ms: 100,
     });
-    mocks.fetchProtectMetrics.mockResolvedValue({ warn_60m: 0, block_60m: 0, last: null });
+    mocks.fetchProtectMetrics.mockResolvedValue({
+      warn_60m: 0,
+      block_60m: 0,
+      decision_timeouts_60m: 0,
+      decision_latency_p50_60m_ms: null,
+      decision_latency_p95_60m_ms: null,
+      last: null,
+    });
     mocks.fetchProtectHealth.mockResolvedValue({ p50_ms: null, p95_ms: null, timeouts_60m: 0 });
   });
 

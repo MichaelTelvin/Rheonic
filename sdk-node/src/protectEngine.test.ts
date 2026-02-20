@@ -200,16 +200,34 @@ test("token estimation failure omits input_tokens_estimate from protect payload"
 
 test("decision timeout fail-open allows provider call", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async () => {
-    throw new Error("network timeout");
+  const timeoutReports: Array<Record<string, unknown>> = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision-timeout")) {
+      timeoutReports.push(typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {});
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    if (url.endsWith("/api/v1/protect/decision")) {
+      const abortError = new Error("aborted");
+      (abortError as Error & { name: string }).name = "AbortError";
+      throw abortError;
+    }
+    throw new Error(`Unexpected URL: ${url}`);
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
+    const client = createClient({
+      ingestKey: "k1",
+      environment: "dev",
+      flushIntervalMs: 30_000,
+      protectFailMode: "open",
+      protectDecisionTimeoutMs: 5,
+    });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini" });
     assert.equal(calls.length, 1);
+    assert.equal(timeoutReports.length, 1);
+    assert.equal(timeoutReports[0].environment, "dev");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;
@@ -218,16 +236,34 @@ test("decision timeout fail-open allows provider call", async () => {
 
 test("decision timeout fail-closed blocks provider call", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async () => {
-    throw new Error("network timeout");
+  const timeoutReports: Array<Record<string, unknown>> = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision-timeout")) {
+      timeoutReports.push(typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {});
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    if (url.endsWith("/api/v1/protect/decision")) {
+      const abortError = new Error("aborted");
+      (abortError as Error & { name: string }).name = "AbortError";
+      throw abortError;
+    }
+    throw new Error(`Unexpected URL: ${url}`);
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
+    const client = createClient({
+      ingestKey: "k1",
+      environment: "staging",
+      flushIntervalMs: 30_000,
+      protectFailMode: "closed",
+      protectDecisionTimeoutMs: 5,
+    });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
     assert.equal(calls.length, 0);
+    assert.equal(timeoutReports.length, 1);
+    assert.equal(timeoutReports[0].environment, "staging");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;

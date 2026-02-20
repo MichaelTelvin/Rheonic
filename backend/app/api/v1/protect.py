@@ -5,8 +5,15 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.application.services.protect_service import ProtectDecisionContext, ProtectService
+from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.project_service import ProjectService
-from app.dependencies import get_current_user, get_project_service, get_protect_action_store, get_protect_service
+from app.dependencies import (
+    get_current_user,
+    get_ingest_key_service,
+    get_project_service,
+    get_protect_action_store,
+    get_protect_service,
+)
 from app.domain.models.user import User
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.logger import get_logger
@@ -51,6 +58,11 @@ class ProjectProtectIn(BaseModel):
     protect_decision_timeout_ms: int = Field(default=100, ge=10, le=10_000)
 
 
+class DecisionTimeoutIn(BaseModel):
+    # Timeout report payload from SDK when decision preflight call times out.
+    environment: str
+
+
 @router.post("/protect/decision", response_model=ProtectDecisionOut)
 def protect_decision(
     payload: ProtectDecisionIn,
@@ -87,6 +99,30 @@ def protect_decision(
     except Exception:
         logger.exception("Protect decision endpoint failed")
         raise HTTPException(status_code=500, detail="Failed to evaluate protect decision")
+
+
+@router.post("/protect/decision-timeout", status_code=202)
+def protect_decision_timeout(
+    payload: DecisionTimeoutIn,
+    ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
+    protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
+    ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
+) -> dict[str, str]:
+    # Record one SDK-side preflight timeout for the project mapped from ingest key.
+    _ = payload
+    try:
+        if not ingest_key:
+            raise HTTPException(status_code=401, detail="missing ingest key")
+        project = ingest_key_service.resolve_project(plaintext_key=ingest_key)
+        if project is None:
+            raise HTTPException(status_code=401, detail="invalid ingest key")
+        protect_action_store.record_decision_timeout(project_id=project.id)
+        return {"status": "accepted"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Protect decision-timeout endpoint failed")
+        raise HTTPException(status_code=500, detail="Failed to record decision timeout")
 
 
 @router.get("/projects/{project_id}/protect", response_model=ProjectProtectOut)

@@ -36,6 +36,7 @@ export class LLMTBGBlockedError extends Error {
 export class ProtectEngine {
   private readonly baseUrl: string;
   private readonly ingestKey: string;
+  private readonly environment: string;
   private readonly fallbackRequestTimeoutMs: number;
   private failMode: ProtectFailMode;
   private decisionTimeoutMs: number;
@@ -43,12 +44,14 @@ export class ProtectEngine {
   public constructor(params: {
     baseUrl: string;
     ingestKey: string;
+    environment: string;
     fallbackRequestTimeoutMs: number;
     initialFailMode: ProtectFailMode;
     initialDecisionTimeoutMs: number;
   }) {
     this.baseUrl = params.baseUrl;
     this.ingestKey = params.ingestKey;
+    this.environment = params.environment;
     this.fallbackRequestTimeoutMs = params.fallbackRequestTimeoutMs;
     this.failMode = params.initialFailMode;
     this.decisionTimeoutMs = params.initialDecisionTimeoutMs;
@@ -87,6 +90,11 @@ export class ProtectEngine {
 
       const parsed = (await response.json()) as ProtectDecisionResponse;
       const decision = parseDecision(parsed.decision);
+      // Remove after testing
+      console.log("=== PROTECT DECISION RESPONSE ===");
+      console.log(JSON.stringify(parsed, null, 2));
+      console.log("=================================");
+
       const reason = typeof parsed.reason === "string" ? parsed.reason : "ok";
       const failMode = parseFailMode(parsed.fail_mode);
       if (failMode) {
@@ -97,11 +105,29 @@ export class ProtectEngine {
         this.decisionTimeoutMs = decisionTimeout;
       }
       return { decision, reason };
-    } catch {
+    } catch (error) {
       clearTimeout(timeout);
+      if (controller.signal.aborted || isTimeoutLikeError(error)) {
+        void this.reportDecisionTimeout(fetchFn);
+      }
       return this.failMode === "closed"
         ? { decision: "block", reason: "decision_unavailable" }
         : { decision: "allow", reason: "decision_unavailable" };
+    }
+  }
+
+  private async reportDecisionTimeout(fetchFn: typeof fetch): Promise<void> {
+    try {
+      await fetchFn(`${this.baseUrl}/api/v1/protect/decision-timeout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Project-Ingest-Key": this.ingestKey,
+        },
+        body: JSON.stringify({ environment: this.environment }),
+      });
+    } catch {
+      return;
     }
   }
 }
@@ -118,6 +144,21 @@ function parseFailMode(value: unknown): ProtectFailMode | null {
     return value;
   }
   return null;
+}
+
+function isTimeoutLikeError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const name = typeof (error as { name?: unknown }).name === "string" ? (error as { name: string }).name : "";
+  if (name === "AbortError" || name === "TimeoutError") {
+    return true;
+  }
+  const message =
+    typeof (error as { message?: unknown }).message === "string"
+      ? (error as { message: string }).message.toLowerCase()
+      : "";
+  return message.includes("timeout") || message.includes("aborted");
 }
 
 async function resolveFetch(): Promise<typeof fetch | null> {

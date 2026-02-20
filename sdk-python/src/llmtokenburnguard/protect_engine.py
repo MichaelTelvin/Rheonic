@@ -1,8 +1,14 @@
 # Protect mode preflight decision engine.
+import sys
 from typing import Any
 
 from llmtokenburnguard.config import sdk_config
 from llmtokenburnguard.logger import get_logger
+
+try:
+    import httpx
+except ModuleNotFoundError:  # pragma: no cover
+    httpx = None  # type: ignore[assignment]
 
 logger = get_logger(__name__)
 
@@ -22,6 +28,7 @@ class ProtectEngine:
         self,
         base_url: str,
         ingest_key: str,
+        environment: str,
         request_timeout_s: float,
         fail_mode: str = sdk_config.default_protect_fail_mode,
         decision_timeout_ms: int = sdk_config.default_protect_decision_timeout_ms,
@@ -29,6 +36,7 @@ class ProtectEngine:
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._ingest_key = ingest_key
+        self._environment = environment
         self._request_timeout_s = request_timeout_s
         self._fail_mode = fail_mode if fail_mode in {"open", "closed"} else "open"
         self._decision_timeout_ms = int(decision_timeout_ms) if decision_timeout_ms > 0 else 100
@@ -63,6 +71,8 @@ class ProtectEngine:
                 decision = "allow"
             return {"decision": decision, "reason": reason}
         except Exception:
+            if self._is_timeout_error():
+                self._report_decision_timeout_fire_and_forget()
             return self._fallback_decision()
 
     def _post_with_timeout(
@@ -98,3 +108,32 @@ class ProtectEngine:
         if self._fail_mode == "closed":
             return {"decision": "block", "reason": "decision_unavailable"}
         return {"decision": "allow", "reason": "decision_unavailable"}
+
+    def _is_timeout_error(self) -> bool:
+        # Identify timeout failures from common SDK transports.
+        exc = sys.exc_info()[1]
+        if isinstance(exc, TimeoutError):
+            return True
+        if httpx is not None and isinstance(exc, httpx.TimeoutException):
+            return True
+        return False
+
+    def _report_decision_timeout_fire_and_forget(self) -> None:
+        # Report decision timeout without blocking caller flow.
+        def _send() -> None:
+            try:
+                self._post_with_timeout(
+                    f"{self._base_url}/api/v1/protect/decision-timeout",
+                    json={"environment": self._environment},
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Project-Ingest-Key": self._ingest_key,
+                    },
+                    timeout_s=max(self._request_timeout_s, 0.1),
+                )
+            except Exception:
+                return
+
+        import threading
+
+        threading.Thread(target=_send, daemon=True).start()
