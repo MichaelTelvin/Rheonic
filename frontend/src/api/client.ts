@@ -64,6 +64,11 @@ export interface UpdateProjectWebhookInput {
   secret: string | null;
 }
 
+export interface TestProjectWebhookInput {
+  url?: string;
+  secret?: string;
+}
+
 export interface UpdateProjectProtectInput {
   protect_enabled: boolean;
   protect_fail_mode: "open" | "closed";
@@ -273,10 +278,10 @@ export async function updateProjectWebhook(
   });
 }
 
-export async function testProjectWebhook(projectId: string): Promise<{ status: string }> {
+export async function testProjectWebhook(projectId: string, payload?: TestProjectWebhookInput): Promise<{ status: string }> {
   return request<{ status: string }>(`/api/v1/projects/${encodeURIComponent(projectId)}/webhook/test`, {
     method: "POST",
-    body: JSON.stringify({}),
+    body: payload ? JSON.stringify(payload) : undefined,
   });
 }
 

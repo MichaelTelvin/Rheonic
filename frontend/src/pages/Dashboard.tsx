@@ -595,15 +595,17 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     }
   };
 
-  const reloadWebhookSettings = async (): Promise<void> => {
+  const reloadWebhookSettings = async (preserveInputs = false): Promise<void> => {
     if (!projectId) {
       return;
     }
     const settings = await fetchProjectWebhook(projectId);
     setWebhookSettings(settings);
-    setWebhookEnabledInput(settings.enabled);
-    setWebhookUrlInput(settings.url ?? "");
-    setWebhookSecretInput("");
+    if (!preserveInputs) {
+      setWebhookEnabledInput(settings.enabled);
+      setWebhookUrlInput(settings.url ?? "");
+      setWebhookSecretInput("");
+    }
   };
 
   const onSaveWebhookSettings = async (): Promise<void> => {
@@ -630,12 +632,24 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     if (!projectId) {
       return;
     }
+    const draftUrl = webhookUrlInput.trim();
+    if (!draftUrl) {
+      setWebhookError("Webhook URL is required for test.");
+      return;
+    }
+    if (/\s/.test(draftUrl)) {
+      setWebhookError("Webhook URL must not contain spaces.");
+      return;
+    }
     setWebhookTesting(true);
     setWebhookError(null);
     try {
-      await testProjectWebhook(projectId);
+      await testProjectWebhook(projectId, {
+        url: draftUrl,
+        secret: webhookSecretInput.trim() || undefined,
+      });
       window.setTimeout(() => {
-        void reloadWebhookSettings();
+        void reloadWebhookSettings(true);
       }, 700);
     } catch (error) {
       setWebhookError(error instanceof Error ? error.message : "Failed to queue webhook test.");
@@ -758,6 +772,8 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   );
   const renderMetric = (value: number | null | undefined): string => (value === null || value === undefined ? "—" : String(value));
   const protectEnabled = Boolean(protectSettings?.protect_enabled);
+  const webhookDraftUrl = webhookUrlInput.trim();
+  const canTestWebhook = Boolean(projectId) && webhookDraftUrl.length > 0 && !webhookTesting;
   const allowCountLabel = renderMetric(protectDecisionStats?.allowed_60m);
   const warnCountLabel = renderMetric(protectDecisionStats?.warned_60m);
   const blockCountLabel = renderMetric(protectDecisionStats?.blocked_60m);
@@ -1291,7 +1307,6 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                 </span>
                 {" "}
                 <span>{webhookSettings?.last_at ? formatTime(webhookSettings.last_at) : "—"}</span>
-                {webhookSettings?.last_error ? <span className="alerts-failed"> · {webhookSettings.last_error}</span> : null}
               </p>
               {webhookError ? <p className="warning-text">{webhookError}</p> : null}
               <div className="modal-actions">
@@ -1302,7 +1317,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                   type="button"
                   className="modal-button"
                   onClick={() => void onTestWebhook()}
-                  disabled={!projectId || webhookTesting}
+                  disabled={!canTestWebhook}
                 >
                   {webhookTesting ? "Testing..." : "Test webhook"}
                 </button>

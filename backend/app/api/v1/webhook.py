@@ -14,6 +14,11 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+def _ensure_no_whitespace_url(value: str) -> None:
+    if any(char.isspace() for char in value):
+        raise HTTPException(status_code=422, detail="Webhook URL must not contain spaces")
+
+
 class ProjectWebhookOut(BaseModel):
     # Project webhook settings response payload.
     enabled: bool
@@ -27,6 +32,20 @@ class ProjectWebhookOut(BaseModel):
 class ProjectWebhookIn(BaseModel):
     # Project webhook settings update payload.
     enabled: bool
+    url: AnyHttpUrl | None = None
+    secret: str | None = None
+
+    @field_validator("secret")
+    @classmethod
+    def normalize_secret(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class ProjectWebhookTestIn(BaseModel):
+    # Optional draft values for webhook test sends.
     url: AnyHttpUrl | None = None
     secret: str | None = None
 
@@ -73,6 +92,8 @@ def update_project_webhook(
     # Update webhook configuration for an owned project.
     try:
         normalized_url = str(payload.url) if payload.url is not None else None
+        if normalized_url is not None:
+            _ensure_no_whitespace_url(normalized_url)
         if payload.enabled and not normalized_url:
             raise HTTPException(status_code=422, detail="url is required when webhook is enabled")
         updated = project_service.update_project_webhook_settings(
@@ -100,21 +121,32 @@ def update_project_webhook(
 @router.post("/projects/{project_id}/webhook/test", status_code=202)
 def test_project_webhook(
     project_id: str,
+    payload: ProjectWebhookTestIn | None = None,
     project_service: ProjectService = Depends(get_project_service),
     dispatcher: RQWebhookDispatcher = Depends(get_webhook_dispatcher),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, str]:
     # Enqueue a webhook test payload for an owned project.
     try:
-        project_service.get_project_webhook_settings(project_id=project_id, user_id=current_user.id)
+        project = project_service.get_project_webhook_settings(project_id=project_id, user_id=current_user.id)
+        override_url = str(payload.url) if payload and payload.url is not None else None
+        target_url = override_url or project.webhook_url
+        if not target_url:
+            raise HTTPException(status_code=422, detail="url is required for webhook test")
+        _ensure_no_whitespace_url(target_url)
         dispatcher.enqueue(
             project_id=project_id,
             event_type="webhook.test",
             payload={
+                "chat_id": 653661315,
+                "text": "hello",
                 "event": "webhook.test",
                 "project_id": project_id,
                 "sent_at": datetime.now(timezone.utc).isoformat(),
             },
+            override_url=target_url,
+            override_secret=payload.secret if payload is not None else None,
+            force_send=True,
         )
         return {"status": "queued"}
     except HTTPException:

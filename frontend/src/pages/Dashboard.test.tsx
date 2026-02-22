@@ -173,6 +173,14 @@ describe("Dashboard", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Alerts" }));
     const urlInput = await screen.findByLabelText("Webhook URL");
     fireEvent.change(urlInput, { target: { value: "https://example.test/hook" } });
+    fireEvent.click(screen.getByRole("button", { name: "Test webhook" }));
+    await waitFor(() =>
+      expect(mocks.testProjectWebhook).toHaveBeenCalledWith("p1", {
+        url: "https://example.test/hook",
+        secret: undefined,
+      }),
+    );
+
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(mocks.updateProjectWebhook).toHaveBeenCalledWith("p1", {
@@ -181,8 +189,5 @@ describe("Dashboard", () => {
         secret: null,
       }),
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Test webhook" }));
-    await waitFor(() => expect(mocks.testProjectWebhook).toHaveBeenCalledWith("p1"));
   });
 });

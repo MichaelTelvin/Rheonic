@@ -13,10 +13,19 @@ from app.main import app
 
 class FakeWebhookDispatcher:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, dict[str, object], str]] = []
+        self.calls: list[tuple[str, dict[str, object], str, str | None, str | None, bool]] = []
 
-    def enqueue(self, project_id: str, payload: dict[str, object], event_type: str) -> None:
-        self.calls.append((project_id, payload, event_type))
+    def enqueue(
+        self,
+        project_id: str,
+        payload: dict[str, object],
+        event_type: str,
+        *,
+        override_url: str | None = None,
+        override_secret: str | None = None,
+        force_send: bool = False,
+    ) -> None:
+        self.calls.append((project_id, payload, event_type, override_url, override_secret, force_send))
 
 
 def _cleanup_overrides() -> None:
@@ -64,6 +73,8 @@ def test_project_webhook_owner_get_put_and_test(tmp_path) -> None:
     assert test_response.json() == {"status": "queued"}
     assert len(dispatcher.calls) == 1
     assert dispatcher.calls[0][2] == "webhook.test"
+    assert dispatcher.calls[0][3] == "https://example.test/hook"
+    assert dispatcher.calls[0][5] is True
 
     _cleanup_overrides()
 
@@ -110,4 +121,30 @@ def test_project_webhook_validation_errors(tmp_path) -> None:
     )
     assert invalid_url.status_code == 422
     assert missing_url.status_code == 422
+    _cleanup_overrides()
+
+
+def test_project_webhook_test_works_when_disabled_and_uses_override_url(tmp_path) -> None:
+    client, dispatcher = _make_client(tmp_path)
+    project_id = client.post("/api/v1/projects", json={"name": "Webhook Test Override"}).json()["id"]
+
+    put_response = client.put(
+        f"/api/v1/projects/{project_id}/webhook",
+        json={"enabled": False, "url": "https://saved.test/hook", "secret": "saved-secret"},
+    )
+    assert put_response.status_code == 200
+    assert put_response.json()["enabled"] is False
+
+    test_response = client.post(
+        f"/api/v1/projects/{project_id}/webhook/test",
+        json={"url": "https://draft.test/hook", "secret": "draft-secret"},
+    )
+    assert test_response.status_code == 202
+    assert len(dispatcher.calls) == 1
+    call = dispatcher.calls[0]
+    assert call[2] == "webhook.test"
+    assert call[3] == "https://draft.test/hook"
+    assert call[4] == "draft-secret"
+    assert call[5] is True
+
     _cleanup_overrides()

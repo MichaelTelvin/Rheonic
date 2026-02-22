@@ -17,13 +17,33 @@ logger = get_logger(__name__)
 _MAX_ERROR_CHARS = 240
 
 
-def send_project_webhook(project_id: str, payload: dict[str, object], event_type: str) -> None:
+def _format_error_message(exc: Exception) -> str:
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
+        status = exc.response.status_code
+        reason = exc.response.reason_phrase or "HTTP error"
+        return f"HTTP {status} {reason}"[:_MAX_ERROR_CHARS]
+    return str(exc).splitlines()[0][:_MAX_ERROR_CHARS]
+
+
+def send_project_webhook(
+    project_id: str,
+    payload: dict[str, object],
+    event_type: str,
+    override_url: str | None = None,
+    override_secret: str | None = None,
+    force_send: bool = False,
+) -> None:
     # Deliver one webhook and persist latest status on project.
     repository = ProjectRepositoryImpl(session_factory=DatabaseSessionFactory())
     project = repository.get_project(project_id)
     if project is None:
         return
-    if not project.webhook_enabled or not project.webhook_url:
+
+    if not force_send and (not project.webhook_enabled or not project.webhook_url):
+        return
+
+    target_url = override_url or project.webhook_url
+    if not target_url:
         return
 
     body_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
@@ -31,9 +51,10 @@ def send_project_webhook(project_id: str, payload: dict[str, object], event_type
         "Content-Type": "application/json",
         "X-LLMTBG-Event-Type": event_type,
     }
-    if project.webhook_secret:
+    signing_secret = override_secret if override_secret is not None else project.webhook_secret
+    if signing_secret:
         digest = hmac.new(
-            project.webhook_secret.encode("utf-8"),
+            signing_secret.encode("utf-8"),
             body_bytes,
             hashlib.sha256,
         ).hexdigest()
@@ -42,8 +63,12 @@ def send_project_webhook(project_id: str, payload: dict[str, object], event_type
     now = datetime.now(timezone.utc)
     try:
         timeout = httpx.Timeout(connect=2.0, read=5.0, write=5.0, pool=5.0)
+        logger.info("Webhook POST -> %s", target_url)
+        if event_type == "webhook.test":
+            logger.info("Webhook test body: %s", body_bytes.decode("utf-8"))
         with httpx.Client(timeout=timeout) as client:
-            response = client.post(project.webhook_url, content=body_bytes, headers=headers)
+            response = client.post(target_url, content=body_bytes, headers=headers)
+            logger.info("Webhook response %s %s", response.status_code, response.text[:500])
             response.raise_for_status()
         repository.update_project_webhook_delivery_status(
             project_id=project_id,
@@ -52,12 +77,15 @@ def send_project_webhook(project_id: str, payload: dict[str, object], event_type
             error=None,
         )
     except Exception as exc:
-        message = str(exc)[:_MAX_ERROR_CHARS]
+        message = _format_error_message(exc)
         repository.update_project_webhook_delivery_status(
             project_id=project_id,
             status="failed",
             at=now,
             error=message,
         )
+        if event_type == "webhook.test":
+            logger.warning("Webhook test delivery failed", extra={"project_id": project_id, "error": message})
+            return
         logger.exception("Webhook delivery failed", extra={"project_id": project_id, "event_type": event_type})
         raise
