@@ -22,8 +22,7 @@ _MAX_ERROR_CHARS = 240
 def _format_error_message(exc: Exception) -> str:
     if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
         status = exc.response.status_code
-        reason = exc.response.reason_phrase or "HTTP error"
-        return f"HTTP {status} {reason}"[:_MAX_ERROR_CHARS]
+        return f"HTTP {status}"[:_MAX_ERROR_CHARS]
     return str(exc).splitlines()[0][:_MAX_ERROR_CHARS]
 
 
@@ -85,7 +84,10 @@ def send_project_webhook(
             error=message,
         )
         if event_type == "webhook.test":
-            logger.warning("Webhook test delivery failed", extra={"project_id": project_id, "error": message})
+            logger.exception(
+                "Webhook test delivery failed",
+                extra={"project_id": project_id, "error": message},
+            )
             return
         logger.exception("Webhook delivery failed", extra={"project_id": project_id, "event_type": event_type})
         raise

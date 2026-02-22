@@ -32,6 +32,19 @@ class _FakeClient:
         return _FakeResponse()
 
 
+class _FakeHttpErrorClient:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        _ = exc_type, exc, tb
+
+    def post(self, url: str, content: bytes, headers: dict[str, str]):
+        request = webhook_job.httpx.Request("POST", url, content=content, headers=headers)
+        response = webhook_job.httpx.Response(status_code=404, request=request)
+        raise webhook_job.httpx.HTTPStatusError("404", request=request, response=response)
+
+
 def test_send_project_webhook_sets_signature_and_success_status(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     db_url = f"sqlite:///{tmp_path}/webhook_job_test.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
@@ -161,3 +174,43 @@ def test_send_project_webhook_rejects_unsafe_host_and_records_failure(tmp_path, 
         assert project is not None
         assert project.webhook_last_status == "failed"
         assert project.webhook_last_error == "Webhook URL host is not allowed"
+
+
+def test_webhook_http_error_stores_status_code_only(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/webhook_job_http_error_test.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    now = datetime.now(timezone.utc)
+    with session_factory.create_session() as session:
+        session.add(
+            ProjectRecord(
+                id="p4",
+                name="P4",
+                user_id="u1",
+                protect_enabled=False,
+                protect_fail_mode="open",
+                protect_max_req_per_min=None,
+                protect_max_tok_per_min=None,
+                protect_decision_timeout_ms=100,
+                webhook_enabled=True,
+                webhook_url="https://example.test/hook",
+                webhook_secret=None,
+                created_at=now,
+            )
+        )
+        session.commit()
+
+    monkeypatch.setattr(webhook_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(webhook_job.httpx, "Client", lambda timeout: _FakeHttpErrorClient())
+
+    webhook_job.send_project_webhook(
+        project_id="p4",
+        payload={"event": "webhook.test", "project_id": "p4"},
+        event_type="webhook.test",
+    )
+
+    with session_factory.create_session() as session:
+        project = session.query(ProjectRecord).filter(ProjectRecord.id == "p4").first()
+        assert project is not None
+        assert project.webhook_last_status == "failed"
+        assert project.webhook_last_error == "HTTP 404"
