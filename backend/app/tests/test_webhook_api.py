@@ -6,7 +6,7 @@ from app.application.services.project_service import ProjectService
 from app.dependencies import get_current_user, get_project_service, get_webhook_dispatcher
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
-from app.infrastructure.db.models import Base
+from app.infrastructure.db.models import Base, ProjectRecord
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.main import app
 
@@ -102,8 +102,8 @@ def test_project_webhook_non_owner_forbidden(tmp_path) -> None:
         f"/api/v1/projects/{project_id}/webhook",
         json={"enabled": True, "url": "https://example.test/hook", "secret": None},
     )
-    assert get_response.status_code == 403
-    assert put_response.status_code == 403
+    assert get_response.status_code == 404
+    assert put_response.status_code == 404
     _cleanup_overrides()
 
 
@@ -121,6 +121,23 @@ def test_project_webhook_validation_errors(tmp_path) -> None:
     )
     assert invalid_url.status_code == 422
     assert missing_url.status_code == 422
+    _cleanup_overrides()
+
+
+def test_project_webhook_rejects_private_hosts(tmp_path) -> None:
+    client, _ = _make_client(tmp_path)
+    project_id = client.post("/api/v1/projects", json={"name": "Unsafe Host Validation"}).json()["id"]
+
+    private_host = client.put(
+        f"/api/v1/projects/{project_id}/webhook",
+        json={"enabled": True, "url": "https://127.0.0.1/hook", "secret": None},
+    )
+    localhost_test = client.post(
+        f"/api/v1/projects/{project_id}/webhook/test",
+        json={"url": "https://localhost/hook"},
+    )
+    assert private_host.status_code == 422
+    assert localhost_test.status_code == 422
     _cleanup_overrides()
 
 
@@ -146,5 +163,38 @@ def test_project_webhook_test_works_when_disabled_and_uses_override_url(tmp_path
     assert call[3] == "https://draft.test/hook"
     assert call[4] == "draft-secret"
     assert call[5] is True
+
+    _cleanup_overrides()
+
+
+def test_project_webhook_secret_is_not_stored_plaintext(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/webhook_secret_storage_test.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    service = ProjectService(project_repository=ProjectRepositoryImpl(session_factory=session_factory))
+    dispatcher = FakeWebhookDispatcher()
+    current_user = User(
+        id="u1",
+        email="u1@example.com",
+        password_hash="hashed",
+        created_at=datetime.now(timezone.utc),
+    )
+    app.dependency_overrides[get_project_service] = lambda: service
+    app.dependency_overrides[get_webhook_dispatcher] = lambda: dispatcher
+    app.dependency_overrides[get_current_user] = lambda: current_user
+    client = TestClient(app)
+
+    project_id = client.post("/api/v1/projects", json={"name": "Encrypted Secret"}).json()["id"]
+    response = client.put(
+        f"/api/v1/projects/{project_id}/webhook",
+        json={"enabled": True, "url": "https://example.test/hook", "secret": "secret-plain"},
+    )
+    assert response.status_code == 200
+
+    with session_factory.create_session() as session:
+        record = session.query(ProjectRecord).filter(ProjectRecord.id == project_id).first()
+        assert record is not None
+        assert record.webhook_secret is not None
+        assert record.webhook_secret != "secret-plain"
 
     _cleanup_overrides()

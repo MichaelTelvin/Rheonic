@@ -86,13 +86,8 @@ class ProjectService:
         return updated
 
     def get_project_webhook_settings(self, project_id: str, user_id: str) -> Project:
-        # Return webhook settings for an owned project. Non-owner is forbidden for explicit management APIs.
-        project = self._project_repository.get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="project not found")
-        if project.user_id != user_id:
-            raise HTTPException(status_code=403, detail="forbidden")
-        return project
+        # Return webhook settings for an owned project.
+        return self.ensure_project_owned_by_user(project_id=project_id, user_id=user_id)
 
     def update_project_webhook_settings(
         self,

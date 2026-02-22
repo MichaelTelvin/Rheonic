@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { setUnauthorizedHandler, type AuthUser, type LoginResponse } from "./api/client";
+import { getAuthItem, removeAuthItem, setAuthItem } from "./authStorage";
 import { frontendConfig } from "./config";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
 
 export function App(): JSX.Element {
-  const [token, setToken] = useState<string | null>(() => window.localStorage.getItem(frontendConfig.authTokenStorageKey));
+  const [token, setToken] = useState<string | null>(() => getAuthItem(frontendConfig.authTokenStorageKey));
   const [user, setUser] = useState<AuthUser | null>(() => {
-    const value = window.localStorage.getItem(frontendConfig.authUserStorageKey);
+    const value = getAuthItem(frontendConfig.authUserStorageKey);
     if (!value) {
       return null;
     }
@@ -20,9 +21,9 @@ export function App(): JSX.Element {
   });
 
   const signOut = useCallback((): void => {
-    window.localStorage.removeItem(frontendConfig.authTokenStorageKey);
-    window.localStorage.removeItem(frontendConfig.authRefreshTokenStorageKey);
-    window.localStorage.removeItem(frontendConfig.authUserStorageKey);
+    removeAuthItem(frontendConfig.authTokenStorageKey);
+    removeAuthItem(frontendConfig.authRefreshTokenStorageKey);
+    removeAuthItem(frontendConfig.authUserStorageKey);
     setToken(null);
     setUser(null);
   }, []);
@@ -35,9 +36,9 @@ export function App(): JSX.Element {
   }, [signOut]);
 
   const onAuthSuccess = (auth: LoginResponse): void => {
-    window.localStorage.setItem(frontendConfig.authTokenStorageKey, auth.access_token);
-    window.localStorage.setItem(frontendConfig.authRefreshTokenStorageKey, auth.refresh_token);
-    window.localStorage.setItem(frontendConfig.authUserStorageKey, JSON.stringify(auth.user));
+    setAuthItem(frontendConfig.authTokenStorageKey, auth.access_token);
+    setAuthItem(frontendConfig.authRefreshTokenStorageKey, auth.refresh_token);
+    setAuthItem(frontendConfig.authUserStorageKey, JSON.stringify(auth.user));
     setToken(auth.access_token);
     setUser(auth.user);
   };

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import Response
 
 from app.api.error_responses import build_error_response, default_code_for_status
 from app.api.routers import api_router
@@ -55,6 +56,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging()
     _settings = settings or Settings()
     app = FastAPI(title=_settings.app_name, lifespan=lifespan)
+
+    @app.middleware("http")
+    async def security_headers_middleware(request: Request, call_next):
+        # Apply baseline browser hardening headers for API and frontend clients.
+        response: Response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        )
+        return response
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(_: Request, exc: HTTPException):

@@ -2,10 +2,12 @@
 from datetime import datetime
 
 from app.application.interfaces.project_repository import ProjectRepository
+from app.config import Settings
 from app.domain.models.project import Project
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import ProjectRecord
 from app.logger import get_logger
+from app.security.webhook_secrets import decrypt_webhook_secret, encrypt_webhook_secret
 
 logger = get_logger(__name__)
 
@@ -16,13 +18,14 @@ class ProjectRepositoryImpl(ProjectRepository):
     def __init__(self, session_factory: DatabaseSessionFactory) -> None:
         # Initialize repository dependencies.
         self._session_factory = session_factory
+        self._settings = Settings()
 
     def list_projects(self) -> list[Project]:
         # Return all projects ordered by creation time.
         try:
             with self._session_factory.create_session() as session:
                 records = session.query(ProjectRecord).order_by(ProjectRecord.created_at.asc()).all()
-            return [_to_domain(record) for record in records]
+            return [_to_domain(record, settings=self._settings) for record in records]
         except Exception:
             logger.exception("Failed listing projects")
             raise
@@ -37,7 +40,7 @@ class ProjectRepositoryImpl(ProjectRepository):
                     .order_by(ProjectRecord.created_at.asc())
                     .all()
                 )
-            return [_to_domain(record) for record in records]
+            return [_to_domain(record, settings=self._settings) for record in records]
         except Exception:
             logger.exception("Failed listing projects for user", extra={"user_id": user_id})
             raise
@@ -49,7 +52,7 @@ class ProjectRepositoryImpl(ProjectRepository):
                 record = session.query(ProjectRecord).filter(ProjectRecord.id == project_id).first()
             if record is None:
                 return None
-            return _to_domain(record)
+            return _to_domain(record, settings=self._settings)
         except Exception:
             logger.exception("Failed fetching project", extra={"project_id": project_id})
             raise
@@ -82,7 +85,7 @@ class ProjectRepositoryImpl(ProjectRepository):
         try:
             with self._session_factory.create_session() as session:
                 record = session.query(ProjectRecord).filter(ProjectRecord.name == name).first()
-            return _to_domain(record) if record is not None else None
+            return _to_domain(record, settings=self._settings) if record is not None else None
         except Exception:
             logger.exception("Failed fetching project by name", extra={"name": name})
             raise
@@ -97,7 +100,7 @@ class ProjectRepositoryImpl(ProjectRepository):
                     .filter(ProjectRecord.user_id == user_id)
                     .first()
                 )
-            return _to_domain(record) if record is not None else None
+            return _to_domain(record, settings=self._settings) if record is not None else None
         except Exception:
             logger.exception("Failed fetching project by name for user", extra={"name": name, "user_id": user_id})
             raise
@@ -125,7 +128,7 @@ class ProjectRepositoryImpl(ProjectRepository):
                 session.add(record)
                 session.commit()
                 session.refresh(record)
-            return _to_domain(record)
+            return _to_domain(record, settings=self._settings)
         except Exception:
             logger.exception("Failed updating project protect settings", extra={"project_id": project_id})
             raise
@@ -145,11 +148,13 @@ class ProjectRepositoryImpl(ProjectRepository):
                     return None
                 record.webhook_enabled = webhook_enabled
                 record.webhook_url = webhook_url
-                record.webhook_secret = webhook_secret
+                record.webhook_secret = (
+                    encrypt_webhook_secret(webhook_secret, settings=self._settings) if webhook_secret is not None else None
+                )
                 session.add(record)
                 session.commit()
                 session.refresh(record)
-            return _to_domain(record)
+            return _to_domain(record, settings=self._settings)
         except Exception:
             logger.exception("Failed updating project webhook settings", extra={"project_id": project_id})
             raise
@@ -173,14 +178,15 @@ class ProjectRepositoryImpl(ProjectRepository):
                 session.add(record)
                 session.commit()
                 session.refresh(record)
-            return _to_domain(record)
+            return _to_domain(record, settings=self._settings)
         except Exception:
             logger.exception("Failed updating project webhook delivery status", extra={"project_id": project_id})
             raise
 
 
-def _to_domain(record: ProjectRecord) -> Project:
+def _to_domain(record: ProjectRecord, settings: Settings | None = None) -> Project:
     # Convert SQLAlchemy project record to domain model.
+    resolved_settings = settings or Settings()
     return Project(
         id=record.id,
         name=record.name,
@@ -193,7 +199,7 @@ def _to_domain(record: ProjectRecord) -> Project:
         protect_decision_timeout_ms=int(getattr(record, "protect_decision_timeout_ms", 100) or 100),
         webhook_enabled=bool(getattr(record, "webhook_enabled", False)),
         webhook_url=getattr(record, "webhook_url", None),
-        webhook_secret=getattr(record, "webhook_secret", None),
+        webhook_secret=decrypt_webhook_secret(getattr(record, "webhook_secret", None), settings=resolved_settings),
         webhook_last_status=getattr(record, "webhook_last_status", None),
         webhook_last_at=getattr(record, "webhook_last_at", None),
         webhook_last_error=getattr(record, "webhook_last_error", None),

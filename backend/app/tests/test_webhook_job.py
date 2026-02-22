@@ -121,3 +121,43 @@ def test_send_project_webhook_force_send_uses_override_when_disabled(tmp_path, m
     assert isinstance(headers, dict)
     assert headers["X-LLMTBG-Event-Type"] == "webhook.test"
     assert headers["X-LLMTBG-Signature"].startswith("sha256=")
+
+
+def test_send_project_webhook_rejects_unsafe_host_and_records_failure(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/webhook_job_unsafe_test.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    now = datetime.now(timezone.utc)
+    with session_factory.create_session() as session:
+        session.add(
+            ProjectRecord(
+                id="p3",
+                name="P3",
+                user_id="u1",
+                protect_enabled=False,
+                protect_fail_mode="open",
+                protect_max_req_per_min=None,
+                protect_max_tok_per_min=None,
+                protect_decision_timeout_ms=100,
+                webhook_enabled=True,
+                webhook_url="https://127.0.0.1/hook",
+                webhook_secret=None,
+                created_at=now,
+            )
+        )
+        session.commit()
+
+    monkeypatch.setattr(webhook_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+
+    with pytest.raises(Exception):
+        webhook_job.send_project_webhook(
+            project_id="p3",
+            payload={"event": "incident.high", "project_id": "p3"},
+            event_type="incident.high",
+        )
+
+    with session_factory.create_session() as session:
+        project = session.query(ProjectRecord).filter(ProjectRecord.id == "p3").first()
+        assert project is not None
+        assert project.webhook_last_status == "failed"
+        assert project.webhook_last_error == "Webhook URL host is not allowed"

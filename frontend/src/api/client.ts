@@ -1,4 +1,5 @@
 import { frontendConfig } from "../config";
+import { getAuthItem, setAuthItem } from "../authStorage";
 
 export interface RealtimeMetrics {
   requests_60s: number;
@@ -126,7 +127,7 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = window.localStorage.getItem(frontendConfig.authTokenStorageKey);
+  const token = getAuthItem(frontendConfig.authTokenStorageKey);
   const isAuthRoute = path.startsWith("/api/v1/auth/");
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has("Content-Type")) {
@@ -191,7 +192,7 @@ async function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) {
     return refreshInFlight;
   }
-  const refreshToken = window.localStorage.getItem(frontendConfig.authRefreshTokenStorageKey);
+  const refreshToken = getAuthItem(frontendConfig.authRefreshTokenStorageKey);
   if (!refreshToken) {
     return null;
   }
@@ -211,9 +212,9 @@ async function refreshAccessToken(): Promise<string | null> {
       if (!payload.access_token || !payload.refresh_token) {
         return null;
       }
-      window.localStorage.setItem(frontendConfig.authTokenStorageKey, payload.access_token);
-      window.localStorage.setItem(frontendConfig.authRefreshTokenStorageKey, payload.refresh_token);
-      window.localStorage.setItem(frontendConfig.authUserStorageKey, JSON.stringify(payload.user));
+      setAuthItem(frontendConfig.authTokenStorageKey, payload.access_token);
+      setAuthItem(frontendConfig.authRefreshTokenStorageKey, payload.refresh_token);
+      setAuthItem(frontendConfig.authUserStorageKey, JSON.stringify(payload.user));
       return payload.access_token;
     } catch {
       return null;

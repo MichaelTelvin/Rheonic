@@ -19,12 +19,13 @@ import { frontendConfig } from "../config";
 describe("api client", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
     vi.unstubAllGlobals();
     setUnauthorizedHandler(null);
   });
 
   it("attaches auth token and json content type", async () => {
-    window.localStorage.setItem(frontendConfig.authTokenStorageKey, "t1");
+    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "t1");
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -66,8 +67,8 @@ describe("api client", () => {
   });
 
   it("retries once after successful refresh on 401", async () => {
-    window.localStorage.setItem(frontendConfig.authTokenStorageKey, "expired");
-    window.localStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-1");
+    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "expired");
+    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-1");
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -97,8 +98,8 @@ describe("api client", () => {
 
     await fetchProjects();
 
-    expect(window.localStorage.getItem(frontendConfig.authTokenStorageKey)).toBe("new-access");
-    expect(window.localStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBe("new-refresh");
+    expect(window.sessionStorage.getItem(frontendConfig.authTokenStorageKey)).toBe("new-access");
+    expect(window.sessionStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBe("new-refresh");
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 

@@ -22,7 +22,13 @@ Object.defineProperty(window, "localStorage", {
   configurable: true,
 });
 
+Object.defineProperty(window, "sessionStorage", {
+  value: createStorage(),
+  configurable: true,
+});
+
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });

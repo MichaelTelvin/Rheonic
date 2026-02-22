@@ -37,5 +37,7 @@ class Settings(BaseSettings):
     incident_auto_close_seconds: int = 300
     auto_close_run_interval_seconds: int = 60
     event_retention_days: int = 30
+    webhook_allow_private_hosts: bool = False
+    webhook_secret_encryption_key: str = ""
 
     # TODO: Add env-driven database, Redis, auth, and provider settings.

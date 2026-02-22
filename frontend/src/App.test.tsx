@@ -49,6 +49,7 @@ import { frontendConfig } from "./config";
 describe("App", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
     mockSetUnauthorizedHandler.mockClear();
   });
 
@@ -61,16 +62,16 @@ describe("App", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Mock Login" }));
 
-    expect(window.localStorage.getItem(frontendConfig.authTokenStorageKey)).toBe("token-1");
-    expect(window.localStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBe("refresh-1");
-    expect(window.localStorage.getItem(frontendConfig.authUserStorageKey)).toContain("user@example.com");
+    expect(window.sessionStorage.getItem(frontendConfig.authTokenStorageKey)).toBe("token-1");
+    expect(window.sessionStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBe("refresh-1");
+    expect(window.sessionStorage.getItem(frontendConfig.authUserStorageKey)).toContain("user@example.com");
     expect(screen.getByText("Mock Dashboard user@example.com")).toBeDefined();
   });
 
   it("renders dashboard from existing local storage and signs out", () => {
-    window.localStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
-    window.localStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
+    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
+    window.sessionStorage.setItem(
       frontendConfig.authUserStorageKey,
       JSON.stringify({ id: "u1", email: "persisted@example.com", created_at: new Date().toISOString() }),
     );
@@ -79,8 +80,8 @@ describe("App", () => {
     expect(screen.getByText("Mock Dashboard persisted@example.com")).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Mock Sign Out" }));
-    expect(window.localStorage.getItem(frontendConfig.authTokenStorageKey)).toBeNull();
-    expect(window.localStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBeNull();
+    expect(window.sessionStorage.getItem(frontendConfig.authTokenStorageKey)).toBeNull();
+    expect(window.sessionStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBeNull();
     expect(screen.getByRole("button", { name: "Mock Login" })).toBeDefined();
   });
 

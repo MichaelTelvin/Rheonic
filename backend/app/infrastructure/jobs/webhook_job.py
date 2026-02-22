@@ -8,9 +8,11 @@ from datetime import datetime, timezone
 
 import httpx
 
+from app.config import Settings
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.logger import get_logger
+from app.security.webhook_urls import ensure_webhook_url_is_safe
 
 logger = get_logger(__name__)
 
@@ -34,6 +36,7 @@ def send_project_webhook(
     force_send: bool = False,
 ) -> None:
     # Deliver one webhook and persist latest status on project.
+    settings = Settings()
     repository = ProjectRepositoryImpl(session_factory=DatabaseSessionFactory())
     project = repository.get_project(project_id)
     if project is None:
@@ -62,13 +65,10 @@ def send_project_webhook(
 
     now = datetime.now(timezone.utc)
     try:
+        ensure_webhook_url_is_safe(target_url, settings=settings)
         timeout = httpx.Timeout(connect=2.0, read=5.0, write=5.0, pool=5.0)
-        logger.info("Webhook POST -> %s", target_url)
-        if event_type == "webhook.test":
-            logger.info("Webhook test body: %s", body_bytes.decode("utf-8"))
         with httpx.Client(timeout=timeout) as client:
             response = client.post(target_url, content=body_bytes, headers=headers)
-            logger.info("Webhook response %s %s", response.status_code, response.text[:500])
             response.raise_for_status()
         repository.update_project_webhook_delivery_status(
             project_id=project_id,
