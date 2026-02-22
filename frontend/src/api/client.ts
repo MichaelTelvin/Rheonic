@@ -49,6 +49,21 @@ export interface ProjectProtectSettings {
   protect_decision_timeout_ms: number;
 }
 
+export interface ProjectWebhookSettings {
+  enabled: boolean;
+  url: string | null;
+  has_secret: boolean;
+  last_status: "success" | "failed" | string | null;
+  last_at: string | null;
+  last_error: string | null;
+}
+
+export interface UpdateProjectWebhookInput {
+  enabled: boolean;
+  url: string | null;
+  secret: string | null;
+}
+
 export interface UpdateProjectProtectInput {
   protect_enabled: boolean;
   protect_fail_mode: "open" | "closed";
@@ -241,6 +256,27 @@ export async function updateProjectProtect(
   return request<ProjectProtectSettings>(`/api/v1/projects/${encodeURIComponent(projectId)}/protect`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchProjectWebhook(projectId: string): Promise<ProjectWebhookSettings> {
+  return request<ProjectWebhookSettings>(`/api/v1/projects/${encodeURIComponent(projectId)}/webhook`);
+}
+
+export async function updateProjectWebhook(
+  projectId: string,
+  payload: UpdateProjectWebhookInput,
+): Promise<ProjectWebhookSettings> {
+  return request<ProjectWebhookSettings>(`/api/v1/projects/${encodeURIComponent(projectId)}/webhook`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function testProjectWebhook(projectId: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/v1/projects/${encodeURIComponent(projectId)}/webhook/test`, {
+    method: "POST",
+    body: JSON.stringify({}),
   });
 }
 

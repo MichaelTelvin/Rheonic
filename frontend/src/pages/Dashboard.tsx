@@ -8,17 +8,21 @@ import {
   fetchMetrics,
   fetchProtectMetrics,
   fetchProjectProtect,
+  fetchProjectWebhook,
   fetchProjects,
   listKeys,
   resolveIncident,
   revokeKey,
   rotateKey,
+  testProjectWebhook,
   updateProjectProtect,
+  updateProjectWebhook,
   type CreateKeyResponse,
   type IncidentItem,
   type IngestKeyItem,
   type ProjectItem,
   type ProjectProtectSettings,
+  type ProjectWebhookSettings,
   type RealtimeMetrics,
 } from "../api/client";
 import { Card } from "../components/Card";
@@ -74,6 +78,14 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   const [protectMaxReqInput, setProtectMaxReqInput] = useState<string>("");
   const [protectMaxTokInput, setProtectMaxTokInput] = useState<string>("");
   const [protectFailModeInput, setProtectFailModeInput] = useState<"open" | "closed">("open");
+  const [webhookSettings, setWebhookSettings] = useState<ProjectWebhookSettings | null>(null);
+  const [webhookEnabledInput, setWebhookEnabledInput] = useState<boolean>(false);
+  const [webhookUrlInput, setWebhookUrlInput] = useState<string>("");
+  const [webhookSecretInput, setWebhookSecretInput] = useState<string>("");
+  const [webhookSaving, setWebhookSaving] = useState<boolean>(false);
+  const [webhookTesting, setWebhookTesting] = useState<boolean>(false);
+  const [webhookError, setWebhookError] = useState<string | null>(null);
+  const [showAlertsModal, setShowAlertsModal] = useState<boolean>(false);
 
   const [showCreateProjectModal, setShowCreateProjectModal] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>("");
@@ -198,8 +210,10 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     setIncidentsWarning(null);
     setGlobalBanner(null);
     setProtectSettings(null);
+    setWebhookSettings(null);
     setProtectDecisionStats(null);
     setProtectHealthStats(null);
+    setWebhookError(null);
 
     if (!projectId) {
       window.localStorage.removeItem(frontendConfig.dashboardSelectedProjectStorageKey);
@@ -279,6 +293,36 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     };
 
     void loadProtectSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadWebhookSettings = async (): Promise<void> => {
+      try {
+        const settings = await fetchProjectWebhook(projectId);
+        if (!cancelled) {
+          setWebhookSettings(settings);
+          setWebhookEnabledInput(settings.enabled);
+          setWebhookUrlInput(settings.url ?? "");
+          setWebhookSecretInput("");
+          setWebhookError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setWebhookSettings(null);
+          setWebhookError(error instanceof Error ? error.message : "Failed to load webhook settings.");
+        }
+      }
+    };
+
+    void loadWebhookSettings();
     return () => {
       cancelled = true;
     };
@@ -551,6 +595,55 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     }
   };
 
+  const reloadWebhookSettings = async (): Promise<void> => {
+    if (!projectId) {
+      return;
+    }
+    const settings = await fetchProjectWebhook(projectId);
+    setWebhookSettings(settings);
+    setWebhookEnabledInput(settings.enabled);
+    setWebhookUrlInput(settings.url ?? "");
+    setWebhookSecretInput("");
+  };
+
+  const onSaveWebhookSettings = async (): Promise<void> => {
+    if (!projectId) {
+      return;
+    }
+    setWebhookSaving(true);
+    setWebhookError(null);
+    try {
+      await updateProjectWebhook(projectId, {
+        enabled: webhookEnabledInput,
+        url: webhookUrlInput.trim() || null,
+        secret: webhookSecretInput.trim() || null,
+      });
+      await reloadWebhookSettings();
+    } catch (error) {
+      setWebhookError(error instanceof Error ? error.message : "Failed to save webhook settings.");
+    } finally {
+      setWebhookSaving(false);
+    }
+  };
+
+  const onTestWebhook = async (): Promise<void> => {
+    if (!projectId) {
+      return;
+    }
+    setWebhookTesting(true);
+    setWebhookError(null);
+    try {
+      await testProjectWebhook(projectId);
+      window.setTimeout(() => {
+        void reloadWebhookSettings();
+      }, 700);
+    } catch (error) {
+      setWebhookError(error instanceof Error ? error.message : "Failed to queue webhook test.");
+    } finally {
+      setWebhookTesting(false);
+    }
+  };
+
   const closeKeysModal = (): void => {
     setShowKeysModal(false);
     setLatestPlaintextKey(null);
@@ -728,15 +821,28 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                     </option>
                   ))}
                 </select>
-                <button type="button" className="toolbar-button" onClick={() => setShowCreateProjectModal(true)}>
+                <button type="button" className="toolbar-button toolbar-button-new-project" onClick={() => setShowCreateProjectModal(true)}>
                   New Project
-                </button>
-                <button type="button" className="toolbar-button" onClick={() => setShowKeysModal(true)} disabled={!projectId}>
-                  Keys
                 </button>
               </div>
             </div>
             <div className="controls-right">
+              <button
+                type="button"
+                className="toolbar-button toolbar-button-compact"
+                onClick={() => setShowKeysModal(true)}
+                disabled={!projectId}
+              >
+                Keys
+              </button>
+              <button
+                type="button"
+                className="toolbar-button toolbar-button-compact"
+                onClick={() => setShowAlertsModal(true)}
+                disabled={!projectId}
+              >
+                Alerts
+              </button>
               <button
                 type="button"
                 className={`protection-toggle-btn btn-protect enable-protect-btn ${protectEnabled ? "is-enabled active" : "is-off"}`}
@@ -1135,6 +1241,80 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
               >
                 {savingProtect ? "Saving..." : "Save"}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {showAlertsModal ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal">
+            <h2 className="section-title">Alerts</h2>
+            <div className="alerts-grid">
+              <label className="alerts-toggle">
+                <input
+                  type="checkbox"
+                  checked={webhookEnabledInput}
+                  disabled={!projectId || webhookSaving}
+                  onChange={(event) => setWebhookEnabledInput(event.target.checked)}
+                />
+                Enabled
+              </label>
+              <div className="alerts-field">
+                <label htmlFor="webhook-url">Webhook URL</label>
+                <input
+                  id="webhook-url"
+                  className="text-input"
+                  type="url"
+                  placeholder="https://..."
+                  value={webhookUrlInput}
+                  onChange={(event) => setWebhookUrlInput(event.target.value)}
+                  disabled={!projectId || webhookSaving}
+                />
+              </div>
+              <div className="alerts-field">
+                <label htmlFor="webhook-secret">Secret (optional)</label>
+                <input
+                  id="webhook-secret"
+                  className="text-input"
+                  type="password"
+                  placeholder={webhookSettings?.has_secret ? "•••••••• (leave blank to keep)" : "optional"}
+                  value={webhookSecretInput}
+                  onChange={(event) => setWebhookSecretInput(event.target.value)}
+                  disabled={!projectId || webhookSaving}
+                />
+              </div>
+              <p className="alerts-status">
+                Last delivery:
+                {" "}
+                <span className={webhookSettings?.last_status === "failed" ? "alerts-failed" : "alerts-success"}>
+                  {webhookSettings?.last_status ? webhookSettings.last_status : "—"}
+                </span>
+                {" "}
+                <span>{webhookSettings?.last_at ? formatTime(webhookSettings.last_at) : "—"}</span>
+                {webhookSettings?.last_error ? <span className="alerts-failed"> · {webhookSettings.last_error}</span> : null}
+              </p>
+              {webhookError ? <p className="warning-text">{webhookError}</p> : null}
+              <div className="modal-actions">
+                <button type="button" className="modal-button" onClick={() => setShowAlertsModal(false)}>
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="modal-button"
+                  onClick={() => void onTestWebhook()}
+                  disabled={!projectId || webhookTesting}
+                >
+                  {webhookTesting ? "Testing..." : "Test webhook"}
+                </button>
+                <button
+                  type="button"
+                  className="modal-button modal-primary"
+                  onClick={() => void onSaveWebhookSettings()}
+                  disabled={!projectId || webhookSaving}
+                >
+                  {webhookSaving ? "Saving..." : "Save"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

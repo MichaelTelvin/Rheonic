@@ -52,6 +52,12 @@ Source of truth remains Postgres incidents; Redis is a cache updated on incident
   - `INCIDENT_AUTO_CLOSE_SECONDS`: cooldown threshold used by auto-close logic.
   - `AUTO_CLOSE_RUN_INTERVAL_SECONDS`: scheduler cadence for enqueueing auto-close runs.
 
+### Project Alerts via Webhook
+- Each project can configure one generic webhook destination.
+- Trigger: `incident.high` on high-severity incident creation or escalation to high.
+- Delivery is asynchronous via RQ with retries.
+- UI supports save + test + last delivery status (success/failed, timestamp, short error).
+
 ---
 
 ## Decision API (Always-on Preflight)

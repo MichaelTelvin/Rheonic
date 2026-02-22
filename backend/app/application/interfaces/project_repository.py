@@ -1,5 +1,6 @@
 # Project repository interface.
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from app.domain.models.project import Project
 
@@ -48,4 +49,26 @@ class ProjectRepository(ABC):
         protect_decision_timeout_ms: int,
     ) -> Project | None:
         # Update and return project protect configuration.
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_project_webhook_settings(
+        self,
+        project_id: str,
+        webhook_enabled: bool,
+        webhook_url: str | None,
+        webhook_secret: str | None,
+    ) -> Project | None:
+        # Update and return project webhook configuration.
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_project_webhook_delivery_status(
+        self,
+        project_id: str,
+        status: str,
+        at: datetime,
+        error: str | None,
+    ) -> Project | None:
+        # Update and return latest webhook delivery status fields.
         raise NotImplementedError

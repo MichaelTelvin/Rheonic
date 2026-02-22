@@ -21,6 +21,7 @@ from app.infrastructure.db.repositories.ingest_key_repository_impl import Ingest
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
+from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
 from app.infrastructure.redis.redis_client import RedisClient
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
@@ -106,6 +107,16 @@ def get_settings() -> Settings:
         raise
 
 
+@lru_cache
+def get_webhook_dispatcher() -> RQWebhookDispatcher:
+    # Provide webhook dispatcher backed by RQ queue.
+    try:
+        return RQWebhookDispatcher(redis_url=get_settings().redis_url)
+    except Exception:
+        logger.exception("Failed to initialize webhook dispatcher")
+        raise
+
+
 def get_ingest_event_service() -> IngestEventService:
     # Provide an ingest event service instance.
     try:
@@ -116,6 +127,8 @@ def get_ingest_event_service() -> IngestEventService:
             incident_severity_cache=get_incident_severity_cache(),
             baseline_window_count=get_settings().baseline_window_count,
             incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
+            webhook_dispatcher=get_webhook_dispatcher(),
+            project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )
         logger.debug("Ingest event service provided")
         return service
@@ -254,6 +267,18 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
             connection.execute(text("ALTER TABLE projects ADD COLUMN protect_max_tok_per_min INTEGER"))
         if "protect_decision_timeout_ms" not in project_columns:
             connection.execute(text("ALTER TABLE projects ADD COLUMN protect_decision_timeout_ms INTEGER DEFAULT 100 NOT NULL"))
+        if "webhook_enabled" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_enabled BOOLEAN DEFAULT FALSE NOT NULL"))
+        if "webhook_url" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_url VARCHAR(2048)"))
+        if "webhook_secret" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_secret VARCHAR(512)"))
+        if "webhook_last_status" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_last_status VARCHAR(16)"))
+        if "webhook_last_at" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_last_at TIMESTAMP"))
+        if "webhook_last_error" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_last_error VARCHAR(512)"))
 
     if "incidents" not in table_names:
         return

@@ -84,3 +84,47 @@ class ProjectService:
         if updated is None:
             raise HTTPException(status_code=404, detail="project not found")
         return updated
+
+    def get_project_webhook_settings(self, project_id: str, user_id: str) -> Project:
+        # Return webhook settings for an owned project. Non-owner is forbidden for explicit management APIs.
+        project = self._project_repository.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="project not found")
+        if project.user_id != user_id:
+            raise HTTPException(status_code=403, detail="forbidden")
+        return project
+
+    def update_project_webhook_settings(
+        self,
+        project_id: str,
+        user_id: str,
+        webhook_enabled: bool,
+        webhook_url: str | None,
+        webhook_secret: str | None,
+    ) -> Project:
+        # Update webhook configuration for owned project.
+        _ = self.get_project_webhook_settings(project_id=project_id, user_id=user_id)
+        updated = self._project_repository.update_project_webhook_settings(
+            project_id=project_id,
+            webhook_enabled=webhook_enabled,
+            webhook_url=webhook_url,
+            webhook_secret=webhook_secret,
+        )
+        if updated is None:
+            raise HTTPException(status_code=404, detail="project not found")
+        return updated
+
+    def update_project_webhook_delivery_status(
+        self,
+        project_id: str,
+        status: str,
+        error: str | None,
+        at: datetime | None = None,
+    ) -> Project | None:
+        # Persist latest webhook delivery status fields.
+        return self._project_repository.update_project_webhook_delivery_status(
+            project_id=project_id,
+            status=status,
+            at=at or datetime.now(timezone.utc),
+            error=error,
+        )

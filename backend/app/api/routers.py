@@ -9,6 +9,7 @@ from app.api.v1.metrics import router as metrics_router
 from app.api.v1.policy import router as policy_router
 from app.api.v1.protect import router as protect_router
 from app.api.v1.projects import router as projects_router
+from app.api.v1.webhook import router as webhook_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router, prefix="/v1/auth", tags=["auth"])
@@ -19,3 +20,4 @@ api_router.include_router(metrics_router, prefix="/v1/metrics", tags=["metrics"]
 api_router.include_router(policy_router, prefix="/v1/policy", tags=["policy"])
 api_router.include_router(protect_router, prefix="/v1", tags=["protect"])
 api_router.include_router(projects_router, prefix="/v1/projects", tags=["projects"])
+api_router.include_router(webhook_router, prefix="/v1", tags=["webhook"])

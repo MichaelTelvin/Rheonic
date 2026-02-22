@@ -340,7 +340,7 @@ body {
 
 .dashboard-controls {
   display: grid;
-  grid-template-columns: minmax(0, calc((100% - 14px) / 2)) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   column-gap: 14px;
   margin-top: 6px;
@@ -354,21 +354,23 @@ body {
 .dashboard-controls .toolbar {
   width: 100%;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(260px, 1fr) auto;
   align-items: center;
   gap: 10px;
 }
 
 .dashboard-controls #project-select {
   min-width: 0;
-  max-width: none;
+  max-width: 500px;
   width: 100%;
 }
 
 .controls-right {
-  margin-left: auto;
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
 }
 
 .protection-toggle-btn {
@@ -427,6 +429,50 @@ select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 26px;
+}
+
+.alerts-panel {
+  margin-bottom: 14px;
+}
+
+.alerts-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.alerts-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.alerts-field label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.alerts-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.alerts-status {
+  margin: 0;
+  min-height: 20px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.alerts-success {
+  color: rgba(209, 250, 229, 0.9);
+}
+
+.alerts-failed {
+  color: rgba(253, 164, 175, 0.9);
 }
 
 .card {
@@ -720,6 +766,8 @@ pre {
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
   display: grid;
   gap: 14px;
+  max-height: min(92vh, 760px);
+  overflow: auto;
 }
 
 .modal-keys {
@@ -848,6 +896,14 @@ pre {
   background: rgba(167, 139, 250, 0.24);
 }
 
+.toolbar-button-new-project {
+  min-width: 118px;
+}
+
+.toolbar-button-compact {
+  min-width: 90px;
+}
+
 .modal-button {
   background: var(--control-bg);
   border-color: var(--control-border);
@@ -963,6 +1019,8 @@ pre {
 
   .controls-right {
     margin-left: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .metrics-grid {

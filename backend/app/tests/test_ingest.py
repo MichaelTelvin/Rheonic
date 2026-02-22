@@ -8,6 +8,7 @@ from app.application.services.ingest_event_service import (
 from app.config import app_config
 from app.domain.models.event import Event
 from app.domain.models.incident import Incident
+from app.domain.models.project import Project
 from app.infrastructure.redis.rolling_window import (
     RollingWindow,
     baseline_req_60s_key,
@@ -261,6 +262,28 @@ class FakeIncidentRepository:
         return None
 
 
+class FakeWebhookDispatcher:
+    # Captures webhook enqueue calls for assertions.
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, object], str]] = []
+
+    def enqueue(self, project_id: str, payload: dict[str, object], event_type: str) -> None:
+        self.calls.append((project_id, payload, event_type))
+
+
+class FakeProjectRepository:
+    # Minimal project repository for webhook snapshot thresholds.
+
+    def __init__(self, project: Project) -> None:
+        self._project = project
+
+    def get_project(self, project_id: str) -> Project | None:
+        if self._project.id != project_id:
+            return None
+        return self._project
+
+
 def _make_time_provider(values: list[int]):
     # Build deterministic millisecond time provider.
     state = {"index": 0}
@@ -428,3 +451,88 @@ def test_both_spikes_create_single_burn_spike_with_both_ratios() -> None:
     assert incident.incident_type == "burn_spike"
     assert incident.evidence["req_ratio"] == 10.0
     assert incident.evidence["tok_ratio"] == 20.0
+
+
+def test_high_incident_creation_enqueues_webhook_once() -> None:
+    # High-severity incident creation should enqueue one incident.high webhook.
+    now = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(10, 200)],
+        baselines=[(1.0, 10.0)],
+    )
+    incidents = FakeIncidentRepository()
+    dispatcher = FakeWebhookDispatcher()
+    project_repo = FakeProjectRepository(
+        Project(
+            id="p1",
+            name="P1",
+            user_id="u1",
+            created_at=now,
+            protect_max_req_per_min=120,
+            protect_max_tok_per_min=500,
+        )
+    )
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
+        project_repository=project_repo,  # type: ignore[arg-type]
+        now_provider=_make_now_provider([now]),
+    )
+
+    service.ingest(_build_event(project_id="p1"))
+
+    assert len(dispatcher.calls) == 1
+    _, payload, event_type = dispatcher.calls[0]
+    assert event_type == "incident.high"
+    assert payload["event"] == "incident.high"
+    assert payload["snapshot"] == {
+        "requests_60s": 10,
+        "tokens_60s": 200,
+        "threshold_req_60s": 120,
+        "threshold_tok_60s": 500,
+    }
+
+
+def test_incident_escalation_to_high_enqueues_once_without_duplicates() -> None:
+    # Escalation medium->high should enqueue exactly once and not re-enqueue for repeated high updates.
+    t0 = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=30)
+    t2 = t1 + timedelta(seconds=30)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(3, 60), (10, 130), (12, 150)],
+        baselines=[(1.0, 10.0), (1.0, 10.0), (1.0, 10.0)],
+    )
+    incidents = FakeIncidentRepository()
+    dispatcher = FakeWebhookDispatcher()
+    project_repo = FakeProjectRepository(
+        Project(
+            id="p1",
+            name="P1",
+            user_id="u1",
+            created_at=t0,
+            protect_max_req_per_min=120,
+            protect_max_tok_per_min=500,
+        )
+    )
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
+        project_repository=project_repo,  # type: ignore[arg-type]
+        now_provider=_make_now_provider([t0, t1, t2]),
+    )
+
+    service.ingest(_build_event(project_id="p1"))  # medium
+    service.ingest(_build_event(project_id="p1"))  # escalates to high
+    service.ingest(_build_event(project_id="p1"))  # remains high
+
+    assert len(dispatcher.calls) == 1

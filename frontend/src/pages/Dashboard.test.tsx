@@ -15,10 +15,13 @@ const mocks = vi.hoisted(() => {
     fetchMetrics: vi.fn(),
     fetchIncidents: vi.fn(),
     fetchProjectProtect: vi.fn(),
+    fetchProjectWebhook: vi.fn(),
     fetchProtectMetrics: vi.fn(),
     fetchProtectHealth: vi.fn(),
     resolveIncident: vi.fn(),
     createProject: vi.fn(),
+    updateProjectWebhook: vi.fn(),
+    testProjectWebhook: vi.fn(),
     listKeys: vi.fn(),
     createKey: vi.fn(),
     revokeKey: vi.fn(),
@@ -33,10 +36,13 @@ vi.mock("../api/client", () => {
     fetchMetrics: (...args: unknown[]) => mocks.fetchMetrics(...args),
     fetchIncidents: (...args: unknown[]) => mocks.fetchIncidents(...args),
     fetchProjectProtect: (...args: unknown[]) => mocks.fetchProjectProtect(...args),
+    fetchProjectWebhook: (...args: unknown[]) => mocks.fetchProjectWebhook(...args),
     fetchProtectMetrics: (...args: unknown[]) => mocks.fetchProtectMetrics(...args),
     fetchProtectHealth: (...args: unknown[]) => mocks.fetchProtectHealth(...args),
     resolveIncident: (...args: unknown[]) => mocks.resolveIncident(...args),
     createProject: (...args: unknown[]) => mocks.createProject(...args),
+    updateProjectWebhook: (...args: unknown[]) => mocks.updateProjectWebhook(...args),
+    testProjectWebhook: (...args: unknown[]) => mocks.testProjectWebhook(...args),
     listKeys: (...args: unknown[]) => mocks.listKeys(...args),
     createKey: (...args: unknown[]) => mocks.createKey(...args),
     revokeKey: (...args: unknown[]) => mocks.revokeKey(...args),
@@ -53,10 +59,13 @@ describe("Dashboard", () => {
     mocks.fetchMetrics.mockReset();
     mocks.fetchIncidents.mockReset();
     mocks.fetchProjectProtect.mockReset();
+    mocks.fetchProjectWebhook.mockReset();
     mocks.fetchProtectMetrics.mockReset();
     mocks.fetchProtectHealth.mockReset();
     mocks.resolveIncident.mockReset();
     mocks.createProject.mockReset();
+    mocks.updateProjectWebhook.mockReset();
+    mocks.testProjectWebhook.mockReset();
     mocks.listKeys.mockReset();
     mocks.createKey.mockReset();
     mocks.revokeKey.mockReset();
@@ -79,6 +88,23 @@ describe("Dashboard", () => {
       decision_latency_p95_60m_ms: null,
       last: null,
     });
+    mocks.fetchProjectWebhook.mockResolvedValue({
+      enabled: false,
+      url: null,
+      has_secret: false,
+      last_status: null,
+      last_at: null,
+      last_error: null,
+    });
+    mocks.updateProjectWebhook.mockResolvedValue({
+      enabled: false,
+      url: null,
+      has_secret: false,
+      last_status: null,
+      last_at: null,
+      last_error: null,
+    });
+    mocks.testProjectWebhook.mockResolvedValue({ status: "queued" });
     mocks.fetchProtectHealth.mockResolvedValue({ p50_ms: null, p95_ms: null, timeouts_60m: 0 });
   });
 
@@ -138,5 +164,25 @@ describe("Dashboard", () => {
     const p50Label = await screen.findByText("P50 latency (ms)");
     const p50Row = p50Label.closest(".protect-decisions-row");
     expect(p50Row?.querySelector(".protect-decisions-value")?.textContent).toBe("—");
+  });
+
+  it("saves and tests webhook from alerts panel", async () => {
+    mocks.fetchProjects.mockResolvedValue([{ id: "p1", name: "Demo", created_at: new Date().toISOString() }]);
+    render(<Dashboard userEmail="user@example.com" onSignOut={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Alerts" }));
+    const urlInput = await screen.findByLabelText("Webhook URL");
+    fireEvent.change(urlInput, { target: { value: "https://example.test/hook" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(mocks.updateProjectWebhook).toHaveBeenCalledWith("p1", {
+        enabled: false,
+        url: "https://example.test/hook",
+        secret: null,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Test webhook" }));
+    await waitFor(() => expect(mocks.testProjectWebhook).toHaveBeenCalledWith("p1"));
   });
 });

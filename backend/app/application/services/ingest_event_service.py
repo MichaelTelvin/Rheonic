@@ -6,6 +6,8 @@ from uuid import uuid4
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.event_repository import EventRepository
 from app.application.interfaces.incident_repository import IncidentRepository
+from app.application.interfaces.project_repository import ProjectRepository
+from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.domain.models.incident import Incident
 from app.domain.models.event import Event
@@ -31,6 +33,8 @@ class IngestEventService:
         incident_severity_cache: IncidentSeverityCache | None,
         baseline_window_count: int,
         incident_dedup_window_seconds: int,
+        webhook_dispatcher: WebhookDispatcher | None = None,
+        project_repository: ProjectRepository | None = None,
         now_provider: Callable[[], datetime] | None = None,
     ) -> None:
         # Initialize service dependencies.
@@ -40,6 +44,8 @@ class IngestEventService:
         self._incident_severity_cache = incident_severity_cache
         self._baseline_window_count = baseline_window_count
         self._incident_dedup_window_seconds = incident_dedup_window_seconds
+        self._webhook_dispatcher = webhook_dispatcher
+        self._project_repository = project_repository
         self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
 
     def ingest(self, event: Event) -> None:
@@ -163,6 +169,18 @@ class IngestEventService:
                 last_seen_at=now,
                 severity=updated_severity,
             )
+            if open_incident.severity != "high" and updated_severity == "high":
+                self._enqueue_high_incident_webhook(
+                    incident_id=open_incident.id,
+                    event=event,
+                    incident_type=incident_type,
+                    severity=updated_severity,
+                    created_at=open_incident.created_at,
+                    last_seen_at=now,
+                    evidence=evidence,
+                    requests_60s=requests_60s,
+                    tokens_60s=tokens_60s,
+                )
             if self._incident_severity_cache is not None:
                 self._incident_severity_cache.set(project_id=event.project_id, severity=updated_severity)
             logger.info(
@@ -184,12 +202,75 @@ class IngestEventService:
             last_seen_at=now,
         )
         self._incident_repository.create_incident(incident=incident)
+        if severity == "high":
+            self._enqueue_high_incident_webhook(
+                incident_id=incident.id,
+                event=event,
+                incident_type=incident_type,
+                severity=severity,
+                created_at=incident.created_at,
+                last_seen_at=now,
+                evidence=evidence,
+                requests_60s=requests_60s,
+                tokens_60s=tokens_60s,
+            )
         if self._incident_severity_cache is not None:
             self._incident_severity_cache.set(project_id=event.project_id, severity=severity)
         logger.info(
             "Incident created from ingest",
             extra={"project_id": event.project_id, "incident_type": incident_type, "severity": severity},
         )
+
+    def _enqueue_high_incident_webhook(
+        self,
+        *,
+        incident_id: str,
+        event: Event,
+        incident_type: str,
+        severity: str,
+        created_at: datetime,
+        last_seen_at: datetime,
+        evidence: dict[str, object],
+        requests_60s: int,
+        tokens_60s: int,
+    ) -> None:
+        # Enqueue high-severity incident webhook if dispatcher is configured.
+        if severity != "high" or self._webhook_dispatcher is None:
+            return
+        threshold_req_60s = None
+        threshold_tok_60s = None
+        if self._project_repository is not None:
+            project = self._project_repository.get_project(event.project_id)
+            if project is not None:
+                threshold_req_60s = project.protect_max_req_per_min
+                threshold_tok_60s = project.protect_max_tok_per_min
+        payload = {
+            "event": "incident.high",
+            "project_id": event.project_id,
+            "incident": {
+                "id": incident_id,
+                "type": incident_type,
+                "severity": severity,
+                "status": "open",
+                "created_at": created_at.isoformat(),
+                "last_seen_at": last_seen_at.isoformat(),
+                "evidence": evidence,
+            },
+            "snapshot": {
+                "requests_60s": requests_60s,
+                "tokens_60s": tokens_60s,
+                "threshold_req_60s": threshold_req_60s,
+                "threshold_tok_60s": threshold_tok_60s,
+            },
+        }
+        try:
+            self._webhook_dispatcher.enqueue(
+                project_id=event.project_id,
+                payload=payload,
+                event_type="incident.high",
+            )
+        except Exception:
+            logger.exception("Failed to enqueue high-incident webhook", extra={"project_id": event.project_id})
 
 
 def _severity_for_ratio(max_ratio: float) -> str:

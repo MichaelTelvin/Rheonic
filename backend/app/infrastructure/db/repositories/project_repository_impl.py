@@ -1,4 +1,6 @@
 # Concrete project repository implementation.
+from datetime import datetime
+
 from app.application.interfaces.project_repository import ProjectRepository
 from app.domain.models.project import Project
 from app.infrastructure.db.base import DatabaseSessionFactory
@@ -128,6 +130,54 @@ class ProjectRepositoryImpl(ProjectRepository):
             logger.exception("Failed updating project protect settings", extra={"project_id": project_id})
             raise
 
+    def update_project_webhook_settings(
+        self,
+        project_id: str,
+        webhook_enabled: bool,
+        webhook_url: str | None,
+        webhook_secret: str | None,
+    ) -> Project | None:
+        # Update and return project webhook settings.
+        try:
+            with self._session_factory.create_session() as session:
+                record = session.query(ProjectRecord).filter(ProjectRecord.id == project_id).first()
+                if record is None:
+                    return None
+                record.webhook_enabled = webhook_enabled
+                record.webhook_url = webhook_url
+                record.webhook_secret = webhook_secret
+                session.add(record)
+                session.commit()
+                session.refresh(record)
+            return _to_domain(record)
+        except Exception:
+            logger.exception("Failed updating project webhook settings", extra={"project_id": project_id})
+            raise
+
+    def update_project_webhook_delivery_status(
+        self,
+        project_id: str,
+        status: str,
+        at: datetime,
+        error: str | None,
+    ) -> Project | None:
+        # Update and return project webhook delivery status fields.
+        try:
+            with self._session_factory.create_session() as session:
+                record = session.query(ProjectRecord).filter(ProjectRecord.id == project_id).first()
+                if record is None:
+                    return None
+                record.webhook_last_status = status
+                record.webhook_last_at = at
+                record.webhook_last_error = error
+                session.add(record)
+                session.commit()
+                session.refresh(record)
+            return _to_domain(record)
+        except Exception:
+            logger.exception("Failed updating project webhook delivery status", extra={"project_id": project_id})
+            raise
+
 
 def _to_domain(record: ProjectRecord) -> Project:
     # Convert SQLAlchemy project record to domain model.
@@ -141,4 +191,10 @@ def _to_domain(record: ProjectRecord) -> Project:
         protect_max_req_per_min=getattr(record, "protect_max_req_per_min", None),
         protect_max_tok_per_min=getattr(record, "protect_max_tok_per_min", None),
         protect_decision_timeout_ms=int(getattr(record, "protect_decision_timeout_ms", 100) or 100),
+        webhook_enabled=bool(getattr(record, "webhook_enabled", False)),
+        webhook_url=getattr(record, "webhook_url", None),
+        webhook_secret=getattr(record, "webhook_secret", None),
+        webhook_last_status=getattr(record, "webhook_last_status", None),
+        webhook_last_at=getattr(record, "webhook_last_at", None),
+        webhook_last_error=getattr(record, "webhook_last_error", None),
     )
