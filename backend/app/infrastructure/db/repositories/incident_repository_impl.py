@@ -1,6 +1,8 @@
 # Concrete incident repository implementation scaffold.
 from datetime import datetime, timezone
 
+from sqlalchemy import and_, or_
+
 from app.application.interfaces.incident_repository import IncidentRepository
 from app.domain.models.incident import Incident
 from app.infrastructure.db.base import DatabaseSessionFactory
@@ -161,6 +163,40 @@ class IncidentRepositoryImpl(IncidentRepository):
             return _to_domain(record)
         except Exception:
             logger.exception("Failed resolving incident", extra={"incident_id": incident_id})
+            raise
+
+    def auto_resolve_stale_open_incidents(
+        self,
+        *,
+        cutoff: datetime,
+        resolved_at: datetime,
+    ) -> tuple[int, set[str]]:
+        # Mark stale open incidents as auto_resolved.
+        try:
+            with self._session_factory.create_session() as session:
+                records = (
+                    session.query(IncidentRecord)
+                    .filter(IncidentRecord.status == "open")
+                    .filter(
+                        or_(
+                            IncidentRecord.last_seen_at < cutoff,
+                            and_(IncidentRecord.last_seen_at.is_(None), IncidentRecord.created_at < cutoff),
+                        )
+                    )
+                    .all()
+                )
+                if not records:
+                    return 0, set()
+                project_ids = {record.project_id for record in records}
+                for record in records:
+                    record.status = "auto_resolved"
+                    record.resolved_at = resolved_at
+                    session.add(record)
+                session.commit()
+            logger.info("Stale incidents auto-resolved", extra={"count": len(records)})
+            return len(records), project_ids
+        except Exception:
+            logger.exception("Failed auto-resolving stale incidents")
             raise
 
 

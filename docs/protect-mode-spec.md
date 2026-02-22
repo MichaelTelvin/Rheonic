@@ -37,6 +37,12 @@ Redis key:
 - `incsev:{project_id}` = `none|low|medium|high`
 Source of truth remains Postgres incidents; Redis is a cache updated on incident changes.
 
+### Incident Auto-Close (cooldown)
+- Open incidents are auto-resolved when not seen again for a cooldown window.
+- Config: `INCIDENT_AUTO_CLOSE_SECONDS` (default `300`).
+- Status transition: `open -> auto_resolved`.
+- Protect decision logic only considers currently `open` incidents (auto-resolved incidents are ignored).
+
 ---
 
 ## Decision API (Always-on Preflight)

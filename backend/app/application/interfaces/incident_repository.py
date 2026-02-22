@@ -53,3 +53,13 @@ class IncidentRepository(ABC):
     def resolve_incident(self, incident_id: str) -> Incident | None:
         # Mark incident as resolved and return updated incident.
         raise NotImplementedError
+
+    @abstractmethod
+    def auto_resolve_stale_open_incidents(
+        self,
+        *,
+        cutoff: datetime,
+        resolved_at: datetime,
+    ) -> tuple[int, set[str]]:
+        # Auto-resolve stale open incidents and return (count, affected_project_ids).
+        raise NotImplementedError
