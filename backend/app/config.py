@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     baseline_window_count: int = 30
     incident_dedup_window_seconds: int = 300
     incident_auto_close_seconds: int = 300
+    auto_close_run_interval_seconds: int = 60
     event_retention_days: int = 30
 
     # TODO: Add env-driven database, Redis, auth, and provider settings.

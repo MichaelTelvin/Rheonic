@@ -43,6 +43,15 @@ Source of truth remains Postgres incidents; Redis is a cache updated on incident
 - Status transition: `open -> auto_resolved`.
 - Protect decision logic only considers currently `open` incidents (auto-resolved incidents are ignored).
 
+### Scheduled Maintenance Jobs
+- A dedicated scheduler service (`rq-scheduler`) enqueues recurring maintenance jobs on queue `llmtbg`.
+- Recurring jobs:
+  - `auto_close_incidents` every `AUTO_CLOSE_RUN_INTERVAL_SECONDS` (default `60`).
+  - `purge_old_events` every 24 hours.
+- Config distinction:
+  - `INCIDENT_AUTO_CLOSE_SECONDS`: cooldown threshold used by auto-close logic.
+  - `AUTO_CLOSE_RUN_INTERVAL_SECONDS`: scheduler cadence for enqueueing auto-close runs.
+
 ---
 
 ## Decision API (Always-on Preflight)

@@ -76,6 +76,24 @@ services:
     command: >
       sh -c "rq worker --url \"$$REDIS_URL\" llmtbg"
 
+  scheduler:
+    build: ./backend
+    container_name: llmtbg_scheduler
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: ${REDIS_URL}
+      APP_ENV: ${APP_ENV}
+      AUTO_CLOSE_RUN_INTERVAL_SECONDS: ${AUTO_CLOSE_RUN_INTERVAL_SECONDS:-60}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "python -m app.workers.scheduler_bootstrap
+      && python -m app.workers.scheduler"
+
   frontend:
     build: ./frontend
     container_name: llmtbg_frontend
