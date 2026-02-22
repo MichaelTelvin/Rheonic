@@ -1,5 +1,6 @@
 # Rolling window helper scaffolding.
 import time
+import json
 from collections.abc import Callable
 from statistics import median
 from typing import Protocol
@@ -35,6 +36,11 @@ def baseline_req_60s_key(project_id: str) -> str:
 def baseline_tok_60s_key(project_id: str) -> str:
     # Return the Redis key for token baseline list.
     return f"bl:{project_id}:tok"
+
+
+def escalation_hits_key(project_id: str, incident_type: str) -> str:
+    # Return Redis key for incident escalation hit history.
+    return f"esc:{project_id}:{incident_type}"
 
 
 def normalize_total_tokens(total_tokens: int | None) -> int:
@@ -81,6 +87,10 @@ class RedisCounterClient(Protocol):
 
     def get(self, key: str) -> object | None:
         # Read a key value.
+        ...
+
+    def set(self, key: str, value: object, ttl_seconds: int) -> None:
+        # Set value with expiration.
         ...
 
     def set_nx_ex(self, key: str, value: object, ttl_seconds: int) -> bool:
@@ -215,6 +225,35 @@ class RollingWindow(RealtimeCounterStore):
             logger.exception("Failed releasing incident lock", extra={"project_id": project_id, "incident_type": incident_type})
             raise
 
+    def record_incident_escalation_hit(
+        self,
+        project_id: str,
+        incident_type: str,
+        ts_unix: int,
+        score: int,
+        ratio: float,
+        *,
+        prune_before_unix: int,
+        ttl_seconds: int,
+    ) -> list[dict[str, float | int]]:
+        # Append escalation hit, prune stale entries, and persist with TTL.
+        try:
+            key = escalation_hits_key(project_id, incident_type)
+            hits = _decode_escalation_hits(self._client.get(key))
+            hits.append({"ts": int(ts_unix), "score": int(score), "ratio": float(ratio)})
+            hits = [hit for hit in hits if int(hit.get("ts", 0)) >= prune_before_unix]
+            # Cap retained hits to prevent unbounded key growth.
+            if len(hits) > app_config.incident_escalation_hit_list_max_entries:
+                hits = hits[-app_config.incident_escalation_hit_list_max_entries :]
+            self._client.set(key, json.dumps(hits, separators=(",", ":")), ttl_seconds=ttl_seconds)
+            return hits
+        except Exception:
+            logger.exception(
+                "Failed recording incident escalation hit",
+                extra={"project_id": project_id, "incident_type": incident_type},
+            )
+            raise
+
 
 def _member_tokens(member: object) -> int:
     # Parse tokens from member format "{now_ms}:{uuid}:{tokens}".
@@ -246,3 +285,32 @@ def _default_now_ms() -> int:
 def _default_member_id() -> str:
     # Return unique member identifier component.
     return uuid4().hex
+
+
+def _decode_escalation_hits(raw: object | None) -> list[dict[str, float | int]]:
+    # Parse escalation hit list from Redis JSON payload.
+    if raw is None:
+        return []
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    try:
+        payload = json.loads(str(raw))
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(payload, list):
+        return []
+    hits: list[dict[str, float | int]] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        try:
+            hits.append(
+                {
+                    "ts": int(item.get("ts", 0)),
+                    "score": int(item.get("score", 0)),
+                    "ratio": float(item.get("ratio", 0.0)),
+                }
+            )
+        except (TypeError, ValueError):
+            continue
+    return hits

@@ -7,8 +7,9 @@ import json
 from datetime import datetime, timezone
 
 import httpx
+from fastapi import HTTPException
 
-from app.config import Settings
+from app.config import Settings, app_config
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.logger import get_logger
@@ -16,14 +17,16 @@ from app.security.webhook_urls import ensure_webhook_url_is_safe
 
 logger = get_logger(__name__)
 
-_MAX_ERROR_CHARS = 240
-
-
 def _format_error_message(exc: Exception) -> str:
     if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
         status = exc.response.status_code
-        return f"HTTP {status}"[:_MAX_ERROR_CHARS]
-    return str(exc).splitlines()[0][:_MAX_ERROR_CHARS]
+        return f"HTTP {status}"[: app_config.webhook_max_error_chars]
+    if isinstance(exc, HTTPException):
+        detail = exc.detail
+        if isinstance(detail, str):
+            return detail[: app_config.webhook_max_error_chars]
+        return str(detail)[: app_config.webhook_max_error_chars]
+    return str(exc).splitlines()[0][: app_config.webhook_max_error_chars]
 
 
 def send_project_webhook(
@@ -65,7 +68,12 @@ def send_project_webhook(
     now = datetime.now(timezone.utc)
     try:
         ensure_webhook_url_is_safe(target_url, settings=settings)
-        timeout = httpx.Timeout(connect=2.0, read=5.0, write=5.0, pool=5.0)
+        timeout = httpx.Timeout(
+            connect=app_config.webhook_timeout_connect_seconds,
+            read=app_config.webhook_timeout_read_seconds,
+            write=app_config.webhook_timeout_write_seconds,
+            pool=app_config.webhook_timeout_pool_seconds,
+        )
         with httpx.Client(timeout=timeout) as client:
             response = client.post(target_url, content=body_bytes, headers=headers)
             response.raise_for_status()

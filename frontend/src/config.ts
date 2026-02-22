@@ -5,4 +5,11 @@ export const frontendConfig = {
   authRefreshTokenStorageKey: "llmtbg_refresh_token",
   authUserStorageKey: "llmtbg_user",
   dashboardMaxSeriesPoints: 60,
+  dashboardClockTickMs: 1000,
+  dashboardProtectStatsPollMs: 2000,
+  dashboardMetricsPollMs: 2000,
+  dashboardIncidentsPollMs: 5000,
+  dashboardNameMaxLength: 80,
+  dashboardNamePattern: "^[A-Za-z0-9 _.-]+$",
+  protectDefaultDecisionTimeoutMs: 100,
 } as const;

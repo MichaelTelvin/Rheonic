@@ -5,6 +5,7 @@ from redis import Redis
 from rq import Queue, Retry
 
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
+from app.config import app_config
 from app.infrastructure.jobs.webhook_job import send_project_webhook
 
 
@@ -35,7 +36,7 @@ class RQWebhookDispatcher(WebhookDispatcher):
                 "override_secret": override_secret,
                 "force_send": force_send,
             },
-            retry=Retry(max=3, interval=[5, 20, 60]),
-            result_ttl=3600,
-            failure_ttl=86400,
+            retry=Retry(max=app_config.webhook_retry_max_attempts, interval=list(app_config.webhook_retry_intervals_seconds)),
+            result_ttl=app_config.webhook_result_ttl_seconds,
+            failure_ttl=app_config.webhook_failure_ttl_seconds,
         )

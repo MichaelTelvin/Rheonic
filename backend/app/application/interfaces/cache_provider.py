@@ -54,3 +54,18 @@ class RealtimeCounterStore(ABC):
     def release_incident_lock(self, project_id: str, incident_type: str) -> None:
         # Release incident dedupe lock.
         raise NotImplementedError
+
+    @abstractmethod
+    def record_incident_escalation_hit(
+        self,
+        project_id: str,
+        incident_type: str,
+        ts_unix: int,
+        score: int,
+        ratio: float,
+        *,
+        prune_before_unix: int,
+        ttl_seconds: int,
+    ) -> list[dict[str, float | int]]:
+        # Append and prune escalation hits for a project/type key, returning retained hits.
+        raise NotImplementedError

@@ -100,6 +100,10 @@ class FakeRedisClient:
     def get(self, key: str) -> object | None:
         return self.values.get(key)
 
+    def set(self, key: str, value: object, ttl_seconds: int) -> None:
+        self.values[key] = value  # type: ignore[assignment]
+        self.ttls[key] = ttl_seconds
+
     def set_nx_ex(self, key: str, value: object, ttl_seconds: int) -> bool:
         if key in self.values:
             return False
@@ -304,7 +308,7 @@ def test_anomaly_baseline_spike_dedup_updates_existing_incident(tmp_path) -> Non
 
 
 def test_anomaly_severity_escalation_updates_or_creates(tmp_path) -> None:
-    # Severity should escalate low->medium->high on stronger spikes within dedup window.
+    # Severity should escalate only after repeated scored hits in escalation windows.
     client, redis_client = _make_client(tmp_path)
     base_ts = 1_000_000_000
 
@@ -347,21 +351,39 @@ def test_anomaly_severity_escalation_updates_or_creates(tmp_path) -> None:
     incidents = _list_open_incidents(client, project_id)
     assert len(incidents) == 1
     assert incidents[0]["id"] == incident_id
-    assert incidents[0]["severity"] == "medium"
+    assert incidents[0]["severity"] == "low"
     assert incidents[0]["evidence"]["count"] == 2
     assert incidents[0]["evidence"]["last_seen"] > low_last_seen
 
+    medium_spike_second = client.post(
+        "/api/v1/events",
+        json=_event_payload(ts_seconds=base_ts + 40, total_tokens=4_000),
+        headers={"X-Project-Ingest-Key": plaintext_key},
+    )
+    assert medium_spike_second.status_code == 202
+    incidents = _list_open_incidents(client, project_id)
+    assert len(incidents) == 1
+    assert incidents[0]["id"] == incident_id
+    assert incidents[0]["severity"] == "medium"
+    assert incidents[0]["evidence"]["count"] == 3
+
     high_spike = client.post(
         "/api/v1/events",
-        json=_event_payload(ts_seconds=base_ts + 40, total_tokens=10_000),
+        json=_event_payload(ts_seconds=base_ts + 50, total_tokens=10_000),
         headers={"X-Project-Ingest-Key": plaintext_key},
     )
     assert high_spike.status_code == 202
+    high_spike_second = client.post(
+        "/api/v1/events",
+        json=_event_payload(ts_seconds=base_ts + 60, total_tokens=10_000),
+        headers={"X-Project-Ingest-Key": plaintext_key},
+    )
+    assert high_spike_second.status_code == 202
     incidents = _list_open_incidents(client, project_id)
     assert len(incidents) == 1
     assert incidents[0]["id"] == incident_id
     assert incidents[0]["severity"] == "high"
-    assert incidents[0]["evidence"]["count"] == 3
+    assert incidents[0]["evidence"]["count"] == 5
     assert incidents[0]["evidence"]["max_ratio_seen"] >= 10
 
     _clear_project_redis_state(redis_client, project_id)

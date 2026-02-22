@@ -8,19 +8,13 @@ from app.application.interfaces.event_repository import EventRepository
 from app.application.interfaces.incident_repository import IncidentRepository
 from app.application.interfaces.project_repository import ProjectRepository
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
+from app.config import app_config
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.domain.models.incident import Incident
 from app.domain.models.event import Event
 from app.logger import get_logger
 
 logger = get_logger(__name__)
-
-INCIDENT_TYPE_BURN_SPIKE = "burn_spike"
-INCIDENT_TYPE_REQUEST_SPIKE = "request_spike"
-LOW_SEVERITY_RATIO = 2.0
-MEDIUM_SEVERITY_RATIO = 5.0
-HIGH_SEVERITY_RATIO = 10.0
-
 
 class IngestEventService:
     # Orchestrates ingest flow without transport or persistence details.
@@ -33,6 +27,13 @@ class IngestEventService:
         incident_severity_cache: IncidentSeverityCache | None,
         baseline_window_count: int,
         incident_dedup_window_seconds: int,
+        incident_escalation_window_medium_seconds: int = app_config.default_incident_escalation_window_medium_seconds,
+        incident_escalation_window_high_seconds: int = app_config.default_incident_escalation_window_high_seconds,
+        incident_escalation_min_hits_medium: int = app_config.default_incident_escalation_min_hits_medium,
+        incident_escalation_min_hits_high: int = app_config.default_incident_escalation_min_hits_high,
+        incident_escalation_score_threshold_medium: int = app_config.default_incident_escalation_score_threshold_medium,
+        incident_escalation_score_threshold_high: int = app_config.default_incident_escalation_score_threshold_high,
+        incident_escalation_ttl_seconds: int = app_config.default_incident_escalation_ttl_seconds,
         webhook_dispatcher: WebhookDispatcher | None = None,
         project_repository: ProjectRepository | None = None,
         now_provider: Callable[[], datetime] | None = None,
@@ -44,6 +45,13 @@ class IngestEventService:
         self._incident_severity_cache = incident_severity_cache
         self._baseline_window_count = baseline_window_count
         self._incident_dedup_window_seconds = incident_dedup_window_seconds
+        self._incident_escalation_window_medium_seconds = incident_escalation_window_medium_seconds
+        self._incident_escalation_window_high_seconds = incident_escalation_window_high_seconds
+        self._incident_escalation_min_hits_medium = incident_escalation_min_hits_medium
+        self._incident_escalation_min_hits_high = incident_escalation_min_hits_high
+        self._incident_escalation_score_threshold_medium = incident_escalation_score_threshold_medium
+        self._incident_escalation_score_threshold_high = incident_escalation_score_threshold_high
+        self._incident_escalation_ttl_seconds = incident_escalation_ttl_seconds
         self._webhook_dispatcher = webhook_dispatcher
         self._project_repository = project_repository
         self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
@@ -90,7 +98,7 @@ class IngestEventService:
     def _has_open_incident_for_dimension(self, event: Event) -> bool:
         # Freeze baseline updates while any open anomaly incident exists for this event dimension.
         created_after = datetime.fromtimestamp(0, tz=timezone.utc)
-        for incident_type in (INCIDENT_TYPE_BURN_SPIKE, INCIDENT_TYPE_REQUEST_SPIKE):
+        for incident_type in (app_config.incident_type_burn_spike, app_config.incident_type_request_spike):
             fingerprint = _build_incident_fingerprint(
                 project_id=event.project_id,
                 incident_type=incident_type,
@@ -119,12 +127,12 @@ class IngestEventService:
         req_ratio = requests_60s / max(baseline_req_60s, 1.0)
         tok_ratio = tokens_60s / max(baseline_tok_60s, 1.0)
         max_ratio = max(req_ratio, tok_ratio)
-        if max_ratio < LOW_SEVERITY_RATIO:
+        if max_ratio < app_config.incident_severity_ratio_low:
             return
 
-        token_spike = tok_ratio >= LOW_SEVERITY_RATIO
-        request_spike = req_ratio >= LOW_SEVERITY_RATIO
-        incident_type = INCIDENT_TYPE_BURN_SPIKE if token_spike else INCIDENT_TYPE_REQUEST_SPIKE
+        token_spike = tok_ratio >= app_config.incident_severity_ratio_low
+        request_spike = req_ratio >= app_config.incident_severity_ratio_low
+        incident_type = app_config.incident_type_burn_spike if token_spike else app_config.incident_type_request_spike
         if not token_spike and not request_spike:
             return
 
@@ -158,11 +166,23 @@ class IngestEventService:
             created_after=dedup_after,
         )
         if open_incident is not None:
+            evidence = {**open_incident.evidence, **evidence}
             current_count = _int_evidence_value(open_incident.evidence.get("count"), default=1)
             existing_max_ratio = _float_evidence_value(open_incident.evidence.get("max_ratio_seen"), default=max_ratio)
             evidence["count"] = current_count + 1
             evidence["max_ratio_seen"] = max(existing_max_ratio, max_ratio)
-            updated_severity = _max_severity(severity, open_incident.severity)
+            updated_severity = open_incident.severity
+            escalation_payload = self._evaluate_incident_escalation(
+                project_id=event.project_id,
+                incident_type=incident_type,
+                current_severity=open_incident.severity,
+                max_ratio=max_ratio,
+                now=now,
+            )
+            evidence["escalation"] = escalation_payload["evidence"]
+            escalated_severity = escalation_payload["severity"]
+            if escalated_severity is not None:
+                updated_severity = escalated_severity
             self._incident_repository.update_open_incident_activity(
                 incident_id=open_incident.id,
                 evidence=evidence,
@@ -221,6 +241,90 @@ class IngestEventService:
             extra={"project_id": event.project_id, "incident_type": incident_type, "severity": severity},
         )
 
+    def _evaluate_incident_escalation(
+        self,
+        *,
+        project_id: str,
+        incident_type: str,
+        current_severity: str,
+        max_ratio: float,
+        now: datetime,
+    ) -> dict[str, object]:
+        # Evaluate severity escalation from repeated anomaly hits within configured windows.
+        hit_score = _score_for_escalation_ratio(max_ratio)
+        default_evidence = {
+            "hit_count_medium_window": 0,
+            "score_sum_medium_window": 0,
+            "window_medium_seconds": self._incident_escalation_window_medium_seconds,
+            "hit_count_high_window": 0,
+            "score_sum_high_window": 0,
+            "window_high_seconds": self._incident_escalation_window_high_seconds,
+            "last_hit_ratio": max_ratio,
+            "last_hit_score": hit_score,
+            "applied": "none",
+        }
+        if hit_score == 0 or current_severity == "high":
+            return {"severity": None, "evidence": default_evidence}
+
+        now_unix = int(now.timestamp())
+        prune_before = now_unix - max(
+            self._incident_escalation_window_medium_seconds,
+            self._incident_escalation_window_high_seconds,
+        )
+        hits = self._realtime_counters.record_incident_escalation_hit(
+            project_id=project_id,
+            incident_type=incident_type,
+            ts_unix=now_unix,
+            score=hit_score,
+            ratio=max_ratio,
+            prune_before_unix=prune_before,
+            ttl_seconds=self._incident_escalation_ttl_seconds,
+        )
+        medium_cutoff = now_unix - self._incident_escalation_window_medium_seconds
+        high_cutoff = now_unix - self._incident_escalation_window_high_seconds
+        medium_hits = [hit for hit in hits if int(hit.get("ts", 0)) >= medium_cutoff]
+        high_hits = [hit for hit in hits if int(hit.get("ts", 0)) >= high_cutoff]
+        hit_count_m = len(medium_hits)
+        score_sum_m = sum(int(hit.get("score", 0)) for hit in medium_hits)
+        hit_count_h = len(high_hits)
+        score_sum_h = sum(int(hit.get("score", 0)) for hit in high_hits)
+        max_score_h = max((int(hit.get("score", 0)) for hit in high_hits), default=0)
+
+        applied = "none"
+        next_severity: str | None = None
+        high_threshold_met = (
+            hit_count_h >= self._incident_escalation_min_hits_high
+            and score_sum_h >= self._incident_escalation_score_threshold_high
+        )
+        medium_threshold_met = (
+            hit_count_m >= self._incident_escalation_min_hits_medium
+            and score_sum_m >= self._incident_escalation_score_threshold_medium
+        )
+        if current_severity == "low":
+            if high_threshold_met and max_score_h >= app_config.incident_escalation_high_score_required:
+                next_severity = "high"
+                applied = "low_to_high"
+            elif medium_threshold_met:
+                next_severity = "medium"
+                applied = "low_to_medium"
+        elif current_severity == "medium":
+            if high_threshold_met:
+                next_severity = "high"
+                applied = "medium_to_high"
+
+        escalation_evidence = {
+            "hit_count_medium_window": hit_count_m,
+            "score_sum_medium_window": score_sum_m,
+            "window_medium_seconds": self._incident_escalation_window_medium_seconds,
+            "hit_count_high_window": hit_count_h,
+            "score_sum_high_window": score_sum_h,
+            "window_high_seconds": self._incident_escalation_window_high_seconds,
+            "last_hit_ratio": max_ratio,
+            "last_hit_score": hit_score,
+            "applied": applied,
+        }
+        return {"severity": next_severity, "evidence": escalation_evidence}
+
     def _enqueue_high_incident_webhook(
         self,
         *,
@@ -275,9 +379,9 @@ class IngestEventService:
 
 def _severity_for_ratio(max_ratio: float) -> str:
     # Map baseline ratio breach to incident severity.
-    if max_ratio >= HIGH_SEVERITY_RATIO:
+    if max_ratio >= app_config.incident_severity_ratio_high:
         return "high"
-    if max_ratio >= MEDIUM_SEVERITY_RATIO:
+    if max_ratio >= app_config.incident_severity_ratio_medium:
         return "medium"
     return "low"
 
@@ -286,6 +390,17 @@ def _max_severity(left: str, right: str) -> str:
     # Return the higher-priority severity.
     ordering = {"low": 1, "medium": 2, "high": 3}
     return left if ordering.get(left, 0) >= ordering.get(right, 0) else right
+
+
+def _score_for_escalation_ratio(max_ratio: float) -> int:
+    # Map incident ratio to escalation score buckets.
+    if max_ratio >= app_config.incident_escalation_score_ratio_high:
+        return 3
+    if max_ratio >= app_config.incident_escalation_score_ratio_medium:
+        return 2
+    if max_ratio >= app_config.incident_escalation_score_ratio_low:
+        return 1
+    return 0
 
 
 def _build_incident_fingerprint(

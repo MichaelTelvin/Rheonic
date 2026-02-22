@@ -129,7 +129,8 @@ describe("Dashboard", () => {
     mocks.fetchProjects.mockResolvedValue([{ id: "p1", name: "Demo", created_at: new Date().toISOString() }]);
     mocks.fetchMetrics.mockRejectedValue(new mocks.ApiError(403, "forbidden"));
     render(<Dashboard userEmail="user@example.com" onSignOut={vi.fn()} />);
-    expect(await screen.findByText("Metrics request was forbidden.")).toBeDefined();
+    const metricWarnings = await screen.findAllByText("Metrics request was forbidden.");
+    expect(metricWarnings).toHaveLength(2);
   });
 
   it("opens create-project modal and validates input", async () => {

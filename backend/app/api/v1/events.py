@@ -122,12 +122,13 @@ def ingest_event(
                 logger.warning("Idempotency Redis unavailable; processing ingest in fail-open mode")
 
         try:
-            window_epoch_minute = int(time.time()) // 60
+            rate_limit_window_seconds = max(int(settings.rate_limit_window_seconds), 1)
+            window_epoch_minute = int(time.time()) // rate_limit_window_seconds
             rate_limit_counter = redis_client.incr(_rate_limit_key(ingest_key=ingest_key, window_epoch_minute=window_epoch_minute))
             if rate_limit_counter == 1:
                 redis_client.expire(
                     _rate_limit_key(ingest_key=ingest_key, window_epoch_minute=window_epoch_minute),
-                    60,
+                    rate_limit_window_seconds,
                 )
             if rate_limit_counter > settings.ingest_rate_limit_per_minute:
                 raise HTTPException(status_code=429, detail="rate limit exceeded")

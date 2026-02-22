@@ -8,14 +8,10 @@ from inspect import signature
 from redis import Redis
 from rq_scheduler import Scheduler
 
-from app.config import Settings
+from app.config import Settings, app_config
 from app.logger import get_logger
 
 logger = get_logger(__name__)
-
-_DEFAULT_RESULT_TTL_SECONDS = 3600
-_DEFAULT_FAILURE_TTL_SECONDS = 86400
-_PURGE_INTERVAL_SECONDS = 24 * 60 * 60
 
 
 @dataclass(frozen=True)
@@ -31,8 +27,8 @@ def ensure_recurring_jobs(
     scheduler: Scheduler,
     jobs: list[RecurringJob],
     *,
-    result_ttl_seconds: int = _DEFAULT_RESULT_TTL_SECONDS,
-    failure_ttl_seconds: int = _DEFAULT_FAILURE_TTL_SECONDS,
+    result_ttl_seconds: int = app_config.scheduler_default_result_ttl_seconds,
+    failure_ttl_seconds: int = app_config.scheduler_default_failure_ttl_seconds,
 ) -> int:
     """Ensure recurring jobs exist exactly once, returning newly scheduled count."""
     try:
@@ -79,7 +75,7 @@ def main() -> None:
         RecurringJob(
             job_id="llmtbg_purge_old_events",
             func_path="app.infrastructure.jobs.purge_events_job.purge_old_events",
-            interval_seconds=_PURGE_INTERVAL_SECONDS,
+            interval_seconds=app_config.purge_interval_seconds,
         ),
     ]
     scheduled = ensure_recurring_jobs(scheduler=scheduler, jobs=jobs)

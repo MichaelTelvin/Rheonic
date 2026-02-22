@@ -9,4 +9,6 @@ export const sdkNodeConfig = {
   defaultProtectFailMode: "open",
   retryDelayMinMs: 200,
   retryDelayMaxMs: 400,
+  defaultTokenizerEncoding: "cl100k_base",
+  maxInputTokenEstimate: 50_000,
 } as const;

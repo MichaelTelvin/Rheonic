@@ -138,6 +138,8 @@ class FakeRealtimeCounterStore:
         self._snapshots = snapshots
         self._baselines = baselines
         self.increment_calls: list[tuple[str, int]] = []
+        self.escalation_hits: dict[str, list[dict[str, float | int]]] = {}
+        self.escalation_ttls: dict[str, int] = {}
 
     def increment_project_60s(self, project_id: str, total_tokens: int) -> None:
         self.increment_calls.append((project_id, total_tokens))
@@ -168,6 +170,25 @@ class FakeRealtimeCounterStore:
 
     def release_incident_lock(self, project_id: str, incident_type: str) -> None:
         _ = project_id, incident_type
+
+    def record_incident_escalation_hit(
+        self,
+        project_id: str,
+        incident_type: str,
+        ts_unix: int,
+        score: int,
+        ratio: float,
+        *,
+        prune_before_unix: int,
+        ttl_seconds: int,
+    ) -> list[dict[str, float | int]]:
+        key = f"{project_id}:{incident_type}"
+        hits = self.escalation_hits.get(key, [])
+        hits.append({"ts": ts_unix, "score": score, "ratio": ratio})
+        hits = [hit for hit in hits if int(hit["ts"]) >= prune_before_unix]
+        self.escalation_hits[key] = hits
+        self.escalation_ttls[key] = ttl_seconds
+        return hits
 
 
 class FakeIncidentRepository:
@@ -536,3 +557,207 @@ def test_incident_escalation_to_high_enqueues_once_without_duplicates() -> None:
     service.ingest(_build_event(project_id="p1"))  # remains high
 
     assert len(dispatcher.calls) == 1
+
+
+def test_escalation_two_mild_hits_stays_low() -> None:
+    # Two 4x hits inside medium window should keep LOW severity.
+    t0 = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=30)
+    t2 = t1 + timedelta(seconds=30)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(1, 40), (1, 40)],
+        baselines=[(1.0, 10.0), (1.0, 10.0)],
+    )
+    incidents = FakeIncidentRepository()
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        now_provider=_make_now_provider([t0, t1]),
+    )
+
+    service.ingest(_build_event(project_id="p1"))
+    service.ingest(_build_event(project_id="p1"))
+
+    assert len(incidents.incidents) == 1
+    assert incidents.incidents[0].severity == "low"
+
+
+def test_escalation_two_moderate_hits_raise_low_to_medium() -> None:
+    # After LOW opens, two 6x hits in medium window should escalate to MEDIUM.
+    t0 = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=30)
+    t2 = t1 + timedelta(seconds=30)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(1, 40), (1, 60), (1, 60)],
+        baselines=[(1.0, 10.0), (1.0, 10.0), (1.0, 10.0)],
+    )
+    incidents = FakeIncidentRepository()
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        now_provider=_make_now_provider([t0, t1, t2]),
+    )
+
+    service.ingest(_build_event(project_id="p1"))  # low
+    service.ingest(_build_event(project_id="p1"))  # 6x hit #1
+    service.ingest(_build_event(project_id="p1"))  # 6x hit #2
+
+    assert len(incidents.incidents) == 1
+    incident = incidents.incidents[0]
+    assert incident.severity == "medium"
+    assert incident.evidence["escalation"]["applied"] == "low_to_medium"
+
+
+def test_escalation_two_severe_hits_raise_low_to_high_with_guard() -> None:
+    # Two 10x hits in high window should escalate LOW->HIGH due to max-score guard.
+    t0 = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=30)
+    t2 = t1 + timedelta(seconds=30)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(1, 40), (1, 100), (1, 100)],
+        baselines=[(1.0, 10.0), (1.0, 10.0), (1.0, 10.0)],
+    )
+    incidents = FakeIncidentRepository()
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        now_provider=_make_now_provider([t0, t1, t2]),
+    )
+
+    service.ingest(_build_event(project_id="p1"))
+    service.ingest(_build_event(project_id="p1"))
+    service.ingest(_build_event(project_id="p1"))
+
+    incident = incidents.incidents[0]
+    assert incident.severity == "high"
+    assert incident.evidence["escalation"]["applied"] == "low_to_high"
+
+
+def test_escalation_two_six_x_hits_do_not_raise_to_high() -> None:
+    # Two 6x hits in high window should only reach MEDIUM, not HIGH.
+    t0 = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=30)
+    t2 = t1 + timedelta(seconds=30)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(1, 40), (1, 60), (1, 60)],
+        baselines=[(1.0, 10.0), (1.0, 10.0), (1.0, 10.0)],
+    )
+    incidents = FakeIncidentRepository()
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        now_provider=_make_now_provider([t0, t1, t2]),
+    )
+
+    service.ingest(_build_event(project_id="p1"))
+    service.ingest(_build_event(project_id="p1"))
+    service.ingest(_build_event(project_id="p1"))
+
+    incident = incidents.incidents[0]
+    assert incident.severity == "medium"
+    assert incident.evidence["escalation"]["applied"] == "low_to_medium"
+
+
+def test_escalation_medium_to_high_when_thresholds_met() -> None:
+    # MEDIUM incidents should escalate to HIGH when high-window score threshold is met.
+    t0 = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=30)
+    t2 = t1 + timedelta(seconds=30)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(1, 60), (1, 100), (1, 100)],
+        baselines=[(1.0, 10.0), (1.0, 10.0), (1.0, 10.0)],
+    )
+    incidents = FakeIncidentRepository()
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        now_provider=_make_now_provider([t0, t1, t2]),
+    )
+
+    service.ingest(_build_event(project_id="p1"))  # medium create
+    service.ingest(_build_event(project_id="p1"))  # high hit #1
+    service.ingest(_build_event(project_id="p1"))  # high hit #2
+
+    incident = incidents.incidents[0]
+    assert incident.severity == "high"
+    assert incident.evidence["escalation"]["applied"] == "medium_to_high"
+
+
+def test_escalation_does_not_create_new_row_during_updates() -> None:
+    # Escalation updates must mutate the same open incident row.
+    t0 = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=30)
+    t2 = t1 + timedelta(seconds=30)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(1, 40), (1, 100), (1, 100)],
+        baselines=[(1.0, 10.0), (1.0, 10.0), (1.0, 10.0)],
+    )
+    incidents = FakeIncidentRepository()
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        now_provider=_make_now_provider([t0, t1, t2]),
+    )
+
+    service.ingest(_build_event(project_id="p1"))
+    first_id = incidents.incidents[0].id
+    service.ingest(_build_event(project_id="p1"))
+    service.ingest(_build_event(project_id="p1"))
+
+    assert len(incidents.incidents) == 1
+    assert incidents.incidents[0].id == first_id
+
+
+def test_escalation_hits_ttl_and_prune_applied() -> None:
+    # Escalation hit history should apply TTL and prune stale entries.
+    t0 = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=10)
+    t2 = t1 + timedelta(seconds=10)
+    t3 = t0 + timedelta(seconds=400)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(1, 40), (1, 40), (1, 40), (1, 40)],
+        baselines=[(1.0, 10.0), (1.0, 10.0), (1.0, 10.0), (1.0, 10.0)],
+    )
+    incidents = FakeIncidentRepository()
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=1000,
+        now_provider=_make_now_provider([t0, t1, t2, t3]),
+    )
+
+    service.ingest(_build_event(project_id="p1"))  # create
+    service.ingest(_build_event(project_id="p1"))  # hit 1
+    service.ingest(_build_event(project_id="p1"))  # hit 2
+    service.ingest(_build_event(project_id="p1"))  # hit 3 + prune
+
+    key = "p1:burn_spike"
+    assert realtime.escalation_ttls[key] == 360
+    assert len(realtime.escalation_hits[key]) == 1

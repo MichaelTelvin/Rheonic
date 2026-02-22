@@ -39,7 +39,11 @@ class ProtectEngine:
         self._environment = environment
         self._request_timeout_s = request_timeout_s
         self._fail_mode = fail_mode if fail_mode in {"open", "closed"} else "open"
-        self._decision_timeout_ms = int(decision_timeout_ms) if decision_timeout_ms > 0 else 100
+        self._decision_timeout_ms = (
+            int(decision_timeout_ms)
+            if decision_timeout_ms > 0
+            else sdk_config.default_protect_decision_timeout_ms
+        )
         self._http_client = http_client
 
     def evaluate(self, context: dict[str, object]) -> dict[str, object]:
@@ -131,7 +135,7 @@ class ProtectEngine:
                         "Content-Type": "application/json",
                         "X-Project-Ingest-Key": self._ingest_key,
                     },
-                    timeout_s=max(self._request_timeout_s, 0.1),
+                    timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),
                 )
             except Exception:
                 return

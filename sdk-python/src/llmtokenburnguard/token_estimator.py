@@ -3,13 +3,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from llmtokenburnguard.config import sdk_config
+
 try:
     import tiktoken  # type: ignore[import-not-found]
 except Exception:  # pragma: no cover - import availability depends on environment
     tiktoken = None
 
 _ENCODER_CACHE: dict[str, Any] = {}
-_DEFAULT_ENCODING = "cl100k_base"
 
 
 def estimate_input_tokens(payload: dict[str, Any]) -> int | None:
@@ -57,7 +58,7 @@ def _extract_text(payload: dict[str, Any]) -> str | None:
 def _get_encoder(model: str | None) -> Any:
     if tiktoken is None:
         return None
-    key = model or _DEFAULT_ENCODING
+    key = model or sdk_config.default_tokenizer_encoding
     cached = _ENCODER_CACHE.get(key)
     if cached is not None:
         return cached
@@ -65,9 +66,9 @@ def _get_encoder(model: str | None) -> Any:
         try:
             encoder = tiktoken.encoding_for_model(model)
         except Exception:
-            encoder = tiktoken.get_encoding(_DEFAULT_ENCODING)
+            encoder = tiktoken.get_encoding(sdk_config.default_tokenizer_encoding)
     else:
-        encoder = tiktoken.get_encoding(_DEFAULT_ENCODING)
+        encoder = tiktoken.get_encoding(sdk_config.default_tokenizer_encoding)
     _ENCODER_CACHE[key] = encoder
     return encoder
 
@@ -75,4 +76,5 @@ def _get_encoder(model: str | None) -> Any:
 def _estimate_by_chars(text: str) -> int:
     if not text:
         return 0
-    return max(1, len(text) // 4 + (1 if len(text) % 4 else 0))
+    chars_per_token = max(int(sdk_config.token_estimate_chars_per_token), 1)
+    return max(1, len(text) // chars_per_token + (1 if len(text) % chars_per_token else 0))

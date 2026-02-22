@@ -516,6 +516,20 @@ select {
   font-size: 0.78rem;
 }
 
+.metric-card-warning {
+  margin: 8px 0 0;
+  min-height: 16px;
+  color: rgba(253, 164, 175, 0.85);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  text-align: left;
+  visibility: hidden;
+}
+
+.metric-card-warning.visible {
+  visibility: visible;
+}
+
 .protect-decisions-list {
   margin-top: 10px;
   display: grid;

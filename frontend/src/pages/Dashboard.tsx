@@ -33,8 +33,8 @@ import { frontendConfig } from "../config";
 import { formatNumber, formatRelative, formatTime } from "./dashboardUtils";
 
 type KeysModalView = "list" | "create" | "success";
-const NAME_REGEX = /^[A-Za-z0-9 _.-]+$/;
-const NAME_MAX = 80;
+const NAME_REGEX = new RegExp(frontendConfig.dashboardNamePattern);
+const NAME_MAX = frontendConfig.dashboardNameMaxLength;
 
 interface DashboardProps {
   userEmail?: string | null;
@@ -117,7 +117,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
   useEffect(() => {
     const interval = window.setInterval(() => {
       setClockTick((value) => value + 1);
-    }, 1000);
+    }, frontendConfig.dashboardClockTickMs);
 
     return () => {
       window.clearInterval(interval);
@@ -257,7 +257,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     void loadProtectStats();
     const interval = window.setInterval(() => {
       void loadProtectStats();
-    }, 2000);
+    }, frontendConfig.dashboardProtectStatsPollMs);
 
     return () => {
       cancelled = true;
@@ -372,7 +372,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     void loadMetrics();
     const interval = window.setInterval(() => {
       void loadMetrics();
-    }, 2000);
+    }, frontendConfig.dashboardMetricsPollMs);
 
     return () => {
       cancelled = true;
@@ -419,7 +419,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
     void loadIncidents();
     const interval = window.setInterval(() => {
       void loadIncidents();
-    }, 5000);
+    }, frontendConfig.dashboardIncidentsPollMs);
 
     return () => {
       cancelled = true;
@@ -554,7 +554,8 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
         protect_fail_mode: protectFailModeInput,
         protect_max_req_per_min,
         protect_max_tok_per_min,
-        protect_decision_timeout_ms: protectSettings?.protect_decision_timeout_ms ?? 100,
+        protect_decision_timeout_ms:
+          protectSettings?.protect_decision_timeout_ms ?? frontendConfig.protectDefaultDecisionTimeoutMs,
       });
       setProtectSettings(updated);
       setShowProtectModal(false);
@@ -586,7 +587,8 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
         protect_fail_mode: protectSettings.protect_fail_mode === "closed" ? "closed" : "open",
         protect_max_req_per_min: protectSettings.protect_max_req_per_min,
         protect_max_tok_per_min: protectSettings.protect_max_tok_per_min,
-        protect_decision_timeout_ms: protectSettings.protect_decision_timeout_ms ?? 100,
+        protect_decision_timeout_ms:
+          protectSettings.protect_decision_timeout_ms ?? frontendConfig.protectDefaultDecisionTimeoutMs,
       });
       setProtectSettings(updated);
       setProtectError(null);
@@ -871,7 +873,6 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
           </section>
 
           {projectWarning ? <p className="warning-text">{projectWarning}</p> : null}
-          {metricsWarning ? <p className="warning-text">{metricsWarning}</p> : null}
           {incidentsWarning ? <p className="warning-text">{incidentsWarning}</p> : null}
           {globalBanner ? <section className="banner">{globalBanner}</section> : null}
           {!projectId ? (
@@ -900,6 +901,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                     <span className="metric-subtitle">Last 60 seconds</span>
                   </div>
                   <Sparkline values={requestsSeries} stroke="var(--req)" />
+                  <p className={`metric-card-warning ${metricsWarning ? "visible" : ""}`}>{metricsWarning ?? ""}</p>
                 </Card>
 
                 <Card>
@@ -909,6 +911,7 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
                     <span className="metric-subtitle">Last 60 seconds</span>
                   </div>
                   <Sparkline values={tokensSeries} stroke="var(--accent)" />
+                  <p className={`metric-card-warning ${metricsWarning ? "visible" : ""}`}>{metricsWarning ?? ""}</p>
                 </Card>
 
                 <Card>

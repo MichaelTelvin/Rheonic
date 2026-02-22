@@ -127,6 +127,13 @@ def get_ingest_event_service() -> IngestEventService:
             incident_severity_cache=get_incident_severity_cache(),
             baseline_window_count=get_settings().baseline_window_count,
             incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
+            incident_escalation_window_medium_seconds=get_settings().incident_escalation_window_medium_seconds,
+            incident_escalation_window_high_seconds=get_settings().incident_escalation_window_high_seconds,
+            incident_escalation_min_hits_medium=get_settings().incident_escalation_min_hits_medium,
+            incident_escalation_min_hits_high=get_settings().incident_escalation_min_hits_high,
+            incident_escalation_score_threshold_medium=get_settings().incident_escalation_score_threshold_medium,
+            incident_escalation_score_threshold_high=get_settings().incident_escalation_score_threshold_high,
+            incident_escalation_ttl_seconds=get_settings().incident_escalation_ttl_seconds,
             webhook_dispatcher=get_webhook_dispatcher(),
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )

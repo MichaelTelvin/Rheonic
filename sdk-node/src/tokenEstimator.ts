@@ -1,8 +1,7 @@
 import { encoding_for_model, get_encoding, type Tiktoken } from "@dqbd/tiktoken";
+import { sdkNodeConfig } from "./config.js";
 
 const encoderCache = new Map<string, Tiktoken>();
-const DEFAULT_ENCODING = "cl100k_base";
-const MAX_INPUT_TOKEN_ESTIMATE = 50_000;
 
 export function estimateInputTokensFromRequest(payload: unknown): number | null {
   if (!payload || typeof payload !== "object") {
@@ -17,7 +16,7 @@ export function estimateInputTokensFromRequest(payload: unknown): number | null 
   try {
     const encoder = getEncoder(typeof request.model === "string" ? request.model : null);
     const encodedLength = encoder.encode(text).length;
-    return Math.min(MAX_INPUT_TOKEN_ESTIMATE, encodedLength);
+    return Math.min(sdkNodeConfig.maxInputTokenEstimate, encodedLength);
   } catch {
     return null;
   }
@@ -40,7 +39,7 @@ function extractTextForEstimation(request: { messages?: unknown; prompt?: unknow
 }
 
 function getEncoder(model: string | null): Tiktoken {
-  const cacheKey = model ?? DEFAULT_ENCODING;
+  const cacheKey = model ?? sdkNodeConfig.defaultTokenizerEncoding;
   const cached = encoderCache.get(cacheKey);
   if (cached) {
     return cached;
@@ -51,10 +50,10 @@ function getEncoder(model: string | null): Tiktoken {
     try {
       encoder = encoding_for_model(model as Parameters<typeof encoding_for_model>[0]);
     } catch {
-      encoder = get_encoding(DEFAULT_ENCODING);
+      encoder = get_encoding(sdkNodeConfig.defaultTokenizerEncoding);
     }
   } else {
-    encoder = get_encoding(DEFAULT_ENCODING);
+    encoder = get_encoding(sdkNodeConfig.defaultTokenizerEncoding);
   }
 
   encoderCache.set(cacheKey, encoder);

@@ -7,12 +7,11 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+from app.config import app_config
 from app.infrastructure.redis.redis_client import RedisClient
 from app.logger import get_logger
 
 logger = get_logger(__name__)
-
-_COUNTER_TTL_SECONDS = 3600
 
 
 def _warn_key(project_id: str) -> str:
@@ -57,7 +56,7 @@ class ProtectActionStore:
                 self._increment_with_ttl(_block_key(project_id))
 
             payload = {"decision": decision, "reason": reason, "ts": timestamp}
-            self._redis_client.set(_last_key(project_id), json.dumps(payload), ex=_COUNTER_TTL_SECONDS)
+            self._redis_client.set(_last_key(project_id), json.dumps(payload), ex=app_config.protect_action_counter_ttl_seconds)
         except Exception:
             logger.warning("Failed recording protect decision counters", extra={"project_id": project_id})
 
@@ -102,13 +101,13 @@ class ProtectActionStore:
         # Record preflight latency samples and timeout counters over a 60-minute window.
         try:
             now_ms = int((ts or datetime.now(timezone.utc)).timestamp() * 1000)
-            cutoff_ms = now_ms - (_COUNTER_TTL_SECONDS * 1000)
+            cutoff_ms = now_ms - (app_config.protect_action_counter_ttl_seconds * 1000)
             normalized_latency = max(int(latency_ms), 0)
             member = f"{now_ms}:{uuid4().hex[:8]}:{normalized_latency}"
             latency_key = _latency_key(project_id)
             self._redis_client.zadd(latency_key, {member: now_ms})
             self._redis_client.zremrangebyscore(latency_key, 0, cutoff_ms)
-            self._redis_client.expire(latency_key, _COUNTER_TTL_SECONDS)
+            self._redis_client.expire(latency_key, app_config.protect_action_counter_ttl_seconds)
             if timed_out:
                 self._increment_with_ttl(_timeout_key(project_id))
         except Exception:
@@ -118,7 +117,7 @@ class ProtectActionStore:
         # Read 60-minute preflight latency percentiles and timeout counter.
         try:
             now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-            cutoff_ms = now_ms - (_COUNTER_TTL_SECONDS * 1000)
+            cutoff_ms = now_ms - (app_config.protect_action_counter_ttl_seconds * 1000)
             latency_key = _latency_key(project_id)
             self._redis_client.zremrangebyscore(latency_key, 0, cutoff_ms)
             latency_members = self._redis_client.zrangebyscore(latency_key, cutoff_ms, float("inf"))
@@ -135,7 +134,7 @@ class ProtectActionStore:
     def _increment_with_ttl(self, key: str) -> None:
         value = self._redis_client.incr(key)
         if value == 1:
-            self._redis_client.expire(key, _COUNTER_TTL_SECONDS)
+            self._redis_client.expire(key, app_config.protect_action_counter_ttl_seconds)
 
     def _read_int(self, key: str) -> int:
         raw = self._redis_client.get(key)

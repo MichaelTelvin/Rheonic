@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.services.ingest_key_service import IngestKeyService
+from app.config import app_config
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.logger import get_logger
@@ -61,7 +62,7 @@ class ProtectService:
         max_tok = project.protect_max_tok_per_min
         fail_mode = project.protect_fail_mode
         decision_timeout_ms = project.protect_decision_timeout_ms
-        near_cap_threshold = float(max_tok) * 0.8 if max_tok is not None else None
+        near_cap_threshold = float(max_tok) * app_config.protect_near_cap_factor if max_tok is not None else None
         estimated_next_tokens: int | None = None
         if isinstance(ctx.input_tokens_estimate, int):
             input_estimate = max(ctx.input_tokens_estimate, 0)
