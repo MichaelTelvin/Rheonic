@@ -16,6 +16,7 @@ interface ProtectDecisionResponse {
   reason?: unknown;
   fail_mode?: unknown;
   protect_decision_timeout_ms?: unknown;
+  blocked_until?: unknown;
 }
 
 export interface ProtectEvaluation {
@@ -40,6 +41,8 @@ export class ProtectEngine {
   private readonly fallbackRequestTimeoutMs: number;
   private failMode: ProtectFailMode;
   private decisionTimeoutMs: number;
+  private cooldownUntilMs: number | null;
+  private cooldownReason: string | null;
 
   public constructor(params: {
     baseUrl: string;
@@ -55,9 +58,16 @@ export class ProtectEngine {
     this.fallbackRequestTimeoutMs = params.fallbackRequestTimeoutMs;
     this.failMode = params.initialFailMode;
     this.decisionTimeoutMs = params.initialDecisionTimeoutMs;
+    this.cooldownUntilMs = null;
+    this.cooldownReason = null;
   }
 
   public async evaluate(context: ProtectContext): Promise<ProtectEvaluation> {
+    const nowMs = Date.now();
+    if (this.cooldownUntilMs !== null && nowMs < this.cooldownUntilMs) {
+      return { decision: "block", reason: this.cooldownReason ?? "cooldown_active" };
+    }
+
     const fetchFn = await resolveFetch();
     if (!fetchFn) {
       return this.failMode === "closed"
@@ -100,6 +110,14 @@ export class ProtectEngine {
       if (Number.isFinite(decisionTimeout) && decisionTimeout > 0) {
         this.decisionTimeoutMs = decisionTimeout;
       }
+      const blockedUntilMs = parseBlockedUntilMs(parsed.blocked_until);
+      if (blockedUntilMs !== null && blockedUntilMs > Date.now()) {
+        this.cooldownUntilMs = blockedUntilMs;
+        this.cooldownReason = "cooldown_active";
+      } else if (this.cooldownUntilMs !== null && Date.now() >= this.cooldownUntilMs) {
+        this.cooldownUntilMs = null;
+        this.cooldownReason = null;
+      }
       return { decision, reason };
     } catch (error) {
       clearTimeout(timeout);
@@ -126,6 +144,17 @@ export class ProtectEngine {
       // Swallow timeout reporting errors; protect evaluation must never throw here.
     }
   }
+}
+
+function parseBlockedUntilMs(value: unknown): number | null {
+  if (typeof value !== "string" || !value) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
 }
 
 function parseDecision(value: unknown): ProtectDecision {

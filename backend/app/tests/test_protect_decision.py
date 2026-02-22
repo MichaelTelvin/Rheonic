@@ -1,5 +1,6 @@
 # API tests for protect preflight decision endpoint.
 from datetime import datetime, timezone
+from typing import Callable
 
 from fastapi.testclient import TestClient
 
@@ -102,7 +103,12 @@ def _cleanup_overrides() -> None:
     app.dependency_overrides.clear()
 
 
-def _make_client(tmp_path) -> tuple[TestClient, RollingWindow, IncidentSeverityCache]:
+def _make_client(
+    tmp_path,
+    *,
+    now_provider: Callable[[], datetime] | None = None,
+    cooldown_seconds: int = 60,
+) -> tuple[TestClient, RollingWindow, IncidentSeverityCache]:
     db_url = f"sqlite:///{tmp_path}/protect_decision.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)
@@ -122,6 +128,8 @@ def _make_client(tmp_path) -> tuple[TestClient, RollingWindow, IncidentSeverityC
         realtime_counters=rolling_window,
         incident_severity_cache=incident_severity_cache,
         protect_action_store=protect_action_store,
+        protect_block_cooldown_seconds=cooldown_seconds,
+        now_provider=now_provider,
     )
     metrics_service = MetricsService(
         realtime_counters=rolling_window,
@@ -187,6 +195,11 @@ def _decision(client: TestClient, ingest_key: str, body: dict[str, object] | Non
     return response.json()
 
 
+def _set_cooldown_key(rolling_window: RollingWindow, project_id: str, blocked_until_ms: int, ttl_seconds: int) -> None:
+    client = getattr(rolling_window, "_client")
+    client.set(f"protect:cooldown:{project_id}", str(blocked_until_ms), ex=ttl_seconds)
+
+
 def test_protect_disabled_returns_allow(tmp_path) -> None:
     client, _, severity_cache = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Disabled")
@@ -218,6 +231,66 @@ def test_tok_limit_exceeded_blocks(tmp_path) -> None:
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "block"
     assert decision["reason"] == "tok_limit"
+    _cleanup_overrides()
+
+
+def test_block_decision_includes_cooldown_fields(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path, cooldown_seconds=60)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Cooldown Fields")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_req_per_min=1)
+    rolling_window.increment_project_60s(project_id=project_id, total_tokens=10)
+    decision = _decision(client, ingest_key)
+    assert decision["decision"] == "block"
+    assert decision["reason"] == "req_limit"
+    assert isinstance(decision["retry_after_seconds"], int)
+    assert decision["retry_after_seconds"] > 0
+    assert isinstance(decision["blocked_until"], str)
+    _cleanup_overrides()
+
+
+def test_cooldown_active_blocks_with_decreasing_retry(tmp_path) -> None:
+    now_holder = {"value": datetime(2026, 2, 22, 12, 0, 0, tzinfo=timezone.utc)}
+    client, rolling_window, _ = _make_client(
+        tmp_path,
+        now_provider=lambda: now_holder["value"],
+        cooldown_seconds=60,
+    )
+    project_id, ingest_key = _create_project_and_key(client, "Protect Cooldown Active")
+    _set_protect(client, project_id, protect_enabled=True)
+
+    blocked_until_ms = int(now_holder["value"].timestamp() * 1000) + 60_000
+    _set_cooldown_key(rolling_window, project_id, blocked_until_ms, ttl_seconds=60)
+
+    first = _decision(client, ingest_key)
+    assert first["decision"] == "block"
+    assert first["reason"] == "cooldown_active"
+    first_retry = int(first["retry_after_seconds"])
+    now_holder["value"] = now_holder["value"].replace(second=20)
+    second = _decision(client, ingest_key)
+    assert second["decision"] == "block"
+    assert second["reason"] == "cooldown_active"
+    assert int(second["retry_after_seconds"]) < first_retry
+    _cleanup_overrides()
+
+
+def test_cooldown_expires_then_decision_resumes(tmp_path) -> None:
+    now_holder = {"value": datetime(2026, 2, 22, 12, 0, 0, tzinfo=timezone.utc)}
+    client, rolling_window, _ = _make_client(
+        tmp_path,
+        now_provider=lambda: now_holder["value"],
+        cooldown_seconds=1,
+    )
+    project_id, ingest_key = _create_project_and_key(client, "Protect Cooldown Expire")
+    _set_protect(client, project_id, protect_enabled=True)
+
+    blocked_until_ms = int(now_holder["value"].timestamp() * 1000) + 1000
+    _set_cooldown_key(rolling_window, project_id, blocked_until_ms, ttl_seconds=1)
+    active = _decision(client, ingest_key)
+    assert active["reason"] == "cooldown_active"
+    now_holder["value"] = now_holder["value"].replace(second=2)
+    resumed = _decision(client, ingest_key)
+    assert resumed["decision"] == "allow"
+    assert resumed["reason"] == "ok"
     _cleanup_overrides()
 
 

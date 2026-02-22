@@ -1,5 +1,7 @@
 # Protect mode preflight decision engine.
 import sys
+import time
+from datetime import datetime, timezone
 from typing import Any
 
 from llmtokenburnguard.config import sdk_config
@@ -45,9 +47,15 @@ class ProtectEngine:
             else sdk_config.default_protect_decision_timeout_ms
         )
         self._http_client = http_client
+        self._cooldown_until_ms: int | None = None
+        self._cooldown_reason: str | None = None
 
     def evaluate(self, context: dict[str, object]) -> dict[str, object]:
         # Return allow/warn/block decision from backend with fail-mode fallback.
+        now_ms = int(time.time() * 1000)
+        if self._cooldown_until_ms is not None and now_ms < self._cooldown_until_ms:
+            return {"decision": "block", "reason": self._cooldown_reason or "cooldown_active"}
+
         timeout_s = max(self._decision_timeout_ms, 1) / 1000.0
         try:
             
@@ -73,6 +81,13 @@ class ProtectEngine:
             decision_timeout = payload.get("protect_decision_timeout_ms")
             if isinstance(decision_timeout, int) and decision_timeout > 0:
                 self._decision_timeout_ms = decision_timeout
+            blocked_until_ms = _parse_blocked_until_ms(payload.get("blocked_until"))
+            if blocked_until_ms is not None and blocked_until_ms > int(time.time() * 1000):
+                self._cooldown_until_ms = blocked_until_ms
+                self._cooldown_reason = "cooldown_active"
+            elif self._cooldown_until_ms is not None and int(time.time() * 1000) >= self._cooldown_until_ms:
+                self._cooldown_until_ms = None
+                self._cooldown_reason = None
             if decision not in {"allow", "warn", "block"}:
                 decision = "allow"
             return {"decision": decision, "reason": reason}
@@ -143,3 +158,17 @@ class ProtectEngine:
         import threading
 
         threading.Thread(target=_send, daemon=True).start()
+
+
+def _parse_blocked_until_ms(value: object) -> int | None:
+    # Parse blocked-until timestamp from decision payload.
+    if not isinstance(value, str) or not value:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return int(parsed.timestamp() * 1000)

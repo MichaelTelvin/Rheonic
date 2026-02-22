@@ -209,6 +209,7 @@ def get_protect_service() -> ProtectService:
             realtime_counters=get_rolling_window(),
             incident_severity_cache=get_incident_severity_cache(),
             protect_action_store=get_protect_action_store(),
+            protect_block_cooldown_seconds=get_settings().protect_block_cooldown_seconds,
         )
     except Exception:
         logger.exception("Failed to construct protect service")

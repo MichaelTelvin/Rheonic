@@ -209,6 +209,7 @@ def test_protect_decision_ignores_auto_resolved_incidents(tmp_path) -> None:
         realtime_counters=RollingWindow(client=redis_client, now_ms_provider=lambda: int(now.timestamp() * 1000)),
         incident_severity_cache=severity_cache,
         protect_action_store=ProtectActionStore(redis_client=redis_client),  # type: ignore[arg-type]
+        protect_block_cooldown_seconds=60,
     )
     _, decision = protect_service.evaluate_decision(ingest_key=plaintext_ingest_key)
     assert decision is not None

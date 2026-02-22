@@ -113,6 +113,26 @@ class ProtectActionStore:
         except Exception:
             logger.warning("Failed recording protect health counters", extra={"project_id": project_id})
 
+    def set_block_cooldown(self, project_id: str, blocked_until_ms: int, cooldown_seconds: int) -> None:
+        # Persist project-level protect cooldown window in Redis.
+        try:
+            self._redis_client.set(f"protect:cooldown:{project_id}", str(int(blocked_until_ms)), ex=max(int(cooldown_seconds), 1))
+        except Exception:
+            logger.warning("Failed setting protect cooldown", extra={"project_id": project_id})
+
+    def get_block_cooldown_until_ms(self, project_id: str) -> int | None:
+        # Read active project-level protect cooldown expiry in epoch milliseconds.
+        try:
+            raw = self._redis_client.get(f"protect:cooldown:{project_id}")
+            if raw is None:
+                return None
+            value = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+            parsed = int(value)
+            return parsed if parsed > 0 else None
+        except Exception:
+            logger.warning("Failed reading protect cooldown", extra={"project_id": project_id})
+            return None
+
     def get_health(self, project_id: str) -> dict[str, Any]:
         # Read 60-minute preflight latency percentiles and timeout counter.
         try:

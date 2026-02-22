@@ -38,6 +38,8 @@ class ProtectDecisionOut(BaseModel):
     reason: str
     fail_mode: str
     protect_decision_timeout_ms: int
+    retry_after_seconds: int | None = None
+    blocked_until: str | None = None
     snapshot: dict[str, int | str | bool | None | dict[str, int | bool | None]]
 
 
@@ -94,6 +96,8 @@ def protect_decision(
             reason=decision.reason,
             fail_mode=decision.fail_mode,
             protect_decision_timeout_ms=decision.decision_timeout_ms,
+            retry_after_seconds=decision.retry_after_seconds,
+            blocked_until=decision.blocked_until,
             snapshot=decision.snapshot,
         )
     except HTTPException:

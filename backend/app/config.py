@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     incident_auto_close_seconds: int = 300
     auto_close_run_interval_seconds: int = 60
     event_retention_days: int = 30
+    protect_block_cooldown_seconds: int = 60
     webhook_allow_private_hosts: bool = False
     webhook_secret_encryption_key: str = ""
 

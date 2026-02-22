@@ -1,4 +1,6 @@
 # Tests for always-on protect preflight behavior in OpenAI instrumentation.
+from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor
 import time
 from typing import Any
 
@@ -101,6 +103,77 @@ def test_preflight_block_prevents_provider_call() -> None:
 
     with pytest.raises(LLMTBGBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
+    assert calls == []
+    client.close()
+
+
+def test_blocked_until_short_circuits_subsequent_decision_calls_locally() -> None:
+    blocked_until = datetime.now(timezone.utc).timestamp() + 60
+    transport = FakeHttpClient(  # type: ignore[arg-type]
+        {
+            "decision": "block",
+            "reason": "req_limit",
+            "fail_mode": "open",
+            "protect_decision_timeout_ms": 100,
+            "blocked_until": datetime.fromtimestamp(blocked_until, tz=timezone.utc).isoformat(),
+        }
+    )
+    client = Client(
+        ingest_key="p1",
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    openai_client, calls = _make_openai_stub()
+    instrument_openai(openai_client, client=client)
+
+    with pytest.raises(LLMTBGBlockedError):
+        openai_client.chat.completions.create(model="gpt-4o-mini")
+    with pytest.raises(LLMTBGBlockedError):
+        openai_client.chat.completions.create(model="gpt-4o-mini")
+    decision_calls = [url for url in transport.calls if url.endswith("/api/v1/protect/decision")]
+    assert len(decision_calls) == 1
+    assert calls == []
+    client.close()
+
+
+def test_parallel_calls_during_active_cooldown_block_locally_without_backend_decision_calls() -> None:
+    blocked_until = datetime.now(timezone.utc).timestamp() + 60
+    transport = FakeHttpClient(  # type: ignore[arg-type]
+        {
+            "decision": "block",
+            "reason": "req_limit",
+            "fail_mode": "open",
+            "protect_decision_timeout_ms": 100,
+            "blocked_until": datetime.fromtimestamp(blocked_until, tz=timezone.utc).isoformat(),
+        }
+    )
+    client = Client(
+        ingest_key="p1",
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    openai_client, calls = _make_openai_stub()
+    instrument_openai(openai_client, client=client)
+
+    # Prime cooldown from backend once.
+    with pytest.raises(LLMTBGBlockedError):
+        openai_client.chat.completions.create(model="gpt-4o-mini")
+    decision_calls_before = len([url for url in transport.calls if url.endswith("/api/v1/protect/decision")])
+    assert decision_calls_before == 1
+
+    def _invoke() -> None:
+        with pytest.raises(LLMTBGBlockedError):
+            openai_client.chat.completions.create(model="gpt-4o-mini")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(_invoke), pool.submit(_invoke)]
+        for future in futures:
+            future.result()
+
+    decision_calls_after = len([url for url in transport.calls if url.endswith("/api/v1/protect/decision")])
+    assert decision_calls_after == 1
     assert calls == []
     client.close()
 

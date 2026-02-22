@@ -45,6 +45,85 @@ test("decision block prevents provider call", async () => {
   }
 });
 
+test("blocked_until short-circuits subsequent decision calls locally", async () => {
+  const originalFetch = globalThis.fetch;
+  let decisionCalls = 0;
+  const blockedUntil = new Date(Date.now() + 60_000).toISOString();
+  globalThis.fetch = (async (url: string) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      decisionCalls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          decision: "block",
+          reason: "req_limit",
+          fail_mode: "open",
+          protect_decision_timeout_ms: 100,
+          blocked_until: blockedUntil,
+        }),
+      } as Response;
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { openai } = makeOpenAIStub();
+    instrumentOpenAI(openai, { client });
+    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
+    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
+    assert.equal(decisionCalls, 1);
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("parallel calls during active cooldown block locally without backend decision calls", async () => {
+  const originalFetch = globalThis.fetch;
+  let decisionCalls = 0;
+  const blockedUntil = new Date(Date.now() + 60_000).toISOString();
+  globalThis.fetch = (async (url: string) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      decisionCalls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          decision: "block",
+          reason: "req_limit",
+          fail_mode: "open",
+          protect_decision_timeout_ms: 100,
+          blocked_until: blockedUntil,
+        }),
+      } as Response;
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { openai } = makeOpenAIStub();
+    instrumentOpenAI(openai, { client });
+
+    // Prime cooldown from backend once.
+    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
+    assert.equal(decisionCalls, 1);
+
+    // During active cooldown, both concurrent calls should short-circuit locally.
+    const first = openai.chat.completions.create({ model: "gpt-4o-mini" });
+    const second = openai.chat.completions.create({ model: "gpt-4o-mini" });
+    const results = await Promise.allSettled([first, second]);
+    assert.equal(results[0].status, "rejected");
+    assert.equal(results[1].status, "rejected");
+    assert.equal(decisionCalls, 1);
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("predictive_near_cap warn allows provider call", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () =>
