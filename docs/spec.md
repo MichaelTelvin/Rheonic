@@ -259,6 +259,14 @@ Notes:
 ### 6.2 Authoritative cost reconciliation (preferred)
 Where available, we periodically pull authoritative usage/cost from provider reporting APIs and reconcile against estimates.
 
+## 7) Architecture diagrams
+- Generated diagrams live at:
+  - `docs/architecture/incident_flow.svg`
+  - `docs/architecture/protect_decision_flow.svg`
+- Regenerate with: `make diagrams`
+- Verify generated artifacts with: `make diagrams-check`
+- Generation requires Graphviz (`dot`); the Make target runs it inside Docker.
+
 Stored fields (per project, per interval):
 - authoritative_cost_usd
 - authoritative_source (provider_api | billing_export)

@@ -373,6 +373,29 @@ body {
   width: 100%;
 }
 
+.architecture-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -4px;
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  color: rgba(229, 231, 235, 0.56);
+}
+
+.architecture-links-label {
+  color: rgba(229, 231, 235, 0.5);
+}
+
+.architecture-links a {
+  color: rgba(148, 163, 184, 0.92);
+  text-decoration: none;
+}
+
+.architecture-links a:hover {
+  text-decoration: underline;
+}
+
 .protection-toggle-btn {
   color: #ececff;
   border-color: rgba(167, 139, 250, 0.5);
@@ -1038,6 +1061,11 @@ pre {
     margin-left: 0;
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .architecture-links {
+    flex-wrap: wrap;
+    margin-top: 0;
   }
 
   .metrics-grid {

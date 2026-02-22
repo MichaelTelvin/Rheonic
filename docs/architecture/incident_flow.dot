@@ -1,0 +1,27 @@
+digraph IncidentFlow {
+  rankdir=LR;
+  splines=ortho;
+  nodesep=0.55;
+  ranksep=0.8;
+  graph [fontname="Helvetica", fontsize=10, bgcolor="transparent"];
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, color="#3a4d73", fillcolor="#13203a", fontcolor="#e4ebfb"];
+  edge [color="#6f86b3", penwidth=1.1, arrowsize=0.8];
+
+  ingest [label="POST /api/v1/events\nPersist event + update rolling 60s"];
+  baseline [label="Baseline update gate\nIf matching OPEN incident exists\n=> baseline frozen"];
+  detect [label="Anomaly compare\nreq_ratio/tok_ratio vs baseline\nlow>=2.0\nmedium>=5.0\nhigh>=10.0"];
+  dedup [label="Dedup window\nincident_dedup_window_seconds=300\nOpen+fingerprint hit => update evidence/count"];
+  create [label="Create incident\nstatus=open\nseverity from ratio"];
+  escalate [label="Escalation (open only)\nlow->medium/high or medium->high\nwm=300s\nwh=120s\nmin_hits_m=2, min_hits_h=2\nscore_m>=4, score_h>=6\n10x guard score=3"];
+  keep_open [label="Incident remains open\nlast_seen_at refreshed", fillcolor="#172946", color="#4d6f9b"];
+  auto_close [label="Auto-close worker\nstatus=open and last_seen_at older than\nINCIDENT_AUTO_CLOSE_SECONDS=300\n=> status=auto_resolved", fillcolor="#1f2a44", color="#5f78a3"];
+  resolved [label="Statuses\nopen -> auto_resolved\n(or manually resolved)", fillcolor="#20304f", color="#607ba8"];
+
+  ingest -> baseline -> detect -> dedup;
+  dedup -> create [label="no open match"];
+  dedup -> escalate [label="open match"];
+  create -> keep_open;
+  escalate -> keep_open;
+  keep_open -> auto_close;
+  auto_close -> resolved;
+}

@@ -871,6 +871,16 @@ export function Dashboard({ userEmail = null, onSignOut }: DashboardProps): JSX.
               </button>
             </div>
           </section>
+          <div className="architecture-links" aria-label="Architecture diagrams">
+            <span className="architecture-links-label">Architecture diagrams:</span>
+            <a href="/architecture/incident_flow.svg" target="_blank" rel="noreferrer">
+              Incident flow
+            </a>
+            <span aria-hidden="true">·</span>
+            <a href="/architecture/protect_decision_flow.svg" target="_blank" rel="noreferrer">
+              Protect decision flow
+            </a>
+          </div>
 
           {projectWarning ? <p className="warning-text">{projectWarning}</p> : null}
           {incidentsWarning ? <p className="warning-text">{incidentsWarning}</p> : null}

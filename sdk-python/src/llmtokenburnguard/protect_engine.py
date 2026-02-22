@@ -71,17 +71,22 @@ class ProtectEngine:
             status_code = int(getattr(response, "status_code", 0))
             if status_code < 200 or status_code >= 300:
                 return self._fallback_decision()
+            
             payload = self._parse_json_payload(response)
             
             decision = str(payload.get("decision") or "allow")
             reason = str(payload.get("reason") or "ok")
             fail_mode = str(payload.get("fail_mode") or self._fail_mode)
+            
             if fail_mode in {"open", "closed"}:
                 self._fail_mode = fail_mode
+            
             decision_timeout = payload.get("protect_decision_timeout_ms")
+            
             if isinstance(decision_timeout, int) and decision_timeout > 0:
                 self._decision_timeout_ms = decision_timeout
             blocked_until_ms = _parse_blocked_until_ms(payload.get("blocked_until"))
+            
             if blocked_until_ms is not None and blocked_until_ms > int(time.time() * 1000):
                 self._cooldown_until_ms = blocked_until_ms
                 self._cooldown_reason = "cooldown_active"

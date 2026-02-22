@@ -1,4 +1,4 @@
-.PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e up-deps up-dev down-dev up-test down-test backend frontend sdk-node sdk-python e2e
+.PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e up-deps up-dev down-dev up-test down-test backend frontend sdk-node sdk-python e2e diagrams diagrams-check
 
 up-deps:
 	@docker compose up -d postgres redis
@@ -28,7 +28,7 @@ test-e2e:
 
 test-backend:
 	@echo "Running isolated backend tests with project llmtbg_test using docker-compose.test.yml"
-	@bash -lc "set -euo pipefail; trap 'docker compose -p llmtbg_test -f docker-compose.test.yml down -v >/dev/null 2>&1 || true' EXIT; docker compose -p llmtbg_test -f docker-compose.test.yml up -d postgres_test redis_test backend_test >/dev/null; docker compose -p llmtbg_test -f docker-compose.test.yml run --rm backend_test pytest -v 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{if (/^[^ ]+::[^ ]+/) sub(/^([^ ]+::[^ ]+)/, \"\\033[36m&\\033[0m\"); gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); gsub(/FAILED/, \"\\033[31mFAILED\\033[0m\"); gsub(/ERROR/, \"\\033[31mERROR\\033[0m\"); print}'"
+	@bash -lc "set -euo pipefail; trap 'docker compose -p llmtbg_test -f docker-compose.test.yml down -v >/dev/null 2>&1 || true' EXIT; docker compose -p llmtbg_test -f docker-compose.test.yml up -d postgres_test redis_test backend_test >/dev/null; docker compose -p llmtbg_test -f docker-compose.test.yml run --rm -v \"$$(pwd):/workspace\" backend_test pytest -v 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{if (/^[^ ]+::[^ ]+/) sub(/^([^ ]+::[^ ]+)/, \"\\033[36m&\\033[0m\"); gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); gsub(/FAILED/, \"\\033[31mFAILED\\033[0m\"); gsub(/ERROR/, \"\\033[31mERROR\\033[0m\"); print}'"
 
 test-sdk-node:
 	@bash -lc "set -o pipefail; docker compose run --rm sdk_node 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{if (/^✔ /) sub(/^.*$$/, \"\\033[36m&\\033[0m\"); if (/^ℹ pass /) sub(/pass/, \"\\033[32mpass\\033[0m\"); if (/^ℹ fail /) sub(/fail/, \"\\033[31mfail\\033[0m\"); print}'"
@@ -48,3 +48,10 @@ sdk-node: test-sdk-node
 sdk-python: test-sdk-python
 
 e2e: test-e2e
+
+diagrams:
+	@docker compose run --rm -v "$$(pwd):/workspace" backend sh -lc "apt-get update >/dev/null && apt-get install -y --no-install-recommends graphviz >/dev/null && PYTHONPATH=/app python /workspace/scripts/generate_arch_diagrams.py"
+
+diagrams-check:
+	@test -s docs/architecture/incident_flow.svg
+	@test -s docs/architecture/protect_decision_flow.svg
