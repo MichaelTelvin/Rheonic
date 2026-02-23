@@ -1,4 +1,4 @@
-# Tests for always-on protect preflight behavior in OpenAI instrumentation.
+# Tests for protect preflight behavior in OpenAI instrumentation.
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 import time
@@ -84,9 +84,74 @@ def _make_openai_stub() -> tuple[Any, list[dict[str, Any]]]:
     return _OpenAI(), calls
 
 
+def test_observe_mode_skips_decision_endpoint_and_allows_provider_call() -> None:
+    transport = FakeHttpClient(  # type: ignore[arg-type]
+        {
+            "decision": "block",
+            "reason": "tok_limit",
+            "fail_mode": "open",
+            "protect_decision_timeout_ms": 100,
+        }
+    )
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=False,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    openai_client, calls = _make_openai_stub()
+    instrument_openai(openai_client, client=client)
+
+    openai_client.chat.completions.create(model="gpt-4o-mini")
+    decision_calls = [url for url in transport.calls if url.endswith("/api/v1/protect/decision")]
+    assert len(decision_calls) == 0
+    assert len(calls) == 1
+    client.close()
+
+
+def test_observe_mode_skips_token_estimation() -> None:
+    transport = FakeHttpClient(  # type: ignore[arg-type]
+        {
+            "decision": "allow",
+            "reason": "ok",
+            "fail_mode": "open",
+            "protect_decision_timeout_ms": 100,
+        }
+    )
+    estimator_calls = {"count": 0}
+
+    def _counting_estimator(_payload: dict[str, Any]) -> int:
+        estimator_calls["count"] += 1
+        return 123
+
+    _set_token_estimator_for_tests(_counting_estimator)
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=False,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    openai_client, calls = _make_openai_stub()
+    instrument_openai(openai_client, client=client)
+
+    openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "hello"}],
+    )
+    decision_calls = [url for url in transport.calls if url.endswith("/api/v1/protect/decision")]
+    assert len(decision_calls) == 0
+    assert len(calls) == 1
+    assert estimator_calls["count"] == 0
+    _set_token_estimator_for_tests(None)
+    client.close()
+
+
 def test_preflight_block_prevents_provider_call() -> None:
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient(  # type: ignore[arg-type]
@@ -120,6 +185,7 @@ def test_blocked_until_short_circuits_subsequent_decision_calls_locally() -> Non
     )
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -150,6 +216,7 @@ def test_parallel_calls_during_active_cooldown_block_locally_without_backend_dec
     )
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -181,6 +248,7 @@ def test_parallel_calls_during_active_cooldown_block_locally_without_backend_dec
 def test_preflight_predictive_near_cap_warn_allows_provider_call() -> None:
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient(  # type: ignore[arg-type]
@@ -211,6 +279,7 @@ def test_preflight_warn_allows_provider_call_and_tags_telemetry() -> None:
     )
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -240,6 +309,7 @@ def test_messages_request_includes_input_tokens_estimate() -> None:
     _set_token_estimator_for_tests(lambda _payload: 222)
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -266,6 +336,7 @@ def test_token_estimation_failure_omits_input_tokens_estimate() -> None:
     _set_token_estimator_for_tests(lambda _payload: None)
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -284,6 +355,7 @@ def test_preflight_timeout_fail_open_allows_provider_call() -> None:
     transport = FakeHttpClient(TimeoutError("timeout"))  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         environment="dev",
         flush_interval_s=30.0,
@@ -305,6 +377,7 @@ def test_preflight_timeout_fail_closed_blocks_provider_call() -> None:
     transport = FakeHttpClient(TimeoutError("timeout"))  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         environment="staging",
         flush_interval_s=30.0,
@@ -326,6 +399,7 @@ def test_preflight_timeout_fail_closed_blocks_provider_call() -> None:
 def test_preflight_500_fail_open_allows_provider_call() -> None:
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="open",
@@ -342,6 +416,7 @@ def test_preflight_500_fail_open_allows_provider_call() -> None:
 def test_preflight_500_fail_closed_blocks_provider_call() -> None:
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="closed",
@@ -359,6 +434,7 @@ def test_preflight_500_fail_closed_blocks_provider_call() -> None:
 def test_preflight_invalid_json_fail_open_allows_provider_call() -> None:
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="open",
@@ -375,6 +451,7 @@ def test_preflight_invalid_json_fail_open_allows_provider_call() -> None:
 def test_preflight_invalid_json_fail_closed_blocks_provider_call() -> None:
     client = Client(
         ingest_key="p1",
+        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="closed",

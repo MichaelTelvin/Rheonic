@@ -25,6 +25,7 @@ async function main() {
     const client = createClient({
         baseUrl: backendBaseUrl,
         ingestKey,
+        protectEnabled: true,
         environment: process.env.LLMTBG_ENV ?? "dev",
         debug: process.env.LLMTBG_DEBUG === "1" || process.env.LLMTBG_DEBUG === "true",
         // keep it simple; we want immediate behavior for manual testing

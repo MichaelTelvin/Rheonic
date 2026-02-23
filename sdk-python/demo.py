@@ -23,6 +23,7 @@ def main() -> None:
         client = create_client(
             base_url=os.getenv("LLMTBG_BASE_URL"),
             ingest_key=ingest_key,
+            protect_enabled=False,
             environment="dev",
             debug=os.getenv("LLMTBG_DEBUG", "").lower() in {"1", "true", "yes"},
         )

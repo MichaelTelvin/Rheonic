@@ -50,7 +50,11 @@ sdk-python: test-sdk-python
 e2e: test-e2e
 
 diagrams:
-	@docker compose run --rm -v "$$(pwd):/workspace" backend sh -lc "apt-get update >/dev/null && apt-get install -y --no-install-recommends graphviz >/dev/null && PYTHONPATH=/app python /workspace/scripts/generate_arch_diagrams.py"
+	@docker run --rm -v "$$(pwd):/work" -w /work terrastruct/d2 docs/architecture/incident_flow.d2 docs/architecture/incident_flow.svg
+	@docker run --rm -v "$$(pwd):/work" -w /work terrastruct/d2 docs/architecture/protect_decision_flow.d2 docs/architecture/protect_decision_flow.svg
+	@python3 scripts/normalize_diagram_svgs.py
+	@cp docs/architecture/incident_flow.svg frontend/public/architecture/incident_flow.svg
+	@cp docs/architecture/protect_decision_flow.svg frontend/public/architecture/protect_decision_flow.svg
 
 diagrams-check:
 	@test -s docs/architecture/incident_flow.svg

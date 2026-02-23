@@ -327,6 +327,25 @@ def test_disabled_with_high_incident_still_allows(tmp_path) -> None:
     _cleanup_overrides()
 
 
+def test_disabled_ignores_active_cooldown_and_allows(tmp_path) -> None:
+    now_holder = {"value": datetime(2026, 2, 22, 12, 0, 0, tzinfo=timezone.utc)}
+    client, rolling_window, _ = _make_client(
+        tmp_path,
+        now_provider=lambda: now_holder["value"],
+        cooldown_seconds=60,
+    )
+    project_id, ingest_key = _create_project_and_key(client, "Protect Disabled Cooldown")
+    _set_protect(client, project_id, protect_enabled=False)
+
+    blocked_until_ms = int(now_holder["value"].timestamp() * 1000) + 60_000
+    _set_cooldown_key(rolling_window, project_id, blocked_until_ms, ttl_seconds=60)
+
+    decision = _decision(client, ingest_key)
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
+    _cleanup_overrides()
+
+
 def test_decision_snapshot_includes_counters_and_thresholds(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Snapshot")
@@ -511,6 +530,10 @@ def test_predictive_warn_does_not_override_medium_incident_warn_reason(tmp_path)
 
     assert decision["decision"] == "warn"
     assert decision["reason"] == "incident_medium"
+    snapshot = decision["snapshot"]
+    assert snapshot["predictive"]["enabled"] is True
+    assert snapshot["predictive"]["estimated_next_tokens"] == 2_000
+    assert snapshot["predictive"]["would_exceed_tokens_cap"] is True
     _cleanup_overrides()
 
 

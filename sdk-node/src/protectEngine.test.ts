@@ -19,6 +19,70 @@ function makeOpenAIStub() {
   return { openai, calls };
 }
 
+test("observe mode skips decision endpoint and still calls provider", async () => {
+  const originalFetch = globalThis.fetch;
+  let decisionCalls = 0;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      decisionCalls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ decision: "block", reason: "tok_limit" }),
+      } as Response;
+    }
+    if (url.endsWith("/api/v1/events")) {
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ ingestKey: "k1", protectEnabled: false, flushIntervalMs: 30_000 });
+    const { openai, calls } = makeOpenAIStub();
+    instrumentOpenAI(openai, { client });
+    await openai.chat.completions.create({ model: "gpt-4o-mini" });
+    await client.flush();
+    assert.equal(calls.length, 1);
+    assert.equal(decisionCalls, 0);
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("observe mode skips token estimation", async () => {
+  const originalFetch = globalThis.fetch;
+  let estimatorCalls = 0;
+  __setInputTokenEstimatorForTests(() => {
+    estimatorCalls += 1;
+    return 111;
+  });
+  globalThis.fetch = (async (url: string) => {
+    if (url.endsWith("/api/v1/events")) {
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ ingestKey: "k1", protectEnabled: false, flushIntervalMs: 30_000 });
+    const { openai, calls } = makeOpenAIStub();
+    instrumentOpenAI(openai, { client });
+    await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "hello" }],
+    });
+    await client.flush();
+    assert.equal(calls.length, 1);
+    assert.equal(estimatorCalls, 0);
+    client.close();
+  } finally {
+    __setInputTokenEstimatorForTests(null);
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("decision block prevents provider call", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () =>
@@ -34,7 +98,7 @@ test("decision block prevents provider call", async () => {
     }) as Response) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
@@ -68,7 +132,7 @@ test("blocked_until short-circuits subsequent decision calls locally", async () 
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
@@ -103,7 +167,7 @@ test("parallel calls during active cooldown block locally without backend decisi
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
 
@@ -139,7 +203,7 @@ test("predictive_near_cap warn allows provider call", async () => {
     }) as Response) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini", max_tokens: 2048 });
@@ -176,7 +240,7 @@ test("decision warn allows provider call and tags telemetry", async () => {
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini", max_tokens: 256 });
@@ -216,7 +280,7 @@ test("messages request includes estimated input_tokens_estimate in protect paylo
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({
@@ -257,7 +321,7 @@ test("messages request sends default-on input_tokens_estimate without overrides"
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({
@@ -300,7 +364,7 @@ test("token estimation failure omits input_tokens_estimate from protect payload"
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({
@@ -341,7 +405,7 @@ test("request with no messages or prompt omits input_tokens_estimate", async () 
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({
@@ -375,6 +439,7 @@ test("decision timeout fail-open allows provider call", async () => {
 
   try {
     const client = createClient({
+      protectEnabled: true,
       ingestKey: "k1",
       environment: "dev",
       flushIntervalMs: 30_000,
@@ -411,6 +476,7 @@ test("decision timeout fail-closed blocks provider call", async () => {
 
   try {
     const client = createClient({
+      protectEnabled: true,
       ingestKey: "k1",
       environment: "staging",
       flushIntervalMs: 30_000,
@@ -439,7 +505,7 @@ test("decision 500 fail-open allows provider call", async () => {
     }) as Response) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini" });
@@ -460,7 +526,7 @@ test("decision 500 fail-closed blocks provider call", async () => {
     }) as Response) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
@@ -483,7 +549,7 @@ test("invalid JSON fail-open allows provider call", async () => {
     }) as unknown as Response) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini" });
@@ -506,7 +572,7 @@ test("invalid JSON fail-closed blocks provider call", async () => {
     }) as unknown as Response) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);

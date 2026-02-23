@@ -44,21 +44,23 @@ def instrument_openai(
             # Async wrapper for AsyncOpenAI style clients.
             started_at = perf_counter()
             requested_model = _extract_requested_model(args, kwargs)
-            request_payload = _extract_request_payload(args, kwargs)
-            estimated_input_tokens = _estimate_input_tokens(request_payload)
-            protect_decision = resolved_client.preflight_protect_decision(
-                {
-                    "provider": "openai",
-                    "model": requested_model,
-                    "feature": feature,
-                    **(
-                        {"input_tokens_estimate": estimated_input_tokens}
-                        if isinstance(estimated_input_tokens, int)
-                        else {}
-                    ),
-                    "max_output_tokens": _extract_max_output_tokens(args, kwargs),
-                }
-            )
+            protect_decision: dict[str, object] = {"decision": "allow", "reason": "protect_disabled"}
+            if resolved_client.should_preflight_decision():
+                request_payload = _extract_request_payload(args, kwargs)
+                estimated_input_tokens = _estimate_input_tokens(request_payload)
+                protect_decision = resolved_client.preflight_protect_decision(
+                    {
+                        "provider": "openai",
+                        "model": requested_model,
+                        "feature": feature,
+                        **(
+                            {"input_tokens_estimate": estimated_input_tokens}
+                            if isinstance(estimated_input_tokens, int)
+                            else {}
+                        ),
+                        "max_output_tokens": _extract_max_output_tokens(args, kwargs),
+                    }
+                )
             if protect_decision.get("decision") == "block":
                 raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
             try:
@@ -96,21 +98,23 @@ def instrument_openai(
         # Sync wrapper for OpenAI client.
         started_at = perf_counter()
         requested_model = _extract_requested_model(args, kwargs)
-        request_payload = _extract_request_payload(args, kwargs)
-        estimated_input_tokens = _estimate_input_tokens(request_payload)
-        protect_decision = resolved_client.preflight_protect_decision(
-            {
-                "provider": "openai",
-                "model": requested_model,
-                "feature": feature,
-                **(
-                    {"input_tokens_estimate": estimated_input_tokens}
-                    if isinstance(estimated_input_tokens, int)
-                    else {}
-                ),
-                "max_output_tokens": _extract_max_output_tokens(args, kwargs),
-            }
-        )
+        protect_decision: dict[str, object] = {"decision": "allow", "reason": "protect_disabled"}
+        if resolved_client.should_preflight_decision():
+            request_payload = _extract_request_payload(args, kwargs)
+            estimated_input_tokens = _estimate_input_tokens(request_payload)
+            protect_decision = resolved_client.preflight_protect_decision(
+                {
+                    "provider": "openai",
+                    "model": requested_model,
+                    "feature": feature,
+                    **(
+                        {"input_tokens_estimate": estimated_input_tokens}
+                        if isinstance(estimated_input_tokens, int)
+                        else {}
+                    ),
+                    "max_output_tokens": _extract_max_output_tokens(args, kwargs),
+                }
+            )
         if protect_decision.get("decision") == "block":
             raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
         try:

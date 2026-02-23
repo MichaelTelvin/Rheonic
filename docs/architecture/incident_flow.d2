@@ -1,0 +1,167 @@
+direction: down
+
+vars: {
+  d2-config: {
+    pad: 22
+    sketch: false
+    layout-engine: elk
+  }
+}
+
+style: {
+  fill: "#f4f6fb"
+}
+
+ingest: "POST /api/v1/events\nPersist event + update rolling 60s" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+    stroke-width: 3
+  }
+}
+
+baseline: "Baseline update gate\nIf matching OPEN incident exists\n=> baseline frozen\nelse record baseline snapshot\nmedian of last baseline_window_count=30" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+    stroke-width: 3
+  }
+}
+
+detect: "Anomaly compare\nreq_ratio/tok_ratio vs baseline\nlow>=2.0, medium>=5.0, high>=10.0\nincident_type=burn_spike or request_spike" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+    stroke-width: 3
+  }
+}
+
+dedup: "Dedup window\nincident_dedup_window_seconds=300\nOpen+fingerprint hit => update evidence/count" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+    stroke-width: 3
+  }
+}
+
+create: "Create incident\nstatus=open\nseverity from ratio" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+    stroke-width: 3
+  }
+}
+
+escalate: "Escalation (open only)\nlow->medium/high or medium->high\nwm=300s, wh=120s\nmin_hits_m=2, min_hits_h=2\nscore_m>=4, score_h>=6\n10x guard score=3\nescalation hit cache ttl=360s" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+    stroke-width: 3
+  }
+}
+
+keep_open: "Incident remains open\nlast_seen_at refreshed" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+    stroke-width: 3
+  }
+}
+
+auto_close: "Auto-close worker\nruns every AUTO_CLOSE_RUN_INTERVAL_SECONDS=60\nstatus=open and last_seen_at older than\nINCIDENT_AUTO_CLOSE_SECONDS=300\n=> status=auto_resolved" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+    stroke-width: 3
+  }
+}
+
+resolved: "Statuses\nopen -> auto_resolved\n(or manually resolved)" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+    stroke-width: 3
+  }
+}
+
+ingest -> baseline: {
+  style: {
+    stroke-width: 3
+    font-size: 15
+  }
+}
+baseline -> detect: {
+  style: {
+    stroke-width: 3
+    font-size: 15
+  }
+}
+detect -> dedup: {
+  style: {
+    stroke-width: 3
+    font-size: 15
+  }
+}
+dedup -> create: "no open match" {
+  style: {
+    stroke-width: 3
+    font-size: 15
+  }
+}
+dedup -> escalate: "open match" {
+  style: {
+    stroke-width: 3
+    font-size: 15
+  }
+}
+create -> keep_open: {
+  style: {
+    stroke-width: 3
+    font-size: 15
+  }
+}
+escalate -> keep_open: {
+  style: {
+    stroke-width: 3
+    font-size: 15
+  }
+}
+keep_open -> auto_close: {
+  style: {
+    stroke-width: 3
+    font-size: 15
+  }
+}
+auto_close -> resolved: {
+  style: {
+    stroke-width: 3
+    font-size: 15
+  }
+}

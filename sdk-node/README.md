@@ -14,6 +14,7 @@ npm install
 - Required: `ingestKey`
 - Optional: `baseUrl` (defaults to `LLMTBG_BASE_URL` env var, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
+- Optional: `protectEnabled` (default `false`; when `true`, SDK calls `POST /api/v1/protect/decision` preflight)
 - Demo env var: `LLMTBG_INGEST_KEY`
 
 ## Integration Path 1: Manual Capture (generic)
@@ -39,7 +40,7 @@ await captureEvent(
 import OpenAI from "openai";
 import { createClient, instrumentOpenAI } from "./src/index";
 
-const burnguard = createClient({ ingestKey: process.env.LLMTBG_INGEST_KEY! });
+const burnguard = createClient({ ingestKey: process.env.LLMTBG_INGEST_KEY!, protectEnabled: true });
 const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
   client: burnguard,
   endpoint: "/chat/completions",
@@ -69,3 +70,7 @@ Before running the demo:
 3. Copy the plaintext key once and export `LLMTBG_INGEST_KEY`.
 
 Then check dashboard metrics for the selected project.
+
+Manual mode check:
+- Observe (`protectEnabled: false`): only `POST /api/v1/events`
+- Protect (`protectEnabled: true`): `POST /api/v1/protect/decision` then `POST /api/v1/events`

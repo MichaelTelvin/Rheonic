@@ -126,6 +126,7 @@ def main() -> None:
     client = Client(
         ingest_key=ingest_key,
         base_url=BACKEND_BASE_URL,
+        protect_enabled=True,
         environment=environment,
         flush_interval_s=60.0,
         http_client=transport,

@@ -10,6 +10,7 @@ async function runDemo(): Promise<void> {
 
   const client: Client = createClient({
     ingestKey,
+    protectEnabled: false,
     environment: process.env.LLMTBG_ENV ?? "dev",
     debug: process.env.LLMTBG_DEBUG === "1" || process.env.LLMTBG_DEBUG === "true",
   });

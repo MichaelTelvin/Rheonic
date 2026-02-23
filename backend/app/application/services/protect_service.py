@@ -71,6 +71,35 @@ class ProtectService:
         max_tok = project.protect_max_tok_per_min
         fail_mode = project.protect_fail_mode
         decision_timeout_ms = project.protect_decision_timeout_ms
+
+        if not project.protect_enabled:
+            requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=project_id)
+            incident_severity = self._incident_severity_cache.get(project_id=project_id)
+            decision = "allow"
+            reason = "ok"
+            self._protect_action_store.record(project_id=project_id, decision=decision, reason=reason)
+            return project_id, ProtectDecision(
+                decision=decision,
+                reason=reason,
+                fail_mode=fail_mode,
+                decision_timeout_ms=decision_timeout_ms,
+                retry_after_seconds=None,
+                blocked_until=None,
+                snapshot={
+                    "requests_60s": requests_60s,
+                    "tokens_60s": tokens_60s,
+                    "threshold_req_60s": max_req,
+                    "threshold_tok_60s": max_tok,
+                    "incident_severity": incident_severity,
+                    "decision_timeout_ms": decision_timeout_ms,
+                    "predictive": {
+                        "enabled": False,
+                        "estimated_next_tokens": None,
+                        "would_exceed_tokens_cap": False,
+                    },
+                },
+            )
+
         cooldown_until_ms = self._protect_action_store.get_block_cooldown_until_ms(project_id=project_id)
         if cooldown_until_ms is not None and now_ms < cooldown_until_ms:
             requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=project_id)
@@ -119,27 +148,30 @@ class ProtectService:
             max_tok is not None and estimated_next_tokens is not None and (tokens_60s + estimated_next_tokens >= max_tok)
         )
 
+        req_cap_exceeded = bool(max_req is not None and requests_60s >= max_req)
+        tok_cap_exceeded = bool(max_tok is not None and tokens_60s >= max_tok)
+        incident_high = incident_severity == "high"
+        incident_medium = incident_severity == "medium"
+        predictive_near_cap = near_cap_reached
+
         decision = "allow"
         reason = "ok"
         retry_after_seconds: int | None = None
         blocked_until: str | None = None
 
-        if not project.protect_enabled:
-            decision = "allow"
-            reason = "ok"
-        elif max_req is not None and requests_60s >= max_req:
-            decision = "block"
-            reason = "req_limit"
-        elif max_tok is not None and tokens_60s >= max_tok:
+        if tok_cap_exceeded:
             decision = "block"
             reason = "tok_limit"
-        elif incident_severity == "high":
+        elif req_cap_exceeded:
+            decision = "block"
+            reason = "req_limit"
+        elif incident_high:
             decision = "block"
             reason = "incident_high"
-        elif incident_severity == "medium":
+        elif incident_medium:
             decision = "warn"
             reason = "incident_medium"
-        elif near_cap_reached:
+        elif predictive_near_cap:
             decision = "warn"
             reason = "predictive_near_cap"
 

@@ -62,7 +62,12 @@ async function main() {
 
   await fetch(`${providerStubUrl}/reset`, { method: "POST" });
 
-  const client = createClient({ baseUrl: backendBaseUrl, ingestKey: createdKey.key, flushIntervalMs: 60000 });
+  const client = createClient({
+    baseUrl: backendBaseUrl,
+    ingestKey: createdKey.key,
+    protectEnabled: true,
+    flushIntervalMs: 60000,
+  });
   const openai = {
     chat: {
       completions: {

@@ -14,6 +14,7 @@ pip install -e .
 - Required: `ingest_key`
 - Optional: `base_url` (defaults to `LLMTBG_BASE_URL` env var, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
+- Optional: `protect_enabled` (default `False`; when `True`, SDK calls `POST /api/v1/protect/decision` preflight)
 - Demo env var: `LLMTBG_INGEST_KEY`
 
 ## Integration Path 1: Manual Capture (generic)
@@ -43,7 +44,7 @@ import os
 from openai import OpenAI
 from llmtokenburnguard import create_client, instrument_openai
 
-burnguard = create_client(ingest_key=os.environ["LLMTBG_INGEST_KEY"])
+burnguard = create_client(ingest_key=os.environ["LLMTBG_INGEST_KEY"], protect_enabled=True)
 openai_client = instrument_openai(
     OpenAI(api_key="..."),
     client=burnguard,
@@ -93,3 +94,7 @@ Optional overrides:
 - `LLMTBG_MAX_TOKENS`
 - `LLMTBG_MODEL`
 - `LLMTBG_ENVIRONMENT`
+
+Manual mode check:
+- Observe (`protect_enabled=False`): only `POST /api/v1/events`
+- Protect (`protect_enabled=True`): `POST /api/v1/protect/decision` then `POST /api/v1/events`

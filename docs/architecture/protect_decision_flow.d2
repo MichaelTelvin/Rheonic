@@ -1,0 +1,203 @@
+direction: down
+
+vars: {
+  d2-config: {
+    pad: 20
+    sketch: false
+    layout-engine: elk
+  }
+}
+
+style: {
+  fill: "#f4f6fb"
+}
+
+preflight: "SDK preflight request (protect mode)\nPOST /api/v1/protect/decision" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+sdk_gate: "SDK protect preflight enabled?\nprotectEnabled/protect_enabled" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+cooldown: "cooldown key exists + active?\nprotect_block_cooldown_seconds=60" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+mode: "protect_enabled?" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+req_cap: "requests_60s >= protect_max_req_per_min?\n(project setting; null=unlimited)" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+tok_cap: "tokens_60s >= protect_max_tok_per_min?\n(project setting; null=unlimited)" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+sev_high: "incident severity == high?\n(from ratio >=10.0 OR escalation)" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+sev_medium: "incident severity == medium?\n(from ratio >=5.0 OR escalation)" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+predictive: "predictive near-cap check\ncomputed before decision selection\nif protect_max_tok_per_min set\nand input_tokens_estimate present\n(estimation runs in protect mode only)\n(+ max_output_tokens when provided)\nprotect_near_cap_factor=0.8" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+predictive_pick: "predictive_near_cap flag true?\n(precomputed signal)" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+warn: "warn\nreason=incident_medium\nor predictive_near_cap" {
+  style: {
+    fill: "#f6efd8"
+    stroke: "#c6ac63"
+    font-color: "#5e4a1f"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+block: "block\nreason=cooldown_active\nor req_limit/tok_limit\nor incident_high\n(set cooldown key)" {
+  style: {
+    fill: "#f7e4ea"
+    stroke: "#bf8095"
+    font-color: "#61283d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+response: "decision response to SDK" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+enforce: "SDK enforcement\nallow/warn => provider call\nblock => LLMTBGBlockedError\nprotect_decision_timeout_ms=100\nfail_mode default=open" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+provider: "Provider/stub call\n(executed on observe path or allow/warn)" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+fallback: "SDK fallback on decision error/timeout\nfail-open => allow (decision_unavailable)\nfail-closed => block (decision_unavailable)" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
+sdk_gate -> preflight: "yes / protect mode"
+sdk_gate -> provider: "no / observe mode"
+preflight -> mode
+mode -> response: "no / reason=ok"
+mode -> cooldown: "yes"
+cooldown -> block: "yes / reason=cooldown_active"
+cooldown -> req_cap: "no"
+
+req_cap -> block: "yes / reason=req_limit"
+req_cap -> tok_cap: "no"
+
+tok_cap -> block: "yes / reason=tok_limit"
+tok_cap -> predictive: "no / compute predictive flag"
+
+predictive -> sev_high: "continue priority path"
+sev_high -> block: "yes / reason=incident_high"
+sev_high -> sev_medium: "no"
+
+sev_medium -> warn: "yes / reason=incident_medium (higher priority)"
+sev_medium -> predictive_pick: "no"
+
+predictive_pick -> warn: "yes / reason=predictive_near_cap"
+predictive_pick -> response: "no / reason=ok"
+
+warn -> response
+block -> response
+response -> enforce
+enforce -> provider: "allow/warn path"
+fallback -> enforce

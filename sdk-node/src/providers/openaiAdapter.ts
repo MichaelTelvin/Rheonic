@@ -1,6 +1,6 @@
 import { Client } from "../client.js";
 import { buildEvent } from "../eventBuilder.js";
-import { LLMTBGBlockedError } from "../protectEngine.js";
+import { LLMTBGBlockedError, type ProtectEvaluation } from "../protectEngine.js";
 import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
 
 export interface OpenAIInstrumentationOptions {
@@ -29,30 +29,33 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
   openaiClient.chat.completions.create = async (...args: unknown[]) => {
     const startedAt = Date.now();
     const model = extractRequestedModel(args);
-    const requestPayload = extractRequestPayload(args);
-    const estimatedInputTokens = requestPayload
-      ? (estimatorOverrideForTests
-          ? estimatorOverrideForTests(requestPayload)
-          : estimateInputTokensFromRequest(requestPayload))
-      : null;
-    const protectPayload: {
-      provider: string;
-      model: string | null;
-      feature?: string;
-      max_output_tokens?: number;
-      input_tokens_estimate?: number;
-    } = {
-      provider: "openai",
-      model,
-      feature: options.feature,
-      max_output_tokens: extractMaxOutputTokens(args),
-    };
-    if (typeof estimatedInputTokens === "number") {
-      protectPayload.input_tokens_estimate = estimatedInputTokens;
+    let protectDecision = { decision: "allow", reason: "protect_disabled" } as ProtectEvaluation;
+    if (options.client.shouldPreflightDecision()) {
+      const requestPayload = extractRequestPayload(args);
+      const estimatedInputTokens = requestPayload
+        ? (estimatorOverrideForTests
+            ? estimatorOverrideForTests(requestPayload)
+            : estimateInputTokensFromRequest(requestPayload))
+        : null;
+      const protectPayload: {
+        provider: string;
+        model: string | null;
+        feature?: string;
+        max_output_tokens?: number;
+        input_tokens_estimate?: number;
+      } = {
+        provider: "openai",
+        model,
+        feature: options.feature,
+        max_output_tokens: extractMaxOutputTokens(args),
+      };
+      if (typeof estimatedInputTokens === "number") {
+        protectPayload.input_tokens_estimate = estimatedInputTokens;
+      }
+      protectDecision = await options.client.evaluateProtectDecision({
+        ...protectPayload,
+      });
     }
-    const protectDecision = await options.client.evaluateProtectDecision({
-      ...protectPayload,
-    });
     if (protectDecision.decision === "block") {
       throw new LLMTBGBlockedError(protectDecision.reason);
     }

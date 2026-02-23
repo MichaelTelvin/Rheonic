@@ -84,6 +84,7 @@ class Client:
         ingest_key: str,
         base_url: str | None = None,
         environment: str = sdk_config.default_environment,
+        protect_enabled: bool = False,
         flush_interval_s: float = sdk_config.default_flush_interval_s,
         max_queue_size: int = sdk_config.default_max_queue_size,
         overflow_policy: OverflowPolicy = "drop_oldest",
@@ -103,6 +104,7 @@ class Client:
             resolved_base_url = base_url or os.getenv("LLMTBG_BASE_URL", sdk_config.default_base_url)
             self.base_url = resolved_base_url.rstrip("/")
             self.environment = environment
+            self.protect_enabled = bool(protect_enabled)
             self.flush_interval_s = flush_interval_s
             self.max_queue_size = max_queue_size
             self.overflow_policy = overflow_policy
@@ -202,7 +204,9 @@ class Client:
             }
 
     def preflight_protect_decision(self, context: dict[str, object]) -> dict[str, object]:
-        # Evaluate always-on protect decision for provider call preflight.
+        # Evaluate protect decision for provider call preflight when protect is enabled.
+        if not self.protect_enabled:
+            return {"decision": "allow", "reason": "protect_disabled"}
         try:
             return self._protect_engine.evaluate(context)
         except Exception:
@@ -210,6 +214,10 @@ class Client:
             if self.protect_fail_mode == "closed":
                 return {"decision": "block", "reason": "decision_unavailable"}
             return {"decision": "allow", "reason": "decision_unavailable"}
+
+    def should_preflight_decision(self) -> bool:
+        # Return whether protect preflight should run for provider calls.
+        return self.protect_enabled
 
     def _run_flush_loop(self) -> None:
         # Periodically flush queue until stopped.
@@ -267,6 +275,7 @@ def create_client(
     ingest_key: str,
     base_url: str | None = None,
     environment: str = sdk_config.default_environment,
+    protect_enabled: bool = False,
     flush_interval_s: float = sdk_config.default_flush_interval_s,
     max_queue_size: int = sdk_config.default_max_queue_size,
     overflow_policy: OverflowPolicy = "drop_oldest",
@@ -283,6 +292,7 @@ def create_client(
         ingest_key=ingest_key,
         base_url=base_url,
         environment=environment,
+        protect_enabled=protect_enabled,
         flush_interval_s=flush_interval_s,
         max_queue_size=max_queue_size,
         overflow_policy=overflow_policy,

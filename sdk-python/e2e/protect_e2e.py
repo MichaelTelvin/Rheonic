@@ -83,7 +83,12 @@ def run() -> None:
     auth = _seed()
     _provider_reset()
 
-    client = create_client(ingest_key=auth.ingest_key, base_url=BACKEND_BASE_URL, flush_interval_s=60.0)
+    client = create_client(
+        ingest_key=auth.ingest_key,
+        base_url=BACKEND_BASE_URL,
+        protect_enabled=True,
+        flush_interval_s=60.0,
+    )
 
     class Completions:
         @staticmethod
