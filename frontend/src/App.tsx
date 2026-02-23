@@ -1,10 +1,49 @@
 import { useCallback, useEffect, useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import { setUnauthorizedHandler, type AuthUser, type LoginResponse } from "./api/client";
 import { getAuthItem, removeAuthItem, setAuthItem } from "./authStorage";
+import { CurrentProjectBar } from "./components/CurrentProjectBar";
+import { Sidebar } from "./components/Sidebar";
 import { frontendConfig } from "./config";
+import { ProjectProvider } from "./context/ProjectContext";
+import { Architecture } from "./pages/Architecture";
+import { Alerts } from "./pages/Alerts";
 import { Dashboard } from "./pages/Dashboard";
+import { Incidents } from "./pages/Incidents";
+import { Keys } from "./pages/Keys";
 import { Login } from "./pages/Login";
+import { Projects } from "./pages/Projects";
+import { Protect } from "./pages/Protect";
+
+interface AuthenticatedAppLayoutProps {
+  userEmail: string | null;
+  onSignOut: () => void;
+}
+
+function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayoutProps): JSX.Element {
+  return (
+    <div className="app-shell">
+      <Sidebar userEmail={userEmail} onSignOut={onSignOut} />
+      <div className="app-main app-main-content">
+        <CurrentProjectBar />
+        <div className="app-routes">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/incidents" element={<Incidents />} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/keys" element={<Keys />} />
+            <Route path="/alerts" element={<Alerts />} />
+            <Route path="/protect" element={<Protect />} />
+            <Route path="/documentation" element={<Architecture />} />
+            <Route path="/architecture" element={<Navigate to="/documentation" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function App(): JSX.Element {
   const [token, setToken] = useState<string | null>(() => getAuthItem(frontendConfig.authTokenStorageKey));
@@ -47,5 +86,9 @@ export function App(): JSX.Element {
     return <Login onAuthSuccess={onAuthSuccess} />;
   }
 
-  return <Dashboard userEmail={user?.email ?? null} onSignOut={signOut} />;
+  return (
+    <ProjectProvider>
+      <AuthenticatedAppLayout userEmail={user?.email ?? null} onSignOut={signOut} />
+    </ProjectProvider>
+  );
 }

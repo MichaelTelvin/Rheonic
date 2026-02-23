@@ -12,7 +12,7 @@ style: {
   fill: "#f4f6fb"
 }
 
-preflight: "SDK preflight request (protect mode)\nPOST /api/v1/protect/decision" {
+preflight: "SDK preflight (protect mode)\nPOST /api/v1/protect/decision" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -22,7 +22,7 @@ preflight: "SDK preflight request (protect mode)\nPOST /api/v1/protect/decision"
   }
 }
 
-sdk_gate: "SDK protect preflight enabled?\nprotectEnabled/protect_enabled" {
+sdk_gate: "SDK preflight enabled?\nprotectEnabled/protect_enabled" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -32,7 +32,7 @@ sdk_gate: "SDK protect preflight enabled?\nprotectEnabled/protect_enabled" {
   }
 }
 
-cooldown: "cooldown key exists + active?\nprotect_block_cooldown_seconds=60" {
+cooldown: "cooldown active?\nprotect_block_cooldown_seconds=60" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -52,7 +52,7 @@ mode: "protect_enabled?" {
   }
 }
 
-req_cap: "requests_60s >= protect_max_req_per_min?\n(project setting; null=unlimited)" {
+req_cap: "requests_60s >= protect_max_req_per_min?\n(null = unlimited)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -62,7 +62,7 @@ req_cap: "requests_60s >= protect_max_req_per_min?\n(project setting; null=unlim
   }
 }
 
-tok_cap: "tokens_60s >= protect_max_tok_per_min?\n(project setting; null=unlimited)" {
+tok_cap: "tokens_60s >= protect_max_tok_per_min?\n(null = unlimited)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -72,7 +72,7 @@ tok_cap: "tokens_60s >= protect_max_tok_per_min?\n(project setting; null=unlimit
   }
 }
 
-sev_high: "incident severity == high?\n(from ratio >=10.0 OR escalation)" {
+sev_high: "incident severity = high?\n(ratio >=10.0 or escalation)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -82,7 +82,7 @@ sev_high: "incident severity == high?\n(from ratio >=10.0 OR escalation)" {
   }
 }
 
-sev_medium: "incident severity == medium?\n(from ratio >=5.0 OR escalation)" {
+sev_medium: "incident severity = medium?\n(ratio >=5.0 or escalation)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -92,7 +92,7 @@ sev_medium: "incident severity == medium?\n(from ratio >=5.0 OR escalation)" {
   }
 }
 
-predictive: "predictive near-cap check\ncomputed before decision selection\nif protect_max_tok_per_min set\nand input_tokens_estimate present\n(estimation runs in protect mode only)\n(+ max_output_tokens when provided)\nprotect_near_cap_factor=0.8" {
+predictive: "predictive near-cap\nprecomputed before priority pick\nrequires protect_max_tok_per_min\n+ input_tokens_estimate\n(+ max_output_tokens if present)\nprotect_near_cap_factor=0.8" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -102,7 +102,7 @@ predictive: "predictive near-cap check\ncomputed before decision selection\nif p
   }
 }
 
-predictive_pick: "predictive_near_cap flag true?\n(precomputed signal)" {
+predictive_pick: "predictive_near_cap?\n(precomputed)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -122,7 +122,7 @@ warn: "warn\nreason=incident_medium\nor predictive_near_cap" {
   }
 }
 
-block: "block\nreason=cooldown_active\nor req_limit/tok_limit\nor incident_high\n(set cooldown key)" {
+block: "block\nreason=cooldown_active\nor req_limit/tok_limit/incident_high\n(set cooldown key)" {
   style: {
     fill: "#f7e4ea"
     stroke: "#bf8095"
@@ -132,7 +132,7 @@ block: "block\nreason=cooldown_active\nor req_limit/tok_limit\nor incident_high\
   }
 }
 
-response: "decision response to SDK" {
+response: "decision response" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
@@ -142,7 +142,7 @@ response: "decision response to SDK" {
   }
 }
 
-enforce: "SDK enforcement\nallow/warn => provider call\nblock => LLMTBGBlockedError\nprotect_decision_timeout_ms=100\nfail_mode default=open" {
+enforce: "SDK enforcement\nallow/warn -> provider\nblock -> LLMTBGBlockedError\ntimeout_ms=100, fail_mode=open (default)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -152,7 +152,7 @@ enforce: "SDK enforcement\nallow/warn => provider call\nblock => LLMTBGBlockedEr
   }
 }
 
-provider: "Provider/stub call\n(executed on observe path or allow/warn)" {
+provider: "Provider call\n(observe path or allow/warn)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -162,7 +162,7 @@ provider: "Provider/stub call\n(executed on observe path or allow/warn)" {
   }
 }
 
-fallback: "SDK fallback on decision error/timeout\nfail-open => allow (decision_unavailable)\nfail-closed => block (decision_unavailable)" {
+fallback: "SDK fallback on decision error/timeout\nfail-open -> allow (decision_unavailable)\nfail-closed -> block (decision_unavailable)" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
@@ -172,8 +172,8 @@ fallback: "SDK fallback on decision error/timeout\nfail-open => allow (decision_
   }
 }
 
-sdk_gate -> preflight: "yes / protect mode"
-sdk_gate -> provider: "no / observe mode"
+sdk_gate -> preflight: "yes / protect"
+sdk_gate -> provider: "no / observe"
 preflight -> mode
 mode -> response: "no / reason=ok"
 mode -> cooldown: "yes"
@@ -184,9 +184,9 @@ req_cap -> block: "yes / reason=req_limit"
 req_cap -> tok_cap: "no"
 
 tok_cap -> block: "yes / reason=tok_limit"
-tok_cap -> predictive: "no / compute predictive flag"
+tok_cap -> predictive: "no / compute predictive"
 
-predictive -> sev_high: "continue priority path"
+predictive -> sev_high: "continue priority"
 sev_high -> block: "yes / reason=incident_high"
 sev_high -> sev_medium: "no"
 

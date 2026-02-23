@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLMTokenBurnGuard Docs</title>
+    <style>
+      :root {
+        --bg: #0a0d14;
+        --panel: #111827;
+        --border: rgba(148, 163, 184, 0.28);
+        --text: #e5e7eb;
+        --muted: rgba(229, 231, 235, 0.78);
+        --accent: rgba(167, 139, 250, 0.22);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: radial-gradient(circle at top, #11182a 0%, var(--bg) 58%);
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 1200px;
+        margin: 24px auto;
+        padding: 0 16px 24px;
+      }
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .tab {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(148, 163, 184, 0.34);
+        border-radius: 9px;
+        padding: 8px 12px;
+        background: rgba(148, 163, 184, 0.08);
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.92rem;
+      }
+      .tab.active {
+        background: var(--accent);
+        border-color: rgba(167, 139, 250, 0.56);
+        color: #f1eaff;
+      }
+      .link {
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 8px;
+        padding: 7px 12px;
+        color: rgba(200, 210, 235, 0.9);
+        text-decoration: none;
+        background: rgba(148, 163, 184, 0.06);
+      }
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: rgba(15, 23, 42, 0.45);
+        padding: 14px;
+      }
+      .canvas {
+        background: #f4f6fb;
+        border-radius: 8px;
+        padding: 28px;
+      }
+      .doc {
+        color: #1f2937;
+        font-size: 16px;
+        line-height: 1.6;
+        max-width: 900px;
+      }
+      .doc h1,
+      .doc h2,
+      .doc h3 {
+        color: #111827;
+        line-height: 1.3;
+        margin: 1.2em 0 0.6em;
+      }
+      .doc h1:first-child,
+      .doc h2:first-child,
+      .doc h3:first-child {
+        margin-top: 0;
+      }
+      .doc p {
+        margin: 0.55em 0;
+      }
+      .doc ul,
+      .doc ol {
+        margin: 0.55em 0 0.55em 1.2em;
+      }
+      .doc code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        background: rgba(15, 23, 42, 0.08);
+        padding: 0.12em 0.32em;
+        border-radius: 4px;
+      }
+      .doc pre {
+        margin: 0.9em 0;
+        padding: 12px;
+        background: #e8eef9;
+        border: 1px solid #c9d8f2;
+        border-radius: 8px;
+        overflow: auto;
+      }
+      .doc a {
+        color: #2b4fae;
+      }
+      .muted {
+        color: #6b7280;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="top">
+        <div class="tabs">
+          <a id="tab-scope" class="tab" href="?doc=scope">Onboarding</a>
+          <a id="tab-spec" class="tab" href="?doc=spec">API Spec</a>
+          <a id="tab-protect-mode-spec" class="tab" href="?doc=protect-mode-spec">Protect Spec</a>
+          <a id="tab-architecture" class="tab" href="?doc=architecture">Architecture</a>
+          <a id="tab-product_design" class="tab" href="?doc=product_design">Product Design</a>
+        </div>
+        <a class="link" href="/documentation">Back to Documentation</a>
+      </section>
+      <section class="panel">
+        <div class="canvas">
+          <article id="doc" class="doc">
+            <p class="muted">Loading...</p>
+          </article>
+        </div>
+      </section>
+    </main>
+    <script>
+      function escapeHtml(text) {
+        return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function inlineMarkdown(text) {
+        return text
+          .replace(/`([^`]+)`/g, "<code>$1</code>")
+          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+          .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      }
+
+      function renderMarkdown(md) {
+        const lines = md.replace(/\r\n/g, "\n").split("\n");
+        const out = [];
+        let i = 0;
+        let inCode = false;
+        let codeLang = "";
+
+        while (i < lines.length) {
+          const line = lines[i];
+
+          if (line.startsWith("```")) {
+            if (!inCode) {
+              inCode = true;
+              codeLang = line.slice(3).trim();
+              out.push('<pre><code' + (codeLang ? ' class="language-' + escapeHtml(codeLang) + '"' : "") + ">");
+            } else {
+              inCode = false;
+              out.push("</code></pre>");
+            }
+            i += 1;
+            continue;
+          }
+
+          if (inCode) {
+            out.push(escapeHtml(line) + "\n");
+            i += 1;
+            continue;
+          }
+
+          if (!line.trim()) {
+            i += 1;
+            continue;
+          }
+
+          if (line.startsWith("### ")) {
+            out.push("<h3>" + inlineMarkdown(escapeHtml(line.slice(4))) + "</h3>");
+            i += 1;
+            continue;
+          }
+          if (line.startsWith("## ")) {
+            out.push("<h2>" + inlineMarkdown(escapeHtml(line.slice(3))) + "</h2>");
+            i += 1;
+            continue;
+          }
+          if (line.startsWith("# ")) {
+            out.push("<h1>" + inlineMarkdown(escapeHtml(line.slice(2))) + "</h1>");
+            i += 1;
+            continue;
+          }
+
+          if (/^\d+\.\s+/.test(line)) {
+            out.push("<ol>");
+            while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
+              out.push("<li>" + inlineMarkdown(escapeHtml(lines[i].replace(/^\d+\.\s+/, ""))) + "</li>");
+              i += 1;
+            }
+            out.push("</ol>");
+            continue;
+          }
+
+          if (/^-\s+/.test(line)) {
+            out.push("<ul>");
+            while (i < lines.length && /^-\s+/.test(lines[i])) {
+              out.push("<li>" + inlineMarkdown(escapeHtml(lines[i].replace(/^-\s+/, ""))) + "</li>");
+              i += 1;
+            }
+            out.push("</ul>");
+            continue;
+          }
+
+          out.push("<p>" + inlineMarkdown(escapeHtml(line)) + "</p>");
+          i += 1;
+        }
+
+        return out.join("");
+      }
+
+      (async function () {
+        const allowed = new Set(["scope", "spec", "protect-mode-spec", "architecture", "product_design"]);
+        const params = new URLSearchParams(window.location.search);
+        const doc = allowed.has(params.get("doc")) ? params.get("doc") : "scope";
+        const tab = document.getElementById("tab-" + doc);
+        if (tab) tab.classList.add("active");
+
+        const target = document.getElementById("doc");
+        if (!target) return;
+
+        try {
+          const response = await fetch("./" + doc + ".md", { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+          }
+          const markdown = await response.text();
+          target.innerHTML = renderMarkdown(markdown);
+        } catch (error) {
+          target.innerHTML = "<p class='muted'>Failed to load document.</p>";
+        }
+      })();
+    </script>
+  </body>
+</html>

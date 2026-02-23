@@ -7,25 +7,28 @@ function migrateLegacyAuthStorage(): void {
     frontendConfig.authUserStorageKey,
   ];
   for (const key of keys) {
-    if (window.sessionStorage.getItem(key) !== null) {
+    const sessionValue = window.sessionStorage.getItem(key);
+    const localValue = window.localStorage.getItem(key);
+
+    if (sessionValue !== null && localValue === null) {
+      window.localStorage.setItem(key, sessionValue);
       continue;
     }
-    const legacyValue = window.localStorage.getItem(key);
-    if (legacyValue !== null) {
-      window.sessionStorage.setItem(key, legacyValue);
-      window.localStorage.removeItem(key);
+
+    if (sessionValue === null && localValue !== null) {
+      window.sessionStorage.setItem(key, localValue);
     }
   }
 }
 
 export function getAuthItem(key: string): string | null {
   migrateLegacyAuthStorage();
-  return window.sessionStorage.getItem(key);
+  return window.sessionStorage.getItem(key) ?? window.localStorage.getItem(key);
 }
 
 export function setAuthItem(key: string, value: string): void {
   window.sessionStorage.setItem(key, value);
-  window.localStorage.removeItem(key);
+  window.localStorage.setItem(key, value);
 }
 
 export function removeAuthItem(key: string): void {
