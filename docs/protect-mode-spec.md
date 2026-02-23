@@ -1,7 +1,7 @@
-# Protect Mode Spec — Always-on Preflight (MVP+)
+# Protect Mode Spec — Preflight Decision (MVP+)
 
 ## Purpose
-Protect Mode adds **active runtime enforcement** for LLM usage by requiring a **preflight decision** before provider calls. It complements observability by preventing cap breaches and reacting to open incident severity.
+Protect Mode adds **active runtime enforcement** for LLM usage by using a **preflight decision** before provider calls when protect is enabled in SDK config. It complements observability by preventing cap breaches and reacting to open incident severity.
 
 This spec covers:
 - Configuration (user-defined hard caps)
@@ -60,7 +60,7 @@ Source of truth remains Postgres incidents; Redis is a cache updated on incident
 
 ---
 
-## Decision API (Always-on Preflight)
+## Decision API (Protect-Gated Preflight)
 
 ### Endpoint
 `POST /api/v1/protect/decision`
@@ -86,7 +86,7 @@ Response Body:
 ```
 {
   "decision": "allow" | "warn" | "block",
-  "reason": "ok" | "req_limit" | "tok_limit" | "tok_predictive" | "incident_medium" | "incident_high",
+  "reason": "ok" | "req_limit" | "tok_limit" | "predictive_near_cap" | "incident_medium" | "incident_high",
   "snapshot": {
     "requests_60s": 0,
     "tokens_60s": 0,
@@ -125,18 +125,18 @@ Rule 2 — Hard Token Cap (absolute)
 
 If protect_max_tok_per_min != null AND tokens_60s >= protect_max_tok_per_min → block (reason=tok_limit)
 
-Rule 3 — Predictive Token Cap (proactive; recommended)
+Rule 3 — Predictive Near-Cap Warning (proactive; recommended)
 
-If protect_max_tok_per_min != null AND max_output_tokens is present:
+If protect_max_tok_per_min != null AND input_tokens_estimate is present:
 	•	Compute:
-	•	estimated_next_tokens = max_output_tokens + (input_tokens_estimate || 0)
-	•	If tokens_60s + estimated_next_tokens > protect_max_tok_per_min → warn (reason=tok_predictive)
+	•	estimated_next_tokens = input_tokens_estimate + (max_output_tokens || 0)
+	•	If tokens_60s + estimated_next_tokens reaches near-cap threshold (`protect_near_cap_factor`, default 0.8) → warn (reason=predictive_near_cap)
 
-Non-risk rule: If max_output_tokens is missing, do not attempt prediction; allow unless already over cap (Rule 2).
+Predictive signal is warning-only. It does not block by itself.
 
 ### SDK Token Estimation
 
-- Default-on in SDK preflight payload construction.
+- Default-on in SDK protect preflight payload construction (when protect preflight is enabled in SDK config).
 - Local-only tokenization using tokenizer libraries (no network calls).
 - SDK computes `input_tokens_estimate` for supported request shapes (for example: chat `messages`, text `prompt`).
 - If tokenization fails or request shape is unsupported, SDK skips `input_tokens_estimate` (or sends 0 by convention) with no heuristics.
@@ -158,9 +158,9 @@ Otherwise → allow (reason=ok)
 
 SDK Enforcement
 
-Always-on behavior
+Protect-enabled behavior
 
-If project protect is enabled, SDK will call POST /protect/decision before each provider call.
+If SDK protect preflight is enabled, SDK will call `POST /api/v1/protect/decision` before each provider call.
 
 Decision handling:
 	•	allow → call provider
@@ -193,13 +193,13 @@ These counters are updated by the backend decision endpoint.
 
 Dashboard Requirements (recommended)
 
-Dashboard must make “proactive blocking” visible.
+Dashboard must make proactive warnings visible.
 
 Header badges
 	•	Mode: Observe when protect_enabled=false
 	•	Mode: Protect when protect_enabled=true
-	•	Small subtext/badge: Caps: Proactive (since predictive blocking exists when max_output_tokens provided)
-  •  Clarification: Caps: Proactive means predictive logic is enabled; it is effective when `max_output_tokens` is present, and `input_tokens_estimate` improves accuracy.
+	•	Small subtext/badge: Caps: Proactive (predictive near-cap warning)
+  •  Clarification: Caps: Proactive means predictive logic is enabled; it is effective when `input_tokens_estimate` is present, and `max_output_tokens` improves accuracy.
 
 Protect actions widget (compact)
 
@@ -221,12 +221,12 @@ Must cover:
 	•	protect disabled -> allow
 	•	req limit exceeded -> block (req_limit)
 	•	tok limit exceeded -> block (tok_limit)
-	•	predictive tok cap -> block (tok_predictive) when max_output_tokens present
+	•	predictive near-cap -> warn (predictive_near_cap) when input estimate is present and near-cap threshold is reached
 	•	predictive does NOT run if max_output_tokens missing; allow unless Rule 2 triggers
 	•	incident medium -> warn
 	•	incident high -> block
 	•	protect disabled + incident high -> allow
-	•	snapshot fields present: counters, thresholds, timeout, predictive block fields
+	•	snapshot fields present: counters, thresholds, timeout, predictive fields
 	•	invalid ingest key -> 401
 	•	incsev missing -> treated as none
 
@@ -237,7 +237,7 @@ Must cover:
 	•	decision warn -> provider called; telemetry tagged with decision+reason
 	•	decision timeout/500 + fail-open -> provider called
 	•	decision timeout/500 + fail-closed -> blocked
-	•	decision tok_predictive -> block
+	•	decision predictive_near_cap -> warn
 	•	messages/prompt request includes local `input_tokens_estimate` in decision payload by default
 	•	tokenizer failure path skips estimate without heuristics
 
@@ -249,7 +249,7 @@ Add E2E harness to run against docker-compose:
 	•	Spin up a local “provider stub” HTTP server
 	•	Run Node SDK call:
 	•	allowed call -> provider stub receives request
-	•	predictive blocked call -> provider stub does NOT receive request
+	•	predictive warned call -> provider stub still receives request
 	•	Run Python SDK call with same scenarios
 	•	Verify backend Redis protect action counters increment accordingly
 

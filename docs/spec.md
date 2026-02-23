@@ -4,13 +4,13 @@
 - REST JSON
 - Auth:
   - User auth: JWT session for web app
-  - SDK ingest: `Authorization: Bearer <project_ingest_key>`
+  - SDK ingest: `X-Project-Ingest-Key: <project_ingest_key>`
 
 ## 1) Event ingest
 
-### POST /v1/events
+### POST /api/v1/events
 Headers:
-- Authorization: Bearer <project_ingest_key>
+- X-Project-Ingest-Key: <project_ingest_key>
 
 Body (Event):
 ```json
@@ -70,7 +70,7 @@ Notes:
 
 ## 2) Realtime metrics
 
-### GET /v1/metrics/realtime?project_id=…
+### GET /api/v1/metrics/realtime?project_id=…
 
 Returns:
 ```
@@ -88,7 +88,7 @@ Returns:
   "open_incidents": 2
 }
 ```
-### GET /v1/metrics/rollup?project_id=…&from=…&to=…&interval=1m|5m|1h&group_by=endpoint|feature|tenant|model|provider
+### GET /api/v1/metrics/rollup?project_id=…&from=…&to=…&interval=1m|5m|1h&group_by=endpoint|feature|tenant|model|provider
 
 Returns:
 	•	time series buckets + grouped sums
@@ -97,7 +97,7 @@ Returns:
 
 ## 3) Incidents
 
-### GET /v1/incidents?project_id=…&status=open|closed
+### GET /api/v1/incidents?project_id=…&status=open|closed
 ```
 Incident shape:
 {
@@ -128,96 +128,38 @@ Incident shape:
 }    
 ```
 
-### POST /v1/incidents/{incident_id}/close
+### POST /api/v1/incidents/{incident_id}/close
 
 Closes incident.
 
 
-## 4) Policy (Protect mode)
+## 4) Protect Mode (implemented)
 
+Project protect settings endpoints:
+- `GET /api/v1/projects/{project_id}/protect`
+- `PUT /api/v1/projects/{project_id}/protect`
 
-### GET /v1/policy/config?project_id=…
+Decision endpoint:
+- `POST /api/v1/protect/decision`
 
-Returns policy config used by SDK locally.
+Decision behavior (ordered):
+- cooldown active -> `block` (`cooldown_active`)
+- hard caps exceeded -> `block` (`tok_limit` or `req_limit`)
+- incident severity high -> `block` (`incident_high`)
+- incident severity medium -> `warn` (`incident_medium`)
+- predictive near-cap reached -> `warn` (`predictive_near_cap`)
+- otherwise -> `allow` (`ok`)
 
-Policy config (v1):
+Predictive snapshot:
+- `snapshot.predictive.enabled`
+- `snapshot.predictive.estimated_next_tokens`
+- `snapshot.predictive.would_exceed_tokens_cap`
 
-```
-{
-  "policy_version": "v1",
-  "enabled": true,
-  "mode": "protect",
-  "budgets": {
-    "monthly_usd": 200.0,
-    "daily_usd": 30.0
-  },
-  "actions": {
-    "downgrade": {
-      "enabled": true,
-      "fallback_chain": {
-        "openai": {
-          "gpt-4o": "gpt-4o-mini"
-        },
-        "anthropic": {
-          "claude-3-5-sonnet": "claude-3-5-haiku"
-        },
-        "gemini": {
-          "gemini-1.5-pro": "gemini-1.5-flash"
-        }
-      }
-    },
-    "cap_output_tokens": {
-      "enabled": true,
-      "default_max_output_tokens": 256
-    },
-    "rate_limit": {
-      "enabled": true,
-      "project_rpm": 120,
-      "tenant_rpm": 30,
-      "behavior": "cooldown_block",
-      "cooldown_seconds": 30
-    },
-    "cooldown": {
-      "enabled": true,
-      "seconds": 30
-    },
-    "cache_fallback": {
-      "enabled": true,
-      "ttl_seconds": 120
-    }
-  },
-  "detectors": {
-    "retry_storm": {
-      "retry_rate_threshold": 0.35,
-      "attempt_rate_multiplier": 2.0,
-      "window_seconds": 60
-    },
-    "burn_spike": {
-      "multiplier": 3.0,
-      "window_seconds": 300
-    },
-    "loop": {
-      "job_id_repeats": 50,
-      "window_seconds": 120
-    },
-    "token_explosion": {
-      "multiplier": 3.0,
-      "window_seconds": 300
-    }
-  }
-}
-```
-
-Protect action semantics (SDK side)
-	•	downgrade_model: swap request.model before sending
-	•	cap_output_tokens: set max output tokens param
-	•	rate_limit:
-	•	local sliding window counters
-	•	if exceeded: cooldown_block with typed error (or delay later)
-	•	cooldown_block:
-	•	raise/return typed cooldown error with retry_after
-	•	serve_cache:
-	•	return cached response if exact key hit, else proceed with downgrade/cap or cooldown
+SDK enforcement:
+- Observe mode: telemetry only (`/api/v1/events`), no preflight decision call.
+- Protect mode: SDK preflight to `/api/v1/protect/decision` before provider calls.
+- `warn` allows provider call and tags telemetry.
+- `block` prevents provider call and raises typed SDK error.
 
 
 ## 5) Alerts
@@ -265,7 +207,7 @@ Where available, we periodically pull authoritative usage/cost from provider rep
   - `docs/architecture/protect_decision_flow.svg`
 - Regenerate with: `make diagrams`
 - Verify generated artifacts with: `make diagrams-check`
-- Generation requires Graphviz (`dot`); the Make target runs it inside Docker.
+- Generation uses D2 (`terrastruct/d2`) via Docker in the Make target.
 
 Stored fields (per project, per interval):
 - authoritative_cost_usd

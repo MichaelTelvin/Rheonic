@@ -1,240 +1,92 @@
-LLMTokenBurnGuard — Scope (Updated MVP Roadmap)
+LLMTokenBurnGuard — Scope (Current State)
 
-Status: Core MVP Completed  
-Target: Complete Operational + Intelligence maturity in next 8 days
-
+Status: Core platform, protect mode, scheduler jobs, and webhook alerts are implemented.
 
 ========================================
-PHASE 0 — FOUNDATION (Completed)
-========================================
-
-Infrastructure
-- Dockerized backend (FastAPI)
-- PostgreSQL + Redis
-- RQ workers
-- Health endpoint
-- Clean architecture layering
-
-Event Ingestion
-- POST /api/v1/events
-- Redis true sliding window
-- Postgres event persistence
-- Realtime metrics endpoint
-- Burn spike incident detection
-
-Incident Intelligence
-- Baseline learning
-- Ratio-based spike detection
-- Incident deduplication (5-minute merge window)
-- Evidence count increment
-- Severity escalation (basic)
-- Rolling window refactor complete
-- Full anomaly test coverage (baseline → spike → escalation)
-
-Backend Hardening
-- Idempotency support
-- Ingest key rate limiting
-- Project ownership checks
-- DB indexes:
-  - events(project_id, ts)
-  - incidents(project_id, status, created_at)
-- Proper HTTP status codes
-- Retry/backoff for background jobs
-- Failed job logging
-
-
-========================================
-PHASE 1 — SDK (Completed MVP)
-========================================
-
-Monorepo
-- sdk-node
-- sdk-python
-
-SDK Capabilities
-- Async fire-and-forget ingest
-- Flush-on-exit
-- OpenAI instrumentation
-- Manual capture
-- Protect preflight (always-on)
-- Predictive near-cap warning
-- Hard cap blocking
-- Fail-open / fail-closed
-- Default-on token estimation
-- Production-safe defaults
-
-
-========================================
-PHASE 2 — AUTH & KEY MANAGEMENT (Completed)
-========================================
-
-Authentication
-- Users table
-- Password hashing
-- /auth/register
-- /auth/login
-- JWT middleware
-- Route protection
-
-Projects
-- Create project
-- Ownership enforced
-- Project selection UI
-
-Ingest Keys
-- Create / rotate / revoke
-- Hashed storage
-- Key → project mapping
-- UI modal flow
-
-
-========================================
-PHASE 3 — OBSERVABILITY DASHBOARD (Completed)
-========================================
-
-Metrics
-- Requests (60s)
-- Tokens (60s)
-- Protect decision counters
-- Decision latency (p50 / p95)
-- Sparkline charts
-- Stable timestamp alignment
-
-Incidents
-- Open incidents list
-- Manual resolve
-- Severity badges
-- Evidence display
-
-UI
-- Dark theme
-- Responsive layout
-- LLM Control Center header
-- Protection status card
-- Protect toggle
-- Policy editor modal
-
-
-========================================
-PHASE 4 — PROTECT MODE (Completed Core)
-========================================
-
 Implemented
-- Project-level protect toggle
-- Max tokens/min
-- Max requests/min
-- Predictive near-cap warn
-- Hard cap block
-- Decision engine (allow / warn / block)
-- Snapshot diagnostics
-- Dashboard counters
-- Node + Python SDK enforcement
-- Manual human-tested allow/warn/block
-
-
-========================================
-NEXT 8-DAY EXECUTION PLAN
 ========================================
 
-We will complete TWO maturity tracks in parallel.
+Backend foundation
+- FastAPI backend with clean layering
+- PostgreSQL + Redis
+- RQ workers + scheduler bootstrap
+- Health endpoint
 
-----------------------------------------
-TRACK A — Operational Maturity
-----------------------------------------
+Event ingest and realtime
+- `POST /api/v1/events`
+- Redis rolling 60s counters
+- Postgres event persistence
+- Idempotency and ingest key rate limiting
+- Realtime metrics endpoints
 
-A1. Auto-close incidents
-- Auto-resolve incidents when signal drops below threshold for cooldown period
-- Configurable cooldown window
-- Status transition: open → auto_resolved
-- Audit trail preserved
+Incident engine
+- Baseline snapshots and freeze while incident is open
+- Ratio-based anomaly detection
+- Dedup window merge for matching open incidents
+- Severity escalation with hit cache TTL
+- Manual close endpoint
+- Auto-close incidents job
 
-A2. Cooldown logic after block
-- Temporary cooldown window after repeated blocks
-- Protect state machine behavior:
-  - normal
-  - cooling_down
-  - recovered
+Protect mode
+- Project-level protect settings (`GET/PUT /api/v1/projects/{project_id}/protect`)
+- Decision endpoint (`POST /api/v1/protect/decision`)
+- Decision ordering:
+- cooldown active -> block
+- hard caps (tok/req) -> block
+- incident high -> block
+- incident medium -> warn
+- predictive near-cap -> warn
+- else allow
+- Predictive snapshot fields in decision response
+- Cooldown key set on block reasons (`tok_limit`, `req_limit`, `incident_high`)
+- Protect metrics and decision health metrics
 
-A3. Escalation refinement
-- Escalate severity on repeated anomaly within time window
-- Prevent baseline pollution during open incident
+SDKs (Node + Python)
+- Async fire-and-forget telemetry ingest
+- Flush on exit
+- OpenAI instrumentation wrappers
+- Protect decision enforcement
+- SDK-gated preflight (observe mode skips decision endpoint)
+- Token estimation runs only in protect mode
+- Fail-open / fail-closed handling for decision timeout/error
 
-A4. Webhook / alert dispatch
-- Trigger on high severity incident creation
-- Configurable webhook per project
-- Retry with backoff
+Dashboard and auth
+- User auth (`/api/v1/auth/register`, `/api/v1/auth/login`)
+- Project and ingest key management
+- Protect settings UI
+- Realtime metrics and incidents view
+- Protect counters and latency cards
 
-A5. RQ Scheduler
-- Add rq-scheduler service
-- Schedule:
-  - purge_old_events
-  - auto-close job
-  - rollup job (if ready)
+Alerts
+- Project webhook config and test API
+- High-severity incident webhook dispatch with retries
+- Webhook delivery status tracking
 
-----------------------------------------
-TRACK B — Intelligence Maturity
-----------------------------------------
-
-B1. Retry storm detector
-- Detect rapid repeated identical requests
-- Trigger incident type: retry_storm
-
-B2. Loop suspect detector
-- Detect repetitive prompt cycles
-- Trigger incident type: loop_suspect
-
-B3. Token explosion detector
-- Detect abnormal output/input ratio
-- Trigger incident type: token_explosion
-
-B4. Policy gap detection
-- Detect new/unrecognized model usage
-- Raise UI warning
-
-B5. Improved escalation logic
-- Low → Medium → High based on frequency & persistence
-
-
-========================================
-PHASE 5 — COMMERCIALIZATION (After A+B)
-========================================
-
-- Billing model
-- Subscription tiers
-- Stripe integration
-- Protect as premium feature
-- Usage-based pricing
-
+Architecture docs and diagrams
+- D2 source-of-truth diagrams:
+- `docs/architecture/incident_flow.d2`
+- `docs/architecture/protect_decision_flow.d2`
+- Generated SVG targets under `docs/architecture` and `frontend/public/architecture`
 
 ========================================
-CRITICAL TODO (Must Not Be Forgotten)
+Remaining / Next
 ========================================
 
-Scheduling & Maintenance
-- [ ] Integrate rq-scheduler into docker-compose
-- [ ] Automate purge_old_events daily
-- [ ] Implement auto-close scheduler
+Detectors and intelligence
+- Retry storm detector
+- Loop suspect detector
+- Token explosion detector
 
-Data Retention
-- [ ] Finalize retention windows (events vs incidents)
-- [ ] Validate production retention automation
+Cost and reconciliation
+- Authoritative cost reconciliation pipeline
+- Pricing drift warnings
+- Budget-triggered policy actions
 
-Operational Safety
-- [ ] Decision endpoint rate limiting at scale
-- [ ] Background job observability
-- [ ] Dead-letter queue or failure persistence
+Operational hardening
+- Decision endpoint rate limiting under sustained load
+- Expanded background job observability and failure persistence
+- Additional e2e scenarios for escalation and auto-close edge cases
 
-Product & UX
-- [ ] Public documentation site
-- [ ] In-app policy explanation tooltips
-- [ ] Onboarding flow
-
-Testing
-- [ ] Full e2e scenario for auto-close
-- [ ] Full e2e scenario for escalation
-- [ ] Retry storm unit tests
-- [ ] Token explosion unit tests
-
----
-
-End of updated scope.
+Productization
+- Public docs/onboarding refinement
+- Commercial packaging and billing controls

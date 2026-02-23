@@ -43,7 +43,7 @@ Both:
 2. Provider returns response (or error).
 3. SDK extracts usage (tokens where available), latency, error classification.
 4. SDK computes cost from a local + server-synced pricing table.
-5. SDK POSTs an Event to `/v1/events` (async, non-blocking).
+5. SDK POSTs an Event to `/api/v1/events` (async, non-blocking).
 6. Backend:
    - stores event
    - updates Redis rolling windows
@@ -55,20 +55,21 @@ Both:
    - shows incidents feed and drilldowns
 
 ### 2.2 Protect Mode (opt-in)
-Protect mode enforcement is client-side, controlled by policy config.
+Protect enforcement is client-side and SDK-gated.
 
-1. SDK loads policy config periodically (e.g., every 10–30s) from `/v1/policy/config`.
-2. For each outgoing request, SDK checks:
-   - output cap
-   - local rate limit counters
-   - cooldown state
-   - downgrade rule triggers
-   - cache fallback eligibility
-3. SDK either:
-   - allows request (maybe downgraded/capped)
-   - or blocks with typed cooldown error (soft)
-   - or serves cached response (if available)
-4. SDK emits event with guard.action + reason_code.
+1. SDK is configured with protect preflight enabled (`protectEnabled` / `protect_enabled`).
+2. Before each provider call, SDK sends preflight request to `POST /api/v1/protect/decision`.
+3. Backend evaluates cooldown, hard caps, incident severity, and predictive near-cap warning.
+4. SDK enforces returned decision:
+   - `allow` -> call provider
+   - `warn` -> call provider and tag telemetry
+   - `block` -> do not call provider; raise `LLMTBGBlockedError`
+5. SDK emits events to `/api/v1/events`.
+
+Observe mode:
+- Protect preflight disabled in SDK config.
+- No `/api/v1/protect/decision` call.
+- Telemetry-only flow to `/api/v1/events`.
 
 ## 3) “No proxy required” stance
 We do not require a drop-in proxy/gateway to deliver value.

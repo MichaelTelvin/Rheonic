@@ -40,7 +40,7 @@ Steps (based on node e2e flow):
 	4.	Run a protected call (not telemetry ingest):
 	•	Use the same pattern as protect.e2e.mjs: create client + wrap provider stub + call openai.chat.completions.create(...).  ￼
 	5.	Expected:
-	•	/protect/decision hit
+	•	/api/v1/protect/decision hit
 	•	provider stub /call increments count to 1
 	•	Dashboard: Allowed (60m) increments
 
