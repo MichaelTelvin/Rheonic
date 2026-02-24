@@ -632,6 +632,57 @@ def test_protect_metrics_increment_on_warn_and_block(tmp_path) -> None:
     _cleanup_overrides()
 
 
+def test_protect_metrics_support_provider_filter_with_unchanged_schema(tmp_path) -> None:
+    client, _, severity_cache = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Metrics Provider Filter")
+    _set_protect(client, project_id, protect_enabled=True)
+
+    _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    severity_cache.set(scoped_project_provider_id(project_id, "anthropic"), "medium")
+    _decision(client, ingest_key, body={"provider": "anthropic", "model": "claude-3-5-sonnet"})
+
+    all_metrics = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
+    assert all_metrics.status_code == 200
+    assert all_metrics.json()["allowed_60m"] == 1
+    assert all_metrics.json()["warned_60m"] == 1
+    assert all_metrics.json()["blocked_60m"] == 0
+
+    openai_metrics = client.get(f"/api/v1/metrics/protect?project_id={project_id}&provider=openai")
+    assert openai_metrics.status_code == 200
+    openai_payload = openai_metrics.json()
+    assert set(openai_payload.keys()) == {
+        "allowed_60m",
+        "warned_60m",
+        "blocked_60m",
+        "decision_timeouts_60m",
+        "last",
+        "decision_latency_p50_60m_ms",
+        "decision_latency_p95_60m_ms",
+    }
+    assert openai_payload["allowed_60m"] == 1
+    assert openai_payload["warned_60m"] == 0
+    assert openai_payload["blocked_60m"] == 0
+
+    anthropic_metrics = client.get(f"/api/v1/metrics/protect?project_id={project_id}&provider=anthropic")
+    assert anthropic_metrics.status_code == 200
+    anthropic_payload = anthropic_metrics.json()
+    assert anthropic_payload["allowed_60m"] == 0
+    assert anthropic_payload["warned_60m"] == 1
+    assert anthropic_payload["blocked_60m"] == 0
+
+    unknown_metrics = client.get(f"/api/v1/metrics/protect?project_id={project_id}&provider=unknown-provider")
+    assert unknown_metrics.status_code == 200
+    unknown_payload = unknown_metrics.json()
+    assert unknown_payload["allowed_60m"] == 0
+    assert unknown_payload["warned_60m"] == 0
+    assert unknown_payload["blocked_60m"] == 0
+    assert unknown_payload["decision_timeouts_60m"] == 0
+    assert unknown_payload["decision_latency_p50_60m_ms"] is None
+    assert unknown_payload["decision_latency_p95_60m_ms"] is None
+    assert unknown_payload["last"] is None
+    _cleanup_overrides()
+
+
 def test_protect_latency_percentiles_are_windowed_and_deterministic(tmp_path) -> None:
     client, _, _ = _make_client(tmp_path)
     project_id, _ = _create_project_and_key(client, "Protect Latency Percentiles")
@@ -685,6 +736,27 @@ def test_protect_health_metrics_shape_and_values(tmp_path) -> None:
     assert payload["timeouts_60m"] == 0
     assert isinstance(payload["p50_ms"], int)
     assert isinstance(payload["p95_ms"], int)
+    _cleanup_overrides()
+
+
+def test_protect_health_supports_provider_filter(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Health Provider Filter")
+    _set_protect(client, project_id, protect_enabled=True)
+
+    _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+
+    openai_response = client.get(f"/api/v1/metrics/protect/health?project_id={project_id}&provider=openai")
+    assert openai_response.status_code == 200
+    openai_payload = openai_response.json()
+    assert set(openai_payload.keys()) == {"p50_ms", "p95_ms", "timeouts_60m"}
+    assert isinstance(openai_payload["p50_ms"], int)
+    assert isinstance(openai_payload["p95_ms"], int)
+    assert openai_payload["timeouts_60m"] == 0
+
+    unknown_response = client.get(f"/api/v1/metrics/protect/health?project_id={project_id}&provider=unknown-provider")
+    assert unknown_response.status_code == 200
+    assert unknown_response.json() == {"p50_ms": None, "p95_ms": None, "timeouts_60m": 0}
     _cleanup_overrides()
 
 

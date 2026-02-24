@@ -33,6 +33,7 @@ class ProtectHealthOut(BaseModel):
 @router.get("/realtime")
 def get_realtime_metrics(
     project_id: str = Query(..., min_length=1),
+    provider: str | None = Query(None, min_length=1),
     service: MetricsService = Depends(get_metrics_service),
     project_service: ProjectService = Depends(get_project_service),
     current_user: User = Depends(get_current_user),
@@ -40,7 +41,7 @@ def get_realtime_metrics(
     # Return project realtime counters from Redis.
     try:
         project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
-        metrics = service.get_realtime(project_id=project_id)
+        metrics = service.get_realtime(project_id=project_id, provider=provider)
         logger.debug("Realtime metrics fetched", extra={"project_id": project_id})
         return metrics
     except HTTPException:
@@ -53,6 +54,7 @@ def get_realtime_metrics(
 @router.get("/protect", response_model=ProtectMetricsOut)
 def get_protect_metrics(
     project_id: str = Query(..., min_length=1),
+    provider: str | None = Query(None, min_length=1),
     service: MetricsService = Depends(get_metrics_service),
     project_service: ProjectService = Depends(get_project_service),
     current_user: User = Depends(get_current_user),
@@ -60,7 +62,7 @@ def get_protect_metrics(
     # Return protect-mode warn/block counters for one project.
     try:
         project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
-        metrics = service.get_protect_metrics(project_id=project_id)
+        metrics = service.get_protect_metrics(project_id=project_id, provider=provider)
         return ProtectMetricsOut(
             allowed_60m=metrics["allowed_60m"],
             warned_60m=metrics["warned_60m"],
@@ -80,6 +82,7 @@ def get_protect_metrics(
 @router.get("/protect/health", response_model=ProtectHealthOut)
 def get_protect_health(
     project_id: str = Query(..., min_length=1),
+    provider: str | None = Query(None, min_length=1),
     service: MetricsService = Depends(get_metrics_service),
     project_service: ProjectService = Depends(get_project_service),
     current_user: User = Depends(get_current_user),
@@ -87,7 +90,7 @@ def get_protect_health(
     # Return protect preflight health metrics (latency + timeouts) for one project.
     try:
         project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
-        metrics = service.get_protect_health(project_id=project_id)
+        metrics = service.get_protect_health(project_id=project_id, provider=provider)
         return ProtectHealthOut(
             p50_ms=int(metrics["p50_ms"]) if isinstance(metrics.get("p50_ms"), int) else None,
             p95_ms=int(metrics["p95_ms"]) if isinstance(metrics.get("p95_ms"), int) else None,

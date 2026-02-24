@@ -25,6 +25,11 @@ class CreateProjectIn(BaseModel):
     name: str
 
 
+class ProjectProvidersOut(BaseModel):
+    # Distinct providers recorded for one project.
+    providers: list[str]
+
+
 @router.get("", response_model=list[ProjectOut])
 def list_projects(
     service: ProjectService = Depends(get_project_service),
@@ -64,3 +69,20 @@ def create_project(
     except Exception:
         logger.exception("Create project endpoint failed")
         raise HTTPException(status_code=500, detail="Failed to create project")
+
+
+@router.get("/{project_id}/providers", response_model=ProjectProvidersOut)
+def list_project_providers(
+    project_id: str,
+    service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+) -> ProjectProvidersOut:
+    # Return ordered distinct providers used by an owned project.
+    try:
+        providers = service.list_project_providers(project_id=project_id, user_id=current_user.id)
+        return ProjectProvidersOut(providers=providers)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("List project providers endpoint failed", extra={"project_id": project_id})
+        raise HTTPException(status_code=500, detail="Failed to list project providers")

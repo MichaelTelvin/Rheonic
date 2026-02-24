@@ -165,6 +165,22 @@ def test_tenant_scoping_blocks_cross_user_metrics_read(tmp_path) -> None:
         assert metrics_response.status_code == 404
 
 
+def test_project_providers_endpoint_auth_and_tenant_scoping(tmp_path) -> None:
+    # Providers endpoint should require auth and enforce ownership.
+    with _make_client(tmp_path) as client:
+        owner_headers = _auth_headers(client, "owner_providers@example.com", "password123")
+        create_project = client.post("/api/v1/projects", json={"name": "Owner Providers Project"}, headers=owner_headers)
+        assert create_project.status_code == 200
+        project_id = create_project.json()["id"]
+
+        unauthenticated = client.get(f"/api/v1/projects/{project_id}/providers")
+        assert unauthenticated.status_code == 401
+
+        other_headers = _auth_headers(client, "other_providers@example.com", "password123")
+        forbidden = client.get(f"/api/v1/projects/{project_id}/providers", headers=other_headers)
+        assert forbidden.status_code == 404
+
+
 def test_sanitization_rejects_invalid_email_project_and_key_label(tmp_path) -> None:
     # Invalid email/project/key inputs should fail with 400 and clear messages.
     with _make_client(tmp_path) as client:

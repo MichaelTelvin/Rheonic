@@ -6,6 +6,8 @@ import {
   createProject,
   fetchIncidents,
   fetchMetrics,
+  fetchProjectProviders,
+  fetchProtectMetrics,
   fetchProjects,
   login,
   register,
@@ -137,6 +139,9 @@ describe("api client", () => {
 
     await register("a@b.com", "password123");
     await fetchMetrics("p 1");
+    await fetchMetrics("p 1", "openai");
+    await fetchProtectMetrics("p 1", "openai");
+    await fetchProjectProviders("p1");
     await fetchIncidents("p/1");
     await resolveIncident("inc#1");
     await createProject("Project");
@@ -147,6 +152,9 @@ describe("api client", () => {
     const calledPaths = fetchMock.mock.calls.map((call) => String(call[0]));
     expect(calledPaths.some((path) => path.endsWith("/api/v1/auth/register"))).toBe(true);
     expect(calledPaths.some((path) => path.includes("/api/v1/metrics/realtime?project_id=p%201"))).toBe(true);
+    expect(calledPaths.some((path) => path.includes("/api/v1/metrics/realtime?project_id=p%201&provider=openai"))).toBe(true);
+    expect(calledPaths.some((path) => path.includes("/api/v1/metrics/protect?project_id=p%201&provider=openai"))).toBe(true);
+    expect(calledPaths.some((path) => path.endsWith("/api/v1/projects/p1/providers"))).toBe(true);
     expect(calledPaths.some((path) => path.includes("/api/v1/incidents?project_id=p%2F1"))).toBe(true);
     expect(calledPaths.some((path) => path.includes("/api/v1/incidents/inc%231/resolve"))).toBe(true);
     expect(calledPaths.some((path) => path.endsWith("/api/v1/projects/p1/keys"))).toBe(true);

@@ -237,10 +237,10 @@ class ProjectRepositoryImpl(ProjectRepository):
                     session.query(ProjectModelRecord.provider)
                     .filter(ProjectModelRecord.project_id == project_id)
                     .distinct()
+                    .order_by(ProjectModelRecord.provider.asc())
                     .all()
                 )
-            providers = [str(provider) for (provider,) in rows if provider]
-            return sorted(set(providers))
+            return [str(provider) for (provider,) in rows if provider]
         except Exception:
             logger.exception("Failed listing project providers", extra={"project_id": project_id})
             raise

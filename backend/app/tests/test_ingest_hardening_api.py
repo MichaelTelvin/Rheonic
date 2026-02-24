@@ -127,12 +127,12 @@ def _cleanup_overrides() -> None:
     app.dependency_overrides.clear()
 
 
-def _event_payload(total_tokens: int) -> dict[str, object]:
+def _event_payload(total_tokens: int, provider: str = "openai", model: str = "gpt-4o-mini") -> dict[str, object]:
     # Build a minimal valid ingest payload.
     return {
         "ts": datetime.now(timezone.utc).isoformat(),
-        "provider": "openai",
-        "model": "gpt-4o-mini",
+        "provider": provider,
+        "model": model,
         "environment": "dev",
         "response": {"total_tokens": total_tokens},
     }
@@ -270,20 +270,43 @@ def test_rolling_counters_are_provider_scoped_and_metrics_aggregate(tmp_path) ->
     for _ in range(3):
         response = client.post(
             "/api/v1/events",
-            json=_event_payload(total_tokens=10),
+            json=_event_payload(total_tokens=10, provider="openai", model="gpt-4o-mini"),
+            headers={"X-Project-Ingest-Key": plaintext_key},
+        )
+        assert response.status_code == 202
+
+    for _ in range(2):
+        response = client.post(
+            "/api/v1/events",
+            json=_event_payload(total_tokens=15, provider="anthropic", model="claude-3-5-sonnet"),
             headers={"X-Project-Ingest-Key": plaintext_key},
         )
         assert response.status_code == 202
 
     metrics = client.get(f"/api/v1/metrics/realtime?project_id={project_id}")
     assert metrics.status_code == 200
-    assert metrics.json()["requests_60s"] == 3
-    assert metrics.json()["tokens_60s"] == 30
+    assert metrics.json()["requests_60s"] == 5
+    assert metrics.json()["tokens_60s"] == 60
+
+    openai_metrics = client.get(f"/api/v1/metrics/realtime?project_id={project_id}&provider=openai")
+    assert openai_metrics.status_code == 200
+    assert openai_metrics.json()["requests_60s"] == 3
+    assert openai_metrics.json()["tokens_60s"] == 30
+
+    anthropic_metrics = client.get(f"/api/v1/metrics/realtime?project_id={project_id}&provider=anthropic")
+    assert anthropic_metrics.status_code == 200
+    assert anthropic_metrics.json()["requests_60s"] == 2
+    assert anthropic_metrics.json()["tokens_60s"] == 30
+
+    unknown_metrics = client.get(f"/api/v1/metrics/realtime?project_id={project_id}&provider=unknown-provider")
+    assert unknown_metrics.status_code == 200
+    assert unknown_metrics.json()["requests_60s"] == 0
+    assert unknown_metrics.json()["tokens_60s"] == 0
 
     rolling = app.dependency_overrides[get_metrics_service]()._realtime_counters  # type: ignore[attr-defined]
     openai_req, _ = rolling.get_project_60s(scoped_project_provider_id(project_id, "openai"))
     anthropic_req, _ = rolling.get_project_60s(scoped_project_provider_id(project_id, "anthropic"))
     assert openai_req == 3
-    assert anthropic_req == 0
+    assert anthropic_req == 2
 
     _cleanup_overrides()

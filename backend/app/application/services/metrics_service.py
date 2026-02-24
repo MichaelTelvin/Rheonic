@@ -22,14 +22,14 @@ class MetricsService:
         self._protect_action_store = protect_action_store
         self._project_repository = project_repository
 
-    def get_realtime(self, project_id: str) -> dict[str, int]:
+    def get_realtime(self, project_id: str, provider: str | None = None) -> dict[str, int]:
         # Return realtime request/token counters aggregated across project providers.
         try:
             requests_60s = 0
             tokens_60s = 0
-            for provider in self._project_providers_for_aggregation(project_id):
+            for scoped_provider in self._project_providers_for_aggregation(project_id=project_id, provider=provider):
                 provider_requests, provider_tokens = self._realtime_counters.get_project_60s(
-                    scoped_project_provider_id(project_id, provider),
+                    scoped_project_provider_id(project_id, scoped_provider),
                 )
                 requests_60s += provider_requests
                 tokens_60s += provider_tokens
@@ -42,7 +42,7 @@ class MetricsService:
             logger.exception("Metrics service failed", extra={"project_id": project_id})
             raise
 
-    def get_protect_metrics(self, project_id: str) -> dict[str, object]:
+    def get_protect_metrics(self, project_id: str, provider: str | None = None) -> dict[str, object]:
         # Return normalized protect counters and latency metrics aggregated across providers.
         try:
             totals: dict[str, int] = {
@@ -55,8 +55,8 @@ class MetricsService:
             latencies_p95: list[int] = []
             latest_last: dict[str, str] | None = None
             latest_last_ts = ""
-            for provider in self._project_providers_for_aggregation(project_id):
-                raw = self._protect_action_store.get_metrics(project_id=scoped_project_provider_id(project_id, provider))
+            for scoped_provider in self._project_providers_for_aggregation(project_id=project_id, provider=provider):
+                raw = self._protect_action_store.get_metrics(project_id=scoped_project_provider_id(project_id, scoped_provider))
                 totals["allowed_60m"] += int(raw.get("allowed_60m", 0) or 0)
                 totals["warned_60m"] += int(raw.get("warned_60m", 0) or 0)
                 totals["blocked_60m"] += int(raw.get("blocked_60m", 0) or 0)
@@ -86,14 +86,14 @@ class MetricsService:
             logger.exception("Protect metrics service failed", extra={"project_id": project_id})
             raise
 
-    def get_protect_health(self, project_id: str) -> dict[str, object]:
+    def get_protect_health(self, project_id: str, provider: str | None = None) -> dict[str, object]:
         # Return protect preflight health metrics aggregated across providers.
         try:
             p50_values: list[int] = []
             p95_values: list[int] = []
             timeouts_60m = 0
-            for provider in self._project_providers_for_aggregation(project_id):
-                metrics = self._protect_action_store.get_health(project_id=scoped_project_provider_id(project_id, provider))
+            for scoped_provider in self._project_providers_for_aggregation(project_id=project_id, provider=provider):
+                metrics = self._protect_action_store.get_health(project_id=scoped_project_provider_id(project_id, scoped_provider))
                 if isinstance(metrics.get("p50_ms"), int):
                     p50_values.append(int(metrics["p50_ms"]))
                 if isinstance(metrics.get("p95_ms"), int):
@@ -110,8 +110,12 @@ class MetricsService:
             logger.exception("Protect health service failed", extra={"project_id": project_id})
             raise
 
-    def _project_providers_for_aggregation(self, project_id: str) -> list[str]:
-        # Return providers to sum for project-level dashboard metrics.
+    def _project_providers_for_aggregation(self, project_id: str, provider: str | None = None) -> list[str]:
+        # Return providers to sum for project-level dashboard metrics or one selected provider.
+        if provider:
+            return [provider]
         providers = self._project_repository.list_project_providers(project_id=project_id)
-        # Keep unknown scope in totals to include legacy/partial rows.
-        return sorted(set(providers + ["openai", "anthropic", "google", "unknown"]))
+        if providers:
+            return providers
+        # Fallback keeps protect counters visible for projects with preflight traffic before first ingest event.
+        return ["openai", "anthropic", "google", "unknown"]

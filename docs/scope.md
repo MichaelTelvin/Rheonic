@@ -58,6 +58,7 @@ Dashboard and auth
 - Project and ingest key management
 - Protect settings UI
 - Realtime metrics and incidents view
+- Provider-aware dashboard filtering (`GET /api/v1/projects/{project_id}/providers` + optional `provider` query on metrics endpoints)
 - Protect counters and latency cards
 
 Alerts

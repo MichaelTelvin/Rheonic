@@ -29,6 +29,11 @@ class ProjectService:
             logger.exception("Project service list failed")
             raise
 
+    def list_project_providers(self, project_id: str, user_id: str) -> list[str]:
+        # Return distinct providers used by one owned project.
+        self.ensure_project_owned_by_user(project_id=project_id, user_id=user_id)
+        return self._project_repository.list_project_providers(project_id=project_id)
+
     def create_project(self, name: str, user_id: str) -> Project:
         # Create a new project after validation and duplicate check.
         try:

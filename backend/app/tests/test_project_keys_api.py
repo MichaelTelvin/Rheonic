@@ -8,7 +8,7 @@ from app.application.services.project_service import ProjectService
 from app.dependencies import get_current_user, get_ingest_event_service, get_ingest_key_service, get_project_service
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
-from app.infrastructure.db.models import Base, IngestKeyRecord
+from app.infrastructure.db.models import Base, IngestKeyRecord, ProjectModelRecord
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.main import app
@@ -168,4 +168,56 @@ def test_key_routes_are_scoped_to_project_owner(tmp_path) -> None:
     create_response = client.post(f"/api/v1/projects/{project_id}/keys", json={"name": "prod"})
     assert list_response.status_code == 404
     assert create_response.status_code == 404
+    _cleanup_overrides()
+
+
+def test_project_providers_endpoint_returns_sorted_distinct_values(tmp_path) -> None:
+    # Providers endpoint should return de-duplicated sorted providers for one project.
+    client, session_factory, _ = _make_client(tmp_path)
+    project = client.post("/api/v1/projects", json={"name": "Provider List Project"}).json()
+    project_id = project["id"]
+
+    with session_factory.create_session() as session:
+        session.add_all(
+            [
+                ProjectModelRecord(
+                    id="pm-1",
+                    project_id=project_id,
+                    provider="openai",
+                    model="gpt-4o-mini",
+                    first_seen_at=datetime.now(timezone.utc),
+                ),
+                ProjectModelRecord(
+                    id="pm-2",
+                    project_id=project_id,
+                    provider="openai",
+                    model="gpt-4.1",
+                    first_seen_at=datetime.now(timezone.utc),
+                ),
+                ProjectModelRecord(
+                    id="pm-3",
+                    project_id=project_id,
+                    provider="anthropic",
+                    model="claude-3-5-sonnet",
+                    first_seen_at=datetime.now(timezone.utc),
+                ),
+            ]
+        )
+        session.commit()
+
+    response = client.get(f"/api/v1/projects/{project_id}/providers")
+    assert response.status_code == 200
+    assert response.json() == {"providers": ["anthropic", "openai"]}
+    _cleanup_overrides()
+
+
+def test_project_providers_endpoint_returns_empty_list_when_none_seen(tmp_path) -> None:
+    # Providers endpoint should return an empty list for projects without recorded models.
+    client, _, _ = _make_client(tmp_path)
+    project = client.post("/api/v1/projects", json={"name": "No Providers Yet"}).json()
+    project_id = project["id"]
+
+    response = client.get(f"/api/v1/projects/{project_id}/providers")
+    assert response.status_code == 200
+    assert response.json() == {"providers": []}
     _cleanup_overrides()

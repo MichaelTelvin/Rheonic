@@ -4,6 +4,7 @@ import {
   ApiError,
   fetchIncidents,
   fetchMetrics,
+  fetchProjectProviders,
   fetchProtectMetrics,
   fetchProjectProtect,
   resolveIncident,
@@ -16,6 +17,14 @@ import { Sparkline } from "../components/Sparkline";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
 import { formatNumber, formatTime } from "./dashboardUtils";
+
+function formatProviderLabel(provider: string): string {
+  return provider
+    .split(/[_-]/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 export function Dashboard(): JSX.Element {
   const { projectId } = useProjectContext();
@@ -44,6 +53,8 @@ export function Dashboard(): JSX.Element {
   } | null>(null);
   const [globalBanner, setGlobalBanner] = useState<string | null>(null);
   const [protectEnabled, setProtectEnabled] = useState<boolean>(false);
+  const [providers, setProviders] = useState<string[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string>("all");
 
   const sortedIncidents = useMemo(
     () => [...incidents].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
@@ -61,6 +72,35 @@ export function Dashboard(): JSX.Element {
     setProtectEnabled(false);
     setProtectDecisionStats(null);
     setProtectHealthStats(null);
+    setProviders([]);
+    setSelectedProvider("all");
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadProviders = async (): Promise<void> => {
+      try {
+        const items = await fetchProjectProviders(projectId);
+        if (!cancelled) {
+          setProviders(items);
+          setSelectedProvider((current) => (current !== "all" && !items.includes(current) ? "all" : current));
+        }
+      } catch {
+        if (!cancelled) {
+          setProviders([]);
+          setSelectedProvider("all");
+        }
+      }
+    };
+
+    void loadProviders();
+    return () => {
+      cancelled = true;
+    };
   }, [projectId]);
 
   useEffect(() => {
@@ -94,9 +134,10 @@ export function Dashboard(): JSX.Element {
     }
 
     let cancelled = false;
+    const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
     const loadProtectStats = async (): Promise<void> => {
       try {
-        const data = await fetchProtectMetrics(projectId);
+        const data = await fetchProtectMetrics(projectId, providerQuery);
         if (cancelled) {
           return;
         }
@@ -127,7 +168,7 @@ export function Dashboard(): JSX.Element {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [projectId]);
+  }, [projectId, selectedProvider]);
 
   useEffect(() => {
     if (!projectId) {
@@ -137,10 +178,11 @@ export function Dashboard(): JSX.Element {
 
     let cancelled = false;
     setLoadingMetrics(true);
+    const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
 
     const loadMetrics = async (): Promise<void> => {
       try {
-        const data = await fetchMetrics(projectId);
+        const data = await fetchMetrics(projectId, providerQuery);
         if (cancelled) {
           return;
         }
@@ -178,7 +220,7 @@ export function Dashboard(): JSX.Element {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [projectId]);
+  }, [projectId, selectedProvider]);
 
   useEffect(() => {
     if (!projectId) {
@@ -300,6 +342,23 @@ export function Dashboard(): JSX.Element {
           </section>
         ) : (
           <>
+            <section className="dashboard-controls">
+              <div className="toolbar">
+                <label htmlFor="dashboard-provider-select">Provider</label>
+                <select
+                  id="dashboard-provider-select"
+                  value={selectedProvider}
+                  onChange={(event) => setSelectedProvider(event.target.value)}
+                >
+                  <option value="all">All</option>
+                  {providers.map((provider) => (
+                    <option key={provider} value={provider}>
+                      {formatProviderLabel(provider)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </section>
             <section className="metrics-grid">
               <Card>
                 <h2 className="card-title">Requests (60s)</h2>

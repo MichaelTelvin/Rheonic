@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => {
     ApiError: HoistedApiError,
     fetchMetrics: vi.fn(),
     fetchIncidents: vi.fn(),
+    fetchProjectProviders: vi.fn(),
     fetchProjectProtect: vi.fn(),
     fetchProtectMetrics: vi.fn(),
     resolveIncident: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock("../api/client", () => {
     ApiError: mocks.ApiError,
     fetchMetrics: (...args: unknown[]) => mocks.fetchMetrics(...args),
     fetchIncidents: (...args: unknown[]) => mocks.fetchIncidents(...args),
+    fetchProjectProviders: (...args: unknown[]) => mocks.fetchProjectProviders(...args),
     fetchProjectProtect: (...args: unknown[]) => mocks.fetchProjectProtect(...args),
     fetchProtectMetrics: (...args: unknown[]) => mocks.fetchProtectMetrics(...args),
     resolveIncident: (...args: unknown[]) => mocks.resolveIncident(...args),
@@ -43,6 +45,7 @@ describe("Dashboard", () => {
   beforeEach(() => {
     mocks.fetchMetrics.mockReset();
     mocks.fetchIncidents.mockReset();
+    mocks.fetchProjectProviders.mockReset();
     mocks.fetchProjectProtect.mockReset();
     mocks.fetchProtectMetrics.mockReset();
     mocks.resolveIncident.mockReset();
@@ -54,6 +57,7 @@ describe("Dashboard", () => {
     });
     mocks.fetchMetrics.mockResolvedValue({ requests_60s: 3, tokens_60s: 42 });
     mocks.fetchIncidents.mockResolvedValue([]);
+    mocks.fetchProjectProviders.mockResolvedValue(["anthropic", "openai"]);
     mocks.fetchProjectProtect.mockResolvedValue({
       protect_enabled: false,
       protect_fail_mode: "open",
@@ -80,10 +84,48 @@ describe("Dashboard", () => {
 
   it("loads metrics and incidents for selected project", async () => {
     render(<Dashboard />);
-    await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1"));
+    await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1", undefined));
     expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1");
     expect(screen.getByText("Requests (60s)")).toBeDefined();
     expect(screen.getByText("Tokens (60s)")).toBeDefined();
+  });
+
+  it("loads provider list and applies provider filter to metrics calls", async () => {
+    render(<Dashboard />);
+
+    await waitFor(() => expect(mocks.fetchProjectProviders).toHaveBeenCalledWith("p1"));
+    const providerSelect = await screen.findByLabelText("Provider");
+    fireEvent.change(providerSelect, { target: { value: "openai" } });
+
+    await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1", "openai"));
+    expect(mocks.fetchProtectMetrics).toHaveBeenCalledWith("p1", "openai");
+
+    fireEvent.change(providerSelect, { target: { value: "all" } });
+    await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1", undefined));
+  });
+
+  it("resets provider filter to All when project changes", async () => {
+    const context = {
+      projectId: "p1",
+      projects: [{ id: "p1", name: "Demo", created_at: new Date().toISOString() }],
+    };
+    mocks.useProjectContext.mockImplementation(() => context);
+    const { rerender } = render(<Dashboard />);
+
+    const providerSelect = await screen.findByLabelText("Provider");
+    fireEvent.change(providerSelect, { target: { value: "openai" } });
+    await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1", "openai"));
+
+    context.projectId = "p2";
+    context.projects = [
+      { id: "p1", name: "Demo", created_at: new Date().toISOString() },
+      { id: "p2", name: "Two", created_at: new Date().toISOString() },
+    ];
+    mocks.fetchProjectProviders.mockResolvedValueOnce(["anthropic"]);
+    rerender(<Dashboard />);
+
+    await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p2", undefined));
+    expect((screen.getByLabelText("Provider") as HTMLSelectElement).value).toBe("all");
   });
 
   it("shows forbidden warning when metrics request fails with 403", async () => {

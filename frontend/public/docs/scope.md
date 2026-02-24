@@ -14,10 +14,10 @@ Backend foundation
 
 Event ingest and realtime
 - `POST /api/v1/events`
-- Redis rolling 60s counters
+- Redis rolling 60s counters scoped by `(project_id, provider)`
 - Postgres event persistence
 - Idempotency and ingest key rate limiting
-- Realtime metrics endpoints
+- Realtime metrics endpoints (project totals aggregated across providers; optional provider filter)
 
 Incident engine
 - Baseline snapshots and freeze while incident is open
@@ -55,6 +55,7 @@ Dashboard and auth
 - Project and ingest key management
 - Protect settings UI
 - Realtime metrics and incidents view
+- Provider-aware dashboard filtering (`GET /api/v1/projects/{project_id}/providers` + optional `provider` query on metrics endpoints)
 - Protect counters and latency cards
 
 Alerts

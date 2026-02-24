@@ -32,6 +32,15 @@ Counters represent **activity over the last ~60 seconds**:
 
 These are computed from the system’s rolling window implementation in Redis.
 
+### Provider Scope
+Protect runtime state is scoped by **(project_id, provider)**:
+- incidents and severity cache are provider-scoped
+- rolling counters are provider-scoped
+- protect decisions are provider-scoped
+
+Dashboard metric endpoints keep project-level totals by summing across providers, with unchanged response schemas.
+Dashboard metrics also support an optional provider filter (`provider=<name>`) for drilldown without changing response shapes.
+
 ### Incident Severity Cache (fast path)
 Redis key:
 - `incsev:{project_id}` = `none|low|medium|high`
@@ -210,6 +219,13 @@ Show:
 
 Data comes from a backend endpoint:
 GET /api/v1/metrics/protect?project_id=... (JWT auth, ownership enforced)
+
+Provider filter support:
+- Dashboard can request provider-scoped metrics with `provider=<name>` on:
+  - `GET /api/v1/metrics/realtime`
+  - `GET /api/v1/metrics/protect`
+  - `GET /api/v1/metrics/protect/health`
+- When omitted, backend returns project totals aggregated across providers.
 
 ⸻
 

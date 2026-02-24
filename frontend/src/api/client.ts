@@ -42,6 +42,10 @@ export interface ProjectItem {
   created_at: string;
 }
 
+export interface ProjectProvidersResponse {
+  providers: string[];
+}
+
 export interface ProjectProtectSettings {
   protect_enabled: boolean;
   protect_fail_mode: "open" | "closed" | string;
@@ -239,16 +243,19 @@ export async function login(email: string, password: string): Promise<LoginRespo
   });
 }
 
-export async function fetchMetrics(projectId: string): Promise<RealtimeMetrics> {
-  return request<RealtimeMetrics>(`/api/v1/metrics/realtime?project_id=${encodeURIComponent(projectId)}`);
+export async function fetchMetrics(projectId: string, provider?: string): Promise<RealtimeMetrics> {
+  const providerQuery = provider ? `&provider=${encodeURIComponent(provider)}` : "";
+  return request<RealtimeMetrics>(`/api/v1/metrics/realtime?project_id=${encodeURIComponent(projectId)}${providerQuery}`);
 }
 
-export async function fetchProtectMetrics(projectId: string): Promise<ProtectMetrics> {
-  return request<ProtectMetrics>(`/api/v1/metrics/protect?project_id=${encodeURIComponent(projectId)}`);
+export async function fetchProtectMetrics(projectId: string, provider?: string): Promise<ProtectMetrics> {
+  const providerQuery = provider ? `&provider=${encodeURIComponent(provider)}` : "";
+  return request<ProtectMetrics>(`/api/v1/metrics/protect?project_id=${encodeURIComponent(projectId)}${providerQuery}`);
 }
 
-export async function fetchProtectHealth(projectId: string): Promise<ProtectHealthMetrics> {
-  return request<ProtectHealthMetrics>(`/api/v1/metrics/protect/health?project_id=${encodeURIComponent(projectId)}`);
+export async function fetchProtectHealth(projectId: string, provider?: string): Promise<ProtectHealthMetrics> {
+  const providerQuery = provider ? `&provider=${encodeURIComponent(provider)}` : "";
+  return request<ProtectHealthMetrics>(`/api/v1/metrics/protect/health?project_id=${encodeURIComponent(projectId)}${providerQuery}`);
 }
 
 export async function fetchProjectProtect(projectId: string): Promise<ProjectProtectSettings> {
@@ -299,6 +306,11 @@ export async function resolveIncident(id: string): Promise<{ status: string }> {
 
 export async function fetchProjects(): Promise<ProjectItem[]> {
   return request<ProjectItem[]>("/api/v1/projects");
+}
+
+export async function fetchProjectProviders(projectId: string): Promise<string[]> {
+  const response = await request<ProjectProvidersResponse>(`/api/v1/projects/${encodeURIComponent(projectId)}/providers`);
+  return response.providers;
 }
 
 export async function createProject(name: string): Promise<ProjectItem> {
