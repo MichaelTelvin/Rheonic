@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     auto_close_run_interval_seconds: int = 60
     event_retention_days: int = 30
     protect_block_cooldown_seconds: int = 60
+    ingest_allow_unowned_project: bool = False
     webhook_allow_private_hosts: bool = False
     webhook_secret_encryption_key: str = ""
 

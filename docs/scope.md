@@ -94,3 +94,6 @@ Alerts channels
 Productization
 - Public docs/onboarding refinement
 - Commercial packaging and billing controls
+
+Multitenancy evolution
+- Org/workspace RBAC multitenancy (roles, resource scoping, and delegated access)

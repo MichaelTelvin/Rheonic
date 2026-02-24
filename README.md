@@ -34,7 +34,7 @@ across OpenAI, Anthropic, and Gemini.
 - Backend: FastAPI
 - Database: PostgreSQL
 - Realtime counters: Redis
-- Worker: RQ/Celery
+- Worker: RQ
 - Frontend: React + Vite + TypeScript
 - SDKs: Python (v1), Node (v1.1)
 
