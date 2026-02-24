@@ -60,6 +60,6 @@ class IncidentRepository(ABC):
         *,
         cutoff: datetime,
         resolved_at: datetime,
-    ) -> tuple[int, set[str]]:
-        # Auto-resolve stale open incidents and return (count, affected_project_ids).
+    ) -> tuple[list[Incident], set[str]]:
+        # Auto-resolve stale open incidents and return (resolved_incidents, affected_project_ids).
         raise NotImplementedError

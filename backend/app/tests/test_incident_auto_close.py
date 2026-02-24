@@ -71,6 +71,25 @@ class FakeRedisClient:
         return [member.encode("utf-8") for member, _ in selected]
 
 
+class FakeWebhookDispatcher:
+    # Captures webhook dispatch enqueue calls.
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, object], str]] = []
+
+    def enqueue(
+        self,
+        project_id: str,
+        payload: dict[str, object],
+        event_type: str,
+        *,
+        override_url: str | None = None,
+        override_secret: str | None = None,
+        force_send: bool = False,
+    ) -> None:
+        _ = (override_url, override_secret, force_send)
+        self.calls.append((project_id, payload, event_type))
+
+
 def _setup_db(tmp_path) -> DatabaseSessionFactory:
     db_url = f"sqlite:///{tmp_path}/incident_auto_close.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
@@ -215,3 +234,41 @@ def test_protect_decision_ignores_auto_resolved_incidents(tmp_path) -> None:
     assert decision is not None
     assert decision.decision == "allow"
     assert decision.reason == "ok"
+
+
+def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
+    session_factory = _setup_db(tmp_path)
+    now = datetime.now(timezone.utc)
+    old_seen = now - timedelta(minutes=20)
+    dispatcher = FakeWebhookDispatcher()
+
+    with session_factory.create_session() as session:
+        session.add(
+            IncidentRecord(
+                id="inc-old-webhook",
+                project_id="p1",
+                type="burn_spike",
+                severity="high",
+                status="open",
+                evidence={"provider": "openai", "model": "gpt-4o-mini", "environment": "prod"},
+                created_at=old_seen,
+                last_seen_at=old_seen,
+                resolved_at=None,
+            )
+        )
+        session.commit()
+
+    service = AutoCloseIncidentsService(
+        incident_repository=IncidentRepositoryImpl(session_factory=session_factory),
+        incident_severity_cache=None,
+        cooldown_seconds=300,
+        webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
+    )
+    resolved_count = service.auto_close(now=now)
+    assert resolved_count == 1
+    assert len(dispatcher.calls) == 1
+    _, payload, event_type = dispatcher.calls[0]
+    assert event_type == "incident.resolved"
+    assert payload["event"] == "incident.resolved"
+    assert payload["resolved_by"] == "auto"
+    assert payload["incident_id"] == "inc-old-webhook"

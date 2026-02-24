@@ -170,7 +170,7 @@ class IncidentRepositoryImpl(IncidentRepository):
         *,
         cutoff: datetime,
         resolved_at: datetime,
-    ) -> tuple[int, set[str]]:
+    ) -> tuple[list[Incident], set[str]]:
         # Mark stale open incidents as auto_resolved.
         try:
             with self._session_factory.create_session() as session:
@@ -186,15 +186,16 @@ class IncidentRepositoryImpl(IncidentRepository):
                     .all()
                 )
                 if not records:
-                    return 0, set()
+                    return [], set()
                 project_ids = {record.project_id for record in records}
                 for record in records:
                     record.status = "auto_resolved"
                     record.resolved_at = resolved_at
                     session.add(record)
                 session.commit()
+                resolved_incidents = [_to_domain(record) for record in records]
             logger.info("Stale incidents auto-resolved", extra={"count": len(records)})
-            return len(records), project_ids
+            return resolved_incidents, project_ids
         except Exception:
             logger.exception("Failed auto-resolving stale incidents")
             raise

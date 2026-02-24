@@ -57,6 +57,25 @@ class FakeRealtimeStore:
         self.locks.discard(key)
 
 
+class FakeWebhookDispatcher:
+    # Captures webhook dispatch enqueue calls.
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, object], str]] = []
+
+    def enqueue(
+        self,
+        project_id: str,
+        payload: dict[str, object],
+        event_type: str,
+        *,
+        override_url: str | None = None,
+        override_secret: str | None = None,
+        force_send: bool = False,
+    ) -> None:
+        _ = (override_url, override_secret, force_send)
+        self.calls.append((project_id, payload, event_type))
+
+
 class FakeProjectService:
     # Minimal ownership verifier for resolve endpoint tests.
     def ensure_project_owned_by_user(self, project_id: str, user_id: str) -> Project:
@@ -74,9 +93,11 @@ def test_resolve_endpoint_marks_resolved_and_deletes_lock() -> None:
     # Resolve endpoint should update incident status and remove dedupe key.
     repo = FakeIncidentRepository()
     realtime = FakeRealtimeStore()
+    dispatcher = FakeWebhookDispatcher()
     service = DetectIncidentsService(
         incident_repository=repo,  # type: ignore[arg-type]
         realtime_counters=realtime,  # type: ignore[arg-type]
+        webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
     )
 
     app.dependency_overrides[get_detect_incidents_service] = lambda: service
@@ -94,5 +115,11 @@ def test_resolve_endpoint_marks_resolved_and_deletes_lock() -> None:
     assert response.status_code == 200
     assert response.json() == {"status": "resolved"}
     assert incident_open_lock_key("p1", "burn_spike") not in realtime.locks
+    assert len(dispatcher.calls) == 1
+    _, payload, event_type = dispatcher.calls[0]
+    assert event_type == "incident.resolved"
+    assert payload["event"] == "incident.resolved"
+    assert payload["resolved_by"] == "manual"
+    assert payload["incident_id"] == "inc-1"
 
     app.dependency_overrides.clear()

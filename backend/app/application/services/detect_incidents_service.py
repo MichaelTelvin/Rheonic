@@ -1,6 +1,9 @@
 # Application service for incident detection.
+from datetime import datetime, timezone
+
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.incident_repository import IncidentRepository
+from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.domain.models.incident import Incident
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.logger import get_logger
@@ -16,11 +19,13 @@ class DetectIncidentsService:
         incident_repository: IncidentRepository,
         realtime_counters: RealtimeCounterStore,
         incident_severity_cache: IncidentSeverityCache | None = None,
+        webhook_dispatcher: WebhookDispatcher | None = None,
     ) -> None:
         # Initialize dependencies.
         self._incident_repository = incident_repository
         self._realtime_counters = realtime_counters
         self._incident_severity_cache = incident_severity_cache
+        self._webhook_dispatcher = webhook_dispatcher
 
     def detect(self) -> list[object]:
         # Detect incidents and return incident DTOs.
@@ -64,10 +69,41 @@ class DetectIncidentsService:
                     project_id=incident.project_id,
                     severity=_highest_severity(open_incidents),
                 )
+            self._enqueue_incident_resolved_webhook(incident=incident, resolved_by="manual")
             return incident
         except Exception:
             logger.exception("Resolve incident service failed", extra={"incident_id": incident_id})
             raise
+
+    def _enqueue_incident_resolved_webhook(self, *, incident: Incident, resolved_by: str) -> None:
+        # Enqueue webhook for incident resolution state changes.
+        if self._webhook_dispatcher is None:
+            return
+        provider, model, environment = _incident_dimensions(incident)
+        resolved_at = incident.resolved_at or datetime.now(timezone.utc)
+        payload = {
+            "event": "incident.resolved",
+            "project_id": incident.project_id,
+            "incident_id": incident.id,
+            "incident_type": incident.incident_type,
+            "severity": incident.severity,
+            "resolved_by": resolved_by,
+            "resolved_at": resolved_at.isoformat(),
+            "created_at": incident.created_at.isoformat(),
+            "last_seen_at": incident.last_seen_at.isoformat() if incident.last_seen_at is not None else None,
+            "provider": provider,
+            "model": model,
+            "environment": environment,
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            self._webhook_dispatcher.enqueue(
+                project_id=incident.project_id,
+                payload=payload,
+                event_type="incident.resolved",
+            )
+        except Exception:
+            logger.exception("Failed to enqueue manual incident resolved webhook", extra={"incident_id": incident.id})
 
 
 def _highest_severity(incidents: list[Incident]) -> str:
@@ -78,3 +114,16 @@ def _highest_severity(incidents: list[Incident]) -> str:
         if ranking.get(incident.severity, 0) > ranking.get(highest, 0):
             highest = incident.severity
     return highest
+
+
+def _incident_dimensions(incident: Incident) -> tuple[str | None, str | None, str | None]:
+    # Extract provider/model/environment from incident evidence when present.
+    evidence = incident.evidence or {}
+    provider = evidence.get("provider")
+    model = evidence.get("model")
+    environment = evidence.get("environment")
+    return (
+        str(provider) if isinstance(provider, str) else None,
+        str(model) if isinstance(model, str) else None,
+        str(environment) if isinstance(environment, str) else None,
+    )

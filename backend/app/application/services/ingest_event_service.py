@@ -194,12 +194,14 @@ class IngestEventService:
                     incident_id=open_incident.id,
                     event=event,
                     incident_type=incident_type,
+                    previous_severity=open_incident.severity,
                     severity=updated_severity,
                     created_at=open_incident.created_at,
                     last_seen_at=now,
                     evidence=evidence,
                     requests_60s=requests_60s,
                     tokens_60s=tokens_60s,
+                    source="escalation",
                 )
             if self._incident_severity_cache is not None:
                 self._incident_severity_cache.set(project_id=event.project_id, severity=updated_severity)
@@ -227,12 +229,14 @@ class IngestEventService:
                 incident_id=incident.id,
                 event=event,
                 incident_type=incident_type,
+                previous_severity=None,
                 severity=severity,
                 created_at=incident.created_at,
                 last_seen_at=now,
                 evidence=evidence,
                 requests_60s=requests_60s,
                 tokens_60s=tokens_60s,
+                source="opened_high",
             )
         if self._incident_severity_cache is not None:
             self._incident_severity_cache.set(project_id=event.project_id, severity=severity)
@@ -331,12 +335,14 @@ class IngestEventService:
         incident_id: str,
         event: Event,
         incident_type: str,
+        previous_severity: str | None,
         severity: str,
         created_at: datetime,
         last_seen_at: datetime,
         evidence: dict[str, object],
         requests_60s: int,
         tokens_60s: int,
+        source: str,
     ) -> None:
         # Enqueue high-severity incident webhook if dispatcher is configured.
         if severity != "high" or self._webhook_dispatcher is None:
@@ -351,6 +357,17 @@ class IngestEventService:
         payload = {
             "event": "incident.high",
             "project_id": event.project_id,
+            "incident_id": incident_id,
+            "incident_type": incident_type,
+            "prev_severity": previous_severity,
+            "severity": severity,
+            "provider": event.provider,
+            "model": event.model,
+            "environment": event.environment,
+            "created_at": created_at.isoformat(),
+            "last_seen_at": last_seen_at.isoformat(),
+            "sent_at": datetime.now(timezone.utc).isoformat(),
+            "source": source,
             "incident": {
                 "id": incident_id,
                 "type": incident_type,

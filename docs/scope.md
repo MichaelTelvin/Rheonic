@@ -87,6 +87,10 @@ Operational hardening
 - Expanded background job observability and failure persistence
 - Additional e2e scenarios for escalation and auto-close edge cases
 
+Alerts channels
+- Additional outbound channels beyond webhook (Slack, email, PagerDuty, etc.)
+- Channel routing, per-project preferences, and delivery/failure observability
+
 Productization
 - Public docs/onboarding refinement
 - Commercial packaging and billing controls

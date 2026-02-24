@@ -557,6 +557,12 @@ def test_incident_escalation_to_high_enqueues_once_without_duplicates() -> None:
     service.ingest(_build_event(project_id="p1"))  # remains high
 
     assert len(dispatcher.calls) == 1
+    _, payload, event_type = dispatcher.calls[0]
+    assert event_type == "incident.high"
+    assert payload["event"] == "incident.high"
+    assert payload["source"] == "escalation"
+    assert payload["prev_severity"] == "medium"
+    assert payload["severity"] == "high"
 
 
 def test_escalation_two_mild_hits_stays_low() -> None:
