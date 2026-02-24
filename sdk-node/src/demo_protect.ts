@@ -1,16 +1,38 @@
-import { createClient, instrumentOpenAI, LLMTBGBlockedError } from "./index.js";
+import { createClient, instrumentAnthropic, instrumentGemini, instrumentOpenAI, LLMTBGBlockedError } from "./index.js";
 
 const backendBaseUrl = process.env.LLMTBG_BACKEND_URL ?? "http://localhost:8000";
 const providerStubUrl = process.env.LLMTBG_PROVIDER_URL ?? "http://localhost:8099";
 
+function printProviderStubHelp(): void {
+    console.error(`Provider stub is unreachable at ${providerStubUrl}.`);
+    console.error("Start it with `python3 e2e/provider_stub.py` or set LLMTBG_PROVIDER_URL to a reachable endpoint.");
+}
+
 async function providerCount(): Promise<number> {
     const res = await fetch(`${providerStubUrl}/count`);
+    if (!res.ok) {
+        throw new Error(`provider_stub_count_failed:${res.status}`);
+    }
     const payload = await res.json() as { count?: number };
     return Number(payload.count ?? 0);
 }
 
 async function resetProvider(): Promise<void> {
-    await fetch(`${providerStubUrl}/reset`, { method: "POST" });
+    const res = await fetch(`${providerStubUrl}/reset`, { method: "POST" });
+    if (!res.ok) {
+        throw new Error(`provider_stub_reset_failed:${res.status}`);
+    }
+}
+
+async function callProviderStub(payload: unknown): Promise<void> {
+    const res = await fetch(`${providerStubUrl}/call`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        throw new Error(`provider_stub_call_failed:${res.status}`);
+    }
 }
 
 async function main() {
@@ -19,8 +41,27 @@ async function main() {
         console.error("LLMTBG_INGEST_KEY is required (create/copy a key from the dashboard).");
         process.exit(1);
     }
+    const provider = (process.env.LLMTBG_PROVIDER ?? "").trim().toLowerCase();
+    if (!provider) {
+        console.error("LLMTBG_PROVIDER is required (openai | anthropic | gemini).");
+        process.exit(1);
+    }
+    if (!["openai", "anthropic", "gemini"].includes(provider)) {
+        console.error(`LLMTBG_PROVIDER is unsupported: ${provider}`);
+        process.exit(1);
+    }
+    const model = (process.env.LLMTBG_MODEL ?? "").trim();
+    if (!model) {
+        console.error(`LLMTBG_MODEL is required for provider ${provider}.`);
+        process.exit(1);
+    }
 
-    await resetProvider();
+    try {
+        await resetProvider();
+    } catch {
+        printProviderStubHelp();
+        process.exit(1);
+    }
 
     const client = createClient({
         baseUrl: backendBaseUrl,
@@ -32,31 +73,52 @@ async function main() {
         flushIntervalMs: 60_000,
     });
 
-    // Fake OpenAI client that hits your local provider stub
+    // Fake provider clients that hit your local provider stub
     const openai = {
         chat: {
             completions: {
                 create: async (payload: any) => {
-                    await fetch(`${providerStubUrl}/call`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(payload),
-                    });
-                    return { model: payload.model ?? "gpt-4o-mini", usage: { total_tokens: 10 } };
+                    await callProviderStub(payload);
+                    return { model: payload.model, usage: { total_tokens: 10 } };
                 },
             },
         },
     };
+    const anthropic = {
+        messages: {
+            create: async (payload: any) => {
+                await callProviderStub(payload);
+                return {
+                    model: payload.model,
+                    usage: { input_tokens: 6, output_tokens: 4 },
+                };
+            },
+        },
+    };
+    const geminiModel = {
+        model,
+        generateContent: async (payload: any) => {
+            const requestPayload = typeof payload === "string" ? { prompt: payload } : payload;
+            await callProviderStub(requestPayload);
+            return {
+                response: {
+                    usageMetadata: { totalTokenCount: 10 },
+                },
+            };
+        },
+    };
 
     instrumentOpenAI(openai as any, { client, feature: "manual-protect-demo" });
+    instrumentAnthropic(anthropic as any, { client, feature: "manual-protect-demo" });
+    instrumentGemini(geminiModel as any, { client, feature: "manual-protect-demo" });
 
     const before = await providerCount();
 
     const scenario = (process.env.LLMTBG_SCENARIO ?? "allow").toLowerCase();
     const maxTokens = Number(process.env.LLMTBG_MAX_TOKENS ?? (scenario === "block" ? 2000 : 128));
     const inputTokens = Number(process.env.LLMTBG_INPUT_TOKENS ?? 10);
-    const providerRequest = {
-        model: "gpt-4o-mini",
+    const openaiRequest = {
+        model,
         messages: [
             {
                 role: "user",
@@ -65,19 +127,34 @@ async function main() {
         ],
         max_tokens: maxTokens,
     };
+    const anthropicRequest = {
+        model,
+        messages: [{ role: "user", content: `Protect demo request. scenario=${scenario}` }],
+        max_tokens: maxTokens,
+    };
+    const geminiRequest = `Protect demo request. scenario=${scenario}`;
+    console.log(`[DEMO] provider=${provider} model=${model} scenario=${scenario}`);
 
     try {
-        await (openai as any).chat.completions.create(providerRequest);
-        console.log(`[OK] Provider call executed (scenario=${scenario}).`);
+        if (provider === "anthropic") {
+            await (anthropic as any).messages.create(anthropicRequest);
+        } else if (provider === "gemini") {
+            await (geminiModel as any).generateContent(geminiRequest);
+        } else {
+            await (openai as any).chat.completions.create(openaiRequest);
+        }
+        console.log(`[OK] Provider call executed (provider=${provider}, scenario=${scenario}).`);
     } catch (err) {
         if (err instanceof LLMTBGBlockedError) {
-            console.log(`[BLOCKED] LLMTBGBlockedError thrown (scenario=${scenario}).`);
+            console.log(`[BLOCKED] LLMTBGBlockedError thrown (provider=${provider}, scenario=${scenario}).`);
         } else {
+            printProviderStubHelp();
             console.error("[ERROR] Unexpected error:", err);
             process.exitCode = 1;
         }
     } finally {
         await client.flush();
+        console.log("[DEMO] sdk delivery stats:", client.getStats());
         client.close();
     }
 

@@ -10,7 +10,9 @@
     "test": "npm run build && node --test dist/protectEngine.test.js"
   },
   "dependencies": {
-    "@dqbd/tiktoken": "^1.0.22"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@dqbd/tiktoken": "^1.0.22",
+    "@google/generative-ai": "^0.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.8.7",

@@ -1,7 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createClient, instrumentOpenAI, LLMTBGBlockedError } from "./index.js";
+import {
+  createClient,
+  instrumentAnthropic,
+  instrumentGemini,
+  instrumentOpenAI,
+  LLMTBGBlockedError,
+  LLMTBGValidationError,
+} from "./index.js";
+import { validateProviderModel } from "./providerModelValidation.js";
+import { __setInputTokenEstimatorForTests as __setAnthropicEstimatorForTests } from "./providers/anthropicAdapter.js";
+import { __setInputTokenEstimatorForTests as __setGeminiEstimatorForTests } from "./providers/geminiAdapter.js";
 import { __setInputTokenEstimatorForTests } from "./providers/openaiAdapter.js";
 
 function makeOpenAIStub() {
@@ -17,6 +27,31 @@ function makeOpenAIStub() {
     },
   };
   return { openai, calls };
+}
+
+function makeAnthropicStub() {
+  const calls: Array<unknown[]> = [];
+  const anthropic = {
+    messages: {
+      create: async (...args: unknown[]) => {
+        calls.push(args);
+        return { model: "claude-3-5-sonnet", usage: { input_tokens: 12, output_tokens: 28 } };
+      },
+    },
+  };
+  return { anthropic, calls };
+}
+
+function makeGeminiStub() {
+  const calls: Array<unknown[]> = [];
+  const geminiModel = {
+    model: "gemini-1.5-pro",
+    generateContent: async (...args: unknown[]) => {
+      calls.push(args);
+      return { response: { usageMetadata: { totalTokenCount: 35 } } };
+    },
+  };
+  return { geminiModel, calls };
 }
 
 test("observe mode skips decision endpoint and still calls provider", async () => {
@@ -581,4 +616,335 @@ test("invalid JSON fail-closed blocks provider call", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("anthropic allow path calls provider and emits telemetry", async () => {
+  const originalFetch = globalThis.fetch;
+  const ingestedEvents: Array<Record<string, unknown>> = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ decision: "allow", reason: "ok", fail_mode: "open", protect_decision_timeout_ms: 100 }),
+      } as Response;
+    }
+    if (url.endsWith("/api/v1/events")) {
+      if (typeof init?.body === "string") {
+        ingestedEvents.push(JSON.parse(init.body) as Record<string, unknown>);
+      }
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { anthropic, calls } = makeAnthropicStub();
+    instrumentAnthropic(anthropic, { client });
+    await anthropic.messages.create({
+      model: "claude-3-5-sonnet",
+      max_tokens: 256,
+      messages: [{ role: "user", content: "hello" }],
+    });
+    await client.flush();
+    assert.equal(calls.length, 1);
+    assert.equal(ingestedEvents.length, 1);
+    assert.equal(ingestedEvents[0].provider, "anthropic");
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("anthropic block path prevents provider call", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    ({
+      ok: true,
+      status: 200,
+      json: async () => ({ decision: "block", reason: "tok_limit", fail_mode: "open", protect_decision_timeout_ms: 100 }),
+    }) as Response) as typeof fetch;
+
+  try {
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { anthropic, calls } = makeAnthropicStub();
+    instrumentAnthropic(anthropic, { client });
+    await assert.rejects(
+      () => anthropic.messages.create({ model: "claude-3-5-sonnet", max_tokens: 128, messages: [{ role: "user", content: "hello" }] }),
+      LLMTBGBlockedError,
+    );
+    assert.equal(calls.length, 0);
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("anthropic includes input_tokens_estimate in decision payload", async () => {
+  const originalFetch = globalThis.fetch;
+  const decisionBodies: Array<Record<string, unknown>> = [];
+  __setAnthropicEstimatorForTests(() => 456);
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      if (typeof init?.body === "string") {
+        decisionBodies.push(JSON.parse(init.body) as Record<string, unknown>);
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ decision: "allow", reason: "ok", fail_mode: "open", protect_decision_timeout_ms: 100 }),
+      } as Response;
+    }
+    return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { anthropic } = makeAnthropicStub();
+    instrumentAnthropic(anthropic, { client });
+    await anthropic.messages.create({
+      model: "claude-3-5-sonnet",
+      max_tokens: 128,
+      messages: [{ role: "user", content: "hello world" }],
+    });
+    assert.equal(decisionBodies.length, 1);
+    assert.equal(decisionBodies[0].input_tokens_estimate, 456);
+    client.close();
+  } finally {
+    __setAnthropicEstimatorForTests(null);
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("gemini allow path calls provider and emits telemetry", async () => {
+  const originalFetch = globalThis.fetch;
+  const ingestedEvents: Array<Record<string, unknown>> = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ decision: "allow", reason: "ok", fail_mode: "open", protect_decision_timeout_ms: 100 }),
+      } as Response;
+    }
+    if (url.endsWith("/api/v1/events")) {
+      if (typeof init?.body === "string") {
+        ingestedEvents.push(JSON.parse(init.body) as Record<string, unknown>);
+      }
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { geminiModel, calls } = makeGeminiStub();
+    instrumentGemini(geminiModel, { client });
+    await geminiModel.generateContent("hello from gemini");
+    await client.flush();
+    assert.equal(calls.length, 1);
+    assert.equal(ingestedEvents.length, 1);
+    assert.equal(ingestedEvents[0].provider, "gemini");
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("gemini block path prevents provider call", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    ({
+      ok: true,
+      status: 200,
+      json: async () => ({ decision: "block", reason: "req_limit", fail_mode: "open", protect_decision_timeout_ms: 100 }),
+    }) as Response) as typeof fetch;
+
+  try {
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { geminiModel, calls } = makeGeminiStub();
+    instrumentGemini(geminiModel, { client });
+    await assert.rejects(() => geminiModel.generateContent("hello"), LLMTBGBlockedError);
+    assert.equal(calls.length, 0);
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("gemini includes input_tokens_estimate in decision payload", async () => {
+  const originalFetch = globalThis.fetch;
+  const decisionBodies: Array<Record<string, unknown>> = [];
+  __setGeminiEstimatorForTests(() => 654);
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      if (typeof init?.body === "string") {
+        decisionBodies.push(JSON.parse(init.body) as Record<string, unknown>);
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ decision: "allow", reason: "ok", fail_mode: "open", protect_decision_timeout_ms: 100 }),
+      } as Response;
+    }
+    return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { geminiModel } = makeGeminiStub();
+    instrumentGemini(geminiModel, { client });
+    await geminiModel.generateContent("hello world");
+    assert.equal(decisionBodies.length, 1);
+    assert.equal(decisionBodies[0].input_tokens_estimate, 654);
+    client.close();
+  } finally {
+    __setGeminiEstimatorForTests(null);
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("provider/model validation accepts openai gpt model", async () => {
+  const client = createClient({ protectEnabled: false, ingestKey: "k1", flushIntervalMs: 30_000 });
+  const { openai, calls } = makeOpenAIStub();
+  instrumentOpenAI(openai, { client });
+  await openai.chat.completions.create({ model: "gpt-4o-mini" });
+  assert.equal(calls.length, 1);
+  client.close();
+});
+
+test("provider/model validation accepts anthropic claude model", async () => {
+  const client = createClient({ protectEnabled: false, ingestKey: "k1", flushIntervalMs: 30_000 });
+  const { anthropic, calls } = makeAnthropicStub();
+  instrumentAnthropic(anthropic, { client });
+  await anthropic.messages.create({
+    model: "claude-3-5-sonnet",
+    max_tokens: 64,
+    messages: [{ role: "user", content: "hello" }],
+  });
+  assert.equal(calls.length, 1);
+  client.close();
+});
+
+test("provider/model validation accepts gemini model", async () => {
+  const client = createClient({ protectEnabled: false, ingestKey: "k1", flushIntervalMs: 30_000 });
+  const { geminiModel, calls } = makeGeminiStub();
+  instrumentGemini(geminiModel, { client });
+  await geminiModel.generateContent("hello");
+  assert.equal(calls.length, 1);
+  client.close();
+});
+
+test("provider/model validation does not enforce naming prefixes", async () => {
+  const client = createClient({ protectEnabled: false, ingestKey: "k1", flushIntervalMs: 30_000 });
+  const { anthropic, calls: anthropicCalls } = makeAnthropicStub();
+  instrumentAnthropic(anthropic, { client });
+  await anthropic.messages.create({
+    model: "gpt-4o-mini",
+    max_tokens: 64,
+    messages: [{ role: "user", content: "hello" }],
+  });
+
+  const { geminiModel, calls: geminiCalls } = makeGeminiStub();
+  (geminiModel as { model: string }).model = "claude-3-opus";
+  instrumentGemini(geminiModel, { client });
+  await geminiModel.generateContent("hello");
+
+  assert.equal(anthropicCalls.length, 1);
+  assert.equal(geminiCalls.length, 1);
+  client.close();
+});
+
+test("provider/model validation rejects anthropic call when model is missing", async () => {
+  const originalFetch = globalThis.fetch;
+  let decisionCalls = 0;
+  globalThis.fetch = (async (url: string) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      decisionCalls += 1;
+    }
+    return { ok: true, status: 202, json: async () => ({}) } as Response;
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { anthropic, calls } = makeAnthropicStub();
+    instrumentAnthropic(anthropic, { client });
+    await assert.rejects(
+      () =>
+        anthropic.messages.create({
+          max_tokens: 64,
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      LLMTBGValidationError,
+    );
+    assert.equal(calls.length, 0);
+    assert.equal(decisionCalls, 0);
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("provider/model validation rejects openai call when model is missing", async () => {
+  const originalFetch = globalThis.fetch;
+  let decisionCalls = 0;
+  globalThis.fetch = (async (url: string) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      decisionCalls += 1;
+    }
+    return { ok: true, status: 202, json: async () => ({}) } as Response;
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { openai, calls } = makeOpenAIStub();
+    instrumentOpenAI(openai, { client });
+    await assert.rejects(
+      () =>
+        openai.chat.completions.create({
+          messages: [{ role: "user", content: "hello" }],
+          max_tokens: 64,
+        }),
+      LLMTBGValidationError,
+    );
+    assert.equal(calls.length, 0);
+    assert.equal(decisionCalls, 0);
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("provider/model validation rejects gemini call when model is missing", async () => {
+  const originalFetch = globalThis.fetch;
+  let decisionCalls = 0;
+  globalThis.fetch = (async (url: string) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      decisionCalls += 1;
+    }
+    return { ok: true, status: 202, json: async () => ({}) } as Response;
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const { geminiModel, calls } = makeGeminiStub();
+    (geminiModel as { model?: string; modelName?: string }).model = "";
+    (geminiModel as { model?: string; modelName?: string }).modelName = "";
+    instrumentGemini(geminiModel, { client });
+    await assert.rejects(() => geminiModel.generateContent("hello"), LLMTBGValidationError);
+    assert.equal(calls.length, 0);
+    assert.equal(decisionCalls, 0);
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("provider/model validation rejects missing provider", async () => {
+  assert.throws(() => validateProviderModel("", "any-model"), LLMTBGValidationError);
+});
+
+test("provider/model validation rejects unknown provider", async () => {
+  assert.throws(() => validateProviderModel("cohere", "command-r"), LLMTBGValidationError);
 });

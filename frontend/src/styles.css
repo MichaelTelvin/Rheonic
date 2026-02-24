@@ -744,6 +744,14 @@ select {
   color: var(--muted);
   font-size: 0.86rem;
   margin: 0 0 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.incident-meta-relative {
+  min-width: 6ch;
+  font-variant-numeric: tabular-nums;
 }
 
 .incident-actions {

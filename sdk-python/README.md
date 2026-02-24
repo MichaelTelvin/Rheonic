@@ -17,6 +17,8 @@ pip install -e .
 - Optional: `protect_enabled` (default `False`; when `True`, SDK calls `POST /api/v1/protect/decision` preflight)
 - Demo env var: `LLMTBG_INGEST_KEY`
 
+Provider/model validation: SDK wrappers fail fast with `LLMTBGValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `gemini`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
+
 ## Integration Path 1: Manual Capture (generic)
 
 ```python
@@ -51,6 +53,29 @@ openai_client = instrument_openai(
     endpoint="/chat/completions",
     feature="assistant",
 )
+```
+
+## Integration Path 3: Anthropic and Gemini wrappers
+
+```python
+import os
+from anthropic import Anthropic
+import google.generativeai as genai
+
+from llmtokenburnguard import create_client
+
+client = create_client(ingest_key=os.environ["LLMTBG_INGEST_KEY"], protect_enabled=True)
+
+anthropic_client = client.instrument_anthropic(Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]))
+anthropic_client.messages.create(
+    model="claude-3-5-sonnet-latest",
+    max_tokens=256,
+    messages=[{"role": "user", "content": "Hello Claude"}],
+)
+
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+gemini_model = client.instrument_gemini(genai.GenerativeModel("gemini-1.5-pro"))
+gemini_model.generate_content("Hello Gemini")
 ```
 
 ## Verify it works

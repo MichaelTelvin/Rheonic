@@ -219,6 +219,60 @@ class Client:
         # Return whether protect preflight should run for provider calls.
         return self.protect_enabled
 
+    def instrument_openai(
+        self,
+        openai_client: Any,
+        environment: str | None = None,
+        endpoint: str | None = None,
+        feature: str | None = None,
+    ) -> Any:
+        # Convenience wrapper that instruments an OpenAI client with this SDK client.
+        from llmtokenburnguard.providers.openai_adapter import instrument_openai
+
+        return instrument_openai(
+            openai_client,
+            client=self,
+            environment=environment,
+            endpoint=endpoint,
+            feature=feature,
+        )
+
+    def instrument_anthropic(
+        self,
+        anthropic_client: Any,
+        environment: str | None = None,
+        endpoint: str | None = None,
+        feature: str | None = None,
+    ) -> Any:
+        # Convenience wrapper that instruments an Anthropic client with this SDK client.
+        from llmtokenburnguard.providers.anthropic_adapter import instrument_anthropic
+
+        return instrument_anthropic(
+            anthropic_client,
+            client=self,
+            environment=environment,
+            endpoint=endpoint,
+            feature=feature,
+        )
+
+    def instrument_gemini(
+        self,
+        gemini_model: Any,
+        environment: str | None = None,
+        endpoint: str | None = None,
+        feature: str | None = None,
+    ) -> Any:
+        # Convenience wrapper that instruments a Gemini model with this SDK client.
+        from llmtokenburnguard.providers.gemini_adapter import instrument_gemini
+
+        return instrument_gemini(
+            gemini_model,
+            client=self,
+            environment=environment,
+            endpoint=endpoint,
+            feature=feature,
+        )
+
     def _run_flush_loop(self) -> None:
         # Periodically flush queue until stopped.
         while not self._stop_event.wait(self.flush_interval_s):

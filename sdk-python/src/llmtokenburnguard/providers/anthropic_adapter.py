@@ -1,19 +1,295 @@
-# Anthropic adapter scaffolding.
+# Anthropic instrumentation wrapper.
+import inspect
+from time import perf_counter
+from typing import Any
+
+from llmtokenburnguard.client import Client, get_default_client
+from llmtokenburnguard.event_builder import build_event
 from llmtokenburnguard.logger import get_logger
+from llmtokenburnguard.provider_model_validation import validate_provider_model
+from llmtokenburnguard.protect_engine import LLMTBGBlockedError
+from llmtokenburnguard.token_estimator import estimate_input_tokens
 
 logger = get_logger(__name__)
 
+_token_estimator_override_for_tests: Any | None = None
 
-class AnthropicAdapter:
-    # Adapter interface implementation for Anthropic responses.
 
-    def extract_usage(self, response: object) -> dict[str, object]:
-        # Extract normalized usage metadata from a provider response.
+def _set_token_estimator_for_tests(estimator: Any | None) -> None:
+    # Test hook to override token estimator behavior deterministically.
+    global _token_estimator_override_for_tests
+    _token_estimator_override_for_tests = estimator
+
+
+def instrument_anthropic(
+    anthropic_client: Any,
+    client: Client | None = None,
+    environment: str | None = None,
+    endpoint: str | None = None,
+    feature: str | None = None,
+) -> Any:
+    # Instrument messages.create and emit usage events.
+    resolved_client = client or get_default_client()
+    if resolved_client is None:
+        return anthropic_client
+
+    messages = getattr(anthropic_client, "messages", None)
+    original_create = getattr(messages, "create", None)
+    if messages is None or not callable(original_create):
+        return anthropic_client
+
+    if inspect.iscoroutinefunction(original_create):
+
+        async def wrapped_create(*args: Any, **kwargs: Any) -> Any:
+            started_at = perf_counter()
+            request_payload = _extract_request_payload(args, kwargs)
+            requested_model = _extract_requested_model(args, kwargs)
+            validate_provider_model("anthropic", requested_model)
+            estimated_input_tokens = _estimate_input_tokens(request_payload)
+            protect_decision = _preflight(
+                sdk_client=resolved_client,
+                requested_model=requested_model,
+                estimated_input_tokens=estimated_input_tokens,
+                max_output_tokens=_extract_max_output_tokens(args, kwargs),
+                feature=feature,
+            )
+            if protect_decision.get("decision") == "block":
+                raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
+            try:
+                response = await original_create(*args, **kwargs)
+                _capture_success(
+                    sdk_client=resolved_client,
+                    response=response,
+                    latency_ms=int((perf_counter() - started_at) * 1000),
+                    requested_model=requested_model,
+                    estimated_input_tokens=estimated_input_tokens,
+                    environment=environment,
+                    endpoint=endpoint,
+                    feature=feature,
+                    protect_decision=str(protect_decision.get("decision") or "allow"),
+                    protect_reason=str(protect_decision.get("reason") or "ok"),
+                )
+                return response
+            except Exception as exc:
+                _capture_failure(
+                    sdk_client=resolved_client,
+                    exc=exc,
+                    latency_ms=int((perf_counter() - started_at) * 1000),
+                    requested_model=requested_model,
+                    estimated_input_tokens=estimated_input_tokens,
+                    environment=environment,
+                    endpoint=endpoint,
+                    feature=feature,
+                    protect_decision=str(protect_decision.get("decision") or "allow"),
+                    protect_reason=str(protect_decision.get("reason") or "ok"),
+                )
+                raise
+
+        messages.create = wrapped_create
+        return anthropic_client
+
+    def wrapped_create(*args: Any, **kwargs: Any) -> Any:
+        started_at = perf_counter()
+        request_payload = _extract_request_payload(args, kwargs)
+        requested_model = _extract_requested_model(args, kwargs)
+        validate_provider_model("anthropic", requested_model)
+        estimated_input_tokens = _estimate_input_tokens(request_payload)
+        protect_decision = _preflight(
+            sdk_client=resolved_client,
+            requested_model=requested_model,
+            estimated_input_tokens=estimated_input_tokens,
+            max_output_tokens=_extract_max_output_tokens(args, kwargs),
+            feature=feature,
+        )
+        if protect_decision.get("decision") == "block":
+            raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
         try:
-            _ = response
-            # TODO: Parse Anthropic response usage schema.
-            logger.debug("Anthropic adapter extract_usage called")
-            return {}
-        except Exception:
-            logger.exception("Anthropic adapter extract_usage failed")
+            response = original_create(*args, **kwargs)
+            _capture_success(
+                sdk_client=resolved_client,
+                response=response,
+                latency_ms=int((perf_counter() - started_at) * 1000),
+                requested_model=requested_model,
+                estimated_input_tokens=estimated_input_tokens,
+                environment=environment,
+                endpoint=endpoint,
+                feature=feature,
+                protect_decision=str(protect_decision.get("decision") or "allow"),
+                protect_reason=str(protect_decision.get("reason") or "ok"),
+            )
+            return response
+        except Exception as exc:
+            _capture_failure(
+                sdk_client=resolved_client,
+                exc=exc,
+                latency_ms=int((perf_counter() - started_at) * 1000),
+                requested_model=requested_model,
+                estimated_input_tokens=estimated_input_tokens,
+                environment=environment,
+                endpoint=endpoint,
+                feature=feature,
+                protect_decision=str(protect_decision.get("decision") or "allow"),
+                protect_reason=str(protect_decision.get("reason") or "ok"),
+            )
             raise
+
+    messages.create = wrapped_create
+    return anthropic_client
+
+
+def _preflight(
+    *,
+    sdk_client: Client,
+    requested_model: str | None,
+    estimated_input_tokens: int | None,
+    max_output_tokens: int | None,
+    feature: str | None,
+) -> dict[str, object]:
+    if not sdk_client.should_preflight_decision():
+        return {"decision": "allow", "reason": "protect_disabled"}
+    return sdk_client.preflight_protect_decision(
+        {
+            "provider": "anthropic",
+            "model": requested_model,
+            "feature": feature,
+            **({"input_tokens_estimate": estimated_input_tokens} if isinstance(estimated_input_tokens, int) else {}),
+            "max_output_tokens": max_output_tokens,
+        }
+    )
+
+
+def _capture_success(
+    sdk_client: Client,
+    response: Any,
+    latency_ms: int,
+    requested_model: str | None,
+    estimated_input_tokens: int | None,
+    environment: str | None,
+    endpoint: str | None,
+    feature: str | None,
+    protect_decision: str,
+    protect_reason: str,
+) -> None:
+    try:
+        response_model = getattr(response, "model", None)
+        usage = getattr(response, "usage", None)
+        total_tokens = getattr(usage, "total_tokens", None)
+        if not isinstance(total_tokens, int):
+            input_tokens = getattr(usage, "input_tokens", None)
+            output_tokens = getattr(usage, "output_tokens", None)
+            if isinstance(input_tokens, int) and isinstance(output_tokens, int):
+                total_tokens = input_tokens + output_tokens
+        sdk_client.capture_event(
+            build_event(
+                provider="anthropic",
+                model=response_model if isinstance(response_model, str) else requested_model,
+                environment=environment or sdk_client.environment,
+                request={
+                    "endpoint": endpoint,
+                    "feature": feature,
+                    "input_tokens_estimate": estimated_input_tokens if isinstance(estimated_input_tokens, int) else None,
+                    "protect_decision": "warn" if protect_decision == "warn" else None,
+                    "protect_reason": protect_reason if protect_decision == "warn" else None,
+                },
+                response={
+                    "latency_ms": latency_ms,
+                    "total_tokens": total_tokens if isinstance(total_tokens, int) else None,
+                    "http_status": 200,
+                },
+            )
+        )
+    except Exception:
+        logger.exception("Failed to capture Anthropic success event")
+
+
+def _capture_failure(
+    sdk_client: Client,
+    exc: Exception,
+    latency_ms: int,
+    requested_model: str | None,
+    estimated_input_tokens: int | None,
+    environment: str | None,
+    endpoint: str | None,
+    feature: str | None,
+    protect_decision: str,
+    protect_reason: str,
+) -> None:
+    try:
+        sdk_client.capture_event(
+            build_event(
+                provider="anthropic",
+                model=requested_model,
+                environment=environment or sdk_client.environment,
+                request={
+                    "endpoint": endpoint,
+                    "feature": feature,
+                    "input_tokens_estimate": estimated_input_tokens if isinstance(estimated_input_tokens, int) else None,
+                    "protect_decision": "warn" if protect_decision == "warn" else None,
+                    "protect_reason": protect_reason if protect_decision == "warn" else None,
+                },
+                response={
+                    "latency_ms": latency_ms,
+                    "error_type": exc.__class__.__name__ or "unknown",
+                    "http_status": _extract_http_status(exc),
+                },
+            )
+        )
+    except Exception:
+        logger.exception("Failed to capture Anthropic failure event")
+
+
+def _extract_request_payload(args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
+    if args and isinstance(args[0], dict):
+        return dict(args[0])
+    return dict(kwargs)
+
+
+def _extract_requested_model(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
+    model = kwargs.get("model")
+    if isinstance(model, str):
+        return model
+    first = args[0] if args else None
+    if isinstance(first, dict):
+        first_model = first.get("model")
+        if isinstance(first_model, str):
+            return first_model
+    return None
+
+
+def _extract_max_output_tokens(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
+    max_tokens = kwargs.get("max_tokens")
+    if isinstance(max_tokens, int):
+        return max_tokens
+    first = args[0] if args else None
+    if isinstance(first, dict):
+        first_max_tokens = first.get("max_tokens")
+        if isinstance(first_max_tokens, int):
+            return first_max_tokens
+    return None
+
+
+def _estimate_input_tokens(payload: dict[str, Any]) -> int | None:
+    try:
+        if callable(_token_estimator_override_for_tests):
+            return _token_estimator_override_for_tests(payload)
+        explicit = payload.get("input_tokens")
+        if isinstance(explicit, int):
+            return explicit
+        return estimate_input_tokens(payload)
+    except Exception:
+        return None
+
+
+def _extract_http_status(exc: Exception) -> int | None:
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
+    status = getattr(exc, "status", None)
+    if isinstance(status, int):
+        return status
+    response = getattr(exc, "response", None)
+    if response is not None:
+        response_status = getattr(response, "status_code", None)
+        if isinstance(response_status, int):
+            return response_status
+    return None

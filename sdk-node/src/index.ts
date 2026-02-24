@@ -1,13 +1,17 @@
 import { Client, type ClientConfig, type ClientStats, type OverflowPolicy } from "./client.js";
 import { buildEvent, type BuildEventInput, type EventPayload } from "./eventBuilder.js";
 import { LLMTBGBlockedError } from "./protectEngine.js";
+import { LLMTBGValidationError } from "./providerModelValidation.js";
 import { instrumentOpenAI as instrumentOpenAIProvider, type OpenAIInstrumentationOptions } from "./providers/openaiAdapter.js";
+import { instrumentAnthropic as instrumentAnthropicProvider, type AnthropicInstrumentationOptions } from "./providers/anthropicAdapter.js";
+import { instrumentGemini as instrumentGeminiProvider, type GeminiInstrumentationOptions } from "./providers/geminiAdapter.js";
 
 let defaultClient: Client | null = null;
 
 export {
   Client,
   LLMTBGBlockedError,
+  LLMTBGValidationError,
   type ClientConfig,
   type ClientStats,
   type OverflowPolicy,
@@ -44,6 +48,40 @@ export function instrumentOpenAI<T extends Record<string, any>>(
   }
 
   return instrumentOpenAIProvider(openaiClient, {
+    client: resolvedClient,
+    environment: options?.environment,
+    endpoint: options?.endpoint,
+    feature: options?.feature,
+  });
+}
+
+export function instrumentAnthropic<T extends Record<string, any>>(
+  anthropicClient: T,
+  options?: Omit<AnthropicInstrumentationOptions, "client"> & { client?: Client },
+): T {
+  const resolvedClient = options?.client ?? defaultClient;
+  if (!resolvedClient) {
+    return anthropicClient;
+  }
+
+  return instrumentAnthropicProvider(anthropicClient, {
+    client: resolvedClient,
+    environment: options?.environment,
+    endpoint: options?.endpoint,
+    feature: options?.feature,
+  });
+}
+
+export function instrumentGemini<T extends Record<string, any>>(
+  geminiModel: T,
+  options?: Omit<GeminiInstrumentationOptions, "client"> & { client?: Client },
+): T {
+  const resolvedClient = options?.client ?? defaultClient;
+  if (!resolvedClient) {
+    return geminiModel;
+  }
+
+  return instrumentGeminiProvider(geminiModel, {
     client: resolvedClient,
     environment: options?.environment,
     endpoint: options?.endpoint,

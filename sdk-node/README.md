@@ -17,6 +17,8 @@ npm install
 - Optional: `protectEnabled` (default `false`; when `true`, SDK calls `POST /api/v1/protect/decision` preflight)
 - Demo env var: `LLMTBG_INGEST_KEY`
 
+Provider/model validation: SDK wrappers fail fast with `LLMTBGValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `gemini`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
+
 ## Integration Path 1: Manual Capture (generic)
 
 ```ts
@@ -46,6 +48,27 @@ const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY 
   endpoint: "/chat/completions",
   feature: "assistant",
 });
+```
+
+## Integration Path 3: Anthropic and Gemini wrappers
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createClient } from "./src/index";
+
+const client = createClient({ ingestKey: process.env.LLMTBG_INGEST_KEY!, protectEnabled: true });
+
+const anthropic = client.instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }));
+await anthropic.messages.create({
+  model: "claude-3-5-sonnet-latest",
+  max_tokens: 256,
+  messages: [{ role: "user", content: "Hello Claude" }],
+});
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const geminiModel = client.instrumentGemini(genAI.getGenerativeModel({ model: "gemini-1.5-pro" }));
+await geminiModel.generateContent("Hello Gemini");
 ```
 
 ## Verify it works

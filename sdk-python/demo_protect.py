@@ -10,6 +10,8 @@ import httpx
 
 from llmtokenburnguard.client import Client
 from llmtokenburnguard.protect_engine import LLMTBGBlockedError
+from llmtokenburnguard.providers.anthropic_adapter import instrument_anthropic
+from llmtokenburnguard.providers.gemini_adapter import instrument_gemini
 from llmtokenburnguard.providers.openai_adapter import instrument_openai
 
 
@@ -97,7 +99,7 @@ def make_openai_stub() -> Any:
         def create(**kwargs: Any) -> Any:
             httpx.post(f"{PROVIDER_STUB_URL}/call", json=kwargs, timeout=3.0).raise_for_status()
             usage = type("Usage", (), {"total_tokens": 10})()
-            return type("Response", (), {"model": kwargs.get("model", "gpt-4o-mini"), "usage": usage})()
+            return type("Response", (), {"model": kwargs.get("model"), "usage": usage})()
 
     class Chat:
         completions = Completions()
@@ -106,6 +108,43 @@ def make_openai_stub() -> Any:
         chat = Chat()
 
     return OpenAIStub()
+
+
+def make_anthropic_stub() -> Any:
+    class Messages:
+        @staticmethod
+        def create(**kwargs: Any) -> Any:
+            httpx.post(f"{PROVIDER_STUB_URL}/call", json=kwargs, timeout=3.0).raise_for_status()
+            usage = type("Usage", (), {"input_tokens": 6, "output_tokens": 4})()
+            return type("Response", (), {"model": kwargs.get("model"), "usage": usage})()
+
+    class AnthropicStub:
+        messages = Messages()
+
+    return AnthropicStub()
+
+
+def make_gemini_stub() -> Any:
+    class UsageMetadata:
+        total_token_count = 10
+
+    class GeminiResponse:
+        usage_metadata = UsageMetadata()
+
+    class GeminiModelStub:
+        model_name = ""
+
+        @staticmethod
+        def generate_content(prompt: str) -> Any:
+            httpx.post(f"{PROVIDER_STUB_URL}/call", json={"prompt": prompt}, timeout=3.0).raise_for_status()
+            return GeminiResponse()
+
+    return GeminiModelStub()
+
+
+def print_provider_stub_help() -> None:
+    print(f"ERROR: provider stub is unreachable at {PROVIDER_STUB_URL}")
+    print("Start it with `python3 e2e/provider_stub.py` or set LLMTBG_PROVIDER_URL to a reachable endpoint.")
 
 
 def main() -> None:
@@ -117,7 +156,17 @@ def main() -> None:
     require_tokenizer()
 
     scenario = (os.getenv("LLMTBG_SCENARIO", "allow") or "allow").lower()
-    model = os.getenv("LLMTBG_MODEL", "gpt-4o-mini")
+    provider = (os.getenv("LLMTBG_PROVIDER", "") or "").strip().lower()
+    if not provider:
+        print("LLMTBG_PROVIDER is required (openai | anthropic | gemini).")
+        sys.exit(1)
+    if provider not in {"openai", "anthropic", "gemini"}:
+        print(f"LLMTBG_PROVIDER is unsupported: {provider}")
+        sys.exit(1)
+    model = (os.getenv("LLMTBG_MODEL", "") or "").strip()
+    if not model:
+        print(f"LLMTBG_MODEL is required for provider {provider}.")
+        sys.exit(1)
     environment = os.getenv("LLMTBG_ENVIRONMENT", "dev")
     max_tokens_env = os.getenv("LLMTBG_MAX_TOKENS")
     max_tokens = int(max_tokens_env) if max_tokens_env else (2000 if scenario == "block" else 128)
@@ -133,35 +182,60 @@ def main() -> None:
     )
 
     openai = make_openai_stub()
+    anthropic = make_anthropic_stub()
+    gemini = make_gemini_stub()
+    gemini.model_name = model
     instrument_openai(openai, client=client, feature="manual-protect-demo", environment=environment)
+    instrument_anthropic(anthropic, client=client, feature="manual-protect-demo", environment=environment)
+    instrument_gemini(gemini, client=client, feature="manual-protect-demo", environment=environment)
 
     provider_reset()
     before = provider_count()
+    if before is None:
+        print_provider_stub_help()
+        client.close()
+        transport.close()
+        return
+
     blocked = False
     warned = False
+    print(f"[DEMO] provider={provider} model={model} scenario={scenario}")
     try:
-        openai.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"Manual protect demo request. scenario={scenario}.",
-                }
-            ],
-            max_tokens=max_tokens,
-        )
+        if provider == "anthropic":
+            anthropic.messages.create(
+                model=model,
+                messages=[{"role": "user", "content": f"Manual protect demo request. scenario={scenario}."}],
+                max_tokens=max_tokens,
+            )
+        elif provider == "gemini":
+            gemini.generate_content(f"Manual protect demo request. scenario={scenario}.")
+        else:
+            openai.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Manual protect demo request. scenario={scenario}.",
+                    }
+                ],
+                max_tokens=max_tokens,
+            )
         decision = transport.last_decision_response or {}
         warned = decision.get("decision") == "warn"
         if warned:
-            print(f"[WARN] Provider call executed (scenario={scenario}).")
+            print(f"[WARN] Provider call executed (provider={provider}, scenario={scenario}).")
         else:
-            print(f"[OK] Provider call executed (scenario={scenario}).")
+            print(f"[OK] Provider call executed (provider={provider}, scenario={scenario}).")
     except LLMTBGBlockedError:
         blocked = True
-        print(f"[BLOCKED] LLMTBGBlockedError thrown (scenario={scenario}).")
+        print(f"[BLOCKED] LLMTBGBlockedError thrown (provider={provider}, scenario={scenario}).")
+    except httpx.ConnectError:
+        print_provider_stub_help()
+        return
     finally:
         client.flush()
         client.close()
+        transport.close()
 
     after = provider_count()
     if before is not None and after is not None:

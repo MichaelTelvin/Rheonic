@@ -1,6 +1,9 @@
 import type { EventPayload } from "./eventBuilder.js";
 import { sdkNodeConfig } from "./config.js";
 import { ProtectEngine, type ProtectContext, type ProtectEvaluation, type ProtectFailMode } from "./protectEngine.js";
+import { instrumentOpenAI as instrumentOpenAIProvider, type OpenAIInstrumentationOptions } from "./providers/openaiAdapter.js";
+import { instrumentAnthropic as instrumentAnthropicProvider, type AnthropicInstrumentationOptions } from "./providers/anthropicAdapter.js";
+import { instrumentGemini as instrumentGeminiProvider, type GeminiInstrumentationOptions } from "./providers/geminiAdapter.js";
 
 export type OverflowPolicy = "drop_oldest" | "drop_newest";
 
@@ -142,6 +145,42 @@ export class Client {
 
   public shouldPreflightDecision(): boolean {
     return this.protectEnabled;
+  }
+
+  public instrumentOpenAI<T extends Record<string, any>>(
+    openaiClient: T,
+    options?: Omit<OpenAIInstrumentationOptions, "client">,
+  ): T {
+    return instrumentOpenAIProvider(openaiClient, {
+      client: this,
+      environment: options?.environment,
+      endpoint: options?.endpoint,
+      feature: options?.feature,
+    });
+  }
+
+  public instrumentAnthropic<T extends Record<string, any>>(
+    anthropicClient: T,
+    options?: Omit<AnthropicInstrumentationOptions, "client">,
+  ): T {
+    return instrumentAnthropicProvider(anthropicClient, {
+      client: this,
+      environment: options?.environment,
+      endpoint: options?.endpoint,
+      feature: options?.feature,
+    });
+  }
+
+  public instrumentGemini<T extends Record<string, any>>(
+    geminiModel: T,
+    options?: Omit<GeminiInstrumentationOptions, "client">,
+  ): T {
+    return instrumentGeminiProvider(geminiModel, {
+      client: this,
+      environment: options?.environment,
+      endpoint: options?.endpoint,
+      feature: options?.feature,
+    });
   }
 
   public async flushWithTimeout(timeoutMs = sdkNodeConfig.defaultFlushTimeoutMs): Promise<void> {

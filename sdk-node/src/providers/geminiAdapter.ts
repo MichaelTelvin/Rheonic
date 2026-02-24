@@ -1,6 +1,198 @@
-export class GeminiAdapter {
-  public extractUsage(_response: unknown): Record<string, unknown> {
-    // TODO: Parse Gemini response usage schema.
-    return {};
+import type { Client } from "../client.js";
+import { buildEvent } from "../eventBuilder.js";
+import { validateProviderModel } from "../providerModelValidation.js";
+import { LLMTBGBlockedError, type ProtectEvaluation } from "../protectEngine.js";
+import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
+
+export interface GeminiInstrumentationOptions {
+  client: Client;
+  environment?: string;
+  endpoint?: string;
+  feature?: string;
+}
+
+let estimatorOverrideForTests: ((payload: unknown) => number | null) | null = null;
+
+export function __setInputTokenEstimatorForTests(
+  estimator: ((payload: unknown) => number | null) | null,
+): void {
+  estimatorOverrideForTests = estimator;
+}
+
+export function instrumentGemini<T extends Record<string, any>>(geminiModel: T, options: GeminiInstrumentationOptions): T {
+  const targetGenerate = geminiModel?.generateContent;
+  if (typeof targetGenerate !== "function") {
+    return geminiModel;
   }
+
+  const originalGenerate = targetGenerate.bind(geminiModel);
+  (geminiModel as unknown as { generateContent: (...args: unknown[]) => Promise<unknown> }).generateContent = async (
+    ...args: unknown[]
+  ) => {
+    const startedAt = Date.now();
+    const requestedModel = extractRequestedModel(geminiModel);
+    validateProviderModel("gemini", requestedModel);
+    const requestPayload = extractRequestPayload(args, requestedModel);
+    const estimatedInputTokens = requestPayload
+      ? (estimatorOverrideForTests
+          ? estimatorOverrideForTests(requestPayload)
+          : estimateInputTokensFromRequest(requestPayload))
+      : null;
+
+    let protectDecision = { decision: "allow", reason: "protect_disabled" } as ProtectEvaluation;
+    if (options.client.shouldPreflightDecision()) {
+      const protectPayload: {
+        provider: string;
+        model: string | null;
+        feature?: string;
+        max_output_tokens?: number;
+        input_tokens_estimate?: number;
+      } = {
+        provider: "gemini",
+        model: requestedModel,
+        feature: options.feature,
+        max_output_tokens: extractMaxOutputTokens(args),
+      };
+      if (typeof estimatedInputTokens === "number") {
+        protectPayload.input_tokens_estimate = estimatedInputTokens;
+      }
+      protectDecision = await options.client.evaluateProtectDecision(protectPayload);
+    }
+
+    if (protectDecision.decision === "block") {
+      throw new LLMTBGBlockedError(protectDecision.reason);
+    }
+
+    try {
+      const response = await originalGenerate(...args);
+      void options.client.captureEvent(
+        buildEvent({
+          provider: "gemini",
+          model: requestedModel,
+          environment: options.environment ?? options.client.environment,
+          request: {
+            endpoint: options.endpoint,
+            feature: options.feature,
+            input_tokens_estimate: typeof estimatedInputTokens === "number" ? estimatedInputTokens : undefined,
+            protect_decision: protectDecision.decision === "warn" ? "warn" : undefined,
+            protect_reason: protectDecision.decision === "warn" ? protectDecision.reason : undefined,
+          },
+          response: {
+            latency_ms: Date.now() - startedAt,
+            total_tokens: extractTotalTokens(response),
+            http_status: 200,
+          },
+        }),
+      );
+      return response;
+    } catch (error) {
+      void options.client.captureEvent(
+        buildEvent({
+          provider: "gemini",
+          model: requestedModel,
+          environment: options.environment ?? options.client.environment,
+          request: {
+            endpoint: options.endpoint,
+            feature: options.feature,
+            input_tokens_estimate: typeof estimatedInputTokens === "number" ? estimatedInputTokens : undefined,
+            protect_decision: protectDecision.decision === "warn" ? "warn" : undefined,
+            protect_reason: protectDecision.decision === "warn" ? protectDecision.reason : undefined,
+          },
+          response: {
+            latency_ms: Date.now() - startedAt,
+            error_type: extractErrorType(error),
+            http_status: extractHttpStatus(error),
+          },
+        }),
+      );
+      throw error;
+    }
+  };
+
+  return geminiModel;
+}
+
+function extractRequestPayload(args: unknown[], model: string | null): Record<string, unknown> | null {
+  const firstArg = args[0];
+  if (typeof firstArg === "string") {
+    return { model, prompt: firstArg };
+  }
+  if (firstArg && typeof firstArg === "object") {
+    return firstArg as Record<string, unknown>;
+  }
+  return null;
+}
+
+function extractRequestedModel(geminiModel: unknown): string | null {
+  if (!geminiModel || typeof geminiModel !== "object") {
+    return null;
+  }
+  const withModel = geminiModel as { model?: unknown; modelName?: unknown };
+  if (typeof withModel.model === "string") {
+    return withModel.model;
+  }
+  if (typeof withModel.modelName === "string") {
+    return withModel.modelName;
+  }
+  return null;
+}
+
+function extractMaxOutputTokens(args: unknown[]): number | undefined {
+  const firstArg = args[0];
+  if (!firstArg || typeof firstArg !== "object") {
+    return undefined;
+  }
+  const payload = firstArg as { generationConfig?: { maxOutputTokens?: unknown } };
+  const maxOutput = payload.generationConfig?.maxOutputTokens;
+  return typeof maxOutput === "number" ? maxOutput : undefined;
+}
+
+function extractTotalTokens(response: unknown): number | undefined {
+  if (!response || typeof response !== "object") {
+    return undefined;
+  }
+  const usageMetadata = (response as { response?: { usageMetadata?: unknown }; usageMetadata?: unknown }).response?.usageMetadata
+    ?? (response as { usageMetadata?: unknown }).usageMetadata;
+  if (!usageMetadata || typeof usageMetadata !== "object") {
+    return undefined;
+  }
+  const usage = usageMetadata as {
+    totalTokenCount?: unknown;
+    promptTokenCount?: unknown;
+    candidatesTokenCount?: unknown;
+  };
+  if (typeof usage.totalTokenCount === "number") {
+    return usage.totalTokenCount;
+  }
+  const prompt = typeof usage.promptTokenCount === "number" ? usage.promptTokenCount : 0;
+  const candidates = typeof usage.candidatesTokenCount === "number" ? usage.candidatesTokenCount : 0;
+  const total = prompt + candidates;
+  return total > 0 ? total : undefined;
+}
+
+function extractErrorType(error: unknown): string {
+  if (error && typeof error === "object" && "name" in error) {
+    const name = (error as { name?: unknown }).name;
+    if (typeof name === "string" && name.length > 0) {
+      return name;
+    }
+  }
+  return "unknown";
+}
+
+function extractHttpStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+  const withStatus = error as { status?: unknown; statusCode?: unknown; response?: { status?: unknown } };
+  if (typeof withStatus.status === "number") {
+    return withStatus.status;
+  }
+  if (typeof withStatus.statusCode === "number") {
+    return withStatus.statusCode;
+  }
+  if (typeof withStatus.response?.status === "number") {
+    return withStatus.response.status;
+  }
+  return undefined;
 }

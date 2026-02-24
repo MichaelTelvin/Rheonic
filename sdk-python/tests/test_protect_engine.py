@@ -7,8 +7,17 @@ from typing import Any
 import pytest
 
 from llmtokenburnguard.client import Client
-from llmtokenburnguard.protect_engine import LLMTBGBlockedError
+from llmtokenburnguard.protect_engine import LLMTBGBlockedError, LLMTBGValidationError
 from llmtokenburnguard.providers.openai_adapter import instrument_openai, _set_token_estimator_for_tests
+from llmtokenburnguard.providers.anthropic_adapter import (
+    instrument_anthropic,
+    _set_token_estimator_for_tests as _set_anthropic_token_estimator_for_tests,
+)
+from llmtokenburnguard.providers.gemini_adapter import (
+    instrument_gemini,
+    _set_token_estimator_for_tests as _set_gemini_token_estimator_for_tests,
+)
+from llmtokenburnguard.provider_model_validation import validate_provider_model
 
 
 class FakeResponse:
@@ -82,6 +91,40 @@ def _make_openai_stub() -> tuple[Any, list[dict[str, Any]]]:
         chat = _Chat()
 
     return _OpenAI(), calls
+
+
+def _make_anthropic_stub() -> tuple[Any, list[dict[str, Any]]]:
+    calls: list[dict[str, Any]] = []
+
+    class _Messages:
+        def create(self, **kwargs: Any) -> Any:
+            calls.append(kwargs)
+            usage = type("Usage", (), {"input_tokens": 11, "output_tokens": 14})()
+            return type("Response", (), {"model": "claude-3-5-sonnet", "usage": usage})()
+
+    class _Anthropic:
+        messages = _Messages()
+
+    return _Anthropic(), calls
+
+
+def _make_gemini_stub() -> tuple[Any, list[tuple[tuple[Any, ...], dict[str, Any]]]]:
+    calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    class _UsageMetadata:
+        total_token_count = 27
+
+    class _GeminiResponse:
+        usage_metadata = _UsageMetadata()
+
+    class _GeminiModel:
+        model_name = "gemini-1.5-pro"
+
+        def generate_content(self, *args: Any, **kwargs: Any) -> Any:
+            calls.append((args, kwargs))
+            return _GeminiResponse()
+
+    return _GeminiModel(), calls
 
 
 def test_observe_mode_skips_decision_endpoint_and_allows_provider_call() -> None:
@@ -464,3 +507,320 @@ def test_preflight_invalid_json_fail_closed_blocks_provider_call() -> None:
         openai_client.chat.completions.create(model="gpt-4o-mini")
     assert calls == []
     client.close()
+
+
+def test_anthropic_allow_path_calls_provider_and_emits_telemetry() -> None:
+    transport = FakeHttpClient(  # type: ignore[arg-type]
+        {
+            "decision": "allow",
+            "reason": "ok",
+            "fail_mode": "open",
+            "protect_decision_timeout_ms": 100,
+        }
+    )
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=True,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    anthropic_client, calls = _make_anthropic_stub()
+    instrument_anthropic(anthropic_client, client=client)
+
+    anthropic_client.messages.create(
+        model="claude-3-5-sonnet",
+        max_tokens=128,
+        messages=[{"role": "user", "content": "hello"}],
+    )
+    client.flush()
+    assert len(calls) == 1
+    assert len(transport.ingested_events) == 1
+    assert transport.ingested_events[0]["provider"] == "anthropic"
+    client.close()
+
+
+def test_anthropic_block_path_prevents_provider_call() -> None:
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=True,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=FakeHttpClient(  # type: ignore[arg-type]
+            {
+                "decision": "block",
+                "reason": "tok_limit",
+                "fail_mode": "open",
+                "protect_decision_timeout_ms": 100,
+            }
+        ),
+    )
+    anthropic_client, calls = _make_anthropic_stub()
+    instrument_anthropic(anthropic_client, client=client)
+
+    with pytest.raises(LLMTBGBlockedError):
+        anthropic_client.messages.create(
+            model="claude-3-5-sonnet",
+            max_tokens=128,
+            messages=[{"role": "user", "content": "hello"}],
+        )
+    assert calls == []
+    client.close()
+
+
+def test_anthropic_includes_input_tokens_estimate() -> None:
+    transport = FakeHttpClient(  # type: ignore[arg-type]
+        {
+            "decision": "allow",
+            "reason": "ok",
+            "fail_mode": "open",
+            "protect_decision_timeout_ms": 100,
+        }
+    )
+    _set_anthropic_token_estimator_for_tests(lambda _payload: 444)
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=True,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    anthropic_client, _ = _make_anthropic_stub()
+    instrument_anthropic(anthropic_client, client=client)
+
+    anthropic_client.messages.create(
+        model="claude-3-5-sonnet",
+        max_tokens=128,
+        messages=[{"role": "user", "content": "hello"}],
+    )
+    assert len(transport.decision_payloads) == 1
+    assert transport.decision_payloads[0]["input_tokens_estimate"] == 444
+    _set_anthropic_token_estimator_for_tests(None)
+    client.close()
+
+
+def test_gemini_allow_path_calls_provider_and_emits_telemetry() -> None:
+    transport = FakeHttpClient(  # type: ignore[arg-type]
+        {
+            "decision": "allow",
+            "reason": "ok",
+            "fail_mode": "open",
+            "protect_decision_timeout_ms": 100,
+        }
+    )
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=True,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    gemini_model, calls = _make_gemini_stub()
+    instrument_gemini(gemini_model, client=client)
+
+    gemini_model.generate_content("hello")
+    client.flush()
+    assert len(calls) == 1
+    assert len(transport.ingested_events) == 1
+    assert transport.ingested_events[0]["provider"] == "gemini"
+    client.close()
+
+
+def test_gemini_block_path_prevents_provider_call() -> None:
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=True,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=FakeHttpClient(  # type: ignore[arg-type]
+            {
+                "decision": "block",
+                "reason": "req_limit",
+                "fail_mode": "open",
+                "protect_decision_timeout_ms": 100,
+            }
+        ),
+    )
+    gemini_model, calls = _make_gemini_stub()
+    instrument_gemini(gemini_model, client=client)
+
+    with pytest.raises(LLMTBGBlockedError):
+        gemini_model.generate_content("hello")
+    assert calls == []
+    client.close()
+
+
+def test_gemini_includes_input_tokens_estimate() -> None:
+    transport = FakeHttpClient(  # type: ignore[arg-type]
+        {
+            "decision": "allow",
+            "reason": "ok",
+            "fail_mode": "open",
+            "protect_decision_timeout_ms": 100,
+        }
+    )
+    _set_gemini_token_estimator_for_tests(lambda _payload: 555)
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=True,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    gemini_model, _ = _make_gemini_stub()
+    instrument_gemini(gemini_model, client=client)
+
+    gemini_model.generate_content("hello")
+    assert len(transport.decision_payloads) == 1
+    assert transport.decision_payloads[0]["input_tokens_estimate"] == 555
+    _set_gemini_token_estimator_for_tests(None)
+    client.close()
+
+
+def test_provider_model_validation_accepts_openai_gpt_model() -> None:
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=False,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=FakeHttpClient({"decision": "allow"}),  # type: ignore[arg-type]
+    )
+    openai_client, calls = _make_openai_stub()
+    instrument_openai(openai_client, client=client)
+
+    openai_client.chat.completions.create(model="gpt-4o-mini")
+    assert len(calls) == 1
+    client.close()
+
+
+def test_provider_model_validation_accepts_anthropic_claude_model() -> None:
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=False,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=FakeHttpClient({"decision": "allow"}),  # type: ignore[arg-type]
+    )
+    anthropic_client, calls = _make_anthropic_stub()
+    instrument_anthropic(anthropic_client, client=client)
+
+    anthropic_client.messages.create(
+        model="claude-3-5-sonnet",
+        max_tokens=64,
+        messages=[{"role": "user", "content": "hello"}],
+    )
+    assert len(calls) == 1
+    client.close()
+
+
+def test_provider_model_validation_accepts_gemini_model() -> None:
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=False,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=FakeHttpClient({"decision": "allow"}),  # type: ignore[arg-type]
+    )
+    gemini_model, calls = _make_gemini_stub()
+    instrument_gemini(gemini_model, client=client)
+
+    gemini_model.generate_content("hello")
+    assert len(calls) == 1
+    client.close()
+
+
+def test_provider_model_validation_does_not_enforce_prefixes() -> None:
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=False,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=FakeHttpClient({"decision": "allow"}),  # type: ignore[arg-type]
+    )
+    anthropic_client, anthropic_calls = _make_anthropic_stub()
+    instrument_anthropic(anthropic_client, client=client)
+    anthropic_client.messages.create(
+        model="gpt-4o-mini",
+        max_tokens=64,
+        messages=[{"role": "user", "content": "hello"}],
+    )
+
+    gemini_model, gemini_calls = _make_gemini_stub()
+    gemini_model.model_name = "claude-3-opus"
+    instrument_gemini(gemini_model, client=client)
+    gemini_model.generate_content("hello")
+
+    assert len(anthropic_calls) == 1
+    assert len(gemini_calls) == 1
+    client.close()
+
+
+def test_provider_model_validation_rejects_anthropic_call_when_model_missing() -> None:
+    transport = FakeHttpClient({"decision": "allow"})  # type: ignore[arg-type]
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=True,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    anthropic_client, calls = _make_anthropic_stub()
+    instrument_anthropic(anthropic_client, client=client)
+
+    with pytest.raises(LLMTBGValidationError):
+        anthropic_client.messages.create(
+            max_tokens=64,
+            messages=[{"role": "user", "content": "hello"}],
+        )
+    assert calls == []
+    assert transport.decision_payloads == []
+    client.close()
+
+
+def test_provider_model_validation_rejects_openai_call_when_model_missing() -> None:
+    transport = FakeHttpClient({"decision": "allow"})  # type: ignore[arg-type]
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=True,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    openai_client, calls = _make_openai_stub()
+    instrument_openai(openai_client, client=client)
+
+    with pytest.raises(LLMTBGValidationError):
+        openai_client.chat.completions.create(messages=[{"role": "user", "content": "hello"}], max_tokens=64)
+    assert calls == []
+    assert transport.decision_payloads == []
+    client.close()
+
+
+def test_provider_model_validation_rejects_gemini_call_when_model_missing() -> None:
+    transport = FakeHttpClient({"decision": "allow"})  # type: ignore[arg-type]
+    client = Client(
+        ingest_key="p1",
+        protect_enabled=True,
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=transport,
+    )
+    gemini_model, calls = _make_gemini_stub()
+    gemini_model.model_name = ""
+    instrument_gemini(gemini_model, client=client)
+
+    with pytest.raises(LLMTBGValidationError):
+        gemini_model.generate_content("hello")
+    assert calls == []
+    assert transport.decision_payloads == []
+    client.close()
+
+
+def test_provider_model_validation_rejects_missing_provider() -> None:
+    with pytest.raises(LLMTBGValidationError):
+        validate_provider_model("", "any-model")
+
+
+def test_provider_model_validation_rejects_unknown_provider() -> None:
+    with pytest.raises(LLMTBGValidationError):
+        validate_provider_model("cohere", "command-r")

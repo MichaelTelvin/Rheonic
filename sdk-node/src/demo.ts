@@ -15,24 +15,36 @@ async function runDemo(): Promise<void> {
     debug: process.env.LLMTBG_DEBUG === "1" || process.env.LLMTBG_DEBUG === "true",
   });
 
-  await client.captureEvent(
-    buildEvent({
-      provider: "openai",
-      model: "gpt-4o-mini",
-      environment: client.environment,
-      request: {
-        endpoint: "/chat/completions",
-        feature: "demo",
-      },
-      response: {
-        latency_ms: 120,
-        total_tokens: 42,
-        http_status: 200,
-      },
-    }),
-  );
+  const demoEvents = [
+    { provider: "openai", model: "gpt-4o-mini", endpoint: "/chat/completions", totalTokens: 42 },
+    { provider: "anthropic", model: "claude-3-5-sonnet", endpoint: "/v1/messages", totalTokens: 39 },
+    { provider: "gemini", model: "gemini-1.5-pro", endpoint: "/v1beta/models/generateContent", totalTokens: 36 },
+  ] as const;
+
+  for (const event of demoEvents) {
+    await client.captureEvent(
+      buildEvent({
+        provider: event.provider,
+        model: event.model,
+        environment: client.environment,
+        request: {
+          endpoint: event.endpoint,
+          feature: "demo",
+        },
+        response: {
+          latency_ms: 120,
+          total_tokens: event.totalTokens,
+          http_status: 200,
+        },
+      }),
+    );
+    console.log(`[DEMO] queued provider=${event.provider} model=${event.model} endpoint=${event.endpoint}`);
+  }
 
   await client.flush();
+  for (const event of demoEvents) {
+    console.log(`[DEMO] flushed provider=${event.provider}`);
+  }
   console.log(client.getStats());
   client.close();
   console.log("done");

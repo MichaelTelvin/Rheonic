@@ -23,6 +23,12 @@ class LLMTBGBlockedError(RuntimeError):
         self.reason = reason
 
 
+class LLMTBGValidationError(Exception):
+    # Raised when provider and model combination is invalid for SDK instrumentation.
+
+    pass
+
+
 class ProtectEngine:
     # Evaluates always-on protect preflight decisions against backend endpoint.
 

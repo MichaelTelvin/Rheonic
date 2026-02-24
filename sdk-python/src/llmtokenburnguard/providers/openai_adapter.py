@@ -6,6 +6,7 @@ from typing import Any
 from llmtokenburnguard.client import Client, get_default_client
 from llmtokenburnguard.event_builder import build_event
 from llmtokenburnguard.logger import get_logger
+from llmtokenburnguard.provider_model_validation import validate_provider_model
 from llmtokenburnguard.protect_engine import LLMTBGBlockedError
 from llmtokenburnguard.token_estimator import estimate_input_tokens
 
@@ -44,6 +45,7 @@ def instrument_openai(
             # Async wrapper for AsyncOpenAI style clients.
             started_at = perf_counter()
             requested_model = _extract_requested_model(args, kwargs)
+            validate_provider_model("openai", requested_model)
             protect_decision: dict[str, object] = {"decision": "allow", "reason": "protect_disabled"}
             if resolved_client.should_preflight_decision():
                 request_payload = _extract_request_payload(args, kwargs)
@@ -98,6 +100,7 @@ def instrument_openai(
         # Sync wrapper for OpenAI client.
         started_at = perf_counter()
         requested_model = _extract_requested_model(args, kwargs)
+        validate_provider_model("openai", requested_model)
         protect_decision: dict[str, object] = {"decision": "allow", "reason": "protect_disabled"}
         if resolved_client.should_preflight_decision():
             request_payload = _extract_request_payload(args, kwargs)

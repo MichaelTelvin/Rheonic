@@ -1,8 +1,10 @@
 # Python SDK public API.
 from llmtokenburnguard.client import Client, LLMTokenBurnGuardClient, capture_event, create_client
 from llmtokenburnguard.event_builder import EventBuilder, build_event
+from llmtokenburnguard.providers.anthropic_adapter import instrument_anthropic
+from llmtokenburnguard.providers.gemini_adapter import instrument_gemini
 from llmtokenburnguard.providers.openai_adapter import instrument_openai
-from llmtokenburnguard.protect_engine import LLMTBGBlockedError
+from llmtokenburnguard.protect_engine import LLMTBGBlockedError, LLMTBGValidationError
 
 __all__ = [
     "Client",
@@ -12,5 +14,8 @@ __all__ = [
     "build_event",
     "EventBuilder",
     "instrument_openai",
+    "instrument_anthropic",
+    "instrument_gemini",
     "LLMTBGBlockedError",
+    "LLMTBGValidationError",
 ]

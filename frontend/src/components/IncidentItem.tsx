@@ -22,7 +22,8 @@ export function IncidentItem({ incident, resolving, onResolve }: IncidentItemPro
       </div>
 
       <p className="incident-meta">
-        {formatRelative(incident.created_at)} · Created {formatTime(incident.created_at)}
+        <span className="incident-meta-relative">{formatRelative(incident.created_at)}</span>
+        <span>· Created {formatTime(incident.created_at)}</span>
       </p>
 
       <div className="incident-actions">

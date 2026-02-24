@@ -1,5 +1,6 @@
-import { Client } from "../client.js";
+import type { Client } from "../client.js";
 import { buildEvent } from "../eventBuilder.js";
+import { validateProviderModel } from "../providerModelValidation.js";
 import { LLMTBGBlockedError, type ProtectEvaluation } from "../protectEngine.js";
 import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
 
@@ -29,6 +30,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
   openaiClient.chat.completions.create = async (...args: unknown[]) => {
     const startedAt = Date.now();
     const model = extractRequestedModel(args);
+    validateProviderModel("openai", model);
     let protectDecision = { decision: "allow", reason: "protect_disabled" } as ProtectEvaluation;
     if (options.client.shouldPreflightDecision()) {
       const requestPayload = extractRequestPayload(args);
