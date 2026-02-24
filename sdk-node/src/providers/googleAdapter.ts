@@ -4,7 +4,7 @@ import { validateProviderModel } from "../providerModelValidation.js";
 import { LLMTBGBlockedError, type ProtectEvaluation } from "../protectEngine.js";
 import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
 
-export interface GeminiInstrumentationOptions {
+export interface GoogleInstrumentationOptions {
   client: Client;
   environment?: string;
   endpoint?: string;
@@ -19,19 +19,19 @@ export function __setInputTokenEstimatorForTests(
   estimatorOverrideForTests = estimator;
 }
 
-export function instrumentGemini<T extends Record<string, any>>(geminiModel: T, options: GeminiInstrumentationOptions): T {
-  const targetGenerate = geminiModel?.generateContent;
+export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, options: GoogleInstrumentationOptions): T {
+  const targetGenerate = googleModel?.generateContent;
   if (typeof targetGenerate !== "function") {
-    return geminiModel;
+    return googleModel;
   }
 
-  const originalGenerate = targetGenerate.bind(geminiModel);
-  (geminiModel as unknown as { generateContent: (...args: unknown[]) => Promise<unknown> }).generateContent = async (
+  const originalGenerate = targetGenerate.bind(googleModel);
+  (googleModel as unknown as { generateContent: (...args: unknown[]) => Promise<unknown> }).generateContent = async (
     ...args: unknown[]
   ) => {
     const startedAt = Date.now();
-    const requestedModel = extractRequestedModel(geminiModel);
-    validateProviderModel("gemini", requestedModel);
+    const requestedModel = extractRequestedModel(googleModel);
+    validateProviderModel("google", requestedModel);
     const requestPayload = extractRequestPayload(args, requestedModel);
     const estimatedInputTokens = requestPayload
       ? (estimatorOverrideForTests
@@ -48,7 +48,7 @@ export function instrumentGemini<T extends Record<string, any>>(geminiModel: T, 
         max_output_tokens?: number;
         input_tokens_estimate?: number;
       } = {
-        provider: "gemini",
+        provider: "google",
         model: requestedModel,
         feature: options.feature,
         max_output_tokens: extractMaxOutputTokens(args),
@@ -67,7 +67,7 @@ export function instrumentGemini<T extends Record<string, any>>(geminiModel: T, 
       const response = await originalGenerate(...args);
       void options.client.captureEvent(
         buildEvent({
-          provider: "gemini",
+          provider: "google",
           model: requestedModel,
           environment: options.environment ?? options.client.environment,
           request: {
@@ -88,7 +88,7 @@ export function instrumentGemini<T extends Record<string, any>>(geminiModel: T, 
     } catch (error) {
       void options.client.captureEvent(
         buildEvent({
-          provider: "gemini",
+          provider: "google",
           model: requestedModel,
           environment: options.environment ?? options.client.environment,
           request: {
@@ -109,7 +109,7 @@ export function instrumentGemini<T extends Record<string, any>>(geminiModel: T, 
     }
   };
 
-  return geminiModel;
+  return googleModel;
 }
 
 function extractRequestPayload(args: unknown[], model: string | null): Record<string, unknown> | null {
@@ -123,11 +123,11 @@ function extractRequestPayload(args: unknown[], model: string | null): Record<st
   return null;
 }
 
-function extractRequestedModel(geminiModel: unknown): string | null {
-  if (!geminiModel || typeof geminiModel !== "object") {
+function extractRequestedModel(googleModel: unknown): string | null {
+  if (!googleModel || typeof googleModel !== "object") {
     return null;
   }
-  const withModel = geminiModel as { model?: unknown; modelName?: unknown };
+  const withModel = googleModel as { model?: unknown; modelName?: unknown };
   if (typeof withModel.model === "string") {
     return withModel.model;
   }

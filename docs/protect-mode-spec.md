@@ -32,9 +32,17 @@ Counters represent **activity over the last ~60 seconds**:
 
 These are computed from the system’s rolling window implementation in Redis.
 
+### Provider Scope
+Protect runtime state is scoped by **(project_id, provider)**:
+- incidents and severity cache are provider-scoped
+- rolling counters are provider-scoped
+- protect decisions are provider-scoped
+
+Dashboard metric endpoints keep project-level totals by summing across providers, with unchanged response schemas.
+
 ### Incident Severity Cache (fast path)
 Redis key:
-- `incsev:{project_id}` = `none|low|medium|high`
+- `incsev:{project_id}:{provider}` = `none|low|medium|high`
 Source of truth remains Postgres incidents; Redis is a cache updated on incident changes.
 
 ### Incident Auto-Close (cooldown)
@@ -145,7 +153,7 @@ Predictive signal is warning-only. It does not block by itself.
 
 Rule 4 — Incident Severity Influence
 
-Read Redis incsev:{project_id}:
+Read Redis incsev:{project_id}:{provider}:
 	•	if high → block (reason=incident_high)
 	•	if medium → warn (reason=incident_medium)
 	•	else → continue
@@ -183,9 +191,9 @@ Decision/Protect Audit (recommended)
 We do not store every decision in Postgres (too heavy).
 
 We maintain Redis counters for visibility:
-	•	pa:{project_id}:warn:60m (INCR, TTL 3600)
-	•	pa:{project_id}:block:60m (INCR, TTL 3600)
-	•	Optionally pa:{project_id}:last = JSON summary of last decision (short TTL ok)
+	•	pa:{project_id}:{provider}:warn:60m (INCR, TTL 3600)
+	•	pa:{project_id}:{provider}:block:60m (INCR, TTL 3600)
+	•	Optionally pa:{project_id}:{provider}:last = JSON summary of last decision (short TTL ok)
 
 These counters are updated by the backend decision endpoint.
 

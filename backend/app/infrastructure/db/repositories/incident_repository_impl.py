@@ -26,6 +26,7 @@ class IncidentRepositoryImpl(IncidentRepository):
                 record = IncidentRecord(
                     id=incident.id,
                     project_id=incident.project_id,
+                    provider=incident.provider,
                     type=incident.incident_type,
                     severity=incident.severity,
                     status=incident.status,
@@ -43,13 +44,14 @@ class IncidentRepositoryImpl(IncidentRepository):
             logger.exception("Failed creating incident", extra={"project_id": incident.project_id})
             raise
 
-    def get_open_incident_by_type(self, project_id: str, incident_type: str) -> Incident | None:
+    def get_open_incident_by_type(self, project_id: str, provider: str, incident_type: str) -> Incident | None:
         # Return open incident for project and type.
         try:
             with self._session_factory.create_session() as session:
                 record = (
                     session.query(IncidentRecord)
                     .filter(IncidentRecord.project_id == project_id)
+                    .filter(IncidentRecord.provider == provider)
                     .filter(IncidentRecord.type == incident_type)
                     .filter(IncidentRecord.status == "open")
                     .order_by(IncidentRecord.created_at.desc())
@@ -59,12 +61,16 @@ class IncidentRepositoryImpl(IncidentRepository):
                 return None
             return _to_domain(record)
         except Exception:
-            logger.exception("Failed fetching open incident", extra={"project_id": project_id, "incident_type": incident_type})
+            logger.exception(
+                "Failed fetching open incident",
+                extra={"project_id": project_id, "provider": provider, "incident_type": incident_type},
+            )
             raise
 
     def get_open_incident_by_fingerprint(
         self,
         project_id: str,
+        provider: str,
         fingerprint: str,
         created_after: datetime,
     ) -> Incident | None:
@@ -74,6 +80,7 @@ class IncidentRepositoryImpl(IncidentRepository):
                 record = (
                     session.query(IncidentRecord)
                     .filter(IncidentRecord.project_id == project_id)
+                    .filter(IncidentRecord.provider == provider)
                     .filter(IncidentRecord.status == "open")
                     .filter(IncidentRecord.fingerprint == fingerprint)
                     .filter(IncidentRecord.created_at >= created_after)
@@ -86,7 +93,7 @@ class IncidentRepositoryImpl(IncidentRepository):
         except Exception:
             logger.exception(
                 "Failed fetching open incident by fingerprint",
-                extra={"project_id": project_id, "fingerprint": fingerprint},
+                extra={"project_id": project_id, "provider": provider, "fingerprint": fingerprint},
             )
             raise
 
@@ -135,6 +142,23 @@ class IncidentRepositoryImpl(IncidentRepository):
             logger.exception("Failed listing incidents", extra={"project_id": project_id, "status": status})
             raise
 
+    def list_open_by_project_provider(self, project_id: str, provider: str) -> list[Incident]:
+        # List open incidents by project/provider.
+        try:
+            with self._session_factory.create_session() as session:
+                records = (
+                    session.query(IncidentRecord)
+                    .filter(IncidentRecord.project_id == project_id)
+                    .filter(IncidentRecord.provider == provider)
+                    .filter(IncidentRecord.status == "open")
+                    .order_by(IncidentRecord.created_at.desc())
+                    .all()
+                )
+            return [_to_domain(record) for record in records]
+        except Exception:
+            logger.exception("Failed listing open incidents by provider", extra={"project_id": project_id, "provider": provider})
+            raise
+
     def get_by_id(self, incident_id: str) -> Incident | None:
         # Fetch incident by id.
         try:
@@ -170,7 +194,7 @@ class IncidentRepositoryImpl(IncidentRepository):
         *,
         cutoff: datetime,
         resolved_at: datetime,
-    ) -> tuple[list[Incident], set[str]]:
+    ) -> tuple[list[Incident], set[tuple[str, str]]]:
         # Mark stale open incidents as auto_resolved.
         try:
             with self._session_factory.create_session() as session:
@@ -187,7 +211,7 @@ class IncidentRepositoryImpl(IncidentRepository):
                 )
                 if not records:
                     return [], set()
-                project_ids = {record.project_id for record in records}
+                project_provider_pairs = {(record.project_id, record.provider) for record in records}
                 for record in records:
                     record.status = "auto_resolved"
                     record.resolved_at = resolved_at
@@ -195,7 +219,7 @@ class IncidentRepositoryImpl(IncidentRepository):
                 session.commit()
                 resolved_incidents = [_to_domain(record) for record in records]
             logger.info("Stale incidents auto-resolved", extra={"count": len(records)})
-            return resolved_incidents, project_ids
+            return resolved_incidents, project_provider_pairs
         except Exception:
             logger.exception("Failed auto-resolving stale incidents")
             raise
@@ -206,6 +230,7 @@ def _to_domain(record: IncidentRecord) -> Incident:
     return Incident(
         id=record.id,
         project_id=record.project_id,
+        provider=record.provider or "unknown",
         incident_type=record.type,
         severity=record.severity,
         status=record.status,

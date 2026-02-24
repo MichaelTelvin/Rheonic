@@ -18,8 +18,9 @@ async function runDemo(): Promise<void> {
   const demoEvents = [
     { provider: "openai", model: "gpt-4o-mini", endpoint: "/chat/completions", totalTokens: 42 },
     { provider: "anthropic", model: "claude-3-5-sonnet", endpoint: "/v1/messages", totalTokens: 39 },
-    { provider: "gemini", model: "gemini-1.5-pro", endpoint: "/v1beta/models/generateContent", totalTokens: 36 },
+    { provider: "google", model: "gemini-1.5-pro", endpoint: "/v1beta/models/generateContent", totalTokens: 36 },
   ] as const;
+  console.log("[DEMO] provider scoping active: counters/incidents/decisions are isolated by provider");
 
   for (const event of demoEvents) {
     await client.captureEvent(

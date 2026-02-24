@@ -1,7 +1,7 @@
 # LLMTokenBurnGuard — Product Design (v1)
 
 ## 1) One-liner
-A runtime safety layer for LLM applications that detects runaway usage patterns (loops, retry storms, spend spikes) and optionally applies guardrail policies (downgrade, cap, rate-limit, cooldown, cache) across OpenAI, Anthropic, and Gemini — with minimal integration and an incident-first dashboard.
+A runtime safety layer for LLM applications that detects runaway usage patterns (loops, retry storms, spend spikes) and optionally applies guardrail policies (downgrade, cap, rate-limit, cooldown, cache) across OpenAI, Anthropic, and Google models — with minimal integration and an incident-first dashboard.
 
 ## 2) Problem
 LLM apps fail in production in predictable, expensive ways:

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.metrics_service import MetricsService
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.project_service import ProjectService
 from app.config import Settings
 from app.dependencies import (
@@ -158,10 +159,12 @@ def _make_client(tmp_path, settings: Settings | None = None) -> tuple[TestClient
         incident_severity_cache=None,
         baseline_window_count=30,
         incident_dedup_window_seconds=300,
+        project_repository=project_repository,
     )
     metrics_service = MetricsService(
         realtime_counters=rolling_window,
         protect_action_store=ProtectActionStore(redis_client=redis_client),  # type: ignore[arg-type]
+        project_repository=project_repository,
     )
 
     app.dependency_overrides[get_project_service] = lambda: project_service
@@ -250,5 +253,37 @@ def test_ingest_rate_limit_returns_429_when_exceeded(tmp_path) -> None:
     assert statuses[:3] == [202, 202, 202]
     assert statuses[3] == 429
     assert responses[3].json() == {"error": {"code": "too_many_requests", "message": "rate limit exceeded"}}
+
+    _cleanup_overrides()
+
+
+def test_rolling_counters_are_provider_scoped_and_metrics_aggregate(tmp_path) -> None:
+    client, _ = _make_client(tmp_path)
+
+    project_response = client.post("/api/v1/projects", json={"name": "Provider Scoped Metrics"})
+    assert project_response.status_code == 200
+    project_id = project_response.json()["id"]
+    key_response = client.post(f"/api/v1/projects/{project_id}/keys", json={"name": "dev"})
+    assert key_response.status_code == 200
+    plaintext_key = key_response.json()["key"]
+
+    for _ in range(3):
+        response = client.post(
+            "/api/v1/events",
+            json=_event_payload(total_tokens=10),
+            headers={"X-Project-Ingest-Key": plaintext_key},
+        )
+        assert response.status_code == 202
+
+    metrics = client.get(f"/api/v1/metrics/realtime?project_id={project_id}")
+    assert metrics.status_code == 200
+    assert metrics.json()["requests_60s"] == 3
+    assert metrics.json()["tokens_60s"] == 30
+
+    rolling = app.dependency_overrides[get_metrics_service]()._realtime_counters  # type: ignore[attr-defined]
+    openai_req, _ = rolling.get_project_60s(scoped_project_provider_id(project_id, "openai"))
+    anthropic_req, _ = rolling.get_project_60s(scoped_project_provider_id(project_id, "anthropic"))
+    assert openai_req == 3
+    assert anthropic_req == 0
 
     _cleanup_overrides()

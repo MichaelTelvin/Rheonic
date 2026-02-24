@@ -28,8 +28,9 @@ def main() -> None:
         demo_events = [
             ("openai", "gpt-4o-mini", "/chat/completions", 2),
             ("anthropic", "claude-3-5-sonnet", "/v1/messages", 3),
-            ("gemini", "gemini-1.5-pro", "/v1beta/models/generateContent", 4),
+            ("google", "gemini-1.5-pro", "/v1beta/models/generateContent", 4),
         ]
+        print("[DEMO] provider scoping active: counters/incidents/decisions are isolated by provider")
         for provider, model, endpoint, total_tokens in demo_events:
             capture_event(
                 build_event(

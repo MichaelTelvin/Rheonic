@@ -150,6 +150,7 @@ def get_metrics_service() -> MetricsService:
         service = MetricsService(
             realtime_counters=get_rolling_window(),
             protect_action_store=get_protect_action_store(),
+            project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )
         logger.debug("Metrics service provided")
         return service
@@ -313,6 +314,26 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
             connection.execute(text("ALTER TABLE incidents ADD COLUMN fingerprint VARCHAR(255)"))
         if "last_seen_at" not in incident_columns:
             connection.execute(text("ALTER TABLE incidents ADD COLUMN last_seen_at TIMESTAMP"))
+        if "provider" not in incident_columns:
+            connection.execute(text("ALTER TABLE incidents ADD COLUMN provider VARCHAR(64)"))
+        # Best-effort provider backfill from incident evidence provider field.
+        if connection.engine.dialect.name == "postgresql":
+            connection.execute(
+                text(
+                    "UPDATE incidents "
+                    "SET provider = NULLIF(TRIM(evidence ->> 'provider'), '') "
+                    "WHERE provider IS NULL OR provider = ''"
+                )
+            )
+        else:
+            connection.execute(
+                text(
+                    "UPDATE incidents "
+                    "SET provider = NULLIF(TRIM(json_extract(evidence, '$.provider')), '') "
+                    "WHERE provider IS NULL OR provider = ''"
+                )
+            )
+        connection.execute(text("UPDATE incidents SET provider = 'unknown' WHERE provider IS NULL OR provider = ''"))
 
     incident_indexes = {index["name"] for index in inspector.get_indexes("incidents")}
     if "ix_incidents_project_status_fingerprint" not in incident_indexes:
@@ -331,6 +352,18 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
                 text(
                     "CREATE INDEX IF NOT EXISTS ix_incidents_project_status_created_at "
                     "ON incidents (project_id, status, created_at)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_incidents_project_provider_status_created_at "
+                    "ON incidents (project_id, provider, status, created_at)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_incidents_project_provider_last_seen_at "
+                    "ON incidents (project_id, provider, last_seen_at)"
                 )
             )
             connection.execute(

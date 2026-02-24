@@ -11,7 +11,7 @@ import httpx
 from llmtokenburnguard.client import Client
 from llmtokenburnguard.protect_engine import LLMTBGBlockedError
 from llmtokenburnguard.providers.anthropic_adapter import instrument_anthropic
-from llmtokenburnguard.providers.gemini_adapter import instrument_gemini
+from llmtokenburnguard.providers.google_adapter import instrument_google
 from llmtokenburnguard.providers.openai_adapter import instrument_openai
 
 
@@ -124,22 +124,22 @@ def make_anthropic_stub() -> Any:
     return AnthropicStub()
 
 
-def make_gemini_stub() -> Any:
+def make_google_stub() -> Any:
     class UsageMetadata:
         total_token_count = 10
 
-    class GeminiResponse:
+    class GoogleResponse:
         usage_metadata = UsageMetadata()
 
-    class GeminiModelStub:
+    class GoogleModelStub:
         model_name = ""
 
         @staticmethod
         def generate_content(prompt: str) -> Any:
             httpx.post(f"{PROVIDER_STUB_URL}/call", json={"prompt": prompt}, timeout=3.0).raise_for_status()
-            return GeminiResponse()
+            return GoogleResponse()
 
-    return GeminiModelStub()
+    return GoogleModelStub()
 
 
 def print_provider_stub_help() -> None:
@@ -158,9 +158,9 @@ def main() -> None:
     scenario = (os.getenv("LLMTBG_SCENARIO", "allow") or "allow").lower()
     provider = (os.getenv("LLMTBG_PROVIDER", "") or "").strip().lower()
     if not provider:
-        print("LLMTBG_PROVIDER is required (openai | anthropic | gemini).")
+        print("LLMTBG_PROVIDER is required (openai | anthropic | google).")
         sys.exit(1)
-    if provider not in {"openai", "anthropic", "gemini"}:
+    if provider not in {"openai", "anthropic", "google"}:
         print(f"LLMTBG_PROVIDER is unsupported: {provider}")
         sys.exit(1)
     model = (os.getenv("LLMTBG_MODEL", "") or "").strip()
@@ -183,11 +183,11 @@ def main() -> None:
 
     openai = make_openai_stub()
     anthropic = make_anthropic_stub()
-    gemini = make_gemini_stub()
-    gemini.model_name = model
+    google = make_google_stub()
+    google.model_name = model
     instrument_openai(openai, client=client, feature="manual-protect-demo", environment=environment)
     instrument_anthropic(anthropic, client=client, feature="manual-protect-demo", environment=environment)
-    instrument_gemini(gemini, client=client, feature="manual-protect-demo", environment=environment)
+    instrument_google(google, client=client, feature="manual-protect-demo", environment=environment)
 
     provider_reset()
     before = provider_count()
@@ -200,6 +200,7 @@ def main() -> None:
     blocked = False
     warned = False
     print(f"[DEMO] provider={provider} model={model} scenario={scenario}")
+    print("[DEMO] provider scoping active: counters/incidents/decisions are isolated by provider")
     try:
         if provider == "anthropic":
             anthropic.messages.create(
@@ -207,8 +208,8 @@ def main() -> None:
                 messages=[{"role": "user", "content": f"Manual protect demo request. scenario={scenario}."}],
                 max_tokens=max_tokens,
             )
-        elif provider == "gemini":
-            gemini.generate_content(f"Manual protect demo request. scenario={scenario}.")
+        elif provider == "google":
+            google.generate_content(f"Manual protect demo request. scenario={scenario}.")
         else:
             openai.chat.completions.create(
                 model=model,

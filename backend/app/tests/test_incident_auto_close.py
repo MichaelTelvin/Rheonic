@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from app.application.services.auto_close_incidents_service import AutoCloseIncidentsService
 from app.application.services.ingest_key_service import IngestKeyService
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.protect_service import ProtectService
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base, IncidentRecord, IngestKeyRecord, ProjectRecord, UserRecord
@@ -108,6 +109,7 @@ def test_auto_close_resolves_only_stale_open_incidents(tmp_path) -> None:
             IncidentRecord(
                 id="inc-old",
                 project_id="p1",
+                provider="openai",
                 type="burn_spike",
                 severity="high",
                 status="open",
@@ -121,6 +123,7 @@ def test_auto_close_resolves_only_stale_open_incidents(tmp_path) -> None:
             IncidentRecord(
                 id="inc-recent",
                 project_id="p1",
+                provider="openai",
                 type="burn_spike",
                 severity="medium",
                 status="open",
@@ -196,6 +199,7 @@ def test_protect_decision_ignores_auto_resolved_incidents(tmp_path) -> None:
             IncidentRecord(
                 id="inc-stale-high",
                 project_id=project_id,
+                provider="openai",
                 type="burn_spike",
                 severity="high",
                 status="open",
@@ -209,7 +213,7 @@ def test_protect_decision_ignores_auto_resolved_incidents(tmp_path) -> None:
 
     redis_client = FakeRedisClient()
     severity_cache = IncidentSeverityCache(redis_client=redis_client)  # type: ignore[arg-type]
-    severity_cache.set(project_id=project_id, severity="high")
+    severity_cache.set(project_id=scoped_project_provider_id(project_id, "openai"), severity="high")
 
     auto_close_service = AutoCloseIncidentsService(
         incident_repository=IncidentRepositoryImpl(session_factory=session_factory),
@@ -218,7 +222,7 @@ def test_protect_decision_ignores_auto_resolved_incidents(tmp_path) -> None:
     )
     resolved_count = auto_close_service.auto_close(now=now)
     assert resolved_count == 1
-    assert severity_cache.get(project_id=project_id) == "none"
+    assert severity_cache.get(project_id=scoped_project_provider_id(project_id, "openai")) == "none"
 
     protect_service = ProtectService(
         ingest_key_service=IngestKeyService(
@@ -247,6 +251,7 @@ def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
             IncidentRecord(
                 id="inc-old-webhook",
                 project_id="p1",
+                provider="openai",
                 type="burn_spike",
                 severity="high",
                 status="open",

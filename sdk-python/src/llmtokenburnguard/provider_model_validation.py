@@ -1,6 +1,6 @@
 from llmtokenburnguard.protect_engine import LLMTBGValidationError
 
-_SUPPORTED_PROVIDERS: tuple[str, ...] = ("openai", "anthropic", "gemini")
+_SUPPORTED_PROVIDERS: tuple[str, ...] = ("openai", "anthropic", "google")
 
 
 def validate_provider_model(provider: str, model: str | None) -> None:

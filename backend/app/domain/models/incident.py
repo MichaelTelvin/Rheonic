@@ -8,6 +8,7 @@ class Incident:
     # Represents a detected anomaly incident.
     id: str
     project_id: str
+    provider: str
     incident_type: str
     severity: str
     status: str

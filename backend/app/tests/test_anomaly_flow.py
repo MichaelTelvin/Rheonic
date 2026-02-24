@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.application.services.detect_incidents_service import DetectIncidentsService
 from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.ingest_key_service import IngestKeyService
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.project_service import ProjectService
 from app.dependencies import (
     get_current_user,
@@ -182,13 +183,14 @@ def _list_open_incidents(client: TestClient, project_id: str) -> list[dict[str, 
 
 def _clear_project_redis_state(redis_client: FakeRedisClient, project_id: str) -> None:
     # Remove rolling-window and baseline keys used by this project.
+    scoped_id = scoped_project_provider_id(project_id, "openai")
     keys = [
-        requests_60s_key(project_id),
-        tokens_60s_key(project_id),
-        baseline_req_60s_key(project_id),
-        baseline_tok_60s_key(project_id),
-        incident_open_lock_key(project_id, "burn_spike"),
-        incident_open_lock_key(project_id, "request_spike"),
+        requests_60s_key(scoped_id),
+        tokens_60s_key(scoped_id),
+        baseline_req_60s_key(scoped_id),
+        baseline_tok_60s_key(scoped_id),
+        incident_open_lock_key(scoped_id, "burn_spike"),
+        incident_open_lock_key(scoped_id, "request_spike"),
     ]
     for key in keys:
         redis_client.delete(key)
@@ -196,7 +198,7 @@ def _clear_project_redis_state(redis_client: FakeRedisClient, project_id: str) -
 
 def _baseline_token_samples(redis_client: FakeRedisClient, project_id: str) -> list[int]:
     # Return baseline token list values for assertions.
-    values = redis_client.lrange(baseline_tok_60s_key(project_id), 0, -1)
+    values = redis_client.lrange(baseline_tok_60s_key(scoped_project_provider_id(project_id, "openai")), 0, -1)
     return [int(value.decode("utf-8") if isinstance(value, bytes) else value) for value in values]
 
 

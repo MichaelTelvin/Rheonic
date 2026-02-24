@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import httpx
 
 from llmtokenburnguard import LLMTBGBlockedError, create_client
+from llmtokenburnguard.providers.anthropic_adapter import instrument_anthropic
+from llmtokenburnguard.providers.google_adapter import instrument_google
 from llmtokenburnguard.providers.openai_adapter import instrument_openai
 
 BACKEND_BASE_URL = os.getenv("LLMTBG_E2E_BACKEND_URL", "http://backend_test:8000")
@@ -70,7 +72,8 @@ def _seed() -> AuthContext:
 
 
 def _provider_reset() -> None:
-    httpx.post(f"{PROVIDER_STUB_URL}/reset", timeout=3.0)
+    response = httpx.post(f"{PROVIDER_STUB_URL}/reset", timeout=3.0)
+    response.raise_for_status()
 
 
 def _provider_count() -> int:
@@ -82,6 +85,7 @@ def _provider_count() -> int:
 def run() -> None:
     auth = _seed()
     _provider_reset()
+    baseline_provider_calls = _provider_count()
 
     client = create_client(
         ingest_key=auth.ingest_key,
@@ -102,11 +106,56 @@ def run() -> None:
     class OpenAIStub:
         chat = Chat()
 
+    class AnthropicMessages:
+        @staticmethod
+        def create(**kwargs):
+            httpx.post(f"{PROVIDER_STUB_URL}/call", json=kwargs, timeout=3.0).raise_for_status()
+
+            class _Usage:
+                input_tokens = 8
+                output_tokens = 6
+                total_tokens = 14
+
+            class _Response:
+                model = kwargs.get("model", "claude-3-5-sonnet-20240620")
+                usage = _Usage()
+
+            return _Response()
+
+    class AnthropicStub:
+        messages = AnthropicMessages()
+
+    class GoogleUsage:
+        prompt_token_count = 7
+        candidates_token_count = 5
+        total_token_count = 12
+
+    class GoogleResponse:
+        usage_metadata = GoogleUsage()
+
+    class GoogleModelStub:
+        model_name = "gemini-1.5-pro"
+
+        @staticmethod
+        def generate_content(prompt):
+            httpx.post(f"{PROVIDER_STUB_URL}/call", json={"prompt": prompt}, timeout=3.0).raise_for_status()
+            return GoogleResponse()
+
     openai = OpenAIStub()
+    anthropic = AnthropicStub()
+    google_model = GoogleModelStub()
     instrument_openai(openai, client=client, feature="python-e2e")
+    instrument_anthropic(anthropic, client=client, feature="python-e2e")
+    instrument_google(google_model, client=client, feature="python-e2e")
 
     openai.chat.completions.create(model="gpt-4o-mini", max_tokens=128, input_tokens=10)
-    assert _provider_count() == 1
+    anthropic.messages.create(
+        model="claude-3-5-sonnet-20240620",
+        max_tokens=128,
+        messages=[{"role": "user", "content": "anthropic e2e smoke"}],
+    )
+    google_model.generate_content("google e2e smoke")
+    assert _provider_count() - baseline_provider_calls == 3
 
     ingest_response = httpx.post(
         f"{BACKEND_BASE_URL}/api/v1/events",
@@ -132,7 +181,7 @@ def run() -> None:
     except LLMTBGBlockedError:
         blocked = True
     assert blocked is False
-    assert _provider_count() == 2
+    assert _provider_count() - baseline_provider_calls == 4
 
     protect_metrics = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
     assert int(protect_metrics.get("warned_60m") or 0) >= 1

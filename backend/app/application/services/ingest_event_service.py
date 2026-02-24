@@ -6,6 +6,7 @@ from uuid import uuid4
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.event_repository import EventRepository
 from app.application.interfaces.incident_repository import IncidentRepository
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.interfaces.project_repository import ProjectRepository
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.config import app_config
@@ -59,31 +60,34 @@ class IngestEventService:
     def ingest(self, event: Event) -> None:
         # Persist a single event and update realtime counters.
         try:
+            provider = (event.provider or "").strip() or "unknown"
+            scoped_id = scoped_project_provider_id(event.project_id, provider)
             # persist event to durable store
             self._event_repository.add(event)
 
             # update realtime 60s counters
             self._realtime_counters.increment_project_60s(
-                project_id=event.project_id,
+                project_id=scoped_id,
                 total_tokens=event.total_tokens,
             )
-            requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=event.project_id)
+            requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=scoped_id)
             self._detect_policy_gap_if_needed(event=event)
             try:
-                if self._has_open_incident_for_dimension(event=event):
+                if self._has_open_incident_for_dimension(event=event, provider=provider):
                     baseline_req_60s, baseline_tok_60s = self._realtime_counters.get_baseline_snapshot(
-                        project_id=event.project_id,
+                        project_id=scoped_id,
                         max_windows=self._baseline_window_count,
                     )
                 else:
                     baseline_req_60s, baseline_tok_60s = self._realtime_counters.record_baseline_snapshot(
-                        project_id=event.project_id,
+                        project_id=scoped_id,
                         requests_60s=requests_60s,
                         tokens_60s=tokens_60s,
                         max_windows=self._baseline_window_count,
                     )
                 self._create_incident_if_needed(
                     event=event,
+                    provider=provider,
                     requests_60s=requests_60s,
                     tokens_60s=tokens_60s,
                     baseline_req_60s=baseline_req_60s,
@@ -137,6 +141,7 @@ class IngestEventService:
         incident = Incident(
             id=str(uuid4()),
             project_id=event.project_id,
+            provider=provider,
             incident_type=app_config.incident_type_policy_gap,
             severity="low",
             status="open",
@@ -177,7 +182,7 @@ class IngestEventService:
             except Exception:
                 logger.exception("Failed to enqueue policy-gap webhook", extra={"project_id": event.project_id})
 
-    def _has_open_incident_for_dimension(self, event: Event) -> bool:
+    def _has_open_incident_for_dimension(self, event: Event, provider: str) -> bool:
         # Freeze baseline updates while any open anomaly incident exists for this event dimension.
         created_after = datetime.fromtimestamp(0, tz=timezone.utc)
         for incident_type in (app_config.incident_type_burn_spike, app_config.incident_type_request_spike):
@@ -190,6 +195,7 @@ class IngestEventService:
             )
             open_incident = self._incident_repository.get_open_incident_by_fingerprint(
                 project_id=event.project_id,
+                provider=provider,
                 fingerprint=fingerprint,
                 created_after=created_after,
             )
@@ -200,6 +206,7 @@ class IngestEventService:
     def _create_incident_if_needed(
         self,
         event: Event,
+        provider: str,
         requests_60s: int,
         tokens_60s: int,
         baseline_req_60s: float,
@@ -244,6 +251,7 @@ class IngestEventService:
         dedup_after = now - timedelta(seconds=self._incident_dedup_window_seconds)
         open_incident = self._incident_repository.get_open_incident_by_fingerprint(
             project_id=event.project_id,
+            provider=provider,
             fingerprint=fingerprint,
             created_after=dedup_after,
         )
@@ -256,6 +264,7 @@ class IngestEventService:
             updated_severity = open_incident.severity
             escalation_payload = self._evaluate_incident_escalation(
                 project_id=event.project_id,
+                provider=provider,
                 incident_type=incident_type,
                 current_severity=open_incident.severity,
                 max_ratio=max_ratio,
@@ -286,7 +295,10 @@ class IngestEventService:
                     source="escalation",
                 )
             if self._incident_severity_cache is not None:
-                self._incident_severity_cache.set(project_id=event.project_id, severity=updated_severity)
+                self._incident_severity_cache.set(
+                    project_id=scoped_project_provider_id(event.project_id, provider),
+                    severity=updated_severity,
+                )
             logger.info(
                 "Incident deduped and updated",
                 extra={"project_id": event.project_id, "incident_id": open_incident.id, "incident_type": incident_type},
@@ -296,6 +308,7 @@ class IngestEventService:
         incident = Incident(
             id=str(uuid4()),
             project_id=event.project_id,
+            provider=provider,
             incident_type=incident_type,
             severity=severity,
             status="open",
@@ -321,7 +334,10 @@ class IngestEventService:
                 source="opened_high",
             )
         if self._incident_severity_cache is not None:
-            self._incident_severity_cache.set(project_id=event.project_id, severity=severity)
+            self._incident_severity_cache.set(
+                project_id=scoped_project_provider_id(event.project_id, provider),
+                severity=severity,
+            )
         logger.info(
             "Incident created from ingest",
             extra={"project_id": event.project_id, "incident_type": incident_type, "severity": severity},
@@ -331,6 +347,7 @@ class IngestEventService:
         self,
         *,
         project_id: str,
+        provider: str,
         incident_type: str,
         current_severity: str,
         max_ratio: float,
@@ -358,7 +375,7 @@ class IngestEventService:
             self._incident_escalation_window_high_seconds,
         )
         hits = self._realtime_counters.record_incident_escalation_hit(
-            project_id=project_id,
+            project_id=scoped_project_provider_id(project_id, provider),
             incident_type=incident_type,
             ts_unix=now_unix,
             score=hit_score,

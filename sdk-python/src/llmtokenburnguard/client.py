@@ -255,18 +255,18 @@ class Client:
             feature=feature,
         )
 
-    def instrument_gemini(
+    def instrument_google(
         self,
-        gemini_model: Any,
+        google_client: Any,
         environment: str | None = None,
         endpoint: str | None = None,
         feature: str | None = None,
     ) -> Any:
-        # Convenience wrapper that instruments a Gemini model with this SDK client.
-        from llmtokenburnguard.providers.gemini_adapter import instrument_gemini
+        # Convenience wrapper that instruments a Google client with this SDK client.
+        from llmtokenburnguard.providers.google_adapter import instrument_google
 
-        return instrument_gemini(
-            gemini_model,
+        return instrument_google(
+            google_client,
             client=self,
             environment=environment,
             endpoint=endpoint,

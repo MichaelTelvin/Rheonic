@@ -3,7 +3,7 @@ import { sdkNodeConfig } from "./config.js";
 import { ProtectEngine, type ProtectContext, type ProtectEvaluation, type ProtectFailMode } from "./protectEngine.js";
 import { instrumentOpenAI as instrumentOpenAIProvider, type OpenAIInstrumentationOptions } from "./providers/openaiAdapter.js";
 import { instrumentAnthropic as instrumentAnthropicProvider, type AnthropicInstrumentationOptions } from "./providers/anthropicAdapter.js";
-import { instrumentGemini as instrumentGeminiProvider, type GeminiInstrumentationOptions } from "./providers/geminiAdapter.js";
+import { instrumentGoogle as instrumentGoogleProvider, type GoogleInstrumentationOptions } from "./providers/googleAdapter.js";
 
 export type OverflowPolicy = "drop_oldest" | "drop_newest";
 
@@ -171,11 +171,11 @@ export class Client {
     });
   }
 
-  public instrumentGemini<T extends Record<string, any>>(
-    geminiModel: T,
-    options?: Omit<GeminiInstrumentationOptions, "client">,
+  public instrumentGoogle<T extends Record<string, any>>(
+    googleModel: T,
+    options?: Omit<GoogleInstrumentationOptions, "client">,
   ): T {
-    return instrumentGeminiProvider(geminiModel, {
+    return instrumentGoogleProvider(googleModel, {
       client: this,
       environment: options?.environment,
       endpoint: options?.endpoint,

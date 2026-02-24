@@ -4,7 +4,7 @@ import { LLMTBGBlockedError } from "./protectEngine.js";
 import { LLMTBGValidationError } from "./providerModelValidation.js";
 import { instrumentOpenAI as instrumentOpenAIProvider, type OpenAIInstrumentationOptions } from "./providers/openaiAdapter.js";
 import { instrumentAnthropic as instrumentAnthropicProvider, type AnthropicInstrumentationOptions } from "./providers/anthropicAdapter.js";
-import { instrumentGemini as instrumentGeminiProvider, type GeminiInstrumentationOptions } from "./providers/geminiAdapter.js";
+import { instrumentGoogle as instrumentGoogleProvider, type GoogleInstrumentationOptions } from "./providers/googleAdapter.js";
 
 let defaultClient: Client | null = null;
 
@@ -72,16 +72,16 @@ export function instrumentAnthropic<T extends Record<string, any>>(
   });
 }
 
-export function instrumentGemini<T extends Record<string, any>>(
-  geminiModel: T,
-  options?: Omit<GeminiInstrumentationOptions, "client"> & { client?: Client },
+export function instrumentGoogle<T extends Record<string, any>>(
+  googleModel: T,
+  options?: Omit<GoogleInstrumentationOptions, "client"> & { client?: Client },
 ): T {
   const resolvedClient = options?.client ?? defaultClient;
   if (!resolvedClient) {
-    return geminiModel;
+    return googleModel;
   }
 
-  return instrumentGeminiProvider(geminiModel, {
+  return instrumentGoogleProvider(googleModel, {
     client: resolvedClient,
     environment: options?.environment,
     endpoint: options?.endpoint,

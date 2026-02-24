@@ -172,6 +172,7 @@ def test_new_model_triggers_policy_gap_incident(tmp_path) -> None:
     assert models_count == 2
     assert len(incidents) == 1
     assert incidents[0].severity == "low"
+    assert incidents[0].provider == "openai"
 
 
 def test_same_model_again_does_not_create_new_incident(tmp_path) -> None:

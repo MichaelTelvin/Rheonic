@@ -134,6 +134,7 @@ def test_tenant_scoping_blocks_cross_user_incident_resolve(tmp_path) -> None:
                 IncidentRecord(
                     id=incident_id,
                     project_id=project_id,
+                    provider="openai",
                     type="burn_spike",
                     severity="low",
                     status="open",

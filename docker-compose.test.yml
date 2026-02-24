@@ -39,6 +39,11 @@ services:
         condition: service_healthy
     command: >
       sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)\""]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   provider_stub_test:
     image: python:3.12-alpine
@@ -47,6 +52,11 @@ services:
       - ./e2e:/app/e2e
     command: >
       sh -c "python /app/e2e/provider_stub.py"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8099/count', timeout=2)\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   sdk_node_test:
     image: node:20-alpine
@@ -61,8 +71,10 @@ services:
       && npm run -s build >/dev/null 2>&1
       && node e2e/protect.e2e.mjs"
     depends_on:
-      - backend_test
-      - provider_stub_test
+      backend_test:
+        condition: service_healthy
+      provider_stub_test:
+        condition: service_healthy
 
   sdk_python_test:
     image: python:3.12-alpine
@@ -76,8 +88,10 @@ services:
       sh -c "pip install -q -e . >/dev/null 2>&1
       && python e2e/protect_e2e.py"
     depends_on:
-      - backend_test
-      - provider_stub_test
+      backend_test:
+        condition: service_healthy
+      provider_stub_test:
+        condition: service_healthy
 
 volumes:
   postgres-test-data:

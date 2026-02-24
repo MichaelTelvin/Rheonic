@@ -12,7 +12,7 @@ style: {
   fill: "#f4f6fb"
 }
 
-preflight: "SDK preflight (protect mode)\nPOST /api/v1/protect/decision" {
+preflight: "SDK preflight (protect mode)\nPOST /api/v1/protect/decision\nscope: project+provider" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -32,7 +32,7 @@ sdk_gate: "SDK preflight enabled?\nprotectEnabled/protect_enabled" {
   }
 }
 
-cooldown: "cooldown active?\nprotect_block_cooldown_seconds=60" {
+cooldown: "cooldown active? (project+provider)\nprotect_block_cooldown_seconds=60" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -52,7 +52,7 @@ mode: "protect_enabled?" {
   }
 }
 
-req_cap: "requests_60s >= protect_max_req_per_min?\n(null = unlimited)" {
+req_cap: "requests_60s >= protect_max_req_per_min?\n(project+provider)\n(null = unlimited)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -62,7 +62,7 @@ req_cap: "requests_60s >= protect_max_req_per_min?\n(null = unlimited)" {
   }
 }
 
-tok_cap: "tokens_60s >= protect_max_tok_per_min?\n(null = unlimited)" {
+tok_cap: "tokens_60s >= protect_max_tok_per_min?\n(project+provider)\n(null = unlimited)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -72,7 +72,7 @@ tok_cap: "tokens_60s >= protect_max_tok_per_min?\n(null = unlimited)" {
   }
 }
 
-sev_high: "incident severity = high?\n(ratio >=10.0 or escalation)" {
+sev_high: "incident severity = high?\n(project+provider open incidents)\n(ratio >=10.0 or escalation)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -82,7 +82,7 @@ sev_high: "incident severity = high?\n(ratio >=10.0 or escalation)" {
   }
 }
 
-sev_medium: "incident severity = medium?\n(ratio >=5.0 or escalation)" {
+sev_medium: "incident severity = medium?\n(project+provider open incidents)\n(ratio >=5.0 or escalation)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -172,6 +172,16 @@ fallback: "SDK fallback on decision error/timeout\nfail-open -> allow (decision_
   }
 }
 
+aggregate: "Dashboard protect metrics aggregate by project\nsum provider-scoped counters\n(response schema unchanged)" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 17
+  }
+}
+
 sdk_gate -> preflight: "yes / protect"
 sdk_gate -> provider: "no / observe"
 preflight -> mode
@@ -201,3 +211,4 @@ block -> response
 response -> enforce
 enforce -> provider: "allow/warn path"
 fallback -> enforce
+enforce -> aggregate: "metrics summed across providers"

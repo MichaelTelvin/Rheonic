@@ -204,21 +204,28 @@ class FakeIncidentRepository:
         self.created_count += 1
         return incident
 
-    def get_open_incident_by_type(self, project_id: str, incident_type: str) -> Incident | None:
+    def get_open_incident_by_type(self, project_id: str, provider: str, incident_type: str) -> Incident | None:
         for incident in reversed(self.incidents):
-            if incident.project_id == project_id and incident.incident_type == incident_type and incident.status == "open":
+            if (
+                incident.project_id == project_id
+                and incident.provider == provider
+                and incident.incident_type == incident_type
+                and incident.status == "open"
+            ):
                 return incident
         return None
 
     def get_open_incident_by_fingerprint(
         self,
         project_id: str,
+        provider: str,
         fingerprint: str,
         created_after: datetime,
     ) -> Incident | None:
         for incident in reversed(self.incidents):
             if (
                 incident.project_id == project_id
+                and incident.provider == provider
                 and incident.status == "open"
                 and incident.fingerprint == fingerprint
                 and incident.created_at >= created_after
@@ -239,6 +246,7 @@ class FakeIncidentRepository:
             updated = Incident(
                 id=incident.id,
                 project_id=incident.project_id,
+                provider=incident.provider,
                 incident_type=incident.incident_type,
                 severity=severity,
                 status=incident.status,
@@ -256,6 +264,13 @@ class FakeIncidentRepository:
     def list_by_project(self, project_id: str, status: str = "open") -> list[Incident]:
         return [incident for incident in self.incidents if incident.project_id == project_id and incident.status == status]
 
+    def list_open_by_project_provider(self, project_id: str, provider: str) -> list[Incident]:
+        return [
+            incident
+            for incident in self.incidents
+            if incident.project_id == project_id and incident.provider == provider and incident.status == "open"
+        ]
+
     def get_by_id(self, incident_id: str) -> Incident | None:
         for incident in self.incidents:
             if incident.id == incident_id:
@@ -269,6 +284,7 @@ class FakeIncidentRepository:
             updated = Incident(
                 id=incident.id,
                 project_id=incident.project_id,
+                provider=incident.provider,
                 incident_type=incident.incident_type,
                 severity=incident.severity,
                 status="resolved",
@@ -785,6 +801,6 @@ def test_escalation_hits_ttl_and_prune_applied() -> None:
     service.ingest(_build_event(project_id="p1"))  # hit 2
     service.ingest(_build_event(project_id="p1"))  # hit 3 + prune
 
-    key = "p1:burn_spike"
+    key = "p1:openai:burn_spike"
     assert realtime.escalation_ttls[key] == 360
     assert len(realtime.escalation_hits[key]) == 1

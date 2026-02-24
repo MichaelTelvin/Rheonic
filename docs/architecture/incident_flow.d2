@@ -12,7 +12,7 @@ style: {
   fill: "#f4f6fb"
 }
 
-ingest: "POST /api/v1/events\nPersist event + update rolling 60s" {
+ingest: "POST /api/v1/events\nPersist event + update rolling 60s\nscope: project+provider" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -23,7 +23,7 @@ ingest: "POST /api/v1/events\nPersist event + update rolling 60s" {
   }
 }
 
-baseline: "Baseline update gate\nIf matching OPEN incident exists\n=> baseline frozen\nelse record baseline snapshot\nmedian of last baseline_window_count=30" {
+baseline: "Baseline update gate\nIf matching OPEN incident exists (project+provider)\n=> baseline frozen\nelse record baseline snapshot\nmedian of last baseline_window_count=30" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -34,7 +34,7 @@ baseline: "Baseline update gate\nIf matching OPEN incident exists\n=> baseline f
   }
 }
 
-detect: "Anomaly compare\nreq_ratio/tok_ratio vs baseline\nlow>=2.0, medium>=5.0, high>=10.0\nincident_type=burn_spike or request_spike" {
+detect: "Anomaly compare (project+provider)\nreq_ratio/tok_ratio vs baseline\nlow>=2.0, medium>=5.0, high>=10.0\nincident_type=burn_spike or request_spike" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -45,7 +45,7 @@ detect: "Anomaly compare\nreq_ratio/tok_ratio vs baseline\nlow>=2.0, medium>=5.0
   }
 }
 
-dedup: "Dedup window\nincident_dedup_window_seconds=300\nOpen+fingerprint hit => update evidence/count" {
+dedup: "Dedup window (project+provider)\nincident_dedup_window_seconds=300\nOpen+fingerprint hit => update evidence/count" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -56,7 +56,7 @@ dedup: "Dedup window\nincident_dedup_window_seconds=300\nOpen+fingerprint hit =>
   }
 }
 
-create: "Create incident\nstatus=open\nseverity from ratio" {
+create: "Create incident (project+provider)\nstatus=open\nseverity from ratio" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -67,7 +67,7 @@ create: "Create incident\nstatus=open\nseverity from ratio" {
   }
 }
 
-escalate: "Escalation (open only)\nlow->medium/high or medium->high\nwm=300s, wh=120s\nmin_hits_m=2, min_hits_h=2\nscore_m>=4, score_h>=6\n10x guard score=3\nescalation hit cache ttl=360s" {
+escalate: "Escalation (open only, project+provider)\nlow->medium/high or medium->high\nwm=300s, wh=120s\nmin_hits_m=2, min_hits_h=2\nscore_m>=4, score_h>=6\n10x guard score=3\nescalation hit cache ttl=360s" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -101,6 +101,17 @@ auto_close: "Auto-close worker\nruns every AUTO_CLOSE_RUN_INTERVAL_SECONDS=60\ns
 }
 
 resolved: "Statuses\nopen -> auto_resolved\n(or manually resolved)" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 8
+    stroke-width: 1
+  }
+}
+
+aggregate: "Dashboard metrics endpoints aggregate totals\nsum across providers for same project\n(response schema unchanged)" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
@@ -160,6 +171,12 @@ keep_open -> auto_close: {
   }
 }
 auto_close -> resolved: {
+  style: {
+    stroke-width: 1
+    font-size: 8
+  }
+}
+resolved -> aggregate: {
   style: {
     stroke-width: 1
     font-size: 8

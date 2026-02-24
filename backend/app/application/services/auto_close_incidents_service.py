@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from app.application.interfaces.incident_repository import IncidentRepository
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.domain.models.incident import Incident
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
@@ -31,16 +32,22 @@ class AutoCloseIncidentsService:
         # Resolve stale incidents and return number of rows changed.
         resolved_at = now or datetime.now(timezone.utc)
         cutoff = resolved_at - timedelta(seconds=self._cooldown_seconds)
-        resolved_incidents, affected_projects = self._incident_repository.auto_resolve_stale_open_incidents(
+        resolved_incidents, affected_scopes = self._incident_repository.auto_resolve_stale_open_incidents(
             cutoff=cutoff,
             resolved_at=resolved_at,
         )
         for incident in resolved_incidents:
             self._enqueue_incident_resolved_webhook(incident=incident, resolved_by="auto")
         if self._incident_severity_cache is not None:
-            for project_id in affected_projects:
-                open_incidents = self._incident_repository.list_by_project(project_id=project_id, status="open")
-                self._incident_severity_cache.set(project_id=project_id, severity=_highest_severity(open_incidents))
+            for project_id, provider in affected_scopes:
+                open_incidents = self._incident_repository.list_open_by_project_provider(
+                    project_id=project_id,
+                    provider=provider,
+                )
+                self._incident_severity_cache.set(
+                    project_id=scoped_project_provider_id(project_id, provider),
+                    severity=_highest_severity(open_incidents),
+                )
         return len(resolved_incidents)
 
     def _enqueue_incident_resolved_webhook(self, *, incident: Incident, resolved_by: str) -> None:
@@ -87,7 +94,7 @@ def _highest_severity(incidents: list[Incident]) -> str:
 def _incident_dimensions(incident: Incident) -> tuple[str | None, str | None, str | None]:
     # Extract provider/model/environment from incident evidence when present.
     evidence = incident.evidence or {}
-    provider = evidence.get("provider")
+    provider = incident.provider or evidence.get("provider")
     model = evidence.get("model")
     environment = evidence.get("environment")
     return (

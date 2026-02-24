@@ -89,3 +89,8 @@ class ProjectRepository(ABC):
     def count_project_models(self, project_id: str) -> int:
         # Return number of distinct provider/model rows already recorded for a project.
         raise NotImplementedError
+
+    @abstractmethod
+    def list_project_providers(self, project_id: str) -> list[str]:
+        # Return distinct providers recorded for a project.
+        raise NotImplementedError

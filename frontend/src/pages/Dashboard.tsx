@@ -158,7 +158,7 @@ export function Dashboard(): JSX.Element {
             setGlobalBanner("You do not have access to this project's metrics.");
             setMetricsWarning("Metrics request was forbidden.");
           } else {
-            setMetricsWarning("Metrics polling failed. Showing last successful values.");
+            setMetricsWarning("Metrics polling failed.");
           }
           setMetricsFetchFailed(true);
         }
@@ -206,7 +206,7 @@ export function Dashboard(): JSX.Element {
             setGlobalBanner("You do not have access to this project's incidents.");
             setIncidentsWarning("Incidents request was forbidden.");
           } else {
-            setIncidentsWarning("Incidents polling failed. Showing last successful values.");
+            setIncidentsWarning("Incidents polling failed.");
           }
         }
       } finally {
@@ -292,7 +292,6 @@ export function Dashboard(): JSX.Element {
           </div>
         </section>
 
-        {incidentsWarning ? <p className="warning-text">{incidentsWarning}</p> : null}
         {globalBanner ? <section className="banner">{globalBanner}</section> : null}
 
         {!projectId ? (

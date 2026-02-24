@@ -122,7 +122,7 @@ export class ProtectEngine {
     } catch (error) {
       clearTimeout(timeout);
       if (isAbortError(error)) {
-        void this.reportDecisionTimeout(fetchFn);
+        void this.reportDecisionTimeout(fetchFn, context.provider);
       }
       return this.failMode === "closed"
         ? { decision: "block", reason: "decision_unavailable" }
@@ -130,7 +130,7 @@ export class ProtectEngine {
     }
   }
 
-  private async reportDecisionTimeout(fetchFn: typeof fetch): Promise<void> {
+  private async reportDecisionTimeout(fetchFn: typeof fetch, provider: string | undefined): Promise<void> {
     try {
       await fetchFn(`${this.baseUrl}/api/v1/protect/decision-timeout`, {
         method: "POST",
@@ -138,7 +138,7 @@ export class ProtectEngine {
           "Content-Type": "application/json",
           "X-Project-Ingest-Key": this.ingestKey,
         },
-        body: JSON.stringify({ environment: this.environment }),
+        body: JSON.stringify({ environment: this.environment, provider }),
       });
     } catch {
       // Swallow timeout reporting errors; protect evaluation must never throw here.

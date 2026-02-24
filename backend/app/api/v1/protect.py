@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.application.services.protect_service import ProtectDecisionContext, ProtectService
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.project_service import ProjectService
 from app.dependencies import (
@@ -64,6 +65,7 @@ class ProjectProtectIn(BaseModel):
 class DecisionTimeoutIn(BaseModel):
     # Timeout report payload from SDK when decision preflight call times out.
     environment: str
+    provider: str | None = None
 
 
 @router.post("/protect/decision", response_model=ProtectDecisionOut)
@@ -84,13 +86,18 @@ def protect_decision(
                 max_output_tokens=payload.max_output_tokens,
                 input_tokens_estimate=payload.input_tokens_estimate,
                 environment=payload.environment,
+                provider=payload.provider,
             ),
         )
         if decision is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
         latency_ms = int((perf_counter() - start) * 1000)
         if project_id:
-            protect_action_store.record_health(project_id=project_id, latency_ms=latency_ms, timed_out=False)
+            protect_action_store.record_health(
+                project_id=scoped_project_provider_id(project_id, payload.provider),
+                latency_ms=latency_ms,
+                timed_out=False,
+            )
         return ProtectDecisionOut(
             decision=decision.decision,
             reason=decision.reason,
@@ -122,7 +129,9 @@ def protect_decision_timeout(
         project = ingest_key_service.resolve_project(plaintext_key=ingest_key)
         if project is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
-        protect_action_store.record_decision_timeout(project_id=project.id)
+        protect_action_store.record_decision_timeout(
+            project_id=scoped_project_provider_id(project.id, payload.provider),
+        )
         return {"status": "accepted"}
     except HTTPException:
         raise

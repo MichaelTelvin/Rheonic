@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.metrics_service import MetricsService
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.project_service import ProjectService
 from app.application.services.protect_service import ProtectService
 from app.dependencies import (
@@ -134,6 +135,7 @@ def _make_client(
     metrics_service = MetricsService(
         realtime_counters=rolling_window,
         protect_action_store=protect_action_store,
+        project_repository=project_repository,
     )
     current_user = User(
         id="u-protect",
@@ -197,14 +199,14 @@ def _decision(client: TestClient, ingest_key: str, body: dict[str, object] | Non
 
 def _set_cooldown_key(rolling_window: RollingWindow, project_id: str, blocked_until_ms: int, ttl_seconds: int) -> None:
     client = getattr(rolling_window, "_client")
-    client.set(f"protect:cooldown:{project_id}", str(blocked_until_ms), ex=ttl_seconds)
+    client.set(f"protect:cooldown:{scoped_project_provider_id(project_id, 'openai')}", str(blocked_until_ms), ex=ttl_seconds)
 
 
 def test_protect_disabled_returns_allow(tmp_path) -> None:
     client, _, severity_cache = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Disabled")
     _set_protect(client, project_id, protect_enabled=False)
-    severity_cache.set(project_id, "high")
+    severity_cache.set(scoped_project_provider_id(project_id, "openai"), "high")
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "allow"
     assert decision["reason"] == "ok"
@@ -216,7 +218,7 @@ def test_req_limit_exceeded_blocks(tmp_path) -> None:
     project_id, ingest_key = _create_project_and_key(client, "Protect Req Limit")
     _set_protect(client, project_id, protect_enabled=True, protect_max_req_per_min=3)
     for _ in range(3):
-        rolling_window.increment_project_60s(project_id=project_id, total_tokens=10)
+        rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "block"
     assert decision["reason"] == "req_limit"
@@ -227,7 +229,7 @@ def test_tok_limit_exceeded_blocks(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Tok Limit")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100)
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=150)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=150)
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "block"
     assert decision["reason"] == "tok_limit"
@@ -238,7 +240,7 @@ def test_block_decision_includes_cooldown_fields(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path, cooldown_seconds=60)
     project_id, ingest_key = _create_project_and_key(client, "Protect Cooldown Fields")
     _set_protect(client, project_id, protect_enabled=True, protect_max_req_per_min=1)
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=10)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "block"
     assert decision["reason"] == "req_limit"
@@ -298,7 +300,7 @@ def test_medium_incident_returns_warn(tmp_path) -> None:
     client, _, severity_cache = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Medium Incident")
     _set_protect(client, project_id, protect_enabled=True)
-    severity_cache.set(project_id, "medium")
+    severity_cache.set(scoped_project_provider_id(project_id, "openai"), "medium")
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "warn"
     assert decision["reason"] == "incident_medium"
@@ -309,10 +311,26 @@ def test_high_incident_returns_block(tmp_path) -> None:
     client, _, severity_cache = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect High Incident")
     _set_protect(client, project_id, protect_enabled=True)
-    severity_cache.set(project_id, "high")
+    severity_cache.set(scoped_project_provider_id(project_id, "openai"), "high")
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "block"
     assert decision["reason"] == "incident_high"
+    _cleanup_overrides()
+
+
+def test_incident_severity_isolated_by_provider(tmp_path) -> None:
+    client, _, severity_cache = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Scoped Incident")
+    _set_protect(client, project_id, protect_enabled=True)
+    severity_cache.set(scoped_project_provider_id(project_id, "anthropic"), "high")
+
+    openai_decision = _decision(client, ingest_key, {"provider": "openai", "model": "gpt-4o-mini"})
+    assert openai_decision["decision"] == "allow"
+    assert openai_decision["reason"] == "ok"
+
+    anthropic_decision = _decision(client, ingest_key, {"provider": "anthropic", "model": "claude-3-5-sonnet"})
+    assert anthropic_decision["decision"] == "block"
+    assert anthropic_decision["reason"] == "incident_high"
     _cleanup_overrides()
 
 
@@ -320,7 +338,7 @@ def test_disabled_with_high_incident_still_allows(tmp_path) -> None:
     client, _, severity_cache = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Disabled High Incident")
     _set_protect(client, project_id, protect_enabled=False)
-    severity_cache.set(project_id, "high")
+    severity_cache.set(scoped_project_provider_id(project_id, "openai"), "high")
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "allow"
     assert decision["reason"] == "ok"
@@ -357,7 +375,7 @@ def test_decision_snapshot_includes_counters_and_thresholds(tmp_path) -> None:
         protect_max_tok_per_min=500,
         protect_decision_timeout_ms=250,
     )
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=120)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=120)
     decision = _decision(client, ingest_key)
     snapshot = decision["snapshot"]
     assert snapshot["requests_60s"] == 1
@@ -376,7 +394,7 @@ def test_predictive_near_cap_warns_when_next_call_would_reach_cap(tmp_path) -> N
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Warn")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=49_000)
 
     decision = _decision(
         client,
@@ -402,7 +420,7 @@ def test_predictive_warn_works_with_input_estimate_only(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Input Only")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=49_000)
 
     decision = _decision(
         client,
@@ -423,7 +441,7 @@ def test_predictive_near_cap_warn_regression_case(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Near Cap Regression")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=168)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=168)
 
     decision = _decision(
         client,
@@ -445,7 +463,7 @@ def test_predictive_near_cap_warn_does_not_trigger_below_80_percent(tmp_path) ->
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Near Cap Non Trigger")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=120)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=120)
 
     decision = _decision(
         client,
@@ -466,7 +484,7 @@ def test_missing_input_tokens_estimate_skips_predictive_warn(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Missing Input Estimate")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=49_000)
 
     response = client.post(
         "/api/v1/protect/decision",
@@ -491,8 +509,8 @@ def test_predictive_warn_does_not_override_high_incident_block(tmp_path) -> None
     client, rolling_window, severity_cache = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Predictive High Incident")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
-    severity_cache.set(project_id, "high")
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=49_000)
+    severity_cache.set(scoped_project_provider_id(project_id, "openai"), "high")
 
     decision = _decision(
         client,
@@ -514,8 +532,8 @@ def test_predictive_warn_does_not_override_medium_incident_warn_reason(tmp_path)
     client, rolling_window, severity_cache = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Predictive Medium Incident")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=50_000)
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=49_000)
-    severity_cache.set(project_id, "medium")
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=49_000)
+    severity_cache.set(scoped_project_provider_id(project_id, "openai"), "medium")
 
     decision = _decision(
         client,
@@ -583,12 +601,12 @@ def test_protect_metrics_increment_on_warn_and_block(tmp_path) -> None:
     project_id, ingest_key = _create_project_and_key(client, "Protect Metrics Counter 2")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=1000)
 
-    severity_cache.set(project_id, "medium")
+    severity_cache.set(scoped_project_provider_id(project_id, "openai"), "medium")
     warn_decision = _decision(client, ingest_key)
     assert warn_decision["decision"] == "warn"
 
-    severity_cache.set(project_id, "none")
-    rolling_window.increment_project_60s(project_id=project_id, total_tokens=1000)
+    severity_cache.set(scoped_project_provider_id(project_id, "openai"), "none")
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=1000)
     _decision(
         client,
         ingest_key,
@@ -619,7 +637,7 @@ def test_protect_latency_percentiles_are_windowed_and_deterministic(tmp_path) ->
     project_id, _ = _create_project_and_key(client, "Protect Latency Percentiles")
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
     redis_client: FakeRedisClient = app.dependency_overrides[get_metrics_service]()._protect_action_store._redis_client  # type: ignore[attr-defined]
-    latency_key = f"pa:{project_id}:latency:60m"
+    latency_key = f"pa:{scoped_project_provider_id(project_id, 'openai')}:latency:60m"
     redis_client.zadd(
         latency_key,
         {
@@ -645,7 +663,7 @@ def test_protect_latency_record_applies_ttl(tmp_path) -> None:
     _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
 
     redis_client: FakeRedisClient = app.dependency_overrides[get_metrics_service]()._protect_action_store._redis_client  # type: ignore[attr-defined]
-    assert redis_client.ttls.get(f"pa:{project_id}:latency:60m") == 3600
+    assert redis_client.ttls.get(f"pa:{scoped_project_provider_id(project_id, 'openai')}:latency:60m") == 3600
     _cleanup_overrides()
 
 

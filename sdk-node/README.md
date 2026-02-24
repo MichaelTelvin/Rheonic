@@ -17,7 +17,7 @@ npm install
 - Optional: `protectEnabled` (default `false`; when `true`, SDK calls `POST /api/v1/protect/decision` preflight)
 - Demo env var: `LLMTBG_INGEST_KEY`
 
-Provider/model validation: SDK wrappers fail fast with `LLMTBGValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `gemini`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
+Provider/model validation: SDK wrappers fail fast with `LLMTBGValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
 
 ## Integration Path 1: Manual Capture (generic)
 
@@ -50,7 +50,7 @@ const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY 
 });
 ```
 
-## Integration Path 3: Anthropic and Gemini wrappers
+## Integration Path 3: Anthropic and Google wrappers
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
@@ -66,9 +66,9 @@ await anthropic.messages.create({
   messages: [{ role: "user", content: "Hello Claude" }],
 });
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const geminiModel = client.instrumentGemini(genAI.getGenerativeModel({ model: "gemini-1.5-pro" }));
-await geminiModel.generateContent("Hello Gemini");
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+const googleModel = client.instrumentGoogle(genAI.getGenerativeModel({ model: "gemini-1.5-pro" }));
+await googleModel.generateContent("Hello Google model");
 ```
 
 ## Verify it works

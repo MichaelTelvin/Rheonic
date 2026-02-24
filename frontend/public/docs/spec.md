@@ -16,7 +16,7 @@ Body (Event):
 ```json
 {
   "ts": "2026-02-12T10:22:31.123Z",
-  "provider": "openai|anthropic|gemini",
+  "provider": "openai|anthropic|google",
   "model": "string",
   "environment": "prod|staging|dev",
   "request": {

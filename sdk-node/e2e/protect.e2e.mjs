@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { createClient, instrumentOpenAI, LLMTBGBlockedError } from "../dist/index.js";
+import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, LLMTBGBlockedError } from "../dist/index.js";
 
 const backendBaseUrl = process.env.LLMTBG_E2E_BACKEND_URL ?? "http://backend_test:8000";
 const providerStubUrl = process.env.LLMTBG_E2E_PROVIDER_URL ?? "http://provider_stub_test:8099";
@@ -61,6 +61,7 @@ async function main() {
   });
 
   await fetch(`${providerStubUrl}/reset`, { method: "POST" });
+  const baselineProviderCalls = await providerCount();
 
   const client = createClient({
     baseUrl: backendBaseUrl,
@@ -82,11 +83,45 @@ async function main() {
       },
     },
   };
+  const anthropic = {
+    messages: {
+      create: async (payload) => {
+        await fetch(`${providerStubUrl}/call`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        return {
+          model: payload.model ?? "claude-3-5-sonnet-20240620",
+          usage: { input_tokens: 8, output_tokens: 6, total_tokens: 14 },
+        };
+      },
+    },
+  };
+  const googleModel = {
+    model: "gemini-1.5-pro",
+    generateContent: async (prompt) => {
+      await fetch(`${providerStubUrl}/call`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      return { usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 5, totalTokenCount: 12 } };
+    },
+  };
 
   instrumentOpenAI(openai, { client, feature: "node-e2e" });
+  instrumentAnthropic(anthropic, { client, feature: "node-e2e" });
+  instrumentGoogle(googleModel, { client, feature: "node-e2e" });
 
   await openai.chat.completions.create({ model: "gpt-4o-mini", max_tokens: 128, input_tokens: 10 });
-  assert.equal(await providerCount(), 1);
+  await anthropic.messages.create({
+    model: "claude-3-5-sonnet-20240620",
+    max_tokens: 128,
+    messages: [{ role: "user", content: "anthropic e2e smoke" }],
+  });
+  await googleModel.generateContent("google e2e smoke");
+  assert.equal((await providerCount()) - baselineProviderCalls, 3);
 
   const nowIso = new Date().toISOString();
   const ingestResponse = await fetch(`${backendBaseUrl}/api/v1/events`, {
@@ -116,7 +151,7 @@ async function main() {
     blocked = error instanceof LLMTBGBlockedError;
   }
   assert.equal(blocked, false);
-  assert.equal(await providerCount(), 2);
+  assert.equal((await providerCount()) - baselineProviderCalls, 4);
 
   const protectMetrics = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
     headers: authHeaders,

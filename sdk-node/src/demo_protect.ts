@@ -1,4 +1,4 @@
-import { createClient, instrumentAnthropic, instrumentGemini, instrumentOpenAI, LLMTBGBlockedError } from "./index.js";
+import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, LLMTBGBlockedError } from "./index.js";
 
 const backendBaseUrl = process.env.LLMTBG_BACKEND_URL ?? "http://localhost:8000";
 const providerStubUrl = process.env.LLMTBG_PROVIDER_URL ?? "http://localhost:8099";
@@ -43,10 +43,10 @@ async function main() {
     }
     const provider = (process.env.LLMTBG_PROVIDER ?? "").trim().toLowerCase();
     if (!provider) {
-        console.error("LLMTBG_PROVIDER is required (openai | anthropic | gemini).");
+        console.error("LLMTBG_PROVIDER is required (openai | anthropic | google).");
         process.exit(1);
     }
-    if (!["openai", "anthropic", "gemini"].includes(provider)) {
+    if (!["openai", "anthropic", "google"].includes(provider)) {
         console.error(`LLMTBG_PROVIDER is unsupported: ${provider}`);
         process.exit(1);
     }
@@ -95,7 +95,7 @@ async function main() {
             },
         },
     };
-    const geminiModel = {
+    const googleModel = {
         model,
         generateContent: async (payload: any) => {
             const requestPayload = typeof payload === "string" ? { prompt: payload } : payload;
@@ -110,7 +110,7 @@ async function main() {
 
     instrumentOpenAI(openai as any, { client, feature: "manual-protect-demo" });
     instrumentAnthropic(anthropic as any, { client, feature: "manual-protect-demo" });
-    instrumentGemini(geminiModel as any, { client, feature: "manual-protect-demo" });
+    instrumentGoogle(googleModel as any, { client, feature: "manual-protect-demo" });
 
     const before = await providerCount();
 
@@ -132,14 +132,15 @@ async function main() {
         messages: [{ role: "user", content: `Protect demo request. scenario=${scenario}` }],
         max_tokens: maxTokens,
     };
-    const geminiRequest = `Protect demo request. scenario=${scenario}`;
+    const googleRequest = `Protect demo request. scenario=${scenario}`;
     console.log(`[DEMO] provider=${provider} model=${model} scenario=${scenario}`);
+    console.log("[DEMO] provider scoping active: counters/incidents/decisions are isolated by provider");
 
     try {
         if (provider === "anthropic") {
             await (anthropic as any).messages.create(anthropicRequest);
-        } else if (provider === "gemini") {
-            await (geminiModel as any).generateContent(geminiRequest);
+        } else if (provider === "google") {
+            await (googleModel as any).generateContent(googleRequest);
         } else {
             await (openai as any).chat.completions.create(openaiRequest);
         }

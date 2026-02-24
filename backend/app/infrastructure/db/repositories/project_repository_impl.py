@@ -229,6 +229,22 @@ class ProjectRepositoryImpl(ProjectRepository):
             logger.exception("Failed counting project models", extra={"project_id": project_id})
             raise
 
+    def list_project_providers(self, project_id: str) -> list[str]:
+        # List distinct providers seen for project models.
+        try:
+            with self._session_factory.create_session() as session:
+                rows = (
+                    session.query(ProjectModelRecord.provider)
+                    .filter(ProjectModelRecord.project_id == project_id)
+                    .distinct()
+                    .all()
+                )
+            providers = [str(provider) for (provider,) in rows if provider]
+            return sorted(set(providers))
+        except Exception:
+            logger.exception("Failed listing project providers", extra={"project_id": project_id})
+            raise
+
 
 def _to_domain(record: ProjectRecord, settings: Settings | None = None) -> Project:
     # Convert SQLAlchemy project record to domain model.

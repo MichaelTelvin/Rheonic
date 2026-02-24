@@ -104,7 +104,10 @@ class ProtectEngine:
             return {"decision": decision, "reason": reason}
         except Exception:
             if self._is_timeout_error():
-                self._report_decision_timeout_fire_and_forget()
+                provider = context.get("provider")
+                self._report_decision_timeout_fire_and_forget(
+                    provider=str(provider) if isinstance(provider, str) else None,
+                )
             return self._fallback_decision()
 
     def _post_with_timeout(
@@ -150,13 +153,13 @@ class ProtectEngine:
             return True
         return False
 
-    def _report_decision_timeout_fire_and_forget(self) -> None:
+    def _report_decision_timeout_fire_and_forget(self, provider: str | None) -> None:
         # Report decision timeout without blocking caller flow.
         def _send() -> None:
             try:
                 self._post_with_timeout(
                     f"{self._base_url}/api/v1/protect/decision-timeout",
-                    json={"environment": self._environment},
+                    json={"environment": self._environment, "provider": provider},
                     headers={
                         "Content-Type": "application/json",
                         "X-Project-Ingest-Key": self._ingest_key,

@@ -4,14 +4,14 @@ import assert from "node:assert/strict";
 import {
   createClient,
   instrumentAnthropic,
-  instrumentGemini,
+  instrumentGoogle,
   instrumentOpenAI,
   LLMTBGBlockedError,
   LLMTBGValidationError,
 } from "./index.js";
 import { validateProviderModel } from "./providerModelValidation.js";
 import { __setInputTokenEstimatorForTests as __setAnthropicEstimatorForTests } from "./providers/anthropicAdapter.js";
-import { __setInputTokenEstimatorForTests as __setGeminiEstimatorForTests } from "./providers/geminiAdapter.js";
+import { __setInputTokenEstimatorForTests as __setGoogleEstimatorForTests } from "./providers/googleAdapter.js";
 import { __setInputTokenEstimatorForTests } from "./providers/openaiAdapter.js";
 
 function makeOpenAIStub() {
@@ -42,16 +42,16 @@ function makeAnthropicStub() {
   return { anthropic, calls };
 }
 
-function makeGeminiStub() {
+function makeGoogleStub() {
   const calls: Array<unknown[]> = [];
-  const geminiModel = {
+  const googleModel = {
     model: "gemini-1.5-pro",
     generateContent: async (...args: unknown[]) => {
       calls.push(args);
       return { response: { usageMetadata: { totalTokenCount: 35 } } };
     },
   };
-  return { geminiModel, calls };
+  return { googleModel, calls };
 }
 
 test("observe mode skips decision endpoint and still calls provider", async () => {
@@ -487,6 +487,7 @@ test("decision timeout fail-open allows provider call", async () => {
     assert.equal(calls.length, 1);
     assert.equal(timeoutReports.length, 1);
     assert.equal(timeoutReports[0].environment, "dev");
+    assert.equal(timeoutReports[0].provider, "openai");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;
@@ -524,6 +525,7 @@ test("decision timeout fail-closed blocks provider call", async () => {
     assert.equal(calls.length, 0);
     assert.equal(timeoutReports.length, 1);
     assert.equal(timeoutReports[0].environment, "staging");
+    assert.equal(timeoutReports[0].provider, "openai");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;
@@ -717,7 +719,7 @@ test("anthropic includes input_tokens_estimate in decision payload", async () =>
   }
 });
 
-test("gemini allow path calls provider and emits telemetry", async () => {
+test("google allow path calls provider and emits telemetry", async () => {
   const originalFetch = globalThis.fetch;
   const ingestedEvents: Array<Record<string, unknown>> = [];
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -739,20 +741,20 @@ test("gemini allow path calls provider and emits telemetry", async () => {
 
   try {
     const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
-    const { geminiModel, calls } = makeGeminiStub();
-    instrumentGemini(geminiModel, { client });
-    await geminiModel.generateContent("hello from gemini");
+    const { googleModel, calls } = makeGoogleStub();
+    instrumentGoogle(googleModel, { client });
+    await googleModel.generateContent("hello from google");
     await client.flush();
     assert.equal(calls.length, 1);
     assert.equal(ingestedEvents.length, 1);
-    assert.equal(ingestedEvents[0].provider, "gemini");
+    assert.equal(ingestedEvents[0].provider, "google");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("gemini block path prevents provider call", async () => {
+test("google block path prevents provider call", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () =>
     ({
@@ -763,9 +765,9 @@ test("gemini block path prevents provider call", async () => {
 
   try {
     const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
-    const { geminiModel, calls } = makeGeminiStub();
-    instrumentGemini(geminiModel, { client });
-    await assert.rejects(() => geminiModel.generateContent("hello"), LLMTBGBlockedError);
+    const { googleModel, calls } = makeGoogleStub();
+    instrumentGoogle(googleModel, { client });
+    await assert.rejects(() => googleModel.generateContent("hello"), LLMTBGBlockedError);
     assert.equal(calls.length, 0);
     client.close();
   } finally {
@@ -773,10 +775,10 @@ test("gemini block path prevents provider call", async () => {
   }
 });
 
-test("gemini includes input_tokens_estimate in decision payload", async () => {
+test("google includes input_tokens_estimate in decision payload", async () => {
   const originalFetch = globalThis.fetch;
   const decisionBodies: Array<Record<string, unknown>> = [];
-  __setGeminiEstimatorForTests(() => 654);
+  __setGoogleEstimatorForTests(() => 654);
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
     if (url.endsWith("/api/v1/protect/decision")) {
       if (typeof init?.body === "string") {
@@ -793,14 +795,14 @@ test("gemini includes input_tokens_estimate in decision payload", async () => {
 
   try {
     const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
-    const { geminiModel } = makeGeminiStub();
-    instrumentGemini(geminiModel, { client });
-    await geminiModel.generateContent("hello world");
+    const { googleModel } = makeGoogleStub();
+    instrumentGoogle(googleModel, { client });
+    await googleModel.generateContent("hello world");
     assert.equal(decisionBodies.length, 1);
     assert.equal(decisionBodies[0].input_tokens_estimate, 654);
     client.close();
   } finally {
-    __setGeminiEstimatorForTests(null);
+    __setGoogleEstimatorForTests(null);
     globalThis.fetch = originalFetch;
   }
 });
@@ -827,11 +829,11 @@ test("provider/model validation accepts anthropic claude model", async () => {
   client.close();
 });
 
-test("provider/model validation accepts gemini model", async () => {
+test("provider/model validation accepts google model", async () => {
   const client = createClient({ protectEnabled: false, ingestKey: "k1", flushIntervalMs: 30_000 });
-  const { geminiModel, calls } = makeGeminiStub();
-  instrumentGemini(geminiModel, { client });
-  await geminiModel.generateContent("hello");
+  const { googleModel, calls } = makeGoogleStub();
+  instrumentGoogle(googleModel, { client });
+  await googleModel.generateContent("hello");
   assert.equal(calls.length, 1);
   client.close();
 });
@@ -846,13 +848,13 @@ test("provider/model validation does not enforce naming prefixes", async () => {
     messages: [{ role: "user", content: "hello" }],
   });
 
-  const { geminiModel, calls: geminiCalls } = makeGeminiStub();
-  (geminiModel as { model: string }).model = "claude-3-opus";
-  instrumentGemini(geminiModel, { client });
-  await geminiModel.generateContent("hello");
+  const { googleModel, calls: googleCalls } = makeGoogleStub();
+  (googleModel as { model: string }).model = "claude-3-opus";
+  instrumentGoogle(googleModel, { client });
+  await googleModel.generateContent("hello");
 
   assert.equal(anthropicCalls.length, 1);
-  assert.equal(geminiCalls.length, 1);
+  assert.equal(googleCalls.length, 1);
   client.close();
 });
 
@@ -916,7 +918,7 @@ test("provider/model validation rejects openai call when model is missing", asyn
   }
 });
 
-test("provider/model validation rejects gemini call when model is missing", async () => {
+test("provider/model validation rejects google call when model is missing", async () => {
   const originalFetch = globalThis.fetch;
   let decisionCalls = 0;
   globalThis.fetch = (async (url: string) => {
@@ -928,11 +930,11 @@ test("provider/model validation rejects gemini call when model is missing", asyn
 
   try {
     const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
-    const { geminiModel, calls } = makeGeminiStub();
-    (geminiModel as { model?: string; modelName?: string }).model = "";
-    (geminiModel as { model?: string; modelName?: string }).modelName = "";
-    instrumentGemini(geminiModel, { client });
-    await assert.rejects(() => geminiModel.generateContent("hello"), LLMTBGValidationError);
+    const { googleModel, calls } = makeGoogleStub();
+    (googleModel as { model?: string; modelName?: string }).model = "";
+    (googleModel as { model?: string; modelName?: string }).modelName = "";
+    instrumentGoogle(googleModel, { client });
+    await assert.rejects(() => googleModel.generateContent("hello"), LLMTBGValidationError);
     assert.equal(calls.length, 0);
     assert.equal(decisionCalls, 0);
     client.close();

@@ -5,6 +5,7 @@ from math import ceil
 from typing import Callable
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.ingest_key_service import IngestKeyService
 from app.config import app_config
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
@@ -32,6 +33,7 @@ class ProtectDecisionContext:
     max_output_tokens: int | None = None
     input_tokens_estimate: int | None = None
     environment: str | None = None
+    provider: str | None = None
 
 
 class ProtectService:
@@ -65,6 +67,7 @@ class ProtectService:
 
         ctx = context or ProtectDecisionContext()
         project_id = project.id
+        scoped_id = scoped_project_provider_id(project_id, ctx.provider)
         now = self._now_provider()
         now_ms = int(now.timestamp() * 1000)
         max_req = project.protect_max_req_per_min
@@ -73,11 +76,11 @@ class ProtectService:
         decision_timeout_ms = project.protect_decision_timeout_ms
 
         if not project.protect_enabled:
-            requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=project_id)
-            incident_severity = self._incident_severity_cache.get(project_id=project_id)
+            requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=scoped_id)
+            incident_severity = self._incident_severity_cache.get(project_id=scoped_id)
             decision = "allow"
             reason = "ok"
-            self._protect_action_store.record(project_id=project_id, decision=decision, reason=reason)
+            self._protect_action_store.record(project_id=scoped_id, decision=decision, reason=reason)
             return project_id, ProtectDecision(
                 decision=decision,
                 reason=reason,
@@ -100,10 +103,10 @@ class ProtectService:
                 },
             )
 
-        cooldown_until_ms = self._protect_action_store.get_block_cooldown_until_ms(project_id=project_id)
+        cooldown_until_ms = self._protect_action_store.get_block_cooldown_until_ms(project_id=scoped_id)
         if cooldown_until_ms is not None and now_ms < cooldown_until_ms:
-            requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=project_id)
-            incident_severity = self._incident_severity_cache.get(project_id=project_id)
+            requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=scoped_id)
+            incident_severity = self._incident_severity_cache.get(project_id=scoped_id)
             retry_after_seconds = max(0, ceil((cooldown_until_ms - now_ms) / 1000))
             return project_id, ProtectDecision(
                 decision="block",
@@ -127,8 +130,8 @@ class ProtectService:
                 },
             )
 
-        requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=project_id)
-        incident_severity = self._incident_severity_cache.get(project_id=project_id)
+        requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=scoped_id)
+        incident_severity = self._incident_severity_cache.get(project_id=scoped_id)
         near_cap_threshold = float(max_tok) * app_config.protect_near_cap_factor if max_tok is not None else None
         estimated_next_tokens: int | None = None
         if isinstance(ctx.input_tokens_estimate, int):
@@ -181,12 +184,12 @@ class ProtectService:
             blocked_until = datetime.fromtimestamp(blocked_until_ms / 1000, tz=timezone.utc).isoformat()
             retry_after_seconds = max(0, ceil((blocked_until_ms - now_ms) / 1000))
             self._protect_action_store.set_block_cooldown(
-                project_id=project_id,
+                project_id=scoped_id,
                 blocked_until_ms=blocked_until_ms,
                 cooldown_seconds=cooldown_seconds,
             )
 
-        self._protect_action_store.record(project_id=project_id, decision=decision, reason=reason)
+        self._protect_action_store.record(project_id=scoped_id, decision=decision, reason=reason)
 
         return project_id, ProtectDecision(
             decision=decision,

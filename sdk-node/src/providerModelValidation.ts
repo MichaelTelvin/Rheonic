@@ -12,7 +12,7 @@ export class LLMTBGValidationError extends Error {
   }
 }
 
-const SUPPORTED_PROVIDERS = ["openai", "anthropic", "gemini"] as const;
+const SUPPORTED_PROVIDERS = ["openai", "anthropic", "google"] as const;
 
 export function validateProviderModel(provider: string, model: string | null | undefined): void {
   const normalizedProvider = provider.trim().toLowerCase();

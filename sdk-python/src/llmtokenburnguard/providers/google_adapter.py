@@ -1,4 +1,4 @@
-# Gemini instrumentation wrapper.
+# Google provider instrumentation wrapper.
 import inspect
 from time import perf_counter
 from typing import Any
@@ -21,8 +21,8 @@ def _set_token_estimator_for_tests(estimator: Any | None) -> None:
     _token_estimator_override_for_tests = estimator
 
 
-def instrument_gemini(
-    gemini_model: Any,
+def instrument_google(
+    google_model: Any,
     client: Client | None = None,
     environment: str | None = None,
     endpoint: str | None = None,
@@ -31,18 +31,18 @@ def instrument_gemini(
     # Instrument generate_content and emit usage events.
     resolved_client = client or get_default_client()
     if resolved_client is None:
-        return gemini_model
+        return google_model
 
-    original_generate = getattr(gemini_model, "generate_content", None)
+    original_generate = getattr(google_model, "generate_content", None)
     if not callable(original_generate):
-        return gemini_model
+        return google_model
 
     if inspect.iscoroutinefunction(original_generate):
 
         async def wrapped_generate(*args: Any, **kwargs: Any) -> Any:
             started_at = perf_counter()
-            requested_model = _extract_requested_model(gemini_model, args, kwargs)
-            validate_provider_model("gemini", requested_model)
+            requested_model = _extract_requested_model(google_model, args, kwargs)
+            validate_provider_model("google", requested_model)
             request_payload = _extract_request_payload(requested_model, args, kwargs)
             estimated_input_tokens = _estimate_input_tokens(request_payload)
             protect_decision = _preflight(
@@ -84,13 +84,13 @@ def instrument_gemini(
                 )
                 raise
 
-        gemini_model.generate_content = wrapped_generate
-        return gemini_model
+        google_model.generate_content = wrapped_generate
+        return google_model
 
     def wrapped_generate(*args: Any, **kwargs: Any) -> Any:
         started_at = perf_counter()
-        requested_model = _extract_requested_model(gemini_model, args, kwargs)
-        validate_provider_model("gemini", requested_model)
+        requested_model = _extract_requested_model(google_model, args, kwargs)
+        validate_provider_model("google", requested_model)
         request_payload = _extract_request_payload(requested_model, args, kwargs)
         estimated_input_tokens = _estimate_input_tokens(request_payload)
         protect_decision = _preflight(
@@ -132,9 +132,8 @@ def instrument_gemini(
             )
             raise
 
-    gemini_model.generate_content = wrapped_generate
-    return gemini_model
-
+    google_model.generate_content = wrapped_generate
+    return google_model
 
 def _preflight(
     *,
@@ -148,7 +147,7 @@ def _preflight(
         return {"decision": "allow", "reason": "protect_disabled"}
     return sdk_client.preflight_protect_decision(
         {
-            "provider": "gemini",
+            "provider": "google",
             "model": requested_model,
             "feature": feature,
             **({"input_tokens_estimate": estimated_input_tokens} if isinstance(estimated_input_tokens, int) else {}),
@@ -172,7 +171,7 @@ def _capture_success(
     try:
         sdk_client.capture_event(
             build_event(
-                provider="gemini",
+                provider="google",
                 model=requested_model,
                 environment=environment or sdk_client.environment,
                 request={
@@ -190,7 +189,7 @@ def _capture_success(
             )
         )
     except Exception:
-        logger.exception("Failed to capture Gemini success event")
+        logger.exception("Failed to capture Google success event")
 
 
 def _capture_failure(
@@ -208,7 +207,7 @@ def _capture_failure(
     try:
         sdk_client.capture_event(
             build_event(
-                provider="gemini",
+                provider="google",
                 model=requested_model,
                 environment=environment or sdk_client.environment,
                 request={
@@ -226,12 +225,12 @@ def _capture_failure(
             )
         )
     except Exception:
-        logger.exception("Failed to capture Gemini failure event")
+        logger.exception("Failed to capture Google failure event")
 
 
-def _extract_requested_model(gemini_model: Any, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
+def _extract_requested_model(google_model: Any, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
     for key in ("model", "model_name"):
-        value = getattr(gemini_model, key, None)
+        value = getattr(google_model, key, None)
         if isinstance(value, str):
             return value
     for source in (kwargs, args[0] if args and isinstance(args[0], dict) else None):

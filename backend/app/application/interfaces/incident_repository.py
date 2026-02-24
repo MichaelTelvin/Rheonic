@@ -14,7 +14,7 @@ class IncidentRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_open_incident_by_type(self, project_id: str, incident_type: str) -> Incident | None:
+    def get_open_incident_by_type(self, project_id: str, provider: str, incident_type: str) -> Incident | None:
         # Return an open incident for a project/type if one exists.
         raise NotImplementedError
 
@@ -22,6 +22,7 @@ class IncidentRepository(ABC):
     def get_open_incident_by_fingerprint(
         self,
         project_id: str,
+        provider: str,
         fingerprint: str,
         created_after: datetime,
     ) -> Incident | None:
@@ -45,6 +46,11 @@ class IncidentRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def list_open_by_project_provider(self, project_id: str, provider: str) -> list[Incident]:
+        # Return open incidents for project/provider.
+        raise NotImplementedError
+
+    @abstractmethod
     def get_by_id(self, incident_id: str) -> Incident | None:
         # Return incident by id.
         raise NotImplementedError
@@ -60,6 +66,6 @@ class IncidentRepository(ABC):
         *,
         cutoff: datetime,
         resolved_at: datetime,
-    ) -> tuple[list[Incident], set[str]]:
-        # Auto-resolve stale open incidents and return (resolved_incidents, affected_project_ids).
+    ) -> tuple[list[Incident], set[tuple[str, str]]]:
+        # Auto-resolve stale open incidents and return (resolved_incidents, affected project/provider pairs).
         raise NotImplementedError

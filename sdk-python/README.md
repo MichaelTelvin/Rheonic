@@ -17,7 +17,7 @@ pip install -e .
 - Optional: `protect_enabled` (default `False`; when `True`, SDK calls `POST /api/v1/protect/decision` preflight)
 - Demo env var: `LLMTBG_INGEST_KEY`
 
-Provider/model validation: SDK wrappers fail fast with `LLMTBGValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `gemini`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
+Provider/model validation: SDK wrappers fail fast with `LLMTBGValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
 
 ## Integration Path 1: Manual Capture (generic)
 
@@ -55,7 +55,7 @@ openai_client = instrument_openai(
 )
 ```
 
-## Integration Path 3: Anthropic and Gemini wrappers
+## Integration Path 3: Anthropic and Google wrappers
 
 ```python
 import os
@@ -73,9 +73,9 @@ anthropic_client.messages.create(
     messages=[{"role": "user", "content": "Hello Claude"}],
 )
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-gemini_model = client.instrument_gemini(genai.GenerativeModel("gemini-1.5-pro"))
-gemini_model.generate_content("Hello Gemini")
+genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+google_model = client.instrument_google(genai.GenerativeModel("gemini-1.5-pro"))
+google_model.generate_content("Hello Google model")
 ```
 
 ## Verify it works

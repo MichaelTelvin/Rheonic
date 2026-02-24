@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.incident_repository import IncidentRepository
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.domain.models.incident import Incident
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
@@ -60,13 +61,16 @@ class DetectIncidentsService:
             if incident is None:
                 return None
             self._realtime_counters.release_incident_lock(
-                project_id=incident.project_id,
+                project_id=scoped_project_provider_id(incident.project_id, incident.provider),
                 incident_type=incident.incident_type,
             )
             if self._incident_severity_cache is not None:
-                open_incidents = self._incident_repository.list_by_project(project_id=incident.project_id, status="open")
-                self._incident_severity_cache.set(
+                open_incidents = self._incident_repository.list_open_by_project_provider(
                     project_id=incident.project_id,
+                    provider=incident.provider,
+                )
+                self._incident_severity_cache.set(
+                    project_id=scoped_project_provider_id(incident.project_id, incident.provider),
                     severity=_highest_severity(open_incidents),
                 )
             self._enqueue_incident_resolved_webhook(incident=incident, resolved_by="manual")
@@ -119,7 +123,7 @@ def _highest_severity(incidents: list[Incident]) -> str:
 def _incident_dimensions(incident: Incident) -> tuple[str | None, str | None, str | None]:
     # Extract provider/model/environment from incident evidence when present.
     evidence = incident.evidence or {}
-    provider = evidence.get("provider")
+    provider = incident.provider or evidence.get("provider")
     model = evidence.get("model")
     environment = evidence.get("environment")
     return (

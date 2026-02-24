@@ -2,7 +2,7 @@
 from llmtokenburnguard.client import Client, LLMTokenBurnGuardClient, capture_event, create_client
 from llmtokenburnguard.event_builder import EventBuilder, build_event
 from llmtokenburnguard.providers.anthropic_adapter import instrument_anthropic
-from llmtokenburnguard.providers.gemini_adapter import instrument_gemini
+from llmtokenburnguard.providers.google_adapter import instrument_google
 from llmtokenburnguard.providers.openai_adapter import instrument_openai
 from llmtokenburnguard.protect_engine import LLMTBGBlockedError, LLMTBGValidationError
 
@@ -15,7 +15,7 @@ __all__ = [
     "EventBuilder",
     "instrument_openai",
     "instrument_anthropic",
-    "instrument_gemini",
+    "instrument_google",
     "LLMTBGBlockedError",
     "LLMTBGValidationError",
 ]

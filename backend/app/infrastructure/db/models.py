@@ -43,11 +43,14 @@ class IncidentRecord(Base):
     __tablename__ = "incidents"
     __table_args__ = (
         Index("ix_incidents_project_status_fingerprint", "project_id", "status", "fingerprint"),
+        Index("ix_incidents_project_provider_status_created_at", "project_id", "provider", "status", "created_at"),
+        Index("ix_incidents_project_provider_last_seen_at", "project_id", "provider", "last_seen_at"),
         Index("ix_incidents_project_status_created_at", "project_id", "status", "created_at"),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     project_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False, default="unknown", server_default="unknown")
     type: Mapped[str] = mapped_column(String(32), nullable=False)
     severity: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
