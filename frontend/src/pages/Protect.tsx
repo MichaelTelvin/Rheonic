@@ -16,6 +16,7 @@ export function Protect(): JSX.Element {
   const [protectMaxReqInput, setProtectMaxReqInput] = useState<string>("");
   const [protectMaxTokInput, setProtectMaxTokInput] = useState<string>("");
   const [protectFailModeInput, setProtectFailModeInput] = useState<"open" | "closed">("open");
+  const protectControlsDisabled = !protectEnabledInput;
 
   useEffect(() => {
     if (!projectId) {
@@ -145,8 +146,10 @@ export function Protect(): JSX.Element {
                 type="number"
                 min={1}
                 placeholder="Unlimited"
-                value={protectMaxReqInput}
+                value={protectEnabledInput ? protectMaxReqInput : ""}
                 onChange={(event) => setProtectMaxReqInput(event.target.value)}
+                disabled={protectControlsDisabled}
+                readOnly={protectControlsDisabled}
               />
             </div>
 
@@ -158,12 +161,14 @@ export function Protect(): JSX.Element {
                 type="number"
                 min={1}
                 placeholder="Unlimited"
-                value={protectMaxTokInput}
+                value={protectEnabledInput ? protectMaxTokInput : ""}
                 onChange={(event) => setProtectMaxTokInput(event.target.value)}
+                disabled={protectControlsDisabled}
+                readOnly={protectControlsDisabled}
               />
             </div>
 
-            <fieldset className="protect-fail-mode">
+            <fieldset className={`protect-fail-mode ${protectControlsDisabled ? "is-disabled" : ""}`} disabled={protectControlsDisabled}>
               <legend>Fail mode</legend>
               <label>
                 <input
@@ -172,6 +177,7 @@ export function Protect(): JSX.Element {
                   value="open"
                   checked={protectFailModeInput === "open"}
                   onChange={() => setProtectFailModeInput("open")}
+                  disabled={protectControlsDisabled}
                 />
                 Fail-open
               </label>
@@ -182,6 +188,7 @@ export function Protect(): JSX.Element {
                   value="closed"
                   checked={protectFailModeInput === "closed"}
                   onChange={() => setProtectFailModeInput("closed")}
+                  disabled={protectControlsDisabled}
                 />
                 Fail-closed
               </label>
