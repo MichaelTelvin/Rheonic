@@ -298,11 +298,32 @@ class FakeProjectRepository:
 
     def __init__(self, project: Project) -> None:
         self._project = project
+        self._seen_models: set[tuple[str, str, str]] = set()
 
     def get_project(self, project_id: str) -> Project | None:
         if self._project.id != project_id:
             return None
         return self._project
+
+    def record_project_model_first_seen(
+        self,
+        *,
+        project_id: str,
+        provider: str,
+        model: str,
+        first_seen_at: datetime,
+    ) -> bool:
+        _ = first_seen_at
+        if self._project.id != project_id:
+            return False
+        key = (project_id, provider, model)
+        if key in self._seen_models:
+            return False
+        self._seen_models.add(key)
+        return True
+
+    def count_project_models(self, project_id: str) -> int:
+        return sum(1 for pid, _, _ in self._seen_models if pid == project_id)
 
 
 def _make_time_provider(values: list[int]):

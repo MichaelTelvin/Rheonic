@@ -288,6 +288,22 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
             connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_last_at TIMESTAMP"))
         if "webhook_last_error" not in project_columns:
             connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_last_error VARCHAR(512)"))
+        connection.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS project_models ("
+                "id VARCHAR(64) PRIMARY KEY, "
+                "project_id VARCHAR(64) NOT NULL, "
+                "provider VARCHAR(64) NOT NULL, "
+                "model VARCHAR(255) NOT NULL, "
+                "first_seen_at TIMESTAMP NOT NULL, "
+                "FOREIGN KEY(project_id) REFERENCES projects(id), "
+                "CONSTRAINT uq_project_models_project_provider_model UNIQUE(project_id, provider, model)"
+                ")"
+            )
+        )
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_project_models_project_id ON project_models (project_id)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_project_models_provider ON project_models (provider)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_project_models_model ON project_models (model)"))
 
     if "incidents" not in table_names:
         return

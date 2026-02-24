@@ -24,6 +24,7 @@ Incident engine
 - Ratio-based anomaly detection
 - Dedup window merge for matching open incidents
 - Severity escalation with hit cache TTL
+- First-seen provider/model policy-gap detection (records all models; raises low `policy_gap` incident when protect is enabled)
 - Manual close endpoint
 - Auto-close incidents job
 

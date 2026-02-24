@@ -72,3 +72,20 @@ class ProjectRepository(ABC):
     ) -> Project | None:
         # Update and return latest webhook delivery status fields.
         raise NotImplementedError
+
+    @abstractmethod
+    def record_project_model_first_seen(
+        self,
+        *,
+        project_id: str,
+        provider: str,
+        model: str,
+        first_seen_at: datetime,
+    ) -> bool:
+        # Insert first-seen provider/model tuple for project; return True only when newly inserted.
+        raise NotImplementedError
+
+    @abstractmethod
+    def count_project_models(self, project_id: str) -> int:
+        # Return number of distinct provider/model rows already recorded for a project.
+        raise NotImplementedError

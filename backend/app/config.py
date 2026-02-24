@@ -14,6 +14,7 @@ class AppConfig:
     rate_limit_window_seconds: int = 60
     incident_type_burn_spike: str = "burn_spike"
     incident_type_request_spike: str = "request_spike"
+    incident_type_policy_gap: str = "policy_gap"
     incident_severity_ratio_low: float = 2.0
     incident_severity_ratio_medium: float = 5.0
     incident_severity_ratio_high: float = 10.0

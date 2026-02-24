@@ -68,6 +68,7 @@ class IngestEventService:
                 total_tokens=event.total_tokens,
             )
             requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=event.project_id)
+            self._detect_policy_gap_if_needed(event=event)
             try:
                 if self._has_open_incident_for_dimension(event=event):
                     baseline_req_60s, baseline_tok_60s = self._realtime_counters.get_baseline_snapshot(
@@ -94,6 +95,87 @@ class IngestEventService:
         except Exception:
             logger.exception("Ingest service failed", extra={"project_id": event.project_id})
             raise
+
+    def _detect_policy_gap_if_needed(self, *, event: Event) -> None:
+        # Record first-seen project provider/model and raise policy-gap incident for protect-enabled projects.
+        if self._project_repository is None:
+            return
+        provider = (event.provider or "").strip()
+        model = (event.model or "").strip()
+        if not provider or not model:
+            return
+        first_seen_at = self._now_provider()
+        try:
+            existing_models_count = self._project_repository.count_project_models(event.project_id)
+        except Exception:
+            logger.exception(
+                "Failed counting project models before first-seen insert",
+                extra={"project_id": event.project_id},
+            )
+            return
+        try:
+            is_new_combination = self._project_repository.record_project_model_first_seen(
+                project_id=event.project_id,
+                provider=provider,
+                model=model,
+                first_seen_at=first_seen_at,
+            )
+        except Exception:
+            logger.exception(
+                "Failed recording provider/model first-seen tuple",
+                extra={"project_id": event.project_id, "provider": provider, "model": model},
+            )
+            return
+        if not is_new_combination:
+            return
+        # First-ever model for the project is only recorded for analytics; no incident/webhook.
+        if existing_models_count == 0:
+            return
+        project = self._project_repository.get_project(event.project_id)
+        if project is None or not project.protect_enabled:
+            return
+        incident = Incident(
+            id=str(uuid4()),
+            project_id=event.project_id,
+            incident_type=app_config.incident_type_policy_gap,
+            severity="low",
+            status="open",
+            created_at=first_seen_at,
+            resolved_at=None,
+            evidence={
+                "provider": provider,
+                "model": model,
+                "environment": event.environment,
+                "first_seen_at": first_seen_at.isoformat(),
+                "source": "policy_gap",
+            },
+            fingerprint=_build_incident_fingerprint(
+                project_id=event.project_id,
+                incident_type=app_config.incident_type_policy_gap,
+                provider=provider,
+                model=model,
+                environment=None,
+            ),
+            last_seen_at=first_seen_at,
+        )
+        self._incident_repository.create_incident(incident=incident)
+        if self._webhook_dispatcher is not None:
+            try:
+                self._webhook_dispatcher.enqueue(
+                    project_id=event.project_id,
+                    event_type="policy_gap.detected",
+                    payload={
+                        "event": "policy_gap.detected",
+                        "project_id": event.project_id,
+                        "provider": provider,
+                        "model": model,
+                        "incident_id": incident.id,
+                        "first_seen_at": first_seen_at.isoformat(),
+                        "sent_at": self._now_provider().isoformat(),
+                    },
+                )
+            except Exception:
+                logger.exception("Failed to enqueue policy-gap webhook", extra={"project_id": event.project_id})
 
     def _has_open_incident_for_dimension(self, event: Event) -> bool:
         # Freeze baseline updates while any open anomaly incident exists for this event dimension.

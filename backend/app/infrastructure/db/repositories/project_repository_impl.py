@@ -1,11 +1,14 @@
 # Concrete project repository implementation.
 from datetime import datetime
+from uuid import uuid4
+
+from sqlalchemy.exc import IntegrityError
 
 from app.application.interfaces.project_repository import ProjectRepository
 from app.config import Settings
 from app.domain.models.project import Project
 from app.infrastructure.db.base import DatabaseSessionFactory
-from app.infrastructure.db.models import ProjectRecord
+from app.infrastructure.db.models import ProjectModelRecord, ProjectRecord
 from app.logger import get_logger
 from app.security.webhook_secrets import decrypt_webhook_secret, encrypt_webhook_secret
 
@@ -181,6 +184,49 @@ class ProjectRepositoryImpl(ProjectRepository):
             return _to_domain(record, settings=self._settings)
         except Exception:
             logger.exception("Failed updating project webhook delivery status", extra={"project_id": project_id})
+            raise
+
+    def record_project_model_first_seen(
+        self,
+        *,
+        project_id: str,
+        provider: str,
+        model: str,
+        first_seen_at: datetime,
+    ) -> bool:
+        # Insert first-seen provider/model tuple for project; ignore duplicates from retries/races.
+        try:
+            with self._session_factory.create_session() as session:
+                record = ProjectModelRecord(
+                    id=str(uuid4()),
+                    project_id=project_id,
+                    provider=provider,
+                    model=model,
+                    first_seen_at=first_seen_at,
+                )
+                session.add(record)
+                session.commit()
+                return True
+        except IntegrityError:
+            return False
+        except Exception:
+            logger.exception(
+                "Failed recording project model first seen",
+                extra={"project_id": project_id, "provider": provider, "model": model},
+            )
+            raise
+
+    def count_project_models(self, project_id: str) -> int:
+        # Count distinct provider/model rows tracked for a project.
+        try:
+            with self._session_factory.create_session() as session:
+                return int(
+                    session.query(ProjectModelRecord)
+                    .filter(ProjectModelRecord.project_id == project_id)
+                    .count()
+                )
+        except Exception:
+            logger.exception("Failed counting project models", extra={"project_id": project_id})
             raise
 
 

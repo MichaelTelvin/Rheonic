@@ -90,6 +90,23 @@ class ProjectRecord(Base):
     )
 
 
+class ProjectModelRecord(Base):
+    # Persistence record for first-seen provider/model per project.
+    __tablename__ = "project_models"
+    __table_args__ = (
+        UniqueConstraint("project_id", "provider", "model", name="uq_project_models_project_provider_model"),
+        Index("ix_project_models_project_id", "project_id"),
+        Index("ix_project_models_provider", "provider"),
+        Index("ix_project_models_model", "model"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    project_id: Mapped[str] = mapped_column(String(64), ForeignKey("projects.id"), nullable=False)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(255), nullable=False)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class IngestKeyRecord(Base):
     # Persistence record for project ingest keys.
     __tablename__ = "ingest_keys"
