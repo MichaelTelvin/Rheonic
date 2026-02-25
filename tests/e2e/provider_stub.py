@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 _REQUEST_COUNT = 0
+logger = logging.getLogger("provider_stub")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -26,10 +28,12 @@ class Handler(BaseHTTPRequestHandler):
         global _REQUEST_COUNT
         if self.path == "/call":
             _REQUEST_COUNT += 1
+            logger.info("provider call received (count=%s)", _REQUEST_COUNT)
             self._json(200, {"ok": True, "count": _REQUEST_COUNT})
             return
         if self.path == "/reset":
             _REQUEST_COUNT = 0
+            logger.info("provider counter reset")
             self._json(200, {"ok": True})
             return
         self._json(404, {"error": "not found"})
@@ -39,5 +43,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="[provider_stub] %(message)s")
     server = HTTPServer(("0.0.0.0", 8099), Handler)
-    server.serve_forever()
+    logger.info("listening on http://0.0.0.0:8099")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        logger.info("shutdown requested, exiting")
+    finally:
+        server.server_close()

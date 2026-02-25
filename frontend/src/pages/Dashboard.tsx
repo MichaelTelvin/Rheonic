@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ApiError,
@@ -55,6 +55,7 @@ export function Dashboard(): JSX.Element {
   const [protectEnabled, setProtectEnabled] = useState<boolean>(false);
   const [providers, setProviders] = useState<string[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>("all");
+  const providerRequestSeq = useRef<number>(0);
 
   const sortedIncidents = useMemo(
     () => [...incidents].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
@@ -76,32 +77,31 @@ export function Dashboard(): JSX.Element {
     setSelectedProvider("all");
   }, [projectId]);
 
-  useEffect(() => {
+  const refreshProviders = useCallback(async (): Promise<void> => {
     if (!projectId) {
       return;
     }
-
-    let cancelled = false;
-    const loadProviders = async (): Promise<void> => {
-      try {
-        const items = await fetchProjectProviders(projectId);
-        if (!cancelled) {
-          setProviders(items);
-          setSelectedProvider((current) => (current !== "all" && !items.includes(current) ? "all" : current));
-        }
-      } catch {
-        if (!cancelled) {
-          setProviders([]);
-          setSelectedProvider("all");
-        }
+    providerRequestSeq.current += 1;
+    const requestSeq = providerRequestSeq.current;
+    try {
+      const items = await fetchProjectProviders(projectId);
+      if (requestSeq !== providerRequestSeq.current) {
+        return;
       }
-    };
-
-    void loadProviders();
-    return () => {
-      cancelled = true;
-    };
+      setProviders(items);
+      setSelectedProvider((current) => (current !== "all" && !items.includes(current) ? "all" : current));
+    } catch {
+      if (requestSeq !== providerRequestSeq.current) {
+        return;
+      }
+      setProviders([]);
+      setSelectedProvider("all");
+    }
   }, [projectId]);
+
+  useEffect(() => {
+    void refreshProviders();
+  }, [refreshProviders]);
 
   useEffect(() => {
     if (!projectId) {
@@ -349,6 +349,15 @@ export function Dashboard(): JSX.Element {
                   id="dashboard-provider-select"
                   value={selectedProvider}
                   onChange={(event) => setSelectedProvider(event.target.value)}
+                  onFocus={() => {
+                    void refreshProviders();
+                  }}
+                  onMouseDown={() => {
+                    void refreshProviders();
+                  }}
+                  onTouchStart={() => {
+                    void refreshProviders();
+                  }}
                 >
                   <option value="all">All</option>
                   {providers.map((provider) => (

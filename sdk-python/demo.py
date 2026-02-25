@@ -16,35 +16,50 @@ def main() -> None:
         print("LLMTBG_INGEST_KEY is required. Create a key in the dashboard Keys modal first.")
         return
 
+    provider = (os.getenv("LLMTBG_PROVIDER", "") or "").strip().lower()
+    if not provider:
+        print("LLMTBG_PROVIDER is required (openai | anthropic | google).")
+        return
+    if provider not in {"openai", "anthropic", "google"}:
+        print(f"LLMTBG_PROVIDER is unsupported: {provider}")
+        return
+
+    model = (os.getenv("LLMTBG_MODEL", "") or "").strip()
+    if not model:
+        print(f"LLMTBG_MODEL is required for provider {provider}.")
+        return
+
+    environment = os.getenv("LLMTBG_ENVIRONMENT") or os.getenv("LLMTBG_ENV") or "dev"
+    endpoint_by_provider = {
+        "openai": "/chat/completions",
+        "anthropic": "/v1/messages",
+        "google": "/v1beta/models/generateContent",
+    }
+    endpoint = endpoint_by_provider.get(provider, "/chat/completions")
+    total_tokens = int(os.getenv("LLMTBG_TOTAL_TOKENS", "42"))
+
     client = None
     try:
         client = create_client(
             base_url=os.getenv("LLMTBG_BASE_URL"),
             ingest_key=ingest_key,
             protect_enabled=False,
-            environment="dev",
+            environment=environment,
             debug=os.getenv("LLMTBG_DEBUG", "").lower() in {"1", "true", "yes"},
         )
-        demo_events = [
-            ("openai", "gpt-4o-mini", "/chat/completions", 2),
-            ("anthropic", "claude-3-5-sonnet", "/v1/messages", 3),
-            ("google", "gemini-1.5-pro", "/v1beta/models/generateContent", 4),
-        ]
         print("[DEMO] provider scoping active: counters/incidents/decisions are isolated by provider")
-        for provider, model, endpoint, total_tokens in demo_events:
-            capture_event(
-                build_event(
-                    provider=provider,
-                    model=model,
-                    environment="dev",
-                    request={"endpoint": endpoint, "input_tokens": 1},
-                    response={"output_tokens": 1, "total_tokens": total_tokens, "http_status": 200},
-                )
+        capture_event(
+            build_event(
+                provider=provider,
+                model=model,
+                environment=environment,
+                request={"endpoint": endpoint, "input_tokens": 1},
+                response={"output_tokens": 1, "total_tokens": total_tokens, "http_status": 200},
             )
-            print(f"[DEMO] queued provider={provider} model={model} endpoint={endpoint}")
+        )
+        print(f"[DEMO] queued provider={provider} model={model} endpoint={endpoint}")
         client.flush()
-        for provider, _, _, _ in demo_events:
-            print(f"[DEMO] flushed provider={provider}")
+        print(f"[DEMO] flushed provider={provider}")
         print(client.stats())
     finally:
         if client is not None:

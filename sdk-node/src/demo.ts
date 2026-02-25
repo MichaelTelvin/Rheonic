@@ -15,37 +15,55 @@ async function runDemo(): Promise<void> {
     debug: process.env.LLMTBG_DEBUG === "1" || process.env.LLMTBG_DEBUG === "true",
   });
 
-  const demoEvents = [
-    { provider: "openai", model: "gpt-4o-mini", endpoint: "/chat/completions", totalTokens: 42 },
-    { provider: "anthropic", model: "claude-3-5-sonnet", endpoint: "/v1/messages", totalTokens: 39 },
-    { provider: "google", model: "gemini-1.5-pro", endpoint: "/v1beta/models/generateContent", totalTokens: 36 },
-  ] as const;
+  const provider = (process.env.LLMTBG_PROVIDER ?? "").trim().toLowerCase();
+  if (!provider) {
+    console.error("LLMTBG_PROVIDER is required (openai | anthropic | google).");
+    process.exitCode = 1;
+    return;
+  }
+  if (!["openai", "anthropic", "google"].includes(provider)) {
+    console.error(`LLMTBG_PROVIDER is unsupported: ${provider}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const model = (process.env.LLMTBG_MODEL ?? "").trim();
+  if (!model) {
+    console.error(`LLMTBG_MODEL is required for provider ${provider}.`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const endpointByProvider: Record<string, string> = {
+    openai: "/chat/completions",
+    anthropic: "/v1/messages",
+    google: "/v1beta/models/generateContent",
+  };
+  const endpoint = endpointByProvider[provider] ?? "/chat/completions";
+  const totalTokens = Number(process.env.LLMTBG_TOTAL_TOKENS ?? 42);
+
   console.log("[DEMO] provider scoping active: counters/incidents/decisions are isolated by provider");
 
-  for (const event of demoEvents) {
-    await client.captureEvent(
-      buildEvent({
-        provider: event.provider,
-        model: event.model,
-        environment: client.environment,
-        request: {
-          endpoint: event.endpoint,
-          feature: "demo",
-        },
-        response: {
-          latency_ms: 120,
-          total_tokens: event.totalTokens,
-          http_status: 200,
-        },
-      }),
-    );
-    console.log(`[DEMO] queued provider=${event.provider} model=${event.model} endpoint=${event.endpoint}`);
-  }
+  await client.captureEvent(
+    buildEvent({
+      provider,
+      model,
+      environment: client.environment,
+      request: {
+        endpoint,
+        feature: "demo",
+      },
+      response: {
+        latency_ms: 120,
+        total_tokens: totalTokens,
+        http_status: 200,
+      },
+    }),
+  );
+  console.log(`[DEMO] queued provider=${provider} model=${model} endpoint=${endpoint}`);
 
   await client.flush();
-  for (const event of demoEvents) {
-    console.log(`[DEMO] flushed provider=${event.provider}`);
-  }
+  console.log(`[DEMO] flushed provider=${provider}`);
   console.log(client.getStats());
   client.close();
   console.log("done");
