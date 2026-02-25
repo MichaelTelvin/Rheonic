@@ -41,6 +41,14 @@ Protect runtime state is scoped by **(project_id, provider)**:
 Dashboard metric endpoints keep project-level totals by summing across providers, with unchanged response schemas.
 Dashboard metrics also support an optional provider filter (`provider=<name>`) for drilldown without changing response shapes.
 
+### Detection Pipeline
+Ingest anomaly handling uses a modular pipeline:
+- baseline gate (warm-up + early-absolute spike checks)
+- detector registry emits transient `Signal` objects
+- incident manager consumes signals and handles create/dedup/escalation/webhook
+
+This keeps detector logic separate from incident persistence and allows adding new detectors without changing ingest orchestration.
+
 ### Incident Severity Cache (fast path)
 Redis key:
 - `incsev:{project_id}:{provider}` = `none|low|medium|high`

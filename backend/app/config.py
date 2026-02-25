@@ -30,6 +30,15 @@ class AppConfig:
     default_incident_escalation_score_threshold_medium: int = 4
     default_incident_escalation_score_threshold_high: int = 6
     default_incident_escalation_ttl_seconds: int = 360
+    baseline_gate_min_windows: int = 5
+    baseline_gate_min_baseline_req: float = 5.0
+    baseline_gate_min_baseline_tok: float = 500.0
+    baseline_gate_early_abs_req_60s: int = 300
+    baseline_gate_early_abs_tok_60s: int = 20000
+    detectors_req_spike_ratio_low: float = 4.0
+    detectors_req_spike_delta_low: float = 50.0
+    detectors_tok_spike_ratio_low: float = 4.0
+    detectors_tok_spike_delta_low: float = 2000.0
     protect_near_cap_factor: float = 0.8
     protect_action_counter_ttl_seconds: int = 3600
     webhook_retry_max_attempts: int = 3
@@ -82,6 +91,16 @@ class Settings(BaseSettings):
     incident_escalation_score_threshold_medium: int = 4
     incident_escalation_score_threshold_high: int = 6
     incident_escalation_ttl_seconds: int = 360
+    baseline_gate_min_windows: int = app_config.baseline_gate_min_windows
+    baseline_gate_min_baseline_req: float = app_config.baseline_gate_min_baseline_req
+    baseline_gate_min_baseline_tok: float = app_config.baseline_gate_min_baseline_tok
+    baseline_gate_early_abs_req_60s: int = app_config.baseline_gate_early_abs_req_60s
+    baseline_gate_early_abs_tok_60s: int = app_config.baseline_gate_early_abs_tok_60s
+    # Detector thresholds (authoritative); legacy incident_* ratio cutoffs are retained for severity mapping.
+    detectors_req_spike_ratio_low: float = app_config.detectors_req_spike_ratio_low
+    detectors_req_spike_delta_low: float = app_config.detectors_req_spike_delta_low
+    detectors_tok_spike_ratio_low: float = app_config.detectors_tok_spike_ratio_low
+    detectors_tok_spike_delta_low: float = app_config.detectors_tok_spike_delta_low
     incident_auto_close_seconds: int = 300
     auto_close_run_interval_seconds: int = 60
     event_retention_days: int = 30

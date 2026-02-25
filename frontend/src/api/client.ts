@@ -293,8 +293,9 @@ export async function testProjectWebhook(projectId: string, payload?: TestProjec
   });
 }
 
-export async function fetchIncidents(projectId: string): Promise<IncidentItem[]> {
-  return request<IncidentItem[]>(`/api/v1/incidents?project_id=${encodeURIComponent(projectId)}`);
+export async function fetchIncidents(projectId: string, provider?: string): Promise<IncidentItem[]> {
+  const providerQuery = provider ? `&provider=${encodeURIComponent(provider)}` : "";
+  return request<IncidentItem[]>(`/api/v1/incidents?project_id=${encodeURIComponent(projectId)}${providerQuery}`);
 }
 
 export async function resolveIncident(id: string): Promise<{ status: string }> {

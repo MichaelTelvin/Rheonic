@@ -59,6 +59,10 @@ class FakeRealtimeCounterStore:
         _ = project_id, max_windows
         return self._baseline_req_60s, self._baseline_tok_60s
 
+    def get_baseline_sample_count(self, project_id: str, max_windows: int) -> int:
+        _ = project_id, max_windows
+        return 30
+
     def acquire_incident_lock(self, project_id: str, incident_type: str, ttl_seconds: int) -> bool:
         _ = project_id, incident_type, ttl_seconds
         return True

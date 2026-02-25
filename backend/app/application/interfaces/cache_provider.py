@@ -46,6 +46,11 @@ class RealtimeCounterStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_baseline_sample_count(self, project_id: str, max_windows: int) -> int:
+        # Return current number of retained baseline samples.
+        raise NotImplementedError
+
+    @abstractmethod
     def acquire_incident_lock(self, project_id: str, incident_type: str, ttl_seconds: int) -> bool:
         # Acquire incident dedupe lock with NX semantics.
         raise NotImplementedError

@@ -230,10 +230,11 @@ export function Dashboard(): JSX.Element {
 
     let cancelled = false;
     setLoadingIncidents(true);
+    const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
 
     const loadIncidents = async (): Promise<void> => {
       try {
-        const data = await fetchIncidents(projectId);
+        const data = await fetchIncidents(projectId, providerQuery);
         if (cancelled) {
           return;
         }
@@ -267,7 +268,7 @@ export function Dashboard(): JSX.Element {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [projectId]);
+  }, [projectId, selectedProvider]);
 
   const onResolve = async (incidentId: string): Promise<void> => {
     if (!projectId) {
@@ -280,7 +281,8 @@ export function Dashboard(): JSX.Element {
 
     try {
       await resolveIncident(incidentId);
-      const updated = await fetchIncidents(projectId);
+      const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
+      const updated = await fetchIncidents(projectId, providerQuery);
       setIncidents(updated);
       setIncidentsWarning(null);
       setLastIncidentsSuccessAt(new Date().toISOString());

@@ -134,9 +134,11 @@ class FakeRealtimeCounterStore:
         self,
         snapshots: list[tuple[int, int]],
         baselines: list[tuple[float, float]],
+        baseline_sample_count: int = 30,
     ) -> None:
         self._snapshots = snapshots
         self._baselines = baselines
+        self._baseline_sample_count = baseline_sample_count
         self.increment_calls: list[tuple[str, int]] = []
         self.escalation_hits: dict[str, list[dict[str, float | int]]] = {}
         self.escalation_ttls: dict[str, int] = {}
@@ -163,6 +165,10 @@ class FakeRealtimeCounterStore:
         if not self._baselines:
             return 0.0, 0.0
         return self._baselines[0]
+
+    def get_baseline_sample_count(self, project_id: str, max_windows: int) -> int:
+        _ = project_id, max_windows
+        return self._baseline_sample_count
 
     def acquire_incident_lock(self, project_id: str, incident_type: str, ttl_seconds: int) -> bool:
         _ = project_id, incident_type, ttl_seconds
@@ -261,8 +267,11 @@ class FakeIncidentRepository:
             return updated
         return None
 
-    def list_by_project(self, project_id: str, status: str = "open") -> list[Incident]:
-        return [incident for incident in self.incidents if incident.project_id == project_id and incident.status == status]
+    def list_by_project(self, project_id: str, status: str = "open", provider: str | None = None) -> list[Incident]:
+        rows = [incident for incident in self.incidents if incident.project_id == project_id and incident.status == status]
+        if provider:
+            return [incident for incident in rows if incident.provider == provider]
+        return rows
 
     def list_open_by_project_provider(self, project_id: str, provider: str) -> list[Incident]:
         return [
@@ -804,3 +813,88 @@ def test_escalation_hits_ttl_and_prune_applied() -> None:
     key = "p1:openai:burn_spike"
     assert realtime.escalation_ttls[key] == 360
     assert len(realtime.escalation_hits[key]) == 1
+
+
+def test_small_token_events_do_not_open_incident() -> None:
+    # Small deltas during warm-up should not emit spike incidents.
+    t0 = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=10)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(1, 42), (2, 84)],
+        baselines=[(1.0, 42.0), (1.0, 42.0)],
+    )
+    incidents = FakeIncidentRepository()
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        now_provider=_make_now_provider([t0, t1]),
+    )
+
+    service.ingest(_build_event(project_id="p1", total_tokens=42))
+    service.ingest(_build_event(project_id="p1", total_tokens=42))
+
+    assert incidents.incidents == []
+
+
+def test_early_absolute_token_spike_opens_incident_during_warmup() -> None:
+    # Early absolute threshold must trigger even before baseline gate is ready.
+    now = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(1, app_config.baseline_gate_early_abs_tok_60s + 100)],
+        baselines=[(1.0, 1.0)],
+        baseline_sample_count=1,
+    )
+    incidents = FakeIncidentRepository()
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        now_provider=_make_now_provider([now]),
+    )
+
+    service.ingest(_build_event(project_id="p1", total_tokens=app_config.baseline_gate_early_abs_tok_60s + 100))
+
+    assert len(incidents.incidents) == 1
+    assert incidents.incidents[0].incident_type == "burn_spike"
+    assert incidents.incidents[0].evidence["early_abs"] is True
+
+
+def test_baseline_ready_spike_requires_ratio_and_delta() -> None:
+    # Relative spike requires both ratio and delta thresholds once gate is ready.
+    t0 = datetime(2026, 2, 18, 12, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=20)
+    realtime = FakeRealtimeCounterStore(
+        snapshots=[(40, 3_500), (120, 6_000)],
+        baselines=[
+            (20.0, 1_000.0),
+            (20.0, 1_000.0),
+            (20.0, 1_000.0),
+            (20.0, 1_000.0),
+            (20.0, 1_000.0),
+            (20.0, 1_000.0),
+            (20.0, 1_000.0),
+        ],
+    )
+    incidents = FakeIncidentRepository()
+    service = IngestEventService(
+        event_repository=FakeEventRepository(),
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        incident_repository=incidents,  # type: ignore[arg-type]
+        incident_severity_cache=None,
+        baseline_window_count=30,
+        incident_dedup_window_seconds=300,
+        now_provider=_make_now_provider([t0, t1]),
+    )
+
+    service.ingest(_build_event(project_id="p1"))
+    assert incidents.incidents == []
+
+    service.ingest(_build_event(project_id="p1"))
+    assert len(incidents.incidents) == 1

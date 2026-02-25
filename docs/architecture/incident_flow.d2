@@ -34,7 +34,7 @@ baseline: "Baseline update gate\nIf matching OPEN incident exists (project+provi
   }
 }
 
-detect: "Anomaly compare (project+provider)\nreq_ratio/tok_ratio vs baseline\nlow>=2.0, medium>=5.0, high>=10.0\nincident_type=burn_spike or request_spike" {
+detect: "Detector registry (project+provider)\nBaselineGate: warmup/ready + early_abs check\nReq/Tok detectors emit Signal objects\nrule: ratio>=threshold AND delta>=threshold\n(stubs: retry_storm/loop_suspect/token_explosion)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -45,7 +45,7 @@ detect: "Anomaly compare (project+provider)\nreq_ratio/tok_ratio vs baseline\nlo
   }
 }
 
-dedup: "Dedup window (project+provider)\nincident_dedup_window_seconds=300\nOpen+fingerprint hit => update evidence/count" {
+dedup: "IncidentManager consumes signals\nDedup window (project+provider)\nincident_dedup_window_seconds=300\nOpen+fingerprint hit => update evidence/count" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"

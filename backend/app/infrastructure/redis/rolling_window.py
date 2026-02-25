@@ -201,6 +201,18 @@ class RollingWindow(RealtimeCounterStore):
             logger.exception("Failed reading baseline snapshot", extra={"project_id": project_id})
             raise
 
+    def get_baseline_sample_count(self, project_id: str, max_windows: int) -> int:
+        # Return retained baseline sample count for warm-up gating.
+        try:
+            req_key = baseline_req_60s_key(project_id)
+            tok_key = baseline_tok_60s_key(project_id)
+            req_values = self._client.lrange(req_key, 0, max_windows - 1)
+            tok_values = self._client.lrange(tok_key, 0, max_windows - 1)
+            return min(len(req_values), len(tok_values))
+        except Exception:
+            logger.exception("Failed reading baseline sample count", extra={"project_id": project_id})
+            raise
+
     def acquire_incident_lock(self, project_id: str, incident_type: str, ttl_seconds: int) -> bool:
         # Acquire incident dedupe lock.
         try:

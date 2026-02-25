@@ -72,7 +72,7 @@ tok_cap: "tokens_60s >= protect_max_tok_per_min?\n(project+provider)\n(null = un
   }
 }
 
-sev_high: "incident severity = high?\n(project+provider open incidents)\n(ratio >=10.0 or escalation)" {
+sev_high: "incident severity = high?\n(project+provider open incidents)\n(source: detector signals -> IncidentManager)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -82,7 +82,7 @@ sev_high: "incident severity = high?\n(project+provider open incidents)\n(ratio 
   }
 }
 
-sev_medium: "incident severity = medium?\n(project+provider open incidents)\n(ratio >=5.0 or escalation)" {
+sev_medium: "incident severity = medium?\n(project+provider open incidents)\n(source: detector signals -> IncidentManager)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"

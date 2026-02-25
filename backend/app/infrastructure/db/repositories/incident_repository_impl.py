@@ -126,20 +126,24 @@ class IncidentRepositoryImpl(IncidentRepository):
             logger.exception("Failed updating open incident activity", extra={"incident_id": incident_id})
             raise
 
-    def list_by_project(self, project_id: str, status: str = "open") -> list[Incident]:
+    def list_by_project(self, project_id: str, status: str = "open", provider: str | None = None) -> list[Incident]:
         # List incidents by project and status.
         try:
             with self._session_factory.create_session() as session:
-                records = (
+                query = (
                     session.query(IncidentRecord)
                     .filter(IncidentRecord.project_id == project_id)
                     .filter(IncidentRecord.status == status)
-                    .order_by(IncidentRecord.created_at.desc())
-                    .all()
                 )
+                if provider:
+                    query = query.filter(IncidentRecord.provider == provider)
+                records = query.order_by(IncidentRecord.created_at.desc()).all()
             return [_to_domain(record) for record in records]
         except Exception:
-            logger.exception("Failed listing incidents", extra={"project_id": project_id, "status": status})
+            logger.exception(
+                "Failed listing incidents",
+                extra={"project_id": project_id, "status": status, "provider": provider},
+            )
             raise
 
     def list_open_by_project_provider(self, project_id: str, provider: str) -> list[Incident]:

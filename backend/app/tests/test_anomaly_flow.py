@@ -163,12 +163,15 @@ def _cleanup_overrides() -> None:
     app.dependency_overrides.clear()
 
 
-def _event_payload(ts_seconds: int, total_tokens: int) -> dict[str, object]:
+def _event_payload(ts_seconds: int, total_tokens: int, provider: str = "openai", model: str | None = None) -> dict[str, object]:
     # Build deterministic ingest payload with explicit timestamp.
+    resolved_model = model
+    if resolved_model is None:
+        resolved_model = "claude-3-5-sonnet" if provider == "anthropic" else "gpt-4o-mini"
     return {
         "ts": datetime.fromtimestamp(ts_seconds, tz=timezone.utc).isoformat(),
-        "provider": "openai",
-        "model": "gpt-4o-mini",
+        "provider": provider,
+        "model": resolved_model,
         "environment": "dev",
         "response": {"total_tokens": total_tokens},
     }
@@ -447,6 +450,71 @@ def test_baseline_freeze_when_incident_open(tmp_path) -> None:
     )
     assert post_resolve.status_code == 202
     assert _baseline_token_samples(redis_client, project_id) != frozen_baseline_samples
+
+    _clear_project_redis_state(redis_client, project_id)
+    _cleanup_overrides()
+
+
+def test_incidents_provider_filter_returns_scoped_rows(tmp_path) -> None:
+    # Incidents list should filter by provider when provider query param is supplied.
+    client, redis_client = _make_client(tmp_path)
+    base_ts = 1_000_001_000
+
+    project = client.post("/api/v1/projects", json={"name": "Provider Incident Filter"})
+    assert project.status_code == 200
+    project_id = project.json()["id"]
+    _clear_project_redis_state(redis_client, project_id)
+
+    key_response = client.post(f"/api/v1/projects/{project_id}/keys", json={"name": "provider"})
+    assert key_response.status_code == 200
+    plaintext_key = key_response.json()["key"]
+
+    for i in range(10):
+        response = client.post(
+            "/api/v1/events",
+            json=_event_payload(ts_seconds=base_ts + i, total_tokens=100, provider="openai"),
+            headers={"X-Project-Ingest-Key": plaintext_key},
+        )
+        assert response.status_code == 202
+        response = client.post(
+            "/api/v1/events",
+            json=_event_payload(ts_seconds=base_ts + i, total_tokens=100, provider="anthropic"),
+            headers={"X-Project-Ingest-Key": plaintext_key},
+        )
+        assert response.status_code == 202
+
+    openai_spike = client.post(
+        "/api/v1/events",
+        json=_event_payload(ts_seconds=base_ts + 20, total_tokens=60_000, provider="openai"),
+        headers={"X-Project-Ingest-Key": plaintext_key},
+    )
+    assert openai_spike.status_code == 202
+    anthropic_spike = client.post(
+        "/api/v1/events",
+        json=_event_payload(ts_seconds=base_ts + 21, total_tokens=60_000, provider="anthropic"),
+        headers={"X-Project-Ingest-Key": plaintext_key},
+    )
+    assert anthropic_spike.status_code == 202
+
+    all_incidents = client.get("/api/v1/incidents", params={"project_id": project_id, "status": "open"})
+    assert all_incidents.status_code == 200
+    assert len(all_incidents.json()) == 2
+
+    openai_incidents = client.get(
+        "/api/v1/incidents",
+        params={"project_id": project_id, "status": "open", "provider": "openai"},
+    )
+    assert openai_incidents.status_code == 200
+    assert len(openai_incidents.json()) == 1
+    assert openai_incidents.json()[0]["evidence"]["provider"] == "openai"
+
+    anthropic_incidents = client.get(
+        "/api/v1/incidents",
+        params={"project_id": project_id, "status": "open", "provider": "anthropic"},
+    )
+    assert anthropic_incidents.status_code == 200
+    assert len(anthropic_incidents.json()) == 1
+    assert anthropic_incidents.json()[0]["evidence"]["provider"] == "anthropic"
 
     _clear_project_redis_state(redis_client, project_id)
     _cleanup_overrides()

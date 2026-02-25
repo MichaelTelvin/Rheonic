@@ -85,12 +85,12 @@ describe("Dashboard", () => {
   it("loads metrics and incidents for selected project", async () => {
     render(<Dashboard />);
     await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1", undefined));
-    expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1");
+    expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", undefined);
     expect(screen.getByText("Requests (60s)")).toBeDefined();
     expect(screen.getByText("Tokens (60s)")).toBeDefined();
   });
 
-  it("loads provider list and applies provider filter to metrics calls", async () => {
+  it("loads provider list and applies provider filter to metrics and incidents calls", async () => {
     render(<Dashboard />);
 
     await waitFor(() => expect(mocks.fetchProjectProviders).toHaveBeenCalledWith("p1"));
@@ -99,6 +99,7 @@ describe("Dashboard", () => {
 
     await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1", "openai"));
     expect(mocks.fetchProtectMetrics).toHaveBeenCalledWith("p1", "openai");
+    expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai");
 
     fireEvent.change(providerSelect, { target: { value: "all" } });
     await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1", undefined));

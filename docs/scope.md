@@ -21,7 +21,8 @@ Event ingest and realtime
 
 Incident engine
 - Baseline snapshots and freeze while incident is open
-- Ratio-based anomaly detection
+- Detector pipeline (`BaselineGate` + detector registry + `Signal` -> `IncidentManager`)
+- Ratio+delta anomaly detection for request/token spike detectors
 - Dedup window merge for matching open incidents in `(project_id, provider)` scope
 - Severity escalation with hit cache TTL
 - First-seen provider/model policy-gap detection (records all models; raises low `policy_gap` incident when protect is enabled)
@@ -77,9 +78,9 @@ Remaining / Next
 ========================================
 
 Detectors and intelligence
-- Retry storm detector
-- Loop suspect detector
-- Token explosion detector
+- Retry storm detector heuristics (stub scaffold created)
+- Loop suspect detector heuristics (stub scaffold created)
+- Token explosion detector heuristics (stub scaffold created)
 
 Cost and reconciliation
 - Authoritative cost reconciliation pipeline

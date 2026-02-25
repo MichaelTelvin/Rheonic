@@ -1,12 +1,10 @@
-# Retry storm detector.
-from app.domain.detectors.base_detector import BaseDetector
-from app.domain.models.event import Event
-from app.domain.models.incident import Incident
+# Retry storm detector scaffold.
+from app.domain.detectors.contracts import DetectionContext, Signal
+from app.domain.detectors.detector import Detector
 
 
-class RetryStormDetector(BaseDetector):
-    # Detects abnormally frequent retry patterns.
-    def detect(self, events: list[Event]) -> list[Incident]:
-        _ = events
-        # TODO: Implement deterministic retry storm heuristics.
+class RetryStormDetector(Detector):
+    # Stub detector; no runtime behavior change yet.
+    def detect(self, ctx: DetectionContext) -> list[Signal]:
+        _ = ctx
         return []
