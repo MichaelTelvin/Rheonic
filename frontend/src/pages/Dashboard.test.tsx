@@ -151,7 +151,7 @@ describe("Dashboard", () => {
     expect(metricWarnings).toHaveLength(2);
   });
 
-  it("renders counters as 0 and percentiles as em-dash when null", async () => {
+  it("renders protect decision counters", async () => {
     render(
       <MemoryRouter>
         <Dashboard />
@@ -162,13 +162,9 @@ describe("Dashboard", () => {
     const allowedRow = allowedLabel.closest(".protect-decisions-row");
     expect(allowedRow?.querySelector(".protect-decisions-value")?.textContent).toBe("0");
 
-    const timeoutLabel = await screen.findByText("Timeouts");
-    const timeoutRow = timeoutLabel.closest(".protect-decisions-row");
-    expect(timeoutRow?.querySelector(".protect-decisions-value")?.textContent).toBe("0");
-
-    const p50Label = await screen.findByText("P50 latency (ms)");
-    const p50Row = p50Label.closest(".protect-decisions-row");
-    expect(p50Row?.querySelector(".protect-decisions-value")?.textContent).toBe("—");
+    const blockedLabel = await screen.findByText("Blocked");
+    const blockedRow = blockedLabel.closest(".protect-decisions-row");
+    expect(blockedRow?.querySelector(".protect-decisions-value")?.textContent).toBe("0");
   });
 
   it("renders incidents summary card counts", async () => {

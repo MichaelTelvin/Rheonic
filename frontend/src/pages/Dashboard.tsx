@@ -40,11 +40,6 @@ export function Dashboard(): JSX.Element {
     warned_60m: number | null;
     blocked_60m: number | null;
   } | null>(null);
-  const [protectHealthStats, setProtectHealthStats] = useState<{
-    p50_ms: number | null;
-    p95_ms: number | null;
-    decision_timeouts_60m: number | null;
-  } | null>(null);
   const [globalBanner, setGlobalBanner] = useState<string | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>("all");
@@ -72,7 +67,6 @@ export function Dashboard(): JSX.Element {
     setMetricsWarning(null);
     setGlobalBanner(null);
     setProtectDecisionStats(null);
-    setProtectHealthStats(null);
     setProviders([]);
     setSelectedProvider("all");
   }, [projectId]);
@@ -121,15 +115,9 @@ export function Dashboard(): JSX.Element {
           warned_60m: data.warned_60m,
           blocked_60m: data.blocked_60m,
         });
-        setProtectHealthStats({
-          p50_ms: data.decision_latency_p50_60m_ms,
-          p95_ms: data.decision_latency_p95_60m_ms,
-          decision_timeouts_60m: data.decision_timeouts_60m,
-        });
       } catch {
         if (!cancelled) {
           setProtectDecisionStats(null);
-          setProtectHealthStats(null);
         }
       }
     };
@@ -277,7 +265,7 @@ export function Dashboard(): JSX.Element {
           </section>
         ) : (
           <>
-            <section className="dashboard-controls">
+            <section className="dashboard-controls-main">
               <div className="toolbar">
                 <label htmlFor="dashboard-provider-select">Provider</label>
                 <select
@@ -343,24 +331,6 @@ export function Dashboard(): JSX.Element {
               </Card>
 
               <Card>
-                <h2 className="card-title">Decisions latency (60m)</h2>
-                <div className="protect-decisions-list">
-                  <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">P50 latency (ms)</span>
-                    <span className="protect-decisions-value">{renderMetric(protectHealthStats?.p50_ms)}</span>
-                  </div>
-                  <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">P95 latency (ms)</span>
-                    <span className="protect-decisions-value">{renderMetric(protectHealthStats?.p95_ms)}</span>
-                  </div>
-                  <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Timeouts</span>
-                    <span className="protect-decisions-value blocked">{renderMetric(protectHealthStats?.decision_timeouts_60m)}</span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card>
                 <h2 className="card-title">Incidents</h2>
                 <div className="protect-decisions-list">
                   <div className="protect-decisions-row">
@@ -374,24 +344,6 @@ export function Dashboard(): JSX.Element {
                   <div className="protect-decisions-row">
                     <span className="protect-decisions-label">High</span>
                     <span className="protect-decisions-value blocked">{incidentSummary.high}</span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card>
-                <h2 className="card-title">Estimated costs</h2>
-                <div className="protect-decisions-list">
-                  <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Last 60s</span>
-                    <span className="protect-decisions-value">—</span>
-                  </div>
-                  <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Last 24h</span>
-                    <span className="protect-decisions-value">—</span>
-                  </div>
-                  <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Month to date</span>
-                    <span className="protect-decisions-value">—</span>
                   </div>
                 </div>
               </Card>

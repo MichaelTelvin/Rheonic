@@ -12,173 +12,101 @@ style: {
   fill: "#f4f6fb"
 }
 
-ingest: "POST /api/v1/events\nPersist event + update rolling 60s\nscope: project+provider" {
+ingest: "Ingest\nPOST /api/v1/events\nscope: project+provider" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 14
-    font-size: 8
-    stroke-width: 1
+    font-size: 11
   }
 }
 
-baseline: "Baseline update gate\nIf matching OPEN incident exists (project+provider)\n=> baseline frozen\nelse record baseline snapshot\nmedian of last baseline_window_count=30" {
+counters: "Rolling Counters + Baseline Sample\nrequests_60s / tokens_60s\nbaseline snapshots (project+provider)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 14
-    font-size: 8
-    stroke-width: 1
+    font-size: 11
   }
 }
 
-detect: "Detector registry (project+provider)\nBaselineGate: warmup/ready + early_abs check\nReq/Tok detectors emit Signal objects\nrule: ratio>=threshold AND delta>=threshold\n(stubs: retry_storm/loop_suspect/token_explosion)" {
+gate: "BaselineGate\nwarm-up vs ready\nallows early absolute spike checks in warm-up" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 14
-    font-size: 8
-    stroke-width: 1
+    font-size: 11
   }
 }
 
-dedup: "IncidentManager consumes signals\nDedup window (project+provider)\nincident_dedup_window_seconds=300\nOpen+fingerprint hit => update evidence/count" {
+detectors: "Detector(s)\nreq_spike + tok_spike\nemit Signal objects\nfuture: retry_storm / loop_suspect / token_explosion" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 14
-    font-size: 8
-    stroke-width: 1
+    font-size: 11
   }
 }
 
-create: "Create incident (project+provider)\nstatus=open\nseverity from ratio" {
+incident_manager: "IncidentManager\nopen / update / escalate\n(project+provider scope)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 14
-    font-size: 8
-    stroke-width: 1
+    font-size: 11
   }
 }
 
-escalate: "Escalation (open only, project+provider)\nlow->medium/high or medium->high\nwm=300s, wh=120s\nmin_hits_m=2, min_hits_h=2\nscore_m>=4, score_h>=6\n10x guard score=3\nescalation hit cache ttl=360s" {
-  style: {
-    fill: "#e8eef9"
-    stroke: "#7e95be"
-    font-color: "#21324d"
-    border-radius: 14
-    font-size: 8
-    stroke-width: 1
-  }
-}
-
-keep_open: "Incident remains open\nlast_seen_at refreshed" {
+webhooks: "Webhook hooks\nincident.high (open high)\nincident.high (escalation -> high)\nincident.resolved (manual/auto)" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 14
-    font-size: 8
-    stroke-width: 1
+    font-size: 11
   }
 }
 
-auto_close: "Auto-close worker\nruns every AUTO_CLOSE_RUN_INTERVAL_SECONDS=60\nstatus=open and last_seen_at older than\nINCIDENT_AUTO_CLOSE_SECONDS=300\n=> status=auto_resolved" {
+autoclose: "Auto-close\nresolve stale open incidents\ninactivity cooldown" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 14
-    font-size: 8
-    stroke-width: 1
+    font-size: 11
   }
 }
 
-resolved: "Statuses\nopen -> auto_resolved\n(or manually resolved)" {
+resolved: "Resolved incidents\n(manual or auto)" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 14
-    font-size: 8
-    stroke-width: 1
+    font-size: 11
   }
 }
 
-aggregate: "Dashboard metrics endpoints aggregate totals\nsum across providers for same project\noptional provider filter for drilldown\n(response schema unchanged)" {
+dashboard: "Dashboard metrics\nproject totals aggregate across providers\noptional provider filter" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 14
-    font-size: 8
-    stroke-width: 1
+    font-size: 11
   }
 }
 
-ingest -> baseline: {
-  style: {
-    stroke-width: 1
-    font-size: 8
-  }
-}
-baseline -> detect: {
-  style: {
-    stroke-width: 1
-    font-size: 8
-  }
-}
-detect -> dedup: {
-  style: {
-    stroke-width: 1
-    font-size: 8
-  }
-}
-dedup -> create: "no open match" {
-  style: {
-    stroke-width: 1
-    font-size: 8
-  }
-}
-dedup -> escalate: "open match" {
-  style: {
-    stroke-width: 1
-    font-size: 8
-  }
-}
-create -> keep_open: {
-  style: {
-    stroke-width: 1
-    font-size: 8
-  }
-}
-escalate -> keep_open: {
-  style: {
-    stroke-width: 1
-    font-size: 8
-  }
-}
-keep_open -> auto_close: {
-  style: {
-    stroke-width: 1
-    font-size: 8
-  }
-}
-auto_close -> resolved: {
-  style: {
-    stroke-width: 1
-    font-size: 8
-  }
-}
-resolved -> aggregate: {
-  style: {
-    stroke-width: 1
-    font-size: 8
-  }
-}
+ingest -> counters
+counters -> gate
+gate -> detectors
+detectors -> incident_manager
+incident_manager -> webhooks
+incident_manager -> autoclose
+autoclose -> resolved
+resolved -> dashboard

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from dataclasses import dataclass
+import time
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +17,6 @@ from llmtokenburnguard.providers.openai_adapter import instrument_openai
 
 
 def _load_llmtbg_env_from_dotenv() -> None:
-    # Load LLMTBG_* values from repo .env so demos work without manual export.
     dotenv_path = Path(__file__).resolve().parents[1] / ".env"
     if not dotenv_path.exists():
         return
@@ -29,7 +28,7 @@ def _load_llmtbg_env_from_dotenv() -> None:
         key = key.strip()
         if not key.startswith("LLMTBG_"):
             continue
-        os.environ[key] = value.strip().strip("\"").strip("'")
+        os.environ[key] = value.strip().strip('"').strip("'")
 
 
 _load_llmtbg_env_from_dotenv()
@@ -39,8 +38,6 @@ PROVIDER_STUB_URL = os.getenv("LLMTBG_PROVIDER_URL", "http://localhost:8099")
 
 
 class LoggingHttpClient:
-    # Minimal transport wrapper for SDK client that logs protect decision payload/response.
-
     def __init__(self, timeout_s: float) -> None:
         self._client = httpx.Client(timeout=timeout_s)
         self.last_decision_request: dict[str, Any] | None = None
@@ -50,7 +47,7 @@ class LoggingHttpClient:
         if url.endswith("/api/v1/protect/decision"):
             self.last_decision_request = dict(json)
             print("=== PROTECT DECISION REQUEST ===")
-            print(json_dumps(self.last_decision_request))
+            print(_json_dumps(self.last_decision_request))
             response = self._client.post(url, json=json, headers=headers, timeout=timeout)
             payload: dict[str, Any]
             try:
@@ -60,7 +57,7 @@ class LoggingHttpClient:
                 payload = {"status_code": response.status_code, "body": response.text}
             self.last_decision_response = payload
             print("=== PROTECT DECISION RESPONSE ===")
-            print(json_dumps(payload))
+            print(_json_dumps(payload))
             return response
         return self._client.post(url, json=json, headers=headers, timeout=timeout)
 
@@ -68,37 +65,18 @@ class LoggingHttpClient:
         self._client.close()
 
 
-@dataclass
-class ProviderCounts:
-    before: int
-    after: int
-
-    @property
-    def delta(self) -> int:
-        return self.after - self.before
-
-
-def json_dumps(payload: dict[str, Any]) -> str:
+def _json_dumps(payload: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2, sort_keys=True)
 
 
-def require_tokenizer() -> None:
-    try:
-        import tiktoken  # noqa: F401
-    except Exception as exc:  # pragma: no cover - runtime environment dependent
-        print("ERROR: tiktoken is required for token estimation. Install sdk-python dependencies and retry.")
-        print(f"Details: {exc}")
-        sys.exit(1)
-
-
-def provider_reset() -> None:
+def _provider_reset() -> None:
     try:
         httpx.post(f"{PROVIDER_STUB_URL}/reset", timeout=3.0).raise_for_status()
     except Exception:
-        return
+        pass
 
 
-def provider_count() -> int | None:
+def _provider_count() -> int | None:
     try:
         response = httpx.get(f"{PROVIDER_STUB_URL}/count", timeout=3.0)
         response.raise_for_status()
@@ -112,7 +90,7 @@ def provider_count() -> int | None:
         return None
 
 
-def make_openai_stub() -> Any:
+def _make_openai_stub() -> Any:
     class Completions:
         @staticmethod
         def create(**kwargs: Any) -> Any:
@@ -129,7 +107,7 @@ def make_openai_stub() -> Any:
     return OpenAIStub()
 
 
-def make_anthropic_stub() -> Any:
+def _make_anthropic_stub() -> Any:
     class Messages:
         @staticmethod
         def create(**kwargs: Any) -> Any:
@@ -143,7 +121,7 @@ def make_anthropic_stub() -> Any:
     return AnthropicStub()
 
 
-def make_google_stub() -> Any:
+def _make_google_stub() -> Any:
     class UsageMetadata:
         total_token_count = 10
 
@@ -161,9 +139,155 @@ def make_google_stub() -> Any:
     return GoogleModelStub()
 
 
-def print_provider_stub_help() -> None:
+def _print_provider_stub_help() -> None:
     print(f"ERROR: provider stub is unreachable at {PROVIDER_STUB_URL}")
     print("Start it with `python3 tests/e2e/provider_stub.py` or set LLMTBG_PROVIDER_URL to a reachable endpoint.")
+
+
+def _send_ingest_event(ingest_key: str, provider: str, model: str, total_tokens: int, feature: str) -> None:
+    payload = {
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "provider": provider,
+        "model": model,
+        "environment": os.getenv("LLMTBG_ENV", "dev"),
+        "request": {"endpoint": "/chat/completions", "feature": feature, "input_tokens": 1},
+        "response": {"output_tokens": 1, "total_tokens": total_tokens, "latency_ms": 120, "http_status": 200},
+    }
+    response = httpx.post(
+        f"{BACKEND_BASE_URL}/api/v1/events",
+        json=payload,
+        headers={"X-Project-Ingest-Key": ingest_key},
+        timeout=5.0,
+    )
+    response.raise_for_status()
+
+
+def _list_open_incidents(project_id: str, provider: str, auth_token: str) -> list[dict[str, Any]]:
+    params = {"project_id": project_id, "status": "open"}
+    if provider:
+        params["provider"] = provider
+    response = httpx.get(
+        f"{BACKEND_BASE_URL}/api/v1/incidents",
+        params=params,
+        headers={"Authorization": f"Bearer {auth_token}"},
+        timeout=5.0,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    return payload if isinstance(payload, list) else []
+
+
+def _resolve_incident(incident_id: str, auth_token: str) -> None:
+    response = httpx.post(
+        f"{BACKEND_BASE_URL}/api/v1/incidents/{incident_id}/resolve",
+        headers={"Authorization": f"Bearer {auth_token}"},
+        json={},
+        timeout=5.0,
+    )
+    response.raise_for_status()
+
+
+def _print_webhook_status(project_id: str, auth_token: str) -> None:
+    response = httpx.get(
+        f"{BACKEND_BASE_URL}/api/v1/projects/{project_id}/webhook",
+        headers={"Authorization": f"Bearer {auth_token}"},
+        timeout=5.0,
+    )
+    if response.status_code != 200:
+        print(f"[OBSERVE] webhook status unavailable (status={response.status_code})")
+        return
+    payload = response.json() if isinstance(response.json(), dict) else {}
+    print(
+        "[OBSERVE] webhook last_delivery="
+        f"{payload.get('webhook_last_delivery_status', 'none')} "
+        f"at {payload.get('webhook_last_delivery_at', 'n/a')}"
+    )
+
+
+def _run_protect_harness(
+    provider: str,
+    model: str,
+    scenario: str,
+    openai: Any,
+    anthropic: Any,
+    google: Any,
+    client: Client,
+) -> None:
+    max_tokens = int(os.getenv("LLMTBG_MAX_TOKENS", "2000" if scenario == "block" else "128"))
+    before = _provider_count()
+
+    print("\n[STEP] Protect decision preflight")
+    print(f"[EXPECT] scenario={scenario} should produce allow/warn/block before provider call")
+
+    blocked = False
+    try:
+        if provider == "anthropic":
+            anthropic.messages.create(
+                model=model,
+                messages=[{"role": "user", "content": f"Protect harness request. scenario={scenario}"}],
+                max_tokens=max_tokens,
+            )
+        elif provider == "google":
+            google.generate_content(f"Protect harness request. scenario={scenario}")
+        else:
+            openai.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": f"Protect harness request. scenario={scenario}"}],
+                max_tokens=max_tokens,
+            )
+    except LLMTBGBlockedError:
+        blocked = True
+
+    client.flush()
+    after = _provider_count()
+    if blocked:
+        print(f"[OBSERVE] blocked by protect preflight for scenario={scenario}")
+    else:
+        print(f"[OBSERVE] provider call executed for scenario={scenario}")
+    if before is not None and after is not None:
+        print({"provider_calls_delta": after - before, "before": before, "after": after})
+
+
+def _run_webhooks_harness(
+    ingest_key: str,
+    provider: str,
+    model: str,
+    auth_token: str,
+    project_id: str,
+    pause_ms: int,
+) -> None:
+    print("\n[STEP] Warm-up behavior")
+    print("[EXPECT] tiny early traffic should not create ratio-based incident")
+    _send_ingest_event(ingest_key, provider, model, 42, "harness-warmup-1")
+    time.sleep(pause_ms / 1000)
+    _send_ingest_event(ingest_key, provider, model, 42, "harness-warmup-2")
+
+    print("\n[STEP] High-open + webhook")
+    print("[EXPECT] high incident opens and webhook incident.high is dispatched")
+    for i in range(8):
+        _send_ingest_event(ingest_key, provider, model, 100, f"harness-baseline-{i + 1}")
+        time.sleep(pause_ms / 1000)
+    _send_ingest_event(ingest_key, provider, model, 60000, "harness-high-open")
+
+    print("\n[STEP] Escalation + webhook")
+    print("[EXPECT] repeated hits escalate to high and dispatch incident.high (source=escalation)")
+    _send_ingest_event(ingest_key, provider, model, 60000, "harness-escalation-1")
+    time.sleep(pause_ms / 1000)
+    _send_ingest_event(ingest_key, provider, model, 60000, "harness-escalation-2")
+
+    if auth_token and project_id:
+        incidents = _list_open_incidents(project_id, provider, auth_token)
+        print(f"[OBSERVE] open incidents in scope={len(incidents)}")
+        if incidents:
+            print("\n[STEP] Manual resolve + webhook")
+            print("[EXPECT] incident.resolved webhook dispatched with resolved_by=manual")
+            _resolve_incident(str(incidents[0].get("id")), auth_token)
+        print("\n[STEP] Auto-resolve + webhook")
+        print("[EXPECT] after inactivity cooldown, auto-resolve emits incident.resolved with resolved_by=auto")
+        print("[OBSERVE] wait incident_auto_close_seconds, then check incidents/webhook status")
+        _print_webhook_status(project_id, auth_token)
+    else:
+        print("[OBSERVE] set LLMTBG_AUTH_TOKEN + LLMTBG_PROJECT_ID to verify resolve/webhook status via API")
 
 
 def main() -> None:
@@ -171,8 +295,6 @@ def main() -> None:
     if not ingest_key:
         print("LLMTBG_INGEST_KEY is required.")
         sys.exit(1)
-
-    require_tokenizer()
 
     scenario = (os.getenv("LLMTBG_SCENARIO", "allow") or "allow").lower()
     provider = (os.getenv("LLMTBG_PROVIDER", "") or "").strip().lower()
@@ -182,93 +304,64 @@ def main() -> None:
     if provider not in {"openai", "anthropic", "google"}:
         print(f"LLMTBG_PROVIDER is unsupported: {provider}")
         sys.exit(1)
+
     model = (os.getenv("LLMTBG_MODEL", "") or "").strip()
     if not model:
         print(f"LLMTBG_MODEL is required for provider {provider}.")
         sys.exit(1)
-    environment = os.getenv("LLMTBG_ENVIRONMENT", "dev")
-    max_tokens_env = os.getenv("LLMTBG_MAX_TOKENS")
-    max_tokens = int(max_tokens_env) if max_tokens_env else (2000 if scenario == "block" else 128)
+
+    harness_case = (os.getenv("LLMTBG_HARNESS_CASE", "protect") or "protect").lower()
+    pause_ms = int(os.getenv("LLMTBG_STEP_SLEEP_MS", "800"))
+    auth_token = os.getenv("LLMTBG_AUTH_TOKEN", "")
+    project_id = os.getenv("LLMTBG_PROJECT_ID", "")
 
     transport = LoggingHttpClient(timeout_s=5.0)
     client = Client(
         ingest_key=ingest_key,
         base_url=BACKEND_BASE_URL,
         protect_enabled=True,
-        environment=environment,
+        environment=os.getenv("LLMTBG_ENVIRONMENT", "dev"),
         flush_interval_s=60.0,
         http_client=transport,
     )
 
-    openai = make_openai_stub()
-    anthropic = make_anthropic_stub()
-    google = make_google_stub()
+    openai = _make_openai_stub()
+    anthropic = _make_anthropic_stub()
+    google = _make_google_stub()
     google.model_name = model
-    instrument_openai(openai, client=client, feature="manual-protect-demo", environment=environment)
-    instrument_anthropic(anthropic, client=client, feature="manual-protect-demo", environment=environment)
-    instrument_google(google, client=client, feature="manual-protect-demo", environment=environment)
 
-    provider_reset()
-    before = provider_count()
-    if before is None:
-        print_provider_stub_help()
+    instrument_openai(openai, client=client, feature="manual-protect-demo", environment=os.getenv("LLMTBG_ENVIRONMENT", "dev"))
+    instrument_anthropic(anthropic, client=client, feature="manual-protect-demo", environment=os.getenv("LLMTBG_ENVIRONMENT", "dev"))
+    instrument_google(google, client=client, feature="manual-protect-demo", environment=os.getenv("LLMTBG_ENVIRONMENT", "dev"))
+
+    _provider_reset()
+    if _provider_count() is None:
+        _print_provider_stub_help()
         client.close()
         transport.close()
         return
 
-    blocked = False
-    warned = False
-    print(f"[DEMO] provider={provider} model={model} scenario={scenario}")
+    print(f"[DEMO] provider={provider} model={model} harness={harness_case}")
     print("[DEMO] provider scoping active: counters/incidents/decisions are isolated by provider")
+
     try:
-        if provider == "anthropic":
-            anthropic.messages.create(
-                model=model,
-                messages=[{"role": "user", "content": f"Manual protect demo request. scenario={scenario}."}],
-                max_tokens=max_tokens,
-            )
-        elif provider == "google":
-            google.generate_content(f"Manual protect demo request. scenario={scenario}.")
+        if harness_case == "all":
+            _run_protect_harness(provider, model, scenario, openai, anthropic, google, client)
+            _run_webhooks_harness(ingest_key, provider, model, auth_token, project_id, pause_ms)
+        elif harness_case == "protect":
+            _run_protect_harness(provider, model, scenario, openai, anthropic, google, client)
+        elif harness_case == "webhooks":
+            _run_webhooks_harness(ingest_key, provider, model, auth_token, project_id, pause_ms)
         else:
-            openai.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"Manual protect demo request. scenario={scenario}.",
-                    }
-                ],
-                max_tokens=max_tokens,
-            )
-        decision = transport.last_decision_response or {}
-        warned = decision.get("decision") == "warn"
-        if warned:
-            print(f"[WARN] Provider call executed (provider={provider}, scenario={scenario}).")
-        else:
-            print(f"[OK] Provider call executed (provider={provider}, scenario={scenario}).")
-    except LLMTBGBlockedError:
-        blocked = True
-        print(f"[BLOCKED] LLMTBGBlockedError thrown (provider={provider}, scenario={scenario}).")
+            print(f"Unsupported LLMTBG_HARNESS_CASE: {harness_case}")
+            sys.exit(1)
     except httpx.ConnectError:
-        print_provider_stub_help()
-        return
+        _print_provider_stub_help()
     finally:
         client.flush()
+        print("[DEMO] sdk delivery stats:", client.stats())
         client.close()
         transport.close()
-
-    after = provider_count()
-    if before is not None and after is not None:
-        counts = ProviderCounts(before=before, after=after)
-        print({"provider_calls_delta": counts.delta, "before": counts.before, "after": counts.after})
-
-    estimate = None
-    if isinstance(transport.last_decision_request, dict):
-        estimate = transport.last_decision_request.get("input_tokens_estimate")
-    print(f"input_tokens_estimate sent: {estimate if estimate is not None else '(omitted)'}")
-
-    if blocked:
-        return
 
 
 if __name__ == "__main__":

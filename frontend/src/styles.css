@@ -337,11 +337,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  margin-top: -6px;
-  margin-bottom: 24px;
 }
 
-.dashboard-controls .toolbar {
+.dashboard-controls-main {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 14px;
+  margin-bottom: 18px;
+}
+
+.dashboard-controls-main .toolbar {
   width: auto;
   display: flex;
   align-items: center;
@@ -349,12 +355,14 @@ body {
   gap: 12px;
 }
 
-.dashboard-controls label {
+.dashboard-controls label,
+.dashboard-controls-main label {
   color: rgba(229, 231, 235, 0.78);
   font-size: 0.94rem;
 }
 
-.dashboard-controls select {
+.dashboard-controls select,
+.dashboard-controls-main select {
   min-width: 240px;
 }
 
@@ -692,13 +700,13 @@ select {
 
 .incidents-layout {
   display: grid;
-  gap: 4px;
+  gap: 12px;
 }
 
 .incidents-filters-shell {
   border: 0;
   border-radius: 0;
-  padding: 10px 0 6px;
+  padding: 10px 0 16px;
   background: transparent;
 }
 
@@ -1121,11 +1129,11 @@ pre {
     margin-top: 8px;
   }
 
-  .dashboard-controls {
+  .dashboard-controls-main {
     margin-top: 0;
   }
 
-  .dashboard-controls .toolbar {
+  .dashboard-controls-main .toolbar {
     flex-direction: column;
     align-items: flex-start;
   }
