@@ -293,9 +293,18 @@ export async function testProjectWebhook(projectId: string, payload?: TestProjec
   });
 }
 
-export async function fetchIncidents(projectId: string, provider?: string): Promise<IncidentItem[]> {
+export async function fetchIncidents(
+  projectId: string,
+  provider?: string,
+  severity?: "low" | "medium" | "high",
+  status?: "open" | "resolved" | "all",
+): Promise<IncidentItem[]> {
   const providerQuery = provider ? `&provider=${encodeURIComponent(provider)}` : "";
-  return request<IncidentItem[]>(`/api/v1/incidents?project_id=${encodeURIComponent(projectId)}${providerQuery}`);
+  const severityQuery = severity ? `&severity=${encodeURIComponent(severity)}` : "";
+  const statusQuery = status ? `&status=${encodeURIComponent(status)}` : "";
+  return request<IncidentItem[]>(
+    `/api/v1/incidents?project_id=${encodeURIComponent(projectId)}${providerQuery}${severityQuery}${statusQuery}`,
+  );
 }
 
 export async function resolveIncident(id: string): Promise<{ status: string }> {

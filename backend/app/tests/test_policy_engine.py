@@ -31,11 +31,18 @@ class FakeIncidentRepository:
             evidence={"requests_60s": 1, "tokens_60s": 10},
         )
 
-    def list_by_project(self, project_id: str, status: str = "open", provider: str | None = None) -> list[Incident]:
+    def list_by_project(
+        self,
+        project_id: str,
+        status: str = "open",
+        provider: str | None = None,
+        severity: str | None = None,
+    ) -> list[Incident]:
         if (
             self.incident.project_id == project_id
-            and self.incident.status == status
+            and (status == "all" or self.incident.status == status)
             and (provider is None or self.incident.provider == provider)
+            and (severity is None or self.incident.severity == severity)
         ):
             return [self.incident]
         return []

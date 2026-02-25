@@ -13,6 +13,7 @@ export interface IncidentItemProps {
 
 export function IncidentItem({ incident, resolving, onResolve }: IncidentItemProps): JSX.Element {
   const [showDetails, setShowDetails] = useState<boolean>(false);
+  const canResolve = incident.status === "open";
 
   return (
     <Card>
@@ -28,8 +29,8 @@ export function IncidentItem({ incident, resolving, onResolve }: IncidentItemPro
 
       <div className="incident-actions">
         <button onClick={() => setShowDetails((value) => !value)}>{showDetails ? "Hide details" : "Show details"}</button>
-        <button className="resolve" onClick={() => void onResolve(incident.id)} disabled={resolving}>
-          {resolving ? "Resolving..." : "Resolve"}
+        <button className="resolve" onClick={() => void onResolve(incident.id)} disabled={resolving || !canResolve}>
+          {canResolve ? (resolving ? "Resolving..." : "Resolve") : "Resolved"}
         </button>
       </div>
 

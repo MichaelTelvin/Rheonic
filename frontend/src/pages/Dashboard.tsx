@@ -6,13 +6,10 @@ import {
   fetchMetrics,
   fetchProjectProviders,
   fetchProtectMetrics,
-  fetchProjectProtect,
-  resolveIncident,
   type IncidentItem,
   type RealtimeMetrics,
 } from "../api/client";
 import { Card } from "../components/Card";
-import { IncidentItem as IncidentRow } from "../components/IncidentItem";
 import { Sparkline } from "../components/Sparkline";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
@@ -33,11 +30,8 @@ export function Dashboard(): JSX.Element {
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [requestsSeries, setRequestsSeries] = useState<number[]>([]);
   const [tokensSeries, setTokensSeries] = useState<number[]>([]);
-  const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
   const [loadingMetrics, setLoadingMetrics] = useState<boolean>(false);
-  const [loadingIncidents, setLoadingIncidents] = useState<boolean>(false);
   const [metricsWarning, setMetricsWarning] = useState<string | null>(null);
-  const [incidentsWarning, setIncidentsWarning] = useState<string | null>(null);
   const [lastMetricsSuccessAt, setLastMetricsSuccessAt] = useState<string | null>(null);
   const [lastIncidentsSuccessAt, setLastIncidentsSuccessAt] = useState<string | null>(null);
   const [metricsFetchFailed, setMetricsFetchFailed] = useState<boolean>(false);
@@ -52,15 +46,23 @@ export function Dashboard(): JSX.Element {
     decision_timeouts_60m: number | null;
   } | null>(null);
   const [globalBanner, setGlobalBanner] = useState<string | null>(null);
-  const [protectEnabled, setProtectEnabled] = useState<boolean>(false);
   const [providers, setProviders] = useState<string[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>("all");
   const providerRequestSeq = useRef<number>(0);
 
-  const sortedIncidents = useMemo(
-    () => [...incidents].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
-    [incidents],
-  );
+  const incidentSummary = useMemo(() => {
+    const counts = { low: 0, medium: 0, high: 0 };
+    for (const incident of incidents) {
+      if (incident.severity === "low") {
+        counts.low += 1;
+      } else if (incident.severity === "medium") {
+        counts.medium += 1;
+      } else if (incident.severity === "high") {
+        counts.high += 1;
+      }
+    }
+    return counts;
+  }, [incidents]);
 
   useEffect(() => {
     setMetrics(null);
@@ -68,9 +70,7 @@ export function Dashboard(): JSX.Element {
     setRequestsSeries([]);
     setTokensSeries([]);
     setMetricsWarning(null);
-    setIncidentsWarning(null);
     setGlobalBanner(null);
-    setProtectEnabled(false);
     setProtectDecisionStats(null);
     setProtectHealthStats(null);
     setProviders([]);
@@ -102,31 +102,6 @@ export function Dashboard(): JSX.Element {
   useEffect(() => {
     void refreshProviders();
   }, [refreshProviders]);
-
-  useEffect(() => {
-    if (!projectId) {
-      return;
-    }
-
-    let cancelled = false;
-    const loadProtect = async (): Promise<void> => {
-      try {
-        const settings = await fetchProjectProtect(projectId);
-        if (!cancelled) {
-          setProtectEnabled(Boolean(settings.protect_enabled));
-        }
-      } catch {
-        if (!cancelled) {
-          setProtectEnabled(false);
-        }
-      }
-    };
-
-    void loadProtect();
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
 
   useEffect(() => {
     if (!projectId) {
@@ -224,12 +199,10 @@ export function Dashboard(): JSX.Element {
 
   useEffect(() => {
     if (!projectId) {
-      setLoadingIncidents(false);
       return;
     }
 
     let cancelled = false;
-    setLoadingIncidents(true);
     const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
 
     const loadIncidents = async (): Promise<void> => {
@@ -240,21 +213,13 @@ export function Dashboard(): JSX.Element {
         }
 
         setIncidents(data);
-        setIncidentsWarning(null);
         setGlobalBanner(null);
         setLastIncidentsSuccessAt(new Date().toISOString());
       } catch (error) {
         if (!cancelled) {
           if (error instanceof ApiError && error.status === 403) {
             setGlobalBanner("You do not have access to this project's incidents.");
-            setIncidentsWarning("Incidents request was forbidden.");
-          } else {
-            setIncidentsWarning("Incidents polling failed.");
           }
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingIncidents(false);
         }
       }
     };
@@ -269,34 +234,6 @@ export function Dashboard(): JSX.Element {
       window.clearInterval(interval);
     };
   }, [projectId, selectedProvider]);
-
-  const onResolve = async (incidentId: string): Promise<void> => {
-    if (!projectId) {
-      return;
-    }
-
-    const previous = incidents;
-    setResolvingIds((ids) => new Set(ids).add(incidentId));
-    setIncidents((items) => items.filter((item) => item.id !== incidentId));
-
-    try {
-      await resolveIncident(incidentId);
-      const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
-      const updated = await fetchIncidents(projectId, providerQuery);
-      setIncidents(updated);
-      setIncidentsWarning(null);
-      setLastIncidentsSuccessAt(new Date().toISOString());
-    } catch {
-      setIncidents(previous);
-      setIncidentsWarning("Failed to resolve incident. Restored previous list.");
-    } finally {
-      setResolvingIds((ids) => {
-        const next = new Set(ids);
-        next.delete(incidentId);
-        return next;
-      });
-    }
-  };
 
   const renderMetric = (value: number | null | undefined): string => (value === null || value === undefined ? "—" : String(value));
   const isApiConnected = Boolean(
@@ -319,10 +256,6 @@ export function Dashboard(): JSX.Element {
                 <span className={`status-row-value ${isApiConnected ? "connected" : "disconnected"}`}>
                   {isApiConnected ? "Connected" : "Disconnected"}
                 </span>
-              </div>
-              <div className="status-row">
-                <span className="status-row-label">Protection</span>
-                <span className={`status-row-value ${protectEnabled ? "protect-on" : "protect-off"}`}>{protectEnabled ? "On" : "Off"}</span>
               </div>
               <div className="status-row">
                 <span className="status-row-label">Metrics updated</span>
@@ -426,20 +359,42 @@ export function Dashboard(): JSX.Element {
                   </div>
                 </div>
               </Card>
-            </section>
 
-            <section className="incidents-section">
-              <h2 className="section-title">Open Incidents</h2>
-              {loadingIncidents && sortedIncidents.length === 0 ? <p className="subtle">Loading incidents...</p> : null}
-              {!loadingIncidents && sortedIncidents.length === 0 ? (
-                <section className="empty">No open incidents right now. This project looks stable.</section>
-              ) : null}
+              <Card>
+                <h2 className="card-title">Incidents</h2>
+                <div className="protect-decisions-list">
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">Low</span>
+                    <span className="protect-decisions-value">{incidentSummary.low}</span>
+                  </div>
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">Medium</span>
+                    <span className="protect-decisions-value warned">{incidentSummary.medium}</span>
+                  </div>
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">High</span>
+                    <span className="protect-decisions-value blocked">{incidentSummary.high}</span>
+                  </div>
+                </div>
+              </Card>
 
-              <div className="list">
-                {sortedIncidents.map((incident) => (
-                  <IncidentRow key={incident.id} incident={incident} resolving={resolvingIds.has(incident.id)} onResolve={onResolve} />
-                ))}
-              </div>
+              <Card>
+                <h2 className="card-title">Estimated costs</h2>
+                <div className="protect-decisions-list">
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">Last 60s</span>
+                    <span className="protect-decisions-value">—</span>
+                  </div>
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">Last 24h</span>
+                    <span className="protect-decisions-value">—</span>
+                  </div>
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">Month to date</span>
+                    <span className="protect-decisions-value">—</span>
+                  </div>
+                </div>
+              </Card>
             </section>
           </>
         )}

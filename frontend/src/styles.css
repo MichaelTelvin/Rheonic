@@ -683,6 +683,59 @@ select {
   border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
+.incidents-filters-row {
+  margin-top: 0;
+  position: sticky;
+  top: 58px;
+  z-index: 12;
+}
+
+.incidents-layout {
+  display: grid;
+  gap: 4px;
+}
+
+.incidents-filters-shell {
+  border: 0;
+  border-radius: 0;
+  padding: 10px 0 6px;
+  background: transparent;
+}
+
+.incidents-toolbar {
+  width: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 28px;
+}
+
+.dashboard-controls .incidents-toolbar {
+  gap: 28px;
+}
+
+.incidents-filter-field {
+  display: grid;
+  gap: 6px;
+}
+
+.incidents-filter-field select {
+  min-width: 190px;
+}
+
+.incidents-list-shell {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.incidents-scroll-panel {
+  max-height: min(65vh, 700px);
+  overflow: auto;
+  padding-right: 6px;
+}
+
 .list {
   display: grid;
   gap: 10px;
@@ -713,21 +766,21 @@ select {
 }
 
 .badge.low {
-  color: #ddd6fe;
-  border-color: rgba(167, 139, 250, 0.32);
-  background: rgba(167, 139, 250, 0.16);
+  color: rgba(229, 231, 235, 0.9);
+  border-color: rgba(229, 231, 235, 0.32);
+  background: rgba(229, 231, 235, 0.12);
 }
 
 .badge.medium {
-  color: #fde68a;
-  border-color: rgba(251, 191, 36, 0.32);
-  background: rgba(251, 191, 36, 0.16);
+  color: #fcd38f;
+  border-color: rgba(252, 211, 143, 0.34);
+  background: rgba(252, 211, 143, 0.15);
 }
 
 .badge.high {
-  color: #fecdd3;
-  border-color: rgba(253, 164, 175, 0.32);
-  background: rgba(253, 164, 175, 0.16);
+  color: #fda4af;
+  border-color: rgba(253, 164, 175, 0.34);
+  background: rgba(253, 164, 175, 0.15);
 }
 
 .incident-meta {

@@ -267,10 +267,20 @@ class FakeIncidentRepository:
             return updated
         return None
 
-    def list_by_project(self, project_id: str, status: str = "open", provider: str | None = None) -> list[Incident]:
-        rows = [incident for incident in self.incidents if incident.project_id == project_id and incident.status == status]
+    def list_by_project(
+        self,
+        project_id: str,
+        status: str = "open",
+        provider: str | None = None,
+        severity: str | None = None,
+    ) -> list[Incident]:
+        rows = [incident for incident in self.incidents if incident.project_id == project_id]
+        if status != "all":
+            rows = [incident for incident in rows if incident.status == status]
         if provider:
-            return [incident for incident in rows if incident.provider == provider]
+            rows = [incident for incident in rows if incident.provider == provider]
+        if severity:
+            rows = [incident for incident in rows if incident.severity == severity]
         return rows
 
     def list_open_by_project_provider(self, project_id: str, provider: str) -> list[Incident]:

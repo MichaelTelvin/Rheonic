@@ -8,10 +8,11 @@ interface SidebarProps {
 const navItems = [
   { to: "/", label: "Dashboard" },
   { to: "/projects", label: "Projects" },
+  { to: "/incidents", label: "Incidents" },
+  { to: "/protect", label: "Mode" },
   { to: "/keys", label: "Keys" },
   { to: "/alerts", label: "Alerts" },
-  { to: "/protect", label: "Mode" },
-  { to: "/documentation", label: "Documentation" },
+  { to: "/documentation", label: "Docs" },
 ];
 
 export function Sidebar({ userEmail, onSignOut }: SidebarProps): JSX.Element {

@@ -148,7 +148,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("link", { name: "Mode" }));
     expect(await screen.findByText("Protect Page")).toBeDefined();
 
-    fireEvent.click(screen.getByRole("link", { name: "Documentation" }));
+    fireEvent.click(screen.getByRole("link", { name: "Docs" }));
     expect(await screen.findByText("Architecture Page")).toBeDefined();
   });
 });

@@ -23,9 +23,9 @@ const docs: DocItem[] = [
     href: "/docs/viewer.html?doc=protect-mode-spec",
   },
   {
-    title: "Architecture Notes",
-    description: "High-level architecture writeup and system boundaries.",
-    href: "/docs/viewer.html?doc=architecture",
+    title: "Thresholds Map",
+    description: "Single reference for runtime thresholds, windows, and trigger conditions.",
+    href: "/docs/viewer.html?doc=thresholds-map",
   },
   {
     title: "Product Design",

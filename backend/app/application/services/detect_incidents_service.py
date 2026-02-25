@@ -38,14 +38,25 @@ class DetectIncidentsService:
             logger.exception("Detect incidents service failed")
             raise
 
-    def list_incidents(self, project_id: str, status: str = "open", provider: str | None = None) -> list[Incident]:
+    def list_incidents(
+        self,
+        project_id: str,
+        status: str = "open",
+        provider: str | None = None,
+        severity: str | None = None,
+    ) -> list[Incident]:
         # List incidents for project and status.
         try:
-            return self._incident_repository.list_by_project(project_id=project_id, status=status, provider=provider)
+            return self._incident_repository.list_by_project(
+                project_id=project_id,
+                status=status,
+                provider=provider,
+                severity=severity,
+            )
         except Exception:
             logger.exception(
                 "List incidents service failed",
-                extra={"project_id": project_id, "status": status, "provider": provider},
+                extra={"project_id": project_id, "status": status, "provider": provider, "severity": severity},
             )
             raise
 

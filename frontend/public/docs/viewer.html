@@ -130,6 +130,7 @@
           <a id="tab-scope" class="tab" href="?doc=scope">Onboarding</a>
           <a id="tab-spec" class="tab" href="?doc=spec">API Spec</a>
           <a id="tab-protect-mode-spec" class="tab" href="?doc=protect-mode-spec">Protect Spec</a>
+          <a id="tab-thresholds-map" class="tab" href="?doc=thresholds-map">Thresholds Map</a>
           <a id="tab-architecture" class="tab" href="?doc=architecture">Architecture</a>
           <a id="tab-product_design" class="tab" href="?doc=product_design">Product Design</a>
         </div>
@@ -236,7 +237,7 @@
       }
 
       (async function () {
-        const allowed = new Set(["scope", "spec", "protect-mode-spec", "architecture", "product_design"]);
+        const allowed = new Set(["scope", "spec", "protect-mode-spec", "thresholds-map", "architecture", "product_design"]);
         const params = new URLSearchParams(window.location.search);
         const doc = allowed.has(params.get("doc")) ? params.get("doc") : "scope";
         const tab = document.getElementById("tab-" + doc);

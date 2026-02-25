@@ -41,7 +41,13 @@ class IncidentRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def list_by_project(self, project_id: str, status: str = "open", provider: str | None = None) -> list[Incident]:
+    def list_by_project(
+        self,
+        project_id: str,
+        status: str = "open",
+        provider: str | None = None,
+        severity: str | None = None,
+    ) -> list[Incident]:
         # Return incidents for project filtered by status.
         raise NotImplementedError
 
