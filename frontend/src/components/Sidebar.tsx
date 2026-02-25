@@ -12,7 +12,7 @@ const navItems = [
   { to: "/protect", label: "Mode" },
   { to: "/keys", label: "Keys" },
   { to: "/alerts", label: "Alerts" },
-  { to: "/documentation", label: "Docs" },
+  { to: "/docs", label: "Docs" },
 ];
 
 export function Sidebar({ userEmail, onSignOut }: SidebarProps): JSX.Element {

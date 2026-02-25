@@ -40,6 +40,9 @@
         flex-wrap: wrap;
         gap: 8px;
       }
+      .tabs.hidden {
+        display: none;
+      }
       .tab {
         display: inline-flex;
         align-items: center;
@@ -76,11 +79,30 @@
         border-radius: 8px;
         padding: 28px;
       }
+      .canvas.chart {
+        padding: 8px;
+        overflow: auto;
+      }
       .doc {
         color: #1f2937;
         font-size: 16px;
         line-height: 1.6;
         max-width: 900px;
+      }
+      .doc.chart-doc {
+        max-width: none;
+      }
+      .chart-image {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+      .canvas.chart.incident .chart-image {
+        width: min(820px, calc(100% - 40px));
+        margin: 0 auto;
+      }
+      .canvas.chart.protect .chart-image {
+        width: 100%;
       }
       .doc h1,
       .doc h2,
@@ -126,7 +148,7 @@
   <body>
     <main class="wrap">
       <section class="top">
-        <div class="tabs">
+        <div id="doc-tabs" class="tabs">
           <a id="tab-scope" class="tab" href="?doc=scope">Onboarding</a>
           <a id="tab-spec" class="tab" href="?doc=spec">API Spec</a>
           <a id="tab-protect-mode-spec" class="tab" href="?doc=protect-mode-spec">Protect Spec</a>
@@ -134,7 +156,10 @@
           <a id="tab-architecture" class="tab" href="?doc=architecture">Architecture</a>
           <a id="tab-product_design" class="tab" href="?doc=product_design">Product Design</a>
         </div>
-        <a class="link" href="/documentation">Back to Documentation</a>
+        <div id="chart-tabs" class="tabs">
+          <a id="tab-chart-incident" class="tab" href="?chart=incident">Incident Flow</a>
+          <a id="tab-chart-protect" class="tab" href="?chart=protect">Protect Flow</a>
+        </div>
       </section>
       <section class="panel">
         <div class="canvas">
@@ -237,14 +262,38 @@
       }
 
       (async function () {
-        const allowed = new Set(["scope", "spec", "protect-mode-spec", "thresholds-map", "architecture", "product_design"]);
+        const allowedDocs = new Set(["scope", "spec", "protect-mode-spec", "thresholds-map", "architecture", "product_design"]);
+        const allowedCharts = new Set(["incident", "protect"]);
         const params = new URLSearchParams(window.location.search);
-        const doc = allowed.has(params.get("doc")) ? params.get("doc") : "scope";
-        const tab = document.getElementById("tab-" + doc);
-        if (tab) tab.classList.add("active");
+        const requestedChart = params.get("chart");
+        const requestedDoc = params.get("doc");
+        const chart = allowedCharts.has(requestedChart) ? requestedChart : null;
+        const doc = chart ? null : allowedDocs.has(requestedDoc) ? requestedDoc : "scope";
+        const docTabs = document.getElementById("doc-tabs");
+        const chartTabs = document.getElementById("chart-tabs");
 
         const target = document.getElementById("doc");
-        if (!target) return;
+        const panel = target ? target.closest(".canvas") : null;
+        if (!target || !panel) return;
+
+        if (chart) {
+          if (docTabs) docTabs.classList.add("hidden");
+          if (chartTabs) chartTabs.classList.remove("hidden");
+          const chartTab = document.getElementById("tab-chart-" + chart);
+          if (chartTab) chartTab.classList.add("active");
+          panel.classList.add("chart", chart);
+          target.className = "doc chart-doc";
+          const src = chart === "protect" ? "/architecture/protect_decision_flow.svg" : "/architecture/incident_flow.svg";
+          const alt = chart === "protect" ? "Protect decision flow" : "Incident flow";
+          target.innerHTML = '<img class="chart-image" src="' + src + '" alt="' + alt + '" />';
+          return;
+        }
+
+        if (docTabs) docTabs.classList.remove("hidden");
+        if (chartTabs) chartTabs.classList.add("hidden");
+        const tab = document.getElementById("tab-" + doc);
+        if (tab) tab.classList.add("active");
+        target.className = "doc";
 
         try {
           const response = await fetch("./" + doc + ".md", { cache: "no-store" });

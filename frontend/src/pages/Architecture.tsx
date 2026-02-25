@@ -50,7 +50,7 @@ export function Architecture(): JSX.Element {
               Open architecture flows in the standalone chart viewer with clean, full-canvas rendering.
             </p>
             <div className="doc-card-actions">
-              <a className="doc-cta action-btn" href="/documentation/viewer.html?tab=incident" target="_blank" rel="noreferrer">
+              <a className="doc-cta action-btn" href="/docs/viewer.html?chart=incident" target="_blank" rel="noopener noreferrer">
                 Open charts
               </a>
             </div>
@@ -61,7 +61,7 @@ export function Architecture(): JSX.Element {
               <h2 className="section-title">{item.title}</h2>
               <p className="subtle doc-card-description">{item.description}</p>
               <div className="doc-card-actions">
-                <a className="doc-cta action-btn" href={item.href} target="_blank" rel="noreferrer">
+                <a className="doc-cta action-btn" href={item.href} target="_blank" rel="noopener noreferrer">
                   Open docs
                 </a>
               </div>
