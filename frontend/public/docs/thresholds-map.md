@@ -131,6 +131,7 @@ Webhook event timings:
 - escalation to high -> `incident.high` (`source=escalation`)
 - manual resolve -> `incident.resolved` (`resolved_by=manual`)
 - auto resolve -> `incident.resolved` (`resolved_by=auto`)
+- first-seen `(provider, model)` tuple -> `policy_gap.detected` (recorded once per tuple; no incident created)
 
 ## Tuning Checklist
 ### If you get false positives

@@ -157,36 +157,49 @@ def _make_service(
     )
 
 
-def test_new_model_triggers_policy_gap_incident(tmp_path) -> None:
+def test_new_provider_model_sends_webhook_once_and_creates_no_incident(tmp_path) -> None:
     session_factory = _setup_db(tmp_path)
     _seed_project(session_factory, protect_enabled=True)
-    service = _make_service(session_factory=session_factory)
+    dispatcher = FakeWebhookDispatcher()
+    service = _make_service(session_factory=session_factory, webhook_dispatcher=dispatcher)
 
-    service.ingest(_build_event(provider="openai", model="gpt-4o-initial"))
+    service.ingest(_build_event(provider="openai", model="gpt-4o-new"))
     service.ingest(_build_event(provider="openai", model="gpt-4o-new"))
 
     with session_factory.create_session() as session:
-        models_count = session.query(ProjectModelRecord).count()
-        incidents = (
+        models_count = (
+            session.query(ProjectModelRecord)
+            .filter(ProjectModelRecord.project_id == "p1")
+            .filter(ProjectModelRecord.provider == "openai")
+            .filter(ProjectModelRecord.model == "gpt-4o-new")
+            .count()
+        )
+        incidents_count = (
             session.query(IncidentRecord)
             .filter(IncidentRecord.project_id == "p1")
             .filter(IncidentRecord.type == "policy_gap")
-            .all()
+            .count()
         )
-    assert models_count == 2
-    assert len(incidents) == 1
-    assert incidents[0].severity == "low"
-    assert incidents[0].provider == "openai"
+    assert models_count == 1
+    assert incidents_count == 0
+    assert len(dispatcher.calls) == 1
+    project_id, payload, event_type = dispatcher.calls[0]
+    assert project_id == "p1"
+    assert event_type == "policy_gap.detected"
+    assert payload["event_type"] == "policy_gap.detected"
+    assert payload["provider"] == "openai"
+    assert payload["model"] == "gpt-4o-new"
+    assert isinstance(payload.get("first_seen_at"), str)
+    assert isinstance(payload.get("sent_at"), str)
 
 
-def test_same_model_again_does_not_create_new_incident(tmp_path) -> None:
+def test_same_provider_model_does_not_send_webhook_again(tmp_path) -> None:
     session_factory = _setup_db(tmp_path)
     _seed_project(session_factory, protect_enabled=True)
-    service = _make_service(session_factory=session_factory)
-    service.ingest(_build_event(provider="openai", model="gpt-4o-initial"))
-    event = _build_event(provider="openai", model="gpt-4o-reuse")
-
-    service.ingest(event)
+    dispatcher = FakeWebhookDispatcher()
+    service = _make_service(session_factory=session_factory, webhook_dispatcher=dispatcher)
+    service.ingest(_build_event(provider="openai", model="gpt-4o-reuse"))
+    service.ingest(_build_event(provider="openai", model="gpt-4o-reuse"))
     service.ingest(_build_event(provider="openai", model="gpt-4o-reuse"))
 
     with session_factory.create_session() as session:
@@ -204,23 +217,33 @@ def test_same_model_again_does_not_create_new_incident(tmp_path) -> None:
             .count()
         )
     assert models_count == 1
-    assert incidents_count == 1
+    assert incidents_count == 0
+    assert len(dispatcher.calls) == 1
 
 
-def test_first_model_does_not_create_policy_gap_incident_or_webhook(tmp_path) -> None:
+def test_different_provider_same_model_is_distinct_and_sends_once_each(tmp_path) -> None:
     session_factory = _setup_db(tmp_path)
     _seed_project(session_factory, protect_enabled=True)
     dispatcher = FakeWebhookDispatcher()
     service = _make_service(session_factory=session_factory, webhook_dispatcher=dispatcher)
 
-    service.ingest(_build_event(provider="openai", model="gpt-4o-first"))
+    service.ingest(_build_event(provider="openai", model="shared-model"))
+    service.ingest(_build_event(provider="google", model="shared-model"))
+    service.ingest(_build_event(provider="google", model="shared-model"))
 
     with session_factory.create_session() as session:
-        models_count = (
+        openai_model_count = (
             session.query(ProjectModelRecord)
             .filter(ProjectModelRecord.project_id == "p1")
             .filter(ProjectModelRecord.provider == "openai")
-            .filter(ProjectModelRecord.model == "gpt-4o-first")
+            .filter(ProjectModelRecord.model == "shared-model")
+            .count()
+        )
+        google_model_count = (
+            session.query(ProjectModelRecord)
+            .filter(ProjectModelRecord.project_id == "p1")
+            .filter(ProjectModelRecord.provider == "google")
+            .filter(ProjectModelRecord.model == "shared-model")
             .count()
         )
         incidents_count = (
@@ -229,15 +252,20 @@ def test_first_model_does_not_create_policy_gap_incident_or_webhook(tmp_path) ->
             .filter(IncidentRecord.type == "policy_gap")
             .count()
         )
-    assert models_count == 1
+    assert openai_model_count == 1
+    assert google_model_count == 1
     assert incidents_count == 0
-    assert dispatcher.calls == []
+    assert len(dispatcher.calls) == 2
+    payloads = [payload for (_, payload, _) in dispatcher.calls]
+    providers = sorted(str(payload["provider"]) for payload in payloads)
+    assert providers == ["google", "openai"]
 
 
-def test_protect_disabled_records_model_without_policy_gap_incident(tmp_path) -> None:
+def test_policy_gap_never_creates_incident_even_when_protect_disabled(tmp_path) -> None:
     session_factory = _setup_db(tmp_path)
     _seed_project(session_factory, protect_enabled=False)
-    service = _make_service(session_factory=session_factory)
+    dispatcher = FakeWebhookDispatcher()
+    service = _make_service(session_factory=session_factory, webhook_dispatcher=dispatcher)
 
     service.ingest(_build_event(provider="anthropic", model="claude-new"))
 
@@ -257,22 +285,23 @@ def test_protect_disabled_records_model_without_policy_gap_incident(tmp_path) ->
         )
     assert models_count == 1
     assert incidents_count == 0
+    assert len(dispatcher.calls) == 1
 
 
-def test_webhook_dispatched_on_policy_gap(tmp_path) -> None:
+def test_webhook_dispatched_on_policy_gap_contains_required_fields(tmp_path) -> None:
     session_factory = _setup_db(tmp_path)
     _seed_project(session_factory, protect_enabled=True)
     dispatcher = FakeWebhookDispatcher()
     service = _make_service(session_factory=session_factory, webhook_dispatcher=dispatcher)
 
-    service.ingest(_build_event(provider="openai", model="gpt-4o-initial"))
     service.ingest(_build_event(provider="google", model="gemini-new"))
 
     assert len(dispatcher.calls) == 1
     project_id, payload, event_type = dispatcher.calls[0]
     assert project_id == "p1"
     assert event_type == "policy_gap.detected"
-    assert payload["event"] == "policy_gap.detected"
+    assert payload["event_type"] == "policy_gap.detected"
     assert payload["provider"] == "google"
     assert payload["model"] == "gemini-new"
-    assert isinstance(payload.get("incident_id"), str)
+    assert isinstance(payload.get("first_seen_at"), str)
+    assert isinstance(payload.get("sent_at"), str)

@@ -30,7 +30,7 @@ Incident engine
 - Ratio+delta anomaly detection for request/token spike detectors
 - Dedup window merge for matching open incidents in `(project_id, provider)` scope
 - Severity escalation with hit cache TTL
-- Policy-gap detection for new `(provider, model)` combinations
+- Policy-gap first-seen detection for new `(provider, model)` combinations (record + one-time webhook; no incident)
 - Manual resolve endpoint + auto-close incidents job
 
 Protect mode

@@ -1,7 +1,6 @@
 # Application service for event ingestion.
 from collections.abc import Callable
 from datetime import datetime, timezone
-from uuid import uuid4
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.event_repository import EventRepository
@@ -20,7 +19,6 @@ from app.domain.detectors.retry_storm_detector import RetryStormDetector
 from app.domain.detectors.tok_spike_detector import TokSpikeDetector
 from app.domain.detectors.token_explosion_detector import TokenExplosionDetector
 from app.domain.models.event import Event
-from app.domain.models.incident import Incident
 from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.logger import get_logger
 
@@ -173,7 +171,7 @@ class IngestEventService:
             raise
 
     def _detect_policy_gap_if_needed(self, *, event: Event) -> None:
-        # Record first-seen project provider/model and raise policy-gap incident for protect-enabled projects.
+        # Record first-seen project/provider/model tuples and emit one-time policy-gap webhook notification.
         if self._project_repository is None:
             return
         provider = (event.provider or "").strip()
@@ -181,14 +179,6 @@ class IngestEventService:
         if not provider or not model:
             return
         first_seen_at = self._now_provider()
-        try:
-            existing_models_count = self._project_repository.count_project_models(event.project_id)
-        except Exception:
-            logger.exception(
-                "Failed counting project models before first-seen insert",
-                extra={"project_id": event.project_id},
-            )
-            return
         try:
             is_new_combination = self._project_repository.record_project_model_first_seen(
                 project_id=event.project_id,
@@ -204,49 +194,25 @@ class IngestEventService:
             return
         if not is_new_combination:
             return
-        # First-ever model for the project is only recorded for analytics; no incident/webhook.
-        if existing_models_count == 0:
-            return
-        project = self._project_repository.get_project(event.project_id)
-        if project is None or not project.protect_enabled:
-            return
-        incident = Incident(
-            id=str(uuid4()),
-            project_id=event.project_id,
-            provider=provider,
-            incident_type=app_config.incident_type_policy_gap,
-            severity="low",
-            status="open",
-            created_at=first_seen_at,
-            resolved_at=None,
-            evidence={
+        logger.info(
+            "Policy gap detected: first-seen provider/model tuple",
+            extra={
+                "project_id": event.project_id,
                 "provider": provider,
                 "model": model,
-                "environment": event.environment,
                 "first_seen_at": first_seen_at.isoformat(),
-                "source": "policy_gap",
             },
-            fingerprint=_build_incident_fingerprint(
-                project_id=event.project_id,
-                incident_type=app_config.incident_type_policy_gap,
-                provider=provider,
-                model=model,
-                environment=None,
-            ),
-            last_seen_at=first_seen_at,
         )
-        self._incident_repository.create_incident(incident=incident)
         if self._webhook_dispatcher is not None:
             try:
                 self._webhook_dispatcher.enqueue(
                     project_id=event.project_id,
                     event_type="policy_gap.detected",
                     payload={
-                        "event": "policy_gap.detected",
+                        "event_type": "policy_gap.detected",
                         "project_id": event.project_id,
                         "provider": provider,
                         "model": model,
-                        "incident_id": incident.id,
                         "first_seen_at": first_seen_at.isoformat(),
                         "sent_at": self._now_provider().isoformat(),
                     },
