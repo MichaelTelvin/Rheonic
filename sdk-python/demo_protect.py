@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -14,6 +15,24 @@ from llmtokenburnguard.providers.anthropic_adapter import instrument_anthropic
 from llmtokenburnguard.providers.google_adapter import instrument_google
 from llmtokenburnguard.providers.openai_adapter import instrument_openai
 
+
+def _load_llmtbg_env_from_dotenv() -> None:
+    # Load LLMTBG_* values from repo .env so demos work without manual export.
+    dotenv_path = Path(__file__).resolve().parents[1] / ".env"
+    if not dotenv_path.exists():
+        return
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key.startswith("LLMTBG_"):
+            continue
+        os.environ[key] = value.strip().strip("\"").strip("'")
+
+
+_load_llmtbg_env_from_dotenv()
 
 BACKEND_BASE_URL = os.getenv("LLMTBG_BACKEND_URL", "http://localhost:8000")
 PROVIDER_STUB_URL = os.getenv("LLMTBG_PROVIDER_URL", "http://localhost:8099")

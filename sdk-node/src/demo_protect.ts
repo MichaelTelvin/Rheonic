@@ -1,4 +1,33 @@
 import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, LLMTBGBlockedError } from "./index.js";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+function loadLlmtbgEnvFromDotenv(): void {
+    const currentFile = fileURLToPath(import.meta.url);
+    const dotenvPath = resolve(dirname(currentFile), "../../.env");
+    let content = "";
+    try {
+        content = readFileSync(dotenvPath, "utf8");
+    } catch {
+        return;
+    }
+    for (const rawLine of content.split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith("#") || !line.includes("=")) {
+            continue;
+        }
+        const index = line.indexOf("=");
+        const key = line.slice(0, index).trim();
+        if (!key.startsWith("LLMTBG_")) {
+            continue;
+        }
+        const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
+        process.env[key] = value;
+    }
+}
+
+loadLlmtbgEnvFromDotenv();
 
 const backendBaseUrl = process.env.LLMTBG_BACKEND_URL ?? "http://localhost:8000";
 const providerStubUrl = process.env.LLMTBG_PROVIDER_URL ?? "http://localhost:8099";

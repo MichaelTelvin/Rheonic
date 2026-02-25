@@ -9,8 +9,26 @@ if str(sdk_src) not in sys.path:
 from llmtokenburnguard import build_event, capture_event, create_client
 
 
+def _load_llmtbg_env_from_dotenv() -> None:
+    # Load LLMTBG_* values from repo .env so demos work without manual export.
+    dotenv_path = Path(__file__).resolve().parents[1] / ".env"
+    if not dotenv_path.exists():
+        return
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key.startswith("LLMTBG_"):
+            continue
+        os.environ[key] = value.strip().strip("\"").strip("'")
+
+
 def main() -> None:
     # Send one demo event and flush the queue
+    _load_llmtbg_env_from_dotenv()
+
     ingest_key = os.getenv("LLMTBG_INGEST_KEY")
     if not ingest_key:
         print("LLMTBG_INGEST_KEY is required. Create a key in the dashboard Keys modal first.")

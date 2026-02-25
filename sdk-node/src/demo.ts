@@ -1,6 +1,35 @@
 import { buildEvent, createClient, type Client } from "./index.js";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+function loadLlmtbgEnvFromDotenv(): void {
+  const currentFile = fileURLToPath(import.meta.url);
+  const dotenvPath = resolve(dirname(currentFile), "../../.env");
+  let content = "";
+  try {
+    content = readFileSync(dotenvPath, "utf8");
+  } catch {
+    return;
+  }
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#") || !line.includes("=")) {
+      continue;
+    }
+    const index = line.indexOf("=");
+    const key = line.slice(0, index).trim();
+    if (!key.startsWith("LLMTBG_")) {
+      continue;
+    }
+    const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
+    process.env[key] = value;
+  }
+}
 
 async function runDemo(): Promise<void> {
+  loadLlmtbgEnvFromDotenv();
+
   const ingestKey = process.env.LLMTBG_INGEST_KEY;
   if (!ingestKey) {
     console.error("LLMTBG_INGEST_KEY is required. Create a key in the dashboard Keys modal first.");
