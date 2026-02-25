@@ -24,7 +24,7 @@ endif
 
 test-e2e:
 	@echo "Running isolated e2e with project llmtbg_test using docker-compose.test.yml"
-	@bash -lc "set -euo pipefail; trap 'docker compose -p llmtbg_test -f docker-compose.test.yml down -v >/dev/null 2>&1 || true' EXIT; docker compose -p llmtbg_test -f docker-compose.test.yml up -d --build >/dev/null; docker compose -p llmtbg_test -f docker-compose.test.yml run --rm sdk_node_test 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); if (/node protect e2e/) sub(/^.*$$/, \"\\033[36m&\\033[0m\"); print}'; docker compose -p llmtbg_test -f docker-compose.test.yml run --rm sdk_python_test 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); if (/python protect e2e/) sub(/^.*$$/, \"\\033[36m&\\033[0m\"); print}'"
+	@bash -lc "set -euo pipefail; trap 'docker compose -p llmtbg_test -f docker-compose.test.yml down -v >/dev/null 2>&1 || true' EXIT; docker compose -p llmtbg_test -f docker-compose.test.yml up -d --build postgres_test redis_test backend_test provider_stub_test >/dev/null; docker compose -p llmtbg_test -f docker-compose.test.yml run --rm sdk_node_test 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); if (/node protect e2e/) sub(/^.*$$/, \"\\033[36m&\\033[0m\"); print}'; docker compose -p llmtbg_test -f docker-compose.test.yml run --rm sdk_python_test 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); if (/python protect e2e/) sub(/^.*$$/, \"\\033[36m&\\033[0m\"); print}'"
 
 test-backend:
 	@echo "Running isolated backend tests with project llmtbg_test using docker-compose.test.yml"
@@ -52,7 +52,7 @@ e2e: test-e2e
 diagrams:
 	@docker run --rm -v "$$(pwd):/work" -w /work terrastruct/d2 docs/architecture/incident_flow.d2 docs/architecture/incident_flow.svg
 	@docker run --rm -v "$$(pwd):/work" -w /work terrastruct/d2 docs/architecture/protect_decision_flow.d2 docs/architecture/protect_decision_flow.svg
-	@python3 scripts/normalize_diagram_svgs.py
+	@python3 docs/architecture/normalize_diagram_svgs.py
 	@cp docs/architecture/incident_flow.svg frontend/public/architecture/incident_flow.svg
 	@cp docs/architecture/protect_decision_flow.svg frontend/public/architecture/protect_decision_flow.svg
 

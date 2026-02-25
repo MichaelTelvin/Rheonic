@@ -145,9 +145,9 @@ services:
     image: python:3.12-alpine
     working_dir: /app
     volumes:
-      - ./e2e:/app/e2e
+      - ./tests/e2e:/app/tests/e2e
     command: >
-      sh -c "python /app/e2e/provider_stub.py"
+      sh -c "python /app/tests/e2e/provider_stub.py"
 
 volumes:
   postgres-data:

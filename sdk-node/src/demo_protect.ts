@@ -5,7 +5,7 @@ const providerStubUrl = process.env.LLMTBG_PROVIDER_URL ?? "http://localhost:809
 
 function printProviderStubHelp(): void {
     console.error(`Provider stub is unreachable at ${providerStubUrl}.`);
-    console.error("Start it with `python3 e2e/provider_stub.py` or set LLMTBG_PROVIDER_URL to a reachable endpoint.");
+    console.error("Start it with `python3 tests/e2e/provider_stub.py` or set LLMTBG_PROVIDER_URL to a reachable endpoint.");
 }
 
 async function providerCount(): Promise<number> {

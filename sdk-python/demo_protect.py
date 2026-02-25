@@ -144,7 +144,7 @@ def make_google_stub() -> Any:
 
 def print_provider_stub_help() -> None:
     print(f"ERROR: provider stub is unreachable at {PROVIDER_STUB_URL}")
-    print("Start it with `python3 e2e/provider_stub.py` or set LLMTBG_PROVIDER_URL to a reachable endpoint.")
+    print("Start it with `python3 tests/e2e/provider_stub.py` or set LLMTBG_PROVIDER_URL to a reachable endpoint.")
 
 
 def main() -> None:
