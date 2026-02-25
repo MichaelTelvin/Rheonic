@@ -773,18 +773,26 @@ select {
   border: 1px solid transparent;
 }
 
+.badge.near_cap,
+.badge.retry_storm,
+.badge.loop_suspect,
+.badge.token_explosion,
 .badge.low {
   color: rgba(229, 231, 235, 0.9);
   border-color: rgba(229, 231, 235, 0.32);
   background: rgba(229, 231, 235, 0.12);
 }
 
+.badge.open,
+.badge.warned,
 .badge.medium {
   color: #fcd38f;
   border-color: rgba(252, 211, 143, 0.34);
   background: rgba(252, 211, 143, 0.15);
 }
 
+.badge.cap_breach,
+.badge.resolved,
 .badge.high {
   color: #fda4af;
   border-color: rgba(253, 164, 175, 0.34);

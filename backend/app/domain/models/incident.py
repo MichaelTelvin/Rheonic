@@ -10,7 +10,6 @@ class Incident:
     project_id: str
     provider: str
     incident_type: str
-    severity: str
     status: str
     created_at: datetime
     resolved_at: datetime | None

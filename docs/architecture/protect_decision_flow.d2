@@ -42,7 +42,7 @@ preflight: "Protect preflight\nPOST /api/v1/protect/decision\nscope: project+pro
   }
 }
 
-inputs: "Decision inputs\nrolling counters\nincident severity (open)\ncaps + predictive near-cap" {
+inputs: "Decision inputs\nrolling counters (project+provider)\ncaps\nestimated_next_tokens (protect preflight only)" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -52,7 +52,17 @@ inputs: "Decision inputs\nrolling counters\nincident severity (open)\ncaps + pre
   }
 }
 
-priority: "Decision priority\ncooldown -> hard caps -> incident high\n-> incident medium -> predictive warn -> allow" {
+caps: "Caps check (block)\nrequests_60s >= req_cap -> req_cap_breach\ntokens_60s >= tok_cap -> tok_cap_breach\ncooldown_active -> block" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 13
+  }
+}
+
+warn_signals: "Warn signals (protect mode only)\nnear_cap (predictive)\nretry_storm\nloop_suspect\ntoken_explosion" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -102,7 +112,7 @@ ingest: "POST /api/v1/events\ntelemetry ingest\n(project+provider counters/incid
   }
 }
 
-incident_pipeline: "Incident pipeline source\nBaselineGate -> Detector(s) -> IncidentManager\nfeeds incident severity for decisions" {
+incident_pipeline: "Incident pipeline source\nCounters -> Detector(s) -> IncidentManager\n(no baseline / no severity)" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
@@ -126,12 +136,12 @@ sdk_mode -> observe: "Observe"
 sdk_mode -> preflight: "Protect"
 observe -> provider
 preflight -> inputs
-inputs -> priority
-priority -> allow_warn: "allow/warn"
-priority -> block: "block"
+inputs -> caps
+caps -> block: "block"
+caps -> warn_signals: "no block"
+warn_signals -> allow_warn: "warn / allow"
 allow_warn -> provider
 provider -> ingest
 block -> metrics
 ingest -> incident_pipeline
-incident_pipeline -> inputs
 ingest -> metrics

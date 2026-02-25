@@ -5,12 +5,11 @@ import { IncidentItem } from "./IncidentItem";
 
 const incident = {
   id: "inc-1",
-  type: "burn_spike",
-  severity: "high" as const,
+  type: "token_explosion",
   status: "open" as const,
   created_at: new Date("2026-02-19T10:00:00Z").toISOString(),
   resolved_at: null,
-  evidence: { req_ratio: 10, tok_ratio: 12 },
+  evidence: { estimated_next_tokens: 12000, tok_cap: 20000 },
 };
 
 describe("IncidentItem", () => {
@@ -19,7 +18,7 @@ describe("IncidentItem", () => {
     render(<IncidentItem incident={incident} resolving={false} onResolve={onResolve} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Show details" }));
-    expect(screen.getByText(/"tok_ratio": 12/)).toBeDefined();
+    expect(screen.getByText(/"estimated_next_tokens": 12000/)).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Resolve" }));
     await waitFor(() => expect(onResolve).toHaveBeenCalledWith("inc-1"));

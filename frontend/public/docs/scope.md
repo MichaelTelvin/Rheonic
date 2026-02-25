@@ -12,7 +12,7 @@ Backend foundation
 - RQ workers + scheduler bootstrap
 - Health endpoint
 
-Auth and tenancy baseline
+Auth and tenancy
 - User auth (`/api/v1/auth/register`, `/api/v1/auth/login`, refresh flow)
 - Project ownership enforcement across project/key/metrics/incidents APIs
 - Ingest auth via project ingest key
@@ -25,19 +25,18 @@ Event ingest and realtime
 - Realtime metrics endpoints (project totals aggregated across providers; optional provider filter)
 
 Incident engine
-- Baseline snapshots and freeze while incident is open
-- Detector pipeline (`BaselineGate` + detector registry + `Signal` -> `IncidentManager`)
-- Ratio+delta anomaly detection for request/token spike detectors
-- Dedup window merge for matching open incidents in `(project_id, provider)` scope
-- Severity escalation with hit cache TTL
+- Deterministic detector pipeline (`Detector(s)` -> `Signal` -> `IncidentManager`)
+- Incident types: `near_cap`, `cap_breach`, `retry_storm`, `loop_suspect`, `token_explosion`
+- Dedup window merge for matching open incidents in `(project_id, provider, incident_type)` scope
+- No warmup/ratio/escalation dependency in runtime decisions
 - Policy-gap first-seen detection for new `(provider, model)` combinations (record + one-time webhook; no incident)
 - Manual resolve endpoint + auto-close incidents job
 
 Protect mode
 - Project-level protect settings (`GET/PUT /api/v1/projects/{project_id}/protect`)
 - Decision endpoint (`POST /api/v1/protect/decision`)
-- Provider-scoped decision inputs/state (counters + incident severity + cooldown)
-- Decision ordering: cooldown -> caps -> incident high -> incident medium -> predictive near-cap -> allow
+- Provider-scoped decision inputs/state (counters + cooldown + deterministic warn signals)
+- Decision ordering: cooldown -> hard caps (block) -> warn signals (`near_cap`/`retry_storm`/`loop_suspect`/`token_explosion`) -> allow
 - SDK-gated preflight (observe skips decision), token estimation in protect mode only
 - Fail-open / fail-closed handling for decision timeout/error
 - Protect metrics and health endpoints (project totals with optional provider filter)
@@ -45,15 +44,15 @@ Protect mode
 Alerts (webhook)
 - Project webhook config + test API
 - Webhook dispatch on:
-- high incident open
-- escalation to high
+- warn incidents in protect mode (`incident.warn`)
+- block actions / cap breach (`incident.block`)
 - incident resolved (manual/auto)
 - Delivery status tracking
 
 Frontend/docs
 - Control Center layout with auth-gated routes
 - Dashboard metrics + provider filter
-- Dedicated Incidents page with provider/severity/status filters
+- Dedicated Incidents page with provider/type/status filters
 - Docs page + docs/chart viewer and flow charts
 
 ========================================
@@ -70,7 +69,7 @@ Core quality and launch gating
 Operational readiness
 - Final pass on dashboard/incident UX polish for MVP operator workflows
 - Baseline alerting runbook for webhook failures (status visibility and retry behavior)
-- Smoke-test scripts/demos for launch validation scenarios (warm-up, spikes, escalation, lifecycle, protect decisions)
+- Smoke-test scripts/demos for launch validation scenarios (allow, near-cap warn, cap-breach block, retry storm, loop suspect, token explosion, lifecycle)
 
 Productization and deployment
 - Integrate Stripe for billing and subscription lifecycle required for launch

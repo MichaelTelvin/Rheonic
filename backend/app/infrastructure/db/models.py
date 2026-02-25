@@ -52,7 +52,6 @@ class IncidentRecord(Base):
     project_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     provider: Mapped[str] = mapped_column(String(64), nullable=False, default="unknown", server_default="unknown")
     type: Mapped[str] = mapped_column(String(32), nullable=False)
-    severity: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     fingerprint: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     evidence: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)

@@ -85,7 +85,7 @@ def _provider_count() -> int:
 def run() -> None:
     auth = _seed()
     _provider_reset()
-    baseline_provider_calls = _provider_count()
+    initial_provider_calls = _provider_count()
 
     client = create_client(
         ingest_key=auth.ingest_key,
@@ -155,7 +155,7 @@ def run() -> None:
         messages=[{"role": "user", "content": "anthropic e2e smoke"}],
     )
     google_model.generate_content("google e2e smoke")
-    assert _provider_count() - baseline_provider_calls == 3
+    assert _provider_count() - initial_provider_calls == 3
 
     ingest_response = httpx.post(
         f"{BACKEND_BASE_URL}/api/v1/events",
@@ -181,7 +181,7 @@ def run() -> None:
     except LLMTBGBlockedError:
         blocked = True
     assert blocked is False
-    assert _provider_count() - baseline_provider_calls == 4
+    assert _provider_count() - initial_provider_calls == 4
 
     protect_metrics = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
     assert int(protect_metrics.get("warned_60m") or 0) >= 1

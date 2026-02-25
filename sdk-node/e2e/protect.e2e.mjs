@@ -61,7 +61,7 @@ async function main() {
   });
 
   await fetch(`${providerStubUrl}/reset`, { method: "POST" });
-  const baselineProviderCalls = await providerCount();
+  const initialProviderCalls = await providerCount();
 
   const client = createClient({
     baseUrl: backendBaseUrl,
@@ -121,7 +121,7 @@ async function main() {
     messages: [{ role: "user", content: "anthropic e2e smoke" }],
   });
   await googleModel.generateContent("google e2e smoke");
-  assert.equal((await providerCount()) - baselineProviderCalls, 3);
+  assert.equal((await providerCount()) - initialProviderCalls, 3);
 
   const nowIso = new Date().toISOString();
   const ingestResponse = await fetch(`${backendBaseUrl}/api/v1/events`, {
@@ -151,7 +151,7 @@ async function main() {
     blocked = error instanceof LLMTBGBlockedError;
   }
   assert.equal(blocked, false);
-  assert.equal((await providerCount()) - baselineProviderCalls, 4);
+  assert.equal((await providerCount()) - initialProviderCalls, 4);
 
   const protectMetrics = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
     headers: authHeaders,

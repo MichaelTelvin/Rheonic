@@ -46,15 +46,9 @@ export function Dashboard(): JSX.Element {
   const providerRequestSeq = useRef<number>(0);
 
   const incidentSummary = useMemo(() => {
-    const counts = { low: 0, medium: 0, high: 0 };
+    const counts: Record<string, number> = {};
     for (const incident of incidents) {
-      if (incident.severity === "low") {
-        counts.low += 1;
-      } else if (incident.severity === "medium") {
-        counts.medium += 1;
-      } else if (incident.severity === "high") {
-        counts.high += 1;
-      }
+      counts[incident.type] = (counts[incident.type] ?? 0) + 1;
     }
     return counts;
   }, [incidents]);
@@ -313,6 +307,32 @@ export function Dashboard(): JSX.Element {
               </Card>
 
               <Card>
+                <h2 className="card-title">Incidents</h2>
+                <div className="protect-decisions-list">
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">Near cap</span>
+                    <span className="protect-decisions-value">{incidentSummary.near_cap ?? 0}</span>
+                  </div>
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">Retry storm</span>
+                    <span className="protect-decisions-value warned">{incidentSummary.retry_storm ?? 0}</span>
+                  </div>
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">Loop suspect</span>
+                    <span className="protect-decisions-value warned">{incidentSummary.loop_suspect ?? 0}</span>
+                  </div>
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">Token explosion</span>
+                    <span className="protect-decisions-value warned">{incidentSummary.token_explosion ?? 0}</span>
+                  </div>
+                  <div className="protect-decisions-row">
+                    <span className="protect-decisions-label">Cap breach</span>
+                    <span className="protect-decisions-value blocked">{incidentSummary.cap_breach ?? 0}</span>
+                  </div>
+                </div>
+              </Card>
+
+              <Card>
                 <h2 className="card-title">Protect decisions (60m)</h2>
                 <div className="protect-decisions-list">
                   <div className="protect-decisions-row">
@@ -326,24 +346,6 @@ export function Dashboard(): JSX.Element {
                   <div className="protect-decisions-row">
                     <span className="protect-decisions-label">Blocked</span>
                     <span className="protect-decisions-value blocked">{renderMetric(protectDecisionStats?.blocked_60m)}</span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card>
-                <h2 className="card-title">Incidents</h2>
-                <div className="protect-decisions-list">
-                  <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Low</span>
-                    <span className="protect-decisions-value">{incidentSummary.low}</span>
-                  </div>
-                  <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Medium</span>
-                    <span className="protect-decisions-value warned">{incidentSummary.medium}</span>
-                  </div>
-                  <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">High</span>
-                    <span className="protect-decisions-value blocked">{incidentSummary.high}</span>
                   </div>
                 </div>
               </Card>

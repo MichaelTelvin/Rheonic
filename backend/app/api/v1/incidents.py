@@ -18,7 +18,6 @@ class IncidentOut(BaseModel):
     # API response model for incidents.
     id: str
     type: str
-    severity: str
     status: str
     created_at: datetime
     resolved_at: datetime | None
@@ -30,7 +29,6 @@ def list_incidents(
     project_id: str = Query(..., min_length=1),
     status: str = Query("open"),
     provider: str | None = Query(default=None, min_length=1),
-    severity: str | None = Query(default=None, min_length=1),
     service: DetectIncidentsService = Depends(get_detect_incidents_service),
     project_service: ProjectService = Depends(get_project_service),
     current_user: User = Depends(get_current_user),
@@ -38,16 +36,15 @@ def list_incidents(
     # List incidents for the active project context.
     try:
         project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
-        incidents = service.list_incidents(project_id=project_id, status=status, provider=provider, severity=severity)
+        incidents = service.list_incidents(project_id=project_id, status=status, provider=provider)
         logger.debug(
             "Incidents list endpoint called",
-            extra={"project_id": project_id, "status": status, "provider": provider, "severity": severity},
+            extra={"project_id": project_id, "status": status, "provider": provider},
         )
         return [
             IncidentOut(
                 id=incident.id,
                 type=incident.incident_type,
-                severity=incident.severity,
                 status=incident.status,
                 created_at=incident.created_at,
                 resolved_at=incident.resolved_at,

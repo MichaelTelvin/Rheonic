@@ -34,14 +34,15 @@ export function instrumentAnthropic<T extends Record<string, any>>(
     const requestPayload = extractRequestPayload(args);
     const requestedModel = extractRequestedModel(args);
     validateProviderModel("anthropic", requestedModel);
-    const estimatedInputTokens = requestPayload
-      ? (estimatorOverrideForTests
-          ? estimatorOverrideForTests(requestPayload)
-          : estimateInputTokensFromRequest(requestPayload))
-      : null;
+    let estimatedInputTokens: number | null = null;
 
     let protectDecision = { decision: "allow", reason: "protect_disabled" } as ProtectEvaluation;
     if (options.client.shouldPreflightDecision()) {
+      estimatedInputTokens = requestPayload
+        ? (estimatorOverrideForTests
+            ? estimatorOverrideForTests(requestPayload)
+            : estimateInputTokensFromRequest(requestPayload))
+        : null;
       const protectPayload: {
         provider: string;
         model: string | null;

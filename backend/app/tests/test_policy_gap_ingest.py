@@ -31,8 +31,6 @@ class FakeRealtimeCounterStore:
     def __init__(self) -> None:
         self._requests_60s = 0
         self._tokens_60s = 0
-        self._baseline_req_60s = 1.0
-        self._baseline_tok_60s = 1.0
 
     def increment_project_60s(self, project_id: str, total_tokens: int) -> None:
         _ = project_id
@@ -43,45 +41,12 @@ class FakeRealtimeCounterStore:
         _ = project_id
         return self._requests_60s, self._tokens_60s
 
-    def record_baseline_snapshot(
-        self,
-        project_id: str,
-        requests_60s: int,
-        tokens_60s: int,
-        max_windows: int,
-    ) -> tuple[float, float]:
-        _ = project_id, max_windows
-        self._baseline_req_60s = max(float(requests_60s), 1.0)
-        self._baseline_tok_60s = max(float(tokens_60s), 1.0)
-        return self._baseline_req_60s, self._baseline_tok_60s
-
-    def get_baseline_snapshot(self, project_id: str, max_windows: int) -> tuple[float, float]:
-        _ = project_id, max_windows
-        return self._baseline_req_60s, self._baseline_tok_60s
-
-    def get_baseline_sample_count(self, project_id: str, max_windows: int) -> int:
-        _ = project_id, max_windows
-        return 30
-
     def acquire_incident_lock(self, project_id: str, incident_type: str, ttl_seconds: int) -> bool:
         _ = project_id, incident_type, ttl_seconds
         return True
 
     def release_incident_lock(self, project_id: str, incident_type: str) -> None:
         _ = project_id, incident_type
-
-    def record_incident_escalation_hit(
-        self,
-        project_id: str,
-        incident_type: str,
-        ts_unix: int,
-        score: int,
-        ratio: float,
-        prune_before_unix: int,
-        ttl_seconds: int,
-    ) -> list[dict[str, object]]:
-        _ = project_id, incident_type, ts_unix, score, ratio, prune_before_unix, ttl_seconds
-        return []
 
 
 class FakeWebhookDispatcher:
@@ -149,8 +114,6 @@ def _make_service(
         event_repository=FakeEventRepository(),  # type: ignore[arg-type]
         realtime_counters=FakeRealtimeCounterStore(),  # type: ignore[arg-type]
         incident_repository=IncidentRepositoryImpl(session_factory=session_factory),
-        incident_severity_cache=None,
-        baseline_window_count=30,
         incident_dedup_window_seconds=300,
         webhook_dispatcher=webhook_dispatcher,  # type: ignore[arg-type]
         project_repository=ProjectRepositoryImpl(session_factory=session_factory),

@@ -35,9 +35,8 @@ class IncidentRepository(ABC):
         incident_id: str,
         evidence: dict[str, object],
         last_seen_at: datetime,
-        severity: str,
     ) -> Incident | None:
-        # Update deduped incident evidence/last_seen/severity and return updated row.
+        # Update deduped incident evidence/last_seen and return updated row.
         raise NotImplementedError
 
     @abstractmethod
@@ -46,7 +45,6 @@ class IncidentRepository(ABC):
         project_id: str,
         status: str = "open",
         provider: str | None = None,
-        severity: str | None = None,
     ) -> list[Incident]:
         # Return incidents for project filtered by status.
         raise NotImplementedError

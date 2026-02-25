@@ -87,6 +87,7 @@ def protect_decision(
                 input_tokens_estimate=payload.input_tokens_estimate,
                 environment=payload.environment,
                 provider=payload.provider,
+                model=payload.model,
             ),
         )
         if decision is None:

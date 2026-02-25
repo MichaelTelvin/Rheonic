@@ -78,8 +78,8 @@ Protect Mode is explicit opt-in. It provides safe, deterministic actions:
 ### “Runaway” patterns (v1)
 - **RETRY_STORM**: elevated retry rate AND elevated attempts/min
 - **LOOP_SUSPECT**: repeated job_id/trace_id or repeated prompt_hash pattern
-- **BURN_RATE_SPIKE**: spend velocity jumps above baseline
-- **TOKEN_EXPLOSION**: input/output tokens spike vs baseline for endpoint/feature
+- **BURN_RATE_SPIKE**: spend velocity jumps above normal operating range
+- **TOKEN_EXPLOSION**: input/output tokens spike sharply for endpoint/feature
 
 ## 7) UX summary
 ### Observe Mode dashboard (default landing after login)

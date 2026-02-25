@@ -3,21 +3,19 @@ from uuid import uuid4
 
 from app.application.services.auto_close_incidents_service import AutoCloseIncidentsService
 from app.application.services.ingest_key_service import IngestKeyService
-from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.protect_service import ProtectService
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base, IncidentRecord, IngestKeyRecord, ProjectRecord, UserRecord
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
-from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.infrastructure.redis.rolling_window import RollingWindow
 from app.security.ingest_keys import hash_key, last4
 
 
 class FakeRedisClient:
-    # In-memory fake Redis adapter for rolling window and cache/store calls.
+    # In-memory fake Redis adapter for rolling-window/protect-action calls.
 
     def __init__(self) -> None:
         self.values: dict[str, object] = {}
@@ -27,14 +25,14 @@ class FakeRedisClient:
     def get(self, key: str) -> object | None:
         return self.values.get(key)
 
-    def set_persistent(self, key: str, value: object) -> None:
-        self.values[key] = value
-
     def set(self, key: str, value: object, ex: int | None = None) -> bool:
         self.values[key] = value
         if ex is not None:
             self.ttls[key] = ex
         return True
+
+    def set_persistent(self, key: str, value: object) -> None:
+        self.values[key] = value
 
     def incr(self, key: str) -> int:
         next_value = int(self.values.get(key, 0)) + 1
@@ -73,7 +71,8 @@ class FakeRedisClient:
 
 
 class FakeWebhookDispatcher:
-    # Captures webhook dispatch enqueue calls.
+    # Captures webhook dispatcher enqueue calls.
+
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, object], str]] = []
 
@@ -110,8 +109,7 @@ def test_auto_close_resolves_only_stale_open_incidents(tmp_path) -> None:
                 id="inc-old",
                 project_id="p1",
                 provider="openai",
-                type="burn_spike",
-                severity="high",
+                type="retry_storm",
                 status="open",
                 evidence={},
                 created_at=old_seen,
@@ -124,8 +122,7 @@ def test_auto_close_resolves_only_stale_open_incidents(tmp_path) -> None:
                 id="inc-recent",
                 project_id="p1",
                 provider="openai",
-                type="burn_spike",
-                severity="medium",
+                type="loop_suspect",
                 status="open",
                 evidence={},
                 created_at=recent_seen,
@@ -137,7 +134,6 @@ def test_auto_close_resolves_only_stale_open_incidents(tmp_path) -> None:
 
     service = AutoCloseIncidentsService(
         incident_repository=IncidentRepositoryImpl(session_factory=session_factory),
-        incident_severity_cache=None,
         cooldown_seconds=300,
     )
     resolved_count = service.auto_close(now=now)
@@ -197,11 +193,10 @@ def test_protect_decision_ignores_auto_resolved_incidents(tmp_path) -> None:
         )
         session.add(
             IncidentRecord(
-                id="inc-stale-high",
+                id="inc-stale",
                 project_id=project_id,
                 provider="openai",
-                type="burn_spike",
-                severity="high",
+                type="cap_breach",
                 status="open",
                 evidence={},
                 created_at=old_seen,
@@ -212,17 +207,12 @@ def test_protect_decision_ignores_auto_resolved_incidents(tmp_path) -> None:
         session.commit()
 
     redis_client = FakeRedisClient()
-    severity_cache = IncidentSeverityCache(redis_client=redis_client)  # type: ignore[arg-type]
-    severity_cache.set(project_id=scoped_project_provider_id(project_id, "openai"), severity="high")
-
     auto_close_service = AutoCloseIncidentsService(
         incident_repository=IncidentRepositoryImpl(session_factory=session_factory),
-        incident_severity_cache=severity_cache,
         cooldown_seconds=300,
     )
     resolved_count = auto_close_service.auto_close(now=now)
     assert resolved_count == 1
-    assert severity_cache.get(project_id=scoped_project_provider_id(project_id, "openai")) == "none"
 
     protect_service = ProtectService(
         ingest_key_service=IngestKeyService(
@@ -230,7 +220,6 @@ def test_protect_decision_ignores_auto_resolved_incidents(tmp_path) -> None:
             project_repository=ProjectRepositoryImpl(session_factory=session_factory),
         ),
         realtime_counters=RollingWindow(client=redis_client, now_ms_provider=lambda: int(now.timestamp() * 1000)),
-        incident_severity_cache=severity_cache,
         protect_action_store=ProtectActionStore(redis_client=redis_client),  # type: ignore[arg-type]
         protect_block_cooldown_seconds=60,
     )
@@ -252,8 +241,7 @@ def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
                 id="inc-old-webhook",
                 project_id="p1",
                 provider="openai",
-                type="burn_spike",
-                severity="high",
+                type="retry_storm",
                 status="open",
                 evidence={"provider": "openai", "model": "gpt-4o-mini", "environment": "prod"},
                 created_at=old_seen,
@@ -265,7 +253,6 @@ def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
 
     service = AutoCloseIncidentsService(
         incident_repository=IncidentRepositoryImpl(session_factory=session_factory),
-        incident_severity_cache=None,
         cooldown_seconds=300,
         webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
     )

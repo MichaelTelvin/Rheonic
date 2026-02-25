@@ -6,7 +6,6 @@ from app.application.interfaces.incident_repository import IncidentRepository
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.domain.models.incident import Incident
-from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -19,13 +18,11 @@ class DetectIncidentsService:
         self,
         incident_repository: IncidentRepository,
         realtime_counters: RealtimeCounterStore,
-        incident_severity_cache: IncidentSeverityCache | None = None,
         webhook_dispatcher: WebhookDispatcher | None = None,
     ) -> None:
         # Initialize dependencies.
         self._incident_repository = incident_repository
         self._realtime_counters = realtime_counters
-        self._incident_severity_cache = incident_severity_cache
         self._webhook_dispatcher = webhook_dispatcher
 
     def detect(self) -> list[object]:
@@ -43,7 +40,6 @@ class DetectIncidentsService:
         project_id: str,
         status: str = "open",
         provider: str | None = None,
-        severity: str | None = None,
     ) -> list[Incident]:
         # List incidents for project and status.
         try:
@@ -51,12 +47,11 @@ class DetectIncidentsService:
                 project_id=project_id,
                 status=status,
                 provider=provider,
-                severity=severity,
             )
         except Exception:
             logger.exception(
                 "List incidents service failed",
-                extra={"project_id": project_id, "status": status, "provider": provider, "severity": severity},
+                extra={"project_id": project_id, "status": status, "provider": provider},
             )
             raise
 
@@ -78,15 +73,6 @@ class DetectIncidentsService:
                 project_id=scoped_project_provider_id(incident.project_id, incident.provider),
                 incident_type=incident.incident_type,
             )
-            if self._incident_severity_cache is not None:
-                open_incidents = self._incident_repository.list_open_by_project_provider(
-                    project_id=incident.project_id,
-                    provider=incident.provider,
-                )
-                self._incident_severity_cache.set(
-                    project_id=scoped_project_provider_id(incident.project_id, incident.provider),
-                    severity=_highest_severity(open_incidents),
-                )
             self._enqueue_incident_resolved_webhook(incident=incident, resolved_by="manual")
             return incident
         except Exception:
@@ -104,7 +90,6 @@ class DetectIncidentsService:
             "project_id": incident.project_id,
             "incident_id": incident.id,
             "incident_type": incident.incident_type,
-            "severity": incident.severity,
             "resolved_by": resolved_by,
             "resolved_at": resolved_at.isoformat(),
             "created_at": incident.created_at.isoformat(),
@@ -122,16 +107,6 @@ class DetectIncidentsService:
             )
         except Exception:
             logger.exception("Failed to enqueue manual incident resolved webhook", extra={"incident_id": incident.id})
-
-
-def _highest_severity(incidents: list[Incident]) -> str:
-    # Return highest open incident severity for cache refresh.
-    ranking = {"none": 0, "low": 1, "medium": 2, "high": 3}
-    highest = "none"
-    for incident in incidents:
-        if ranking.get(incident.severity, 0) > ranking.get(highest, 0):
-            highest = incident.severity
-    return highest
 
 
 def _incident_dimensions(incident: Incident) -> tuple[str | None, str | None, str | None]:

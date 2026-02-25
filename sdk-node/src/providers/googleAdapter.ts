@@ -33,14 +33,15 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
     const requestedModel = extractRequestedModel(googleModel);
     validateProviderModel("google", requestedModel);
     const requestPayload = extractRequestPayload(args, requestedModel);
-    const estimatedInputTokens = requestPayload
-      ? (estimatorOverrideForTests
-          ? estimatorOverrideForTests(requestPayload)
-          : estimateInputTokensFromRequest(requestPayload))
-      : null;
+    let estimatedInputTokens: number | null = null;
 
     let protectDecision = { decision: "allow", reason: "protect_disabled" } as ProtectEvaluation;
     if (options.client.shouldPreflightDecision()) {
+      estimatedInputTokens = requestPayload
+        ? (estimatorOverrideForTests
+            ? estimatorOverrideForTests(requestPayload)
+            : estimateInputTokensFromRequest(requestPayload))
+        : null;
       const protectPayload: {
         provider: string;
         model: string | null;

@@ -23,7 +23,6 @@ from app.infrastructure.db.repositories.project_repository_impl import ProjectRe
 from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
 from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
 from app.infrastructure.redis.redis_client import RedisClient
-from app.infrastructure.redis.incident_severity_cache import IncidentSeverityCache
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.infrastructure.redis.rolling_window import RollingWindow
 from app.logger import get_logger
@@ -72,18 +71,6 @@ def get_rolling_window() -> RollingWindow:
 
 
 @lru_cache
-def get_incident_severity_cache() -> IncidentSeverityCache:
-    # Provide a shared Redis incident severity cache adapter.
-    try:
-        adapter = IncidentSeverityCache(redis_client=get_redis_client())
-        logger.debug("Incident severity cache initialized")
-        return adapter
-    except Exception:
-        logger.exception("Failed to initialize incident severity cache")
-        raise
-
-
-@lru_cache
 def get_protect_action_store() -> ProtectActionStore:
     # Provide a shared Redis protect action counter adapter.
     try:
@@ -124,25 +111,13 @@ def get_ingest_event_service() -> IngestEventService:
             event_repository=EventRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
-            incident_severity_cache=get_incident_severity_cache(),
-            baseline_window_count=get_settings().baseline_window_count,
             incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
-            incident_escalation_window_medium_seconds=get_settings().incident_escalation_window_medium_seconds,
-            incident_escalation_window_high_seconds=get_settings().incident_escalation_window_high_seconds,
-            incident_escalation_min_hits_medium=get_settings().incident_escalation_min_hits_medium,
-            incident_escalation_min_hits_high=get_settings().incident_escalation_min_hits_high,
-            incident_escalation_score_threshold_medium=get_settings().incident_escalation_score_threshold_medium,
-            incident_escalation_score_threshold_high=get_settings().incident_escalation_score_threshold_high,
-            incident_escalation_ttl_seconds=get_settings().incident_escalation_ttl_seconds,
-            baseline_gate_min_windows=get_settings().baseline_gate_min_windows,
-            baseline_gate_min_baseline_req=get_settings().baseline_gate_min_baseline_req,
-            baseline_gate_min_baseline_tok=get_settings().baseline_gate_min_baseline_tok,
-            baseline_gate_early_abs_req_60s=get_settings().baseline_gate_early_abs_req_60s,
-            baseline_gate_early_abs_tok_60s=get_settings().baseline_gate_early_abs_tok_60s,
-            detectors_req_spike_ratio_low=get_settings().detectors_req_spike_ratio_low,
-            detectors_req_spike_delta_low=get_settings().detectors_req_spike_delta_low,
-            detectors_tok_spike_ratio_low=get_settings().detectors_tok_spike_ratio_low,
-            detectors_tok_spike_delta_low=get_settings().detectors_tok_spike_delta_low,
+            retry_storm_window_seconds=get_settings().retry_storm_window_seconds,
+            retry_storm_count=get_settings().retry_storm_count,
+            loop_window_seconds=get_settings().loop_window_seconds,
+            loop_count=get_settings().loop_count,
+            token_explosion_ratio=get_settings().token_explosion_ratio,
+            token_explosion_abs=get_settings().token_explosion_abs,
             webhook_dispatcher=get_webhook_dispatcher(),
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )
@@ -175,7 +150,6 @@ def get_detect_incidents_service() -> DetectIncidentsService:
         service = DetectIncidentsService(
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
-            incident_severity_cache=get_incident_severity_cache(),
             webhook_dispatcher=get_webhook_dispatcher(),
         )
         logger.debug("Detect incidents service provided")
@@ -217,10 +191,11 @@ def get_protect_service() -> ProtectService:
     try:
         return ProtectService(
             ingest_key_service=get_ingest_key_service(),
+            event_repository=EventRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
-            incident_severity_cache=get_incident_severity_cache(),
             protect_action_store=get_protect_action_store(),
             protect_block_cooldown_seconds=get_settings().protect_block_cooldown_seconds,
+            webhook_dispatcher=get_webhook_dispatcher(),
         )
     except Exception:
         logger.exception("Failed to construct protect service")

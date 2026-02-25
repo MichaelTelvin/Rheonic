@@ -19,12 +19,16 @@ export function IncidentItem({ incident, resolving, onResolve }: IncidentItemPro
     <Card>
       <div className="incident-head">
         <p className="incident-title">{humanizeIncidentType(incident.type)}</p>
-        <Badge severity={incident.severity} />
+        <Badge value={incident.status} kind="status" />
       </div>
 
       <p className="incident-meta">
         <span className="incident-meta-relative">{formatRelative(incident.created_at)}</span>
         <span>· Created {formatTime(incident.created_at)}</span>
+      </p>
+      <p className="incident-meta">
+        <span>Provider {(incident.evidence.provider as string | undefined) ?? "unknown"}</span>
+        <span>· Count {String((incident.evidence.count as number | undefined) ?? 1)}</span>
       </p>
 
       <div className="incident-actions">

@@ -21,8 +21,8 @@ export function Incidents(): JSX.Element {
 
   const [providers, setProviders] = useState<string[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>(initialProvider);
-  const [selectedSeverity, setSelectedSeverity] = useState<"all" | "low" | "medium" | "high">("all");
   const [selectedStatus, setSelectedStatus] = useState<"all" | "open" | "resolved">("open");
+  const [selectedType, setSelectedType] = useState<string>("all");
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState<boolean>(false);
@@ -37,7 +37,7 @@ export function Incidents(): JSX.Element {
   useEffect(() => {
     setIncidents([]);
     setWarning(null);
-    setSelectedSeverity("all");
+    setSelectedType("all");
     setSelectedStatus("open");
     setSelectedProvider((searchParams.get("provider") ?? "all").toLowerCase());
   }, [projectId, searchParams]);
@@ -75,16 +75,15 @@ export function Incidents(): JSX.Element {
     let cancelled = false;
     setLoading(true);
     const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
-    const severityQuery = selectedSeverity === "all" ? undefined : selectedSeverity;
     const statusQuery = selectedStatus === "all" ? "all" : selectedStatus;
 
     const load = async (): Promise<void> => {
       try {
-        const rows = await fetchIncidents(projectId, providerQuery, severityQuery, statusQuery);
+        const rows = await fetchIncidents(projectId, providerQuery, statusQuery);
         if (cancelled) {
           return;
         }
-        setIncidents(rows);
+        setIncidents(selectedType === "all" ? rows : rows.filter((row) => row.type === selectedType));
         setWarning(null);
       } catch (error) {
         if (!cancelled) {
@@ -110,7 +109,7 @@ export function Incidents(): JSX.Element {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [projectId, selectedProvider, selectedSeverity, selectedStatus]);
+  }, [projectId, selectedProvider, selectedStatus, selectedType]);
 
   const onResolve = async (incidentId: string): Promise<void> => {
     if (!projectId) {
@@ -122,10 +121,9 @@ export function Incidents(): JSX.Element {
     try {
       await resolveIncident(incidentId);
       const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
-      const severityQuery = selectedSeverity === "all" ? undefined : selectedSeverity;
       const statusQuery = selectedStatus === "all" ? "all" : selectedStatus;
-      const updated = await fetchIncidents(projectId, providerQuery, severityQuery, statusQuery);
-      setIncidents(updated);
+      const updated = await fetchIncidents(projectId, providerQuery, statusQuery);
+      setIncidents(selectedType === "all" ? updated : updated.filter((row) => row.type === selectedType));
       setWarning(null);
     } catch {
       setIncidents(previous);
@@ -181,16 +179,14 @@ export function Incidents(): JSX.Element {
               </div>
 
               <div className="incidents-filter-field">
-                <label htmlFor="incidents-severity-select">Severity</label>
-                <select
-                  id="incidents-severity-select"
-                  value={selectedSeverity}
-                  onChange={(event) => setSelectedSeverity(event.target.value as "all" | "low" | "medium" | "high")}
-                >
+                <label htmlFor="incidents-type-select">Type</label>
+                <select id="incidents-type-select" value={selectedType} onChange={(event) => setSelectedType(event.target.value)}>
                   <option value="all">All</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
+                  <option value="near_cap">Near cap</option>
+                  <option value="cap_breach">Cap breach</option>
+                  <option value="retry_storm">Retry storm</option>
+                  <option value="loop_suspect">Loop suspect</option>
+                  <option value="token_explosion">Token explosion</option>
                 </select>
               </div>
 

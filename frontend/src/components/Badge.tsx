@@ -1,9 +1,10 @@
 export interface BadgeProps {
-  severity: string;
+  value: string;
+  kind?: "status" | "type";
 }
 
-export function Badge({ severity }: BadgeProps): JSX.Element {
-  const normalized = severity.toLowerCase();
-  const variant = normalized === "high" || normalized === "medium" ? normalized : "low";
+export function Badge({ value, kind = "type" }: BadgeProps): JSX.Element {
+  const normalized = value.toLowerCase();
+  const variant = kind === "status" ? (normalized === "open" ? "warned" : "resolved") : normalized;
   return <span className={`badge ${variant}`}>{normalized}</span>;
 }

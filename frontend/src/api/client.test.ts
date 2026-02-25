@@ -144,7 +144,7 @@ describe("api client", () => {
     await fetchProjectProviders("p1");
     await fetchIncidents("p/1");
     await fetchIncidents("p/1", "openai");
-    await fetchIncidents("p/1", "openai", "high", "resolved");
+    await fetchIncidents("p/1", "openai", "resolved");
     await resolveIncident("inc#1");
     await createProject("Project");
     await createKey("p1", "prod");
@@ -159,11 +159,7 @@ describe("api client", () => {
     expect(calledPaths.some((path) => path.endsWith("/api/v1/projects/p1/providers"))).toBe(true);
     expect(calledPaths.some((path) => path.includes("/api/v1/incidents?project_id=p%2F1"))).toBe(true);
     expect(calledPaths.some((path) => path.includes("/api/v1/incidents?project_id=p%2F1&provider=openai"))).toBe(true);
-    expect(
-      calledPaths.some((path) =>
-        path.includes("/api/v1/incidents?project_id=p%2F1&provider=openai&severity=high&status=resolved"),
-      ),
-    ).toBe(true);
+    expect(calledPaths.some((path) => path.includes("/api/v1/incidents?project_id=p%2F1&provider=openai&status=resolved"))).toBe(true);
     expect(calledPaths.some((path) => path.includes("/api/v1/incidents/inc%231/resolve"))).toBe(true);
     expect(calledPaths.some((path) => path.endsWith("/api/v1/projects/p1/keys"))).toBe(true);
     expect(calledPaths.some((path) => path.endsWith("/api/v1/keys/k1/revoke"))).toBe(true);

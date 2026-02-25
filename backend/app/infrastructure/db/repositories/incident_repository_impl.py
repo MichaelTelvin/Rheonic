@@ -28,7 +28,6 @@ class IncidentRepositoryImpl(IncidentRepository):
                     project_id=incident.project_id,
                     provider=incident.provider,
                     type=incident.incident_type,
-                    severity=incident.severity,
                     status=incident.status,
                     fingerprint=incident.fingerprint,
                     evidence=incident.evidence,
@@ -102,7 +101,6 @@ class IncidentRepositoryImpl(IncidentRepository):
         incident_id: str,
         evidence: dict[str, object],
         last_seen_at: datetime,
-        severity: str,
     ) -> Incident | None:
         # Update dedup activity fields for an existing open incident.
         try:
@@ -117,7 +115,6 @@ class IncidentRepositoryImpl(IncidentRepository):
                     return None
                 record.evidence = evidence
                 record.last_seen_at = last_seen_at
-                record.severity = severity
                 session.add(record)
                 session.commit()
                 session.refresh(record)
@@ -131,24 +128,24 @@ class IncidentRepositoryImpl(IncidentRepository):
         project_id: str,
         status: str = "open",
         provider: str | None = None,
-        severity: str | None = None,
     ) -> list[Incident]:
         # List incidents by project and status.
         try:
             with self._session_factory.create_session() as session:
                 query = session.query(IncidentRecord).filter(IncidentRecord.project_id == project_id)
                 if status and status != "all":
-                    query = query.filter(IncidentRecord.status == status)
+                    if status == "resolved":
+                        query = query.filter(IncidentRecord.status.in_(["resolved", "auto_resolved"]))
+                    else:
+                        query = query.filter(IncidentRecord.status == status)
                 if provider:
                     query = query.filter(IncidentRecord.provider == provider)
-                if severity:
-                    query = query.filter(IncidentRecord.severity == severity)
                 records = query.order_by(IncidentRecord.created_at.desc()).all()
             return [_to_domain(record) for record in records]
         except Exception:
             logger.exception(
                 "Failed listing incidents",
-                extra={"project_id": project_id, "status": status, "provider": provider, "severity": severity},
+                extra={"project_id": project_id, "status": status, "provider": provider},
             )
             raise
 
@@ -242,7 +239,6 @@ def _to_domain(record: IncidentRecord) -> Incident:
         project_id=record.project_id,
         provider=record.provider or "unknown",
         incident_type=record.type,
-        severity=record.severity,
         status=record.status,
         created_at=record.created_at,
         resolved_at=record.resolved_at,

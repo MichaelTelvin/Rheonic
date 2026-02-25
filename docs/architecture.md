@@ -1,127 +1,46 @@
-# LLMTokenBurnGuard — Architecture (v1)
+# LLMTokenBurnGuard Architecture
 
-## 1) System components
+## Runtime model
+- Scope: `(project_id, provider)` for counters, incidents, and protect decisions.
+- Event ingest: `POST /api/v1/events`.
+- Protect preflight: `POST /api/v1/protect/decision` (protect mode only).
 
-### Client-side
-- Python SDK (v1)
-- Node SDK (v1)
-Both:
-- Observe: emit events asynchronously
-- Protect: enforce safe actions (opt-in)
+## Ingest pipeline
+1. Persist event.
+2. Update rolling 60s counters (`requests_60s`, `tokens_60s`) for `(project, provider)`.
+3. Run deterministic detectors:
+- `retry_storm`
+- `loop_suspect`
+- `token_explosion`
+- `cap_breach` logging from counters/caps
+4. Pass signals to `IncidentManager`:
+- create/open incident when no recent matching open fingerprint
+- otherwise update existing incident (count, last_seen, evidence)
+5. Webhook hooks:
+- protect mode warn incidents -> `incident.warn`
+- all mode resolution events -> `incident.resolved`
+- policy-gap first-seen tuple -> `policy_gap.detected`
+6. Auto-close resolves stale open incidents by inactivity cooldown.
 
-### Server-side
-- FastAPI Backend
-  - Auth, orgs/projects, API keys
-  - Event ingest
-  - Realtime counters + rollups
-  - Anomaly detection + incidents
-  - Policy config + evaluation
-  - Alert dispatch
-- PostgreSQL
-  - users, orgs, projects, keys
-  - events (raw or semi-raw), rollups
-  - incidents, policies, alerts, decision logs
-- Redis
-  - rolling windows / counters (low latency)
-  - incident dedupe state
-  - job queue (alerts/rollups)
-- Worker
-  - RQ or Celery (Redis broker)
-  - rollups, retries, cleanup
+## Protect decision pipeline
+1. Observe mode: SDK skips preflight; telemetry only.
+2. Protect mode preflight reads `(project, provider)` counters and caps.
+3. Decision order:
+- cooldown active -> `block`
+- token/request cap breach -> `block`
+- warn-only signals -> `warn`
+- else -> `allow`
+4. Warn-only signals:
+- `near_cap` (predictive)
+- `retry_storm`
+- `loop_suspect`
+- `token_explosion`
 
-### Web
-- React + Vite + TypeScript
-  - Landing/docs
-  - Auth app shell
-  - Incidents-first dashboard
-  - Protect policy settings
+## Dashboard metrics behavior
+- Endpoints return project totals by default.
+- Optional provider filter narrows to a single provider.
 
-## 2) High-level flows
-
-### 2.1 Observe Mode (default)
-1. App uses provider SDK via LLMTokenBurnGuard wrapper.
-2. Provider returns response (or error).
-3. SDK extracts usage (tokens where available), latency, error classification.
-4. SDK computes cost from a local + server-synced pricing table.
-5. SDK POSTs an Event to `/api/v1/events` (async, non-blocking).
-6. Backend:
-   - stores event
-   - updates Redis rolling windows
-   - runs detectors
-   - creates/updates an Incident if triggered
-   - triggers alerts (Slack/webhook)
-7. Dashboard:
-   - reads realtime snapshot (Redis-backed)
-   - shows incidents feed and drilldowns
-
-### 2.2 Protect Mode (opt-in)
-Protect enforcement is client-side and SDK-gated.
-
-1. SDK is configured with protect preflight enabled (`protectEnabled` / `protect_enabled`).
-2. Before each provider call, SDK sends preflight request to `POST /api/v1/protect/decision`.
-3. Backend evaluates cooldown, hard caps, incident severity, and predictive near-cap warning.
-4. SDK enforces returned decision:
-   - `allow` -> call provider
-   - `warn` -> call provider and tag telemetry
-   - `block` -> do not call provider; raise `LLMTBGBlockedError`
-5. SDK emits events to `/api/v1/events`.
-
-Observe mode:
-- Protect preflight disabled in SDK config.
-- No `/api/v1/protect/decision` call.
-- Telemetry-only flow to `/api/v1/events`.
-
-## 3) “No proxy required” stance
-We do not require a drop-in proxy/gateway to deliver value.
-(An optional proxy could be a future add-on, but not MVP.)
-
-## 4) Storage model
-
-### Events
-- Write: append events to Postgres (batch inserts recommended).
-- Realtime: update Redis counters:
-  - spend per minute
-  - requests per minute
-  - retries per minute
-  - token sums
-- Read:
-  - realtime snapshot → Redis
-  - history charts → rollups in Postgres
-
-### Rollups (worker)
-Generate interval rollups:
-- per 1m, 5m, 1h
-Groupable by:
-- provider, model
-- endpoint, feature
-- tenant_id
-
-## 5) Detectors (v1, explainable)
-All detectors emit:
-- incident_type
-- severity
-- reason_code
-- evidence payload
-
-Detectors:
-- BURN_RATE_SPIKE:
-  - burn_now > burn_baseline * k AND burn_slope positive
-- RETRY_STORM:
-  - retry_rate > r AND attempt_rate > baseline * m
-- LOOP_SUSPECT:
-  - repeated job_id or trace_id counts exceed N in window
-  - OR prompt_hash repeats exceed N in window
-- TOKEN_EXPLOSION:
-  - avg input/output tokens now > baseline * p
-
-## 6) Alerts
-MVP:
-- Slack webhook
-- Generic webhook
-Later:
-- Email, PagerDuty, etc.
-
-## 7) Security
-- Project ingest keys (rotate/revoke)
-- RBAC: owner/admin/viewer
-- Minimal sensitive data storage (no raw prompts by default)
+## Frontend model
+- Dashboard: compact monitoring cards + provider filter.
+- Incidents page: provider/type/status filters and incident list.
+- Docs page/viewer: architecture diagrams + markdown docs.

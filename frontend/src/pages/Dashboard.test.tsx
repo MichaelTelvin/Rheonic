@@ -171,8 +171,7 @@ describe("Dashboard", () => {
     mocks.fetchIncidents.mockResolvedValueOnce([
       {
         id: "inc-1",
-        type: "burn_spike",
-        severity: "high",
+        type: "cap_breach",
         status: "open",
         created_at: new Date().toISOString(),
         resolved_at: null,
@@ -180,8 +179,7 @@ describe("Dashboard", () => {
       },
       {
         id: "inc-2",
-        type: "request_spike",
-        severity: "medium",
+        type: "retry_storm",
         status: "open",
         created_at: new Date().toISOString(),
         resolved_at: null,
@@ -194,9 +192,9 @@ describe("Dashboard", () => {
       </MemoryRouter>,
     );
     await screen.findByText("Incidents");
-    expect(screen.getByText("Low")).toBeDefined();
-    expect(screen.getByText("Medium")).toBeDefined();
-    expect(screen.getByText("High")).toBeDefined();
+    expect(screen.getByText("Near cap")).toBeDefined();
+    expect(screen.getByText("Retry storm")).toBeDefined();
+    expect(screen.getByText("Cap breach")).toBeDefined();
   });
 
   it("does not render dashboard config modal buttons", async () => {

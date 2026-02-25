@@ -23,8 +23,7 @@ class FakeIncidentRepository:
             id="inc-1",
             project_id="p1",
             provider="openai",
-            incident_type="burn_spike",
-            severity="low",
+            incident_type="retry_storm",
             status="open",
             created_at=now,
             resolved_at=None,
@@ -36,13 +35,11 @@ class FakeIncidentRepository:
         project_id: str,
         status: str = "open",
         provider: str | None = None,
-        severity: str | None = None,
     ) -> list[Incident]:
         if (
             self.incident.project_id == project_id
             and (status == "all" or self.incident.status == status)
             and (provider is None or self.incident.provider == provider)
-            and (severity is None or self.incident.severity == severity)
         ):
             return [self.incident]
         return []
@@ -63,7 +60,7 @@ class FakeIncidentRepository:
 class FakeRealtimeStore:
     # In-memory lock store used by route test.
     def __init__(self) -> None:
-        self.locks: set[str] = {incident_open_lock_key(scoped_project_provider_id("p1", "openai"), "burn_spike")}
+        self.locks: set[str] = {incident_open_lock_key(scoped_project_provider_id("p1", "openai"), "retry_storm")}
 
     def release_incident_lock(self, project_id: str, incident_type: str) -> None:
         key = incident_open_lock_key(project_id, incident_type)
@@ -127,7 +124,7 @@ def test_resolve_endpoint_marks_resolved_and_deletes_lock() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "resolved"}
-    assert incident_open_lock_key(scoped_project_provider_id("p1", "openai"), "burn_spike") not in realtime.locks
+    assert incident_open_lock_key(scoped_project_provider_id("p1", "openai"), "retry_storm") not in realtime.locks
     assert len(dispatcher.calls) == 1
     _, payload, event_type = dispatcher.calls[0]
     assert event_type == "incident.resolved"

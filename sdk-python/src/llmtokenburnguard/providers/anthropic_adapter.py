@@ -45,7 +45,9 @@ def instrument_anthropic(
             request_payload = _extract_request_payload(args, kwargs)
             requested_model = _extract_requested_model(args, kwargs)
             validate_provider_model("anthropic", requested_model)
-            estimated_input_tokens = _estimate_input_tokens(request_payload)
+            estimated_input_tokens: int | None = None
+            if resolved_client.should_preflight_decision():
+                estimated_input_tokens = _estimate_input_tokens(request_payload)
             protect_decision = _preflight(
                 sdk_client=resolved_client,
                 requested_model=requested_model,
@@ -93,7 +95,9 @@ def instrument_anthropic(
         request_payload = _extract_request_payload(args, kwargs)
         requested_model = _extract_requested_model(args, kwargs)
         validate_provider_model("anthropic", requested_model)
-        estimated_input_tokens = _estimate_input_tokens(request_payload)
+        estimated_input_tokens: int | None = None
+        if resolved_client.should_preflight_decision():
+            estimated_input_tokens = _estimate_input_tokens(request_payload)
         protect_decision = _preflight(
             sdk_client=resolved_client,
             requested_model=requested_model,

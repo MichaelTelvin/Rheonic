@@ -48,22 +48,22 @@ describe("Incidents page", () => {
     mocks.fetchIncidents.mockResolvedValue([]);
   });
 
-  it("loads provider options and applies provider/severity/status filters", async () => {
+  it("loads provider options and applies provider/type/status filters", async () => {
     render(
       <MemoryRouter initialEntries={["/incidents?provider=openai"]}>
         <Incidents />
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai", undefined, "open"));
+    await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai", "open"));
 
-    fireEvent.change(screen.getByLabelText("Severity"), { target: { value: "high" } });
-    await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai", "high", "open"));
+    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "cap_breach" } });
+    await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai", "open"));
 
     fireEvent.change(screen.getByLabelText("Status"), { target: { value: "resolved" } });
-    await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai", "high", "resolved"));
+    await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai", "resolved"));
 
     fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "all" } });
-    await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", undefined, "high", "resolved"));
+    await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", undefined, "resolved"));
   });
 });
