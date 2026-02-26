@@ -45,6 +45,7 @@ export function Dashboard(): JSX.Element {
   const [selectedProvider, setSelectedProvider] = useState<string>("all");
   const providerRequestSeq = useRef<number>(0);
   const metricsRequestSeq = useRef<number>(0);
+  const sparklineCacheRef = useRef<Record<string, { requests: number[]; tokens: number[] }>>({});
 
   const incidentSummary = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -59,6 +60,7 @@ export function Dashboard(): JSX.Element {
     setIncidents([]);
     setRequestsSeries([]);
     setTokensSeries([]);
+    sparklineCacheRef.current = {};
     setMetricsWarning(null);
     setGlobalBanner(null);
     setProtectDecisionStats(null);
@@ -138,8 +140,10 @@ export function Dashboard(): JSX.Element {
     metricsRequestSeq.current += 1;
     const requestSeq = metricsRequestSeq.current;
     setLoadingMetrics(true);
-    setRequestsSeries([]);
-    setTokensSeries([]);
+    const scopeKey = selectedProvider;
+    const cachedSeries = sparklineCacheRef.current[scopeKey];
+    setRequestsSeries(cachedSeries?.requests ?? []);
+    setTokensSeries(cachedSeries?.tokens ?? []);
     const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
 
     const loadMetrics = async (): Promise<void> => {
@@ -154,8 +158,15 @@ export function Dashboard(): JSX.Element {
         setGlobalBanner(null);
         setMetricsFetchFailed(false);
         setLastMetricsSuccessAt(new Date().toISOString());
-        setRequestsSeries((values) => [...values.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.requests_60s]);
-        setTokensSeries((values) => [...values.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.tokens_60s]);
+        const currentSeries = sparklineCacheRef.current[scopeKey] ?? { requests: [], tokens: [] };
+        const nextRequests = [...currentSeries.requests.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.requests_60s];
+        const nextTokens = [...currentSeries.tokens.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.tokens_60s];
+        sparklineCacheRef.current[scopeKey] = {
+          requests: nextRequests,
+          tokens: nextTokens,
+        };
+        setRequestsSeries(nextRequests);
+        setTokensSeries(nextTokens);
       } catch (error) {
         if (!cancelled && requestSeq === metricsRequestSeq.current) {
           if (error instanceof ApiError && error.status === 403) {
