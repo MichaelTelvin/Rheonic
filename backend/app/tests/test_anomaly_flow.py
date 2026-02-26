@@ -123,3 +123,35 @@ def test_incident_dedup_updates_existing_row_count() -> None:
     retry_rows = [row for row in rows.json() if row["type"] == "retry_storm"]
     assert retry_rows
     assert int(retry_rows[0]["evidence"].get("count", 0)) >= 1
+
+
+def test_retry_storm_ingest_returns_202_and_incident_is_listed() -> None:
+    client = TestClient(app)
+    headers = _auth_headers(client)
+    project_id, ingest_key = _create_project_and_key(client, "retry storm ingest", headers)
+
+    set_protect = client.put(
+        f"/api/v1/projects/{project_id}/protect",
+        json={
+            "protect_enabled": True,
+            "protect_fail_mode": "open",
+            "protect_max_req_per_min": 1000,
+            "protect_max_tok_per_min": 100000,
+            "protect_decision_timeout_ms": 100,
+        },
+        headers=headers,
+    )
+    assert set_protect.status_code == 200
+
+    for _ in range(6):
+        response = client.post(
+            "/api/v1/events",
+            json=_event_payload(55, provider="openai", model="gpt-4o-mini"),
+            headers={"X-Project-Ingest-Key": ingest_key},
+        )
+        assert response.status_code == 202
+
+    rows = client.get(f"/api/v1/incidents?project_id={project_id}&status=open&provider=openai", headers=headers)
+    assert rows.status_code == 200
+    retry_rows = [row for row in rows.json() if row["type"] == "retry_storm"]
+    assert retry_rows

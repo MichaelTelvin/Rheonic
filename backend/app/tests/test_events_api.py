@@ -148,6 +148,32 @@ def test_ingest_event_accepts_active_key_and_maps_to_project() -> None:
     app.dependency_overrides.clear()
 
 
+def test_ingest_event_accepts_quoted_and_env_style_ingest_keys() -> None:
+    # Pasted keys with quotes or env-var prefix should normalize and resolve.
+    ingest_service = FakeIngestService()
+    key_service = FakeIngestKeyService()
+    app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
+    app.dependency_overrides[get_ingest_key_service] = lambda: key_service
+    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev")
+    client = TestClient(app)
+
+    quoted = client.post(
+        "/api/v1/events",
+        json=_payload(),
+        headers={"X-Project-Ingest-Key": "\"active-test-key\""},
+    )
+    assert quoted.status_code == 202
+
+    env_style = client.post(
+        "/api/v1/events",
+        json=_payload(),
+        headers={"X-Project-Ingest-Key": "LLMTBG_INGEST_KEY=active-test-key"},
+    )
+    assert env_style.status_code == 202
+    assert len(ingest_service.ingested) == 2
+    app.dependency_overrides.clear()
+
+
 def test_ingest_event_unowned_project_path_requires_explicit_opt_in() -> None:
     # Legacy unowned-project ingest is denied by default and allowed only when explicitly enabled.
     ingest_service = FakeIngestService()

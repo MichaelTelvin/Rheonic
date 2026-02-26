@@ -1,5 +1,5 @@
 export const frontendConfig = {
-  apiBaseUrl: import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? ""),
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000",
   dashboardSelectedProjectStorageKey: "selected_project_id",
   authTokenStorageKey: "llmtbg_token",
   authRefreshTokenStorageKey: "llmtbg_refresh_token",

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from app.api.error_responses import build_error_response, default_code_for_status
@@ -44,7 +45,6 @@ async def lifespan(_: FastAPI):
     # Initialize startup resources and seed local data.
     try:
         get_db_session_factory()
-        _seed_demo_project()
         yield
     except Exception:
         logger.exception("Application startup failed")
@@ -56,6 +56,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging()
     _settings = settings or Settings()
     app = FastAPI(title=_settings.app_name, lifespan=lifespan)
+    origins = [origin.strip() for origin in (_settings.cors_origins or "").split(",") if origin.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins or ["http://localhost:5173"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.middleware("http")
     async def security_headers_middleware(request: Request, call_next):

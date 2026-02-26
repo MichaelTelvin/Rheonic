@@ -45,7 +45,8 @@ def create_refresh_token(
 def decode_access_token(token: str, secret: str, algorithm: str) -> dict[str, object] | None:
     # Decode and validate token payload.
     try:
-        decoded = jwt.decode(token, secret, algorithms=[algorithm])
+        normalized = token.strip().strip('"').strip("'")
+        decoded = jwt.decode(normalized, secret, algorithms=[algorithm])
         return decoded
     except JWTError:
         return None

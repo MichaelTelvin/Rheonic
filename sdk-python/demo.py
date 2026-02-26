@@ -40,21 +40,22 @@ def _send_event(
     http_status: int = 200,
     error_type: str | None = None,
 ) -> None:
-    capture_event(
-        build_event(
-            provider=provider,
-            model=model,
-            environment=environment,
-            request={"endpoint": endpoint, "input_tokens": 1, "feature": feature},
-            response={
-                "output_tokens": 1,
-                "total_tokens": total_tokens,
-                "http_status": http_status,
-                **({"error_type": error_type} if error_type else {}),
-            },
-            status=status,
-        )
+    event = build_event(
+        provider=provider,
+        model=model,
+        environment=environment,
+        request={"endpoint": endpoint, "input_tokens": 1, "feature": feature},
+        response={
+            "output_tokens": 1,
+            "total_tokens": total_tokens,
+        },
     )
+    # Backend ingest reads status/http_status/error_type from top-level fields.
+    event["status"] = status
+    event["http_status"] = http_status
+    if error_type:
+        event["error_type"] = error_type
+    capture_event(event)
 
 
 def _print_realtime_snapshot(project_id: str, auth_token: str, provider: str, phase: str) -> None:

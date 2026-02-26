@@ -3,6 +3,14 @@ import hashlib
 import secrets
 
 
+def normalize_ingest_key(plaintext: str) -> str:
+    # Normalize copied ingest key values (quotes, whitespace, optional env-style prefix).
+    value = (plaintext or "").strip().strip('"').strip("'")
+    if value.startswith("LLMTBG_INGEST_KEY="):
+        value = value.split("=", 1)[1].strip().strip('"').strip("'")
+    return value.strip()
+
+
 def generate_ingest_key() -> str:
     # Generate a url-safe key suitable for header transport.
     return secrets.token_urlsafe(32)

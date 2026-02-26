@@ -13,7 +13,7 @@ from app.dependencies import get_ingest_event_service, get_ingest_key_service, g
 from app.domain.models.event import Event
 from app.infrastructure.redis.redis_client import RedisClient
 from app.logger import get_logger
-from app.security.ingest_keys import hash_key
+from app.security.ingest_keys import hash_key, normalize_ingest_key
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -96,10 +96,11 @@ def ingest_event(
 ) -> dict[str, str]:
     # Receive an SDK event and delegate processing to application services.
     try:
-        if not ingest_key:
+        normalized_ingest_key = normalize_ingest_key(ingest_key or "")
+        if not normalized_ingest_key:
             raise HTTPException(status_code=401, detail="missing ingest key")
         project_id = ingest_key_service.resolve_project_id(
-            ingest_key,
+            normalized_ingest_key,
             allow_unowned_project=settings.ingest_allow_unowned_project,
         )
         if project_id is None:
@@ -124,10 +125,12 @@ def ingest_event(
         try:
             rate_limit_window_seconds = max(int(settings.rate_limit_window_seconds), 1)
             window_epoch_minute = int(time.time()) // rate_limit_window_seconds
-            rate_limit_counter = redis_client.incr(_rate_limit_key(ingest_key=ingest_key, window_epoch_minute=window_epoch_minute))
+            rate_limit_counter = redis_client.incr(
+                _rate_limit_key(ingest_key=normalized_ingest_key, window_epoch_minute=window_epoch_minute)
+            )
             if rate_limit_counter == 1:
                 redis_client.expire(
-                    _rate_limit_key(ingest_key=ingest_key, window_epoch_minute=window_epoch_minute),
+                    _rate_limit_key(ingest_key=normalized_ingest_key, window_epoch_minute=window_epoch_minute),
                     rate_limit_window_seconds,
                 )
             if rate_limit_counter > settings.ingest_rate_limit_per_minute:

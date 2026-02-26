@@ -294,6 +294,11 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
         return
     incident_columns = {column["name"] for column in inspector.get_columns("incidents")}
     with session_factory.engine.begin() as connection:
+        if "severity" in incident_columns:
+            try:
+                connection.execute(text("ALTER TABLE incidents DROP COLUMN severity"))
+            except Exception:
+                logger.warning("Unable to drop legacy incidents.severity column automatically; run migrations")
         if "fingerprint" not in incident_columns:
             connection.execute(text("ALTER TABLE incidents ADD COLUMN fingerprint VARCHAR(255)"))
         if "last_seen_at" not in incident_columns:
