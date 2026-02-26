@@ -217,7 +217,19 @@ class FakeProjectRepository:
         return sorted({provider for _, provider, _ in self.seen})
 
 
-def _event(project_id: str, provider: str = "openai", model: str = "gpt-4o-mini", *, total_tokens: int = 100, status: str = "ok", http_status: int = 200, error_type: str | None = None, offset_seconds: int = 0) -> Event:
+def _event(
+    project_id: str,
+    provider: str = "openai",
+    model: str = "gpt-4o-mini",
+    *,
+    total_tokens: int = 100,
+    status: str = "ok",
+    http_status: int = 200,
+    error_type: str | None = None,
+    endpoint: str = "/chat/completions",
+    feature: str | None = "demo",
+    offset_seconds: int = 0,
+) -> Event:
     now = datetime.now(timezone.utc) + timedelta(seconds=offset_seconds)
     return Event(
         id=f"evt-{project_id}-{provider}-{model}-{offset_seconds}-{total_tokens}",
@@ -233,6 +245,8 @@ def _event(project_id: str, provider: str = "openai", model: str = "gpt-4o-mini"
         status=status,
         error_type=error_type,
         http_status=http_status,
+        request_endpoint=endpoint,
+        request_feature=feature,
         created_at=now,
     )
 
@@ -283,13 +297,49 @@ def test_retry_storm_opens_incident_and_updates_dedup_count() -> None:
 
 def test_loop_suspect_opens_incident_in_observe_without_warn_webhook() -> None:
     service, incidents, webhook = _service(protect_enabled=False, loop_count=3)
-    service.ingest(_event("p1", total_tokens=42, offset_seconds=0))
-    service.ingest(_event("p1", total_tokens=42, offset_seconds=1))
-    service.ingest(_event("p1", total_tokens=42, offset_seconds=2))
+    service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=0))
+    service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=1))
+    service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=2))
 
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "loop_suspect"
     assert all(event_type not in {"incident.warn", "incident.block"} for _, event_type, _ in webhook.calls)
+
+
+def test_loop_detector_ignores_error_events_and_retry_storm_still_triggers() -> None:
+    service, incidents, webhook = _service(protect_enabled=True, retry_storm_count=3, loop_count=3)
+    for i in range(3):
+        service.ingest(
+            _event(
+                "p1",
+                status="error",
+                http_status=500,
+                error_type="provider_5xx",
+                feature="retry-fixed-signature",
+                offset_seconds=i,
+            )
+        )
+
+    assert len(incidents.rows) == 1
+    assert incidents.rows[0].incident_type == "retry_storm"
+    assert all(row.incident_type != "loop_suspect" for row in incidents.rows)
+    assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
+
+
+def test_loop_signature_is_scoped_by_feature() -> None:
+    service, incidents, _ = _service(protect_enabled=False, loop_count=3)
+
+    service.ingest(_event("p1", feature="feature-a", offset_seconds=0))
+    service.ingest(_event("p1", feature="feature-b", offset_seconds=1))
+    service.ingest(_event("p1", feature="feature-a", offset_seconds=2))
+
+    assert all(row.incident_type != "loop_suspect" for row in incidents.rows)
+
+    service.ingest(_event("p1", feature="feature-a", offset_seconds=3))
+
+    loop_rows = [row for row in incidents.rows if row.incident_type == "loop_suspect"]
+    assert len(loop_rows) == 1
+    assert "feature-a" in str(loop_rows[0].evidence.get("signature"))
 
 
 def test_cap_breach_logged_in_observe_mode() -> None:
@@ -302,6 +352,17 @@ def test_cap_breach_logged_in_observe_mode() -> None:
     assert all(event_type not in {"incident.warn", "incident.block"} for _, event_type, _ in webhook.calls)
 
 
+def test_cap_breach_repeated_events_update_same_incident_within_dedup_window() -> None:
+    service, incidents, _ = _service(protect_enabled=False, req_cap=2, tok_cap=1000)
+    service.ingest(_event("p1", provider="openai", total_tokens=10, offset_seconds=0))
+    service.ingest(_event("p1", provider="openai", total_tokens=10, offset_seconds=1))
+    service.ingest(_event("p1", provider="openai", total_tokens=10, offset_seconds=2))
+
+    cap_rows = [row for row in incidents.rows if row.incident_type == "cap_breach" and row.provider == "openai"]
+    assert len(cap_rows) == 1
+    assert int(cap_rows[0].evidence.get("count", 0)) == 2
+
+
 def test_token_explosion_incident_emits_warn_in_protect_mode() -> None:
     service, incidents, webhook = _service(protect_enabled=True, tok_cap=10_000, token_explosion_abs=1500)
     service.ingest(_event("p1", total_tokens=1800, offset_seconds=0))
@@ -309,6 +370,19 @@ def test_token_explosion_incident_emits_warn_in_protect_mode() -> None:
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "token_explosion"
     assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
+
+
+def test_cap_breach_suppresses_token_explosion_for_same_event() -> None:
+    service, incidents, webhook = _service(protect_enabled=True, req_cap=None, tok_cap=1000, token_explosion_abs=500)
+    service.ingest(_event("p1", provider="openai", total_tokens=1200, offset_seconds=0))
+
+    assert len(incidents.rows) == 1
+    incident = incidents.rows[0]
+    assert incident.provider == "openai"
+    assert incident.incident_type == "cap_breach"
+    assert incident.evidence.get("tok_cap_breach") is True
+    assert all(row.incident_type != "token_explosion" for row in incidents.rows)
+    assert any(event_type == "incident.block" for _, event_type, _ in webhook.calls)
 
 
 def test_policy_gap_first_seen_webhook_only_once_and_no_incident() -> None:

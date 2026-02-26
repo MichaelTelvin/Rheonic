@@ -20,3 +20,5 @@ class Event:
     error_type: str | None
     http_status: int | None
     created_at: datetime
+    request_endpoint: str | None = None
+    request_feature: str | None = None

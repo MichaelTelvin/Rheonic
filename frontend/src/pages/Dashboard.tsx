@@ -44,6 +44,7 @@ export function Dashboard(): JSX.Element {
   const [providers, setProviders] = useState<string[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>("all");
   const providerRequestSeq = useRef<number>(0);
+  const metricsRequestSeq = useRef<number>(0);
 
   const incidentSummary = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -134,13 +135,17 @@ export function Dashboard(): JSX.Element {
     }
 
     let cancelled = false;
+    metricsRequestSeq.current += 1;
+    const requestSeq = metricsRequestSeq.current;
     setLoadingMetrics(true);
+    setRequestsSeries([]);
+    setTokensSeries([]);
     const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
 
     const loadMetrics = async (): Promise<void> => {
       try {
         const data = await fetchMetrics(projectId, providerQuery);
-        if (cancelled) {
+        if (cancelled || requestSeq !== metricsRequestSeq.current) {
           return;
         }
 
@@ -152,7 +157,7 @@ export function Dashboard(): JSX.Element {
         setRequestsSeries((values) => [...values.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.requests_60s]);
         setTokensSeries((values) => [...values.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.tokens_60s]);
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && requestSeq === metricsRequestSeq.current) {
           if (error instanceof ApiError && error.status === 403) {
             setGlobalBanner("You do not have access to this project's metrics.");
             setMetricsWarning("Metrics request was forbidden.");
@@ -162,7 +167,7 @@ export function Dashboard(): JSX.Element {
           setMetricsFetchFailed(true);
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && requestSeq === metricsRequestSeq.current) {
           setLoadingMetrics(false);
         }
       }

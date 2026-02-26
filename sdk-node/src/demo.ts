@@ -84,34 +84,42 @@ async function sendEvent(
   endpoint: string,
   totalTokens: number,
   feature: string,
-  options?: { httpStatus?: number; errorType?: string },
+  options?: { status?: string; httpStatus?: number; errorType?: string },
 ): Promise<void> {
-  await client.captureEvent(
-    buildEvent({
-      provider,
-      model,
-      environment: client.environment,
-      request: { endpoint, feature },
-      response: {
-        latency_ms: 120,
-        total_tokens: totalTokens,
-        http_status: options?.httpStatus ?? 200,
-        error_type: options?.errorType,
-      },
-    }),
-  );
+  const event: ReturnType<typeof buildEvent> & {
+    status?: string;
+    http_status?: number;
+    error_type?: string;
+  } = buildEvent({
+    provider,
+    model,
+    environment: client.environment,
+    request: { endpoint, feature },
+    response: {
+      latency_ms: 120,
+      total_tokens: totalTokens,
+    },
+  });
+  event.status = options?.status ?? "ok";
+  event.http_status = options?.httpStatus ?? 200;
+  if (options?.errorType) {
+    event.error_type = options.errorType;
+  }
+  await client.captureEvent(event);
 }
 
 function printUsageExamples(): void {
   console.log("Example:");
   console.log("  LLMTBG_PROVIDER=openai");
   console.log("  LLMTBG_MODEL=gpt-4o-mini");
-  console.log("  LLMTBG_DEMO_CASE=steady|retry_storm|loop_suspect|token_explosion|cap_breach|all");
+  console.log("  LLMTBG_DEMO_CASE=steady|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all");
   console.log("  LLMTBG_STEP_SLEEP_MS=200");
   console.log("  LLMTBG_RETRY_STORM_COUNT=6");
   console.log("  LLMTBG_LOOP_COUNT=7");
   console.log("  LLMTBG_TOKEN_EXPLOSION_TOKENS=9000");
   console.log("  LLMTBG_CAP_BREACH_TOKENS=4000");
+  console.log("  LLMTBG_CAP_BREACH_REQ_COUNT=6");
+  console.log("  LLMTBG_CAP_BREACH_REQ_TOKENS=1");
   console.log("  Optional snapshot/incident summary:");
   console.log("  LLMTBG_AUTH_TOKEN=<jwt> LLMTBG_PROJECT_ID=<project_id>");
 }
@@ -155,6 +163,8 @@ async function runDemo(): Promise<void> {
   const loopCount = Number(process.env.LLMTBG_LOOP_COUNT ?? 7);
   const tokenExplosionTokens = Number(process.env.LLMTBG_TOKEN_EXPLOSION_TOKENS ?? 9000);
   const capBreachTokens = Number(process.env.LLMTBG_CAP_BREACH_TOKENS ?? 4000);
+  const capBreachReqCount = Number(process.env.LLMTBG_CAP_BREACH_REQ_COUNT ?? 6);
+  const capBreachReqTokens = Number(process.env.LLMTBG_CAP_BREACH_REQ_TOKENS ?? 1);
 
   const authToken = process.env.LLMTBG_AUTH_TOKEN ?? "";
   const projectId = process.env.LLMTBG_PROJECT_ID ?? "";
@@ -170,7 +180,7 @@ async function runDemo(): Promise<void> {
   console.log(`[DEMO] provider=${provider} model=${model} case=${demoCase}`);
   console.log(`[DEMO] environment=${environment}`);
   console.log(
-    `[DEMO] params retry_storm_count=${retryStormCount} loop_count=${loopCount} token_explosion_tokens=${tokenExplosionTokens} cap_breach_tokens=${capBreachTokens} step_sleep_ms=${stepSleepMs}`,
+    `[DEMO] params retry_storm_count=${retryStormCount} loop_count=${loopCount} token_explosion_tokens=${tokenExplosionTokens} cap_breach_tokens=${capBreachTokens} cap_breach_req_count=${capBreachReqCount} cap_breach_req_tokens=${capBreachReqTokens} step_sleep_ms=${stepSleepMs}`,
   );
 
   const runSteady = async (): Promise<void> => {
@@ -186,6 +196,7 @@ async function runDemo(): Promise<void> {
     console.log("\n[STEP] Retry storm");
     for (let i = 0; i < retryStormCount; i += 1) {
       await sendEvent(client, provider, model, endpoint, 50, `retry-${i + 1}`, {
+        status: "error",
         httpStatus: 500,
         errorType: "provider_5xx",
       });
@@ -214,9 +225,24 @@ async function runDemo(): Promise<void> {
 
   const runCapBreach = async (): Promise<void> => {
     console.log("\n[STEP] Cap breach logging (observe)");
+    console.log("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).");
     await sendEvent(client, provider, model, endpoint, capBreachTokens, "cap-breach");
     await client.flush();
     await printPhase("cap_breach", projectId, authToken, provider);
+  };
+
+  const runReqCapBreach = async (): Promise<void> => {
+    console.log("\n[STEP] Request cap breach logging (observe)");
+    console.log("[STEP] Requires project request cap configured in Mode page (max requests per minute).");
+    for (let i = 0; i < capBreachReqCount; i += 1) {
+      await sendEvent(client, provider, model, endpoint, capBreachReqTokens, `req-cap-breach-${i + 1}`, {
+        status: "ok",
+        httpStatus: 200,
+      });
+      await sleep(stepSleepMs);
+    }
+    await client.flush();
+    await printPhase("req_cap_breach", projectId, authToken, provider);
   };
 
   if (demoCase === "all") {
@@ -225,6 +251,7 @@ async function runDemo(): Promise<void> {
     await runLoopSuspect();
     await runTokenExplosion();
     await runCapBreach();
+    await runReqCapBreach();
   } else if (demoCase === "steady") {
     await runSteady();
   } else if (demoCase === "retry_storm") {
@@ -235,6 +262,8 @@ async function runDemo(): Promise<void> {
     await runTokenExplosion();
   } else if (demoCase === "cap_breach") {
     await runCapBreach();
+  } else if (demoCase === "req_cap_breach") {
+    await runReqCapBreach();
   } else {
     console.error(`Unsupported LLMTBG_DEMO_CASE: ${demoCase}`);
     printUsageExamples();

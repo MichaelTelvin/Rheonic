@@ -24,6 +24,8 @@ class EventRequestIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     input_tokens: int | None = None
+    endpoint: str | None = None
+    feature: str | None = None
 
 
 class EventResponseIn(BaseModel):
@@ -158,6 +160,8 @@ def ingest_event(
             status=payload.status,
             error_type=payload.error_type,
             http_status=payload.http_status,
+            request_endpoint=(payload.request.endpoint if payload.request is not None else None),
+            request_feature=(payload.request.feature if payload.request is not None else None),
             created_at=datetime.now(timezone.utc),
         )
 

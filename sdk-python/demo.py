@@ -120,12 +120,14 @@ def _usage() -> None:
     print("Example:")
     print("  LLMTBG_PROVIDER=openai")
     print("  LLMTBG_MODEL=gpt-4o-mini")
-    print("  LLMTBG_DEMO_CASE=steady|retry_storm|loop_suspect|token_explosion|cap_breach|all")
+    print("  LLMTBG_DEMO_CASE=steady|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all")
     print("  LLMTBG_STEP_SLEEP_MS=200")
     print("  LLMTBG_RETRY_STORM_COUNT=6")
     print("  LLMTBG_LOOP_COUNT=7")
     print("  LLMTBG_TOKEN_EXPLOSION_TOKENS=9000")
     print("  LLMTBG_CAP_BREACH_TOKENS=4000")
+    print("  LLMTBG_CAP_BREACH_REQ_COUNT=6")
+    print("  LLMTBG_CAP_BREACH_REQ_TOKENS=1")
     print("  Optional snapshot/incident summary: LLMTBG_AUTH_TOKEN, LLMTBG_PROJECT_ID")
 
 
@@ -164,6 +166,8 @@ def main() -> None:
     loop_count = int(os.getenv("LLMTBG_LOOP_COUNT", "7"))
     token_explosion_tokens = int(os.getenv("LLMTBG_TOKEN_EXPLOSION_TOKENS", "9000"))
     cap_breach_tokens = int(os.getenv("LLMTBG_CAP_BREACH_TOKENS", "4000"))
+    cap_breach_req_count = int(os.getenv("LLMTBG_CAP_BREACH_REQ_COUNT", "6"))
+    cap_breach_req_tokens = int(os.getenv("LLMTBG_CAP_BREACH_REQ_TOKENS", "1"))
 
     auth_token = os.getenv("LLMTBG_AUTH_TOKEN", "")
     project_id = os.getenv("LLMTBG_PROJECT_ID", "")
@@ -183,7 +187,9 @@ def main() -> None:
         print(
             "[DEMO] params "
             f"retry_storm_count={retry_storm_count} loop_count={loop_count} "
-            f"token_explosion_tokens={token_explosion_tokens} cap_breach_tokens={cap_breach_tokens} step_sleep_ms={step_sleep_ms}"
+            f"token_explosion_tokens={token_explosion_tokens} cap_breach_tokens={cap_breach_tokens} "
+            f"cap_breach_req_count={cap_breach_req_count} cap_breach_req_tokens={cap_breach_req_tokens} "
+            f"step_sleep_ms={step_sleep_ms}"
         )
 
         def run_steady() -> None:
@@ -228,9 +234,28 @@ def main() -> None:
 
         def run_cap_breach() -> None:
             print("\n[STEP] Cap breach logging (observe)")
+            print("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).")
             _send_event(provider, model, endpoint, cap_breach_tokens, "cap-breach", environment)
             client.flush()
             _print_phase("cap_breach", project_id, auth_token, provider)
+
+        def run_req_cap_breach() -> None:
+            print("\n[STEP] Request cap breach logging (observe)")
+            print("[STEP] Requires project request cap configured in Mode page (max requests per minute).")
+            for i in range(cap_breach_req_count):
+                _send_event(
+                    provider,
+                    model,
+                    endpoint,
+                    cap_breach_req_tokens,
+                    f"req-cap-breach-{i+1}",
+                    environment,
+                    status="ok",
+                    http_status=200,
+                )
+                time.sleep(step_sleep_ms / 1000)
+            client.flush()
+            _print_phase("req_cap_breach", project_id, auth_token, provider)
 
         if demo_case == "all":
             run_steady()
@@ -238,6 +263,7 @@ def main() -> None:
             run_loop_suspect()
             run_token_explosion()
             run_cap_breach()
+            run_req_cap_breach()
         elif demo_case == "steady":
             run_steady()
         elif demo_case == "retry_storm":
@@ -248,6 +274,8 @@ def main() -> None:
             run_token_explosion()
         elif demo_case == "cap_breach":
             run_cap_breach()
+        elif demo_case == "req_cap_breach":
+            run_req_cap_breach()
         else:
             print(f"Unsupported LLMTBG_DEMO_CASE: {demo_case}")
             _usage()

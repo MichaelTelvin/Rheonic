@@ -31,6 +31,8 @@ class EventRecord(Base):
     status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     error_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    request_endpoint: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    request_feature: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

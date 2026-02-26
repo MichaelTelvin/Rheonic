@@ -65,6 +65,8 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=32), nullable=True),
         sa.Column("error_type", sa.String(length=64), nullable=True),
         sa.Column("http_status", sa.Integer(), nullable=True),
+        sa.Column("request_endpoint", sa.String(length=255), nullable=True),
+        sa.Column("request_feature", sa.String(length=255), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )

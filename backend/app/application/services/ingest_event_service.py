@@ -105,7 +105,11 @@ class IngestEventService:
                 token_explosion_abs=self._token_explosion_abs,
             )
             signals = self._detector_registry.detect(ctx)
-            signals.extend(self._cap_breach_signal_if_any(ctx))
+            cap_breach_signals = self._cap_breach_signal_if_any(ctx)
+            if cap_breach_signals:
+                # Prevent duplicate anomaly incidents for the same ingest event.
+                signals = [signal for signal in signals if signal.detector != "token_explosion"]
+            signals.extend(cap_breach_signals)
             self._incident_manager.process_signals(
                 project_id=event.project_id,
                 provider=provider,

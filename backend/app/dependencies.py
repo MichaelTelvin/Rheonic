@@ -337,6 +337,11 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
         with session_factory.engine.begin() as connection:
             connection.execute(text("CREATE INDEX IF NOT EXISTS ix_events_project_id_ts ON events (project_id, ts)"))
             connection.execute(text("CREATE INDEX IF NOT EXISTS ix_events_ts ON events (ts)"))
+            event_columns = {column["name"] for column in inspector.get_columns("events")} if "events" in table_names else set()
+            if "request_endpoint" not in event_columns:
+                connection.execute(text("ALTER TABLE events ADD COLUMN request_endpoint VARCHAR(255)"))
+            if "request_feature" not in event_columns:
+                connection.execute(text("ALTER TABLE events ADD COLUMN request_feature VARCHAR(255)"))
             connection.execute(
                 text(
                     "CREATE INDEX IF NOT EXISTS ix_incidents_project_status_created_at "

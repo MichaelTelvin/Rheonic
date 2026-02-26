@@ -5,17 +5,31 @@ from app.domain.detectors.detector import Detector
 class LoopSuspectDetector(Detector):
     # Detect rapid repeated traffic with the same signature.
     def detect(self, ctx: DetectionContext) -> list[Signal]:
-        if not ctx.recent_events:
+        if not ctx.recent_events or _is_error_event(ctx.current_event):
             return []
         cutoff = ctx.now.timestamp() - float(ctx.loop_window_seconds)
-        signature = _signature(ctx.provider, ctx.model, ctx.environment, ctx.current_event)
+        signature = _signature(
+            project_id=ctx.project_id,
+            provider=ctx.provider,
+            model=ctx.model,
+            environment=ctx.environment,
+            event=ctx.current_event,
+        )
         hit_count = 0
         for event in ctx.recent_events:
             if event.provider != ctx.provider:
                 continue
             if event.created_at.timestamp() < cutoff:
                 continue
-            event_signature = _signature(event.provider, event.model, event.environment, event)
+            if _is_error_event(event):
+                continue
+            event_signature = _signature(
+                project_id=ctx.project_id,
+                provider=event.provider,
+                model=event.model,
+                environment=event.environment,
+                event=event,
+            )
             if event_signature == signature:
                 hit_count += 1
         if hit_count < ctx.loop_count:
@@ -46,12 +60,24 @@ class LoopSuspectDetector(Detector):
         ]
 
 
-def _signature(provider: str, model: str | None, environment: str | None, event) -> str:
+def _signature(*, project_id: str, provider: str, model: str | None, environment: str | None, event) -> str:
     if event is None:
-        return f"{provider}:{model or 'na'}:{environment or 'na'}"
-    status = (event.status or "na").strip().lower()
-    error = (event.error_type or "na").strip().lower()
-    return f"{provider}:{model or 'na'}:{environment or 'na'}:{status}:{error}:{event.total_tokens}"
+        return f"{project_id}:{provider}:{model or 'na'}:{environment or 'na'}:na:unknown"
+    endpoint = (event.request_endpoint or "na").strip()
+    feature = (event.request_feature or "unknown").strip() or "unknown"
+    return f"{project_id}:{provider}:{model or 'na'}:{environment or 'na'}:{endpoint}:{feature}"
+
+
+def _is_error_event(event) -> bool:
+    if event is None:
+        return False
+    status = (event.status or "").strip().lower()
+    if status and status != "ok":
+        return True
+    http_status = int(event.http_status or 0)
+    if http_status >= 400:
+        return True
+    return bool(event.error_type)
 
 
 def _tags(ctx: DetectionContext) -> dict[str, str]:
