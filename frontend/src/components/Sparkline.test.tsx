@@ -14,6 +14,6 @@ describe("Sparkline", () => {
     const { container } = render(<Sparkline values={[1, 3, 2]} stroke="#fff" width={100} height={20} />);
     const path = container.querySelector("path")?.getAttribute("d") ?? "";
     expect(path.startsWith("M ")).toBe(true);
-    expect(path.includes(" C ")).toBe(true);
+    expect(path.includes(" Q ")).toBe(true);
   });
 });

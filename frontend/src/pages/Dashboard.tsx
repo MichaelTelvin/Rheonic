@@ -23,6 +23,10 @@ function formatProviderLabel(provider: string): string {
     .join(" ");
 }
 
+function normalizeProviderValue(provider: string): string {
+  return provider.trim().toLowerCase();
+}
+
 export function Dashboard(): JSX.Element {
   const { projectId } = useProjectContext();
 
@@ -45,7 +49,7 @@ export function Dashboard(): JSX.Element {
   const [selectedProvider, setSelectedProvider] = useState<string>("all");
   const providerRequestSeq = useRef<number>(0);
   const metricsRequestSeq = useRef<number>(0);
-  const sparklineCacheRef = useRef<Record<string, { requests: number[]; tokens: number[] }>>({});
+  const seriesByScopeRef = useRef<Record<string, { requests: number[]; tokens: number[] }>>({});
 
   const incidentSummary = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -60,7 +64,7 @@ export function Dashboard(): JSX.Element {
     setIncidents([]);
     setRequestsSeries([]);
     setTokensSeries([]);
-    sparklineCacheRef.current = {};
+    seriesByScopeRef.current = {};
     setMetricsWarning(null);
     setGlobalBanner(null);
     setProtectDecisionStats(null);
@@ -79,8 +83,9 @@ export function Dashboard(): JSX.Element {
       if (requestSeq !== providerRequestSeq.current) {
         return;
       }
-      setProviders(items);
-      setSelectedProvider((current) => (current !== "all" && !items.includes(current) ? "all" : current));
+      const normalized = Array.from(new Set(items.map((provider) => normalizeProviderValue(provider)).filter(Boolean)));
+      setProviders(normalized);
+      setSelectedProvider((current) => (current !== "all" && !normalized.includes(normalizeProviderValue(current)) ? "all" : current));
     } catch {
       if (requestSeq !== providerRequestSeq.current) {
         return;
@@ -128,7 +133,7 @@ export function Dashboard(): JSX.Element {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [projectId, selectedProvider]);
+  }, [projectId, selectedProvider, providers]);
 
   useEffect(() => {
     if (!projectId) {
@@ -140,15 +145,19 @@ export function Dashboard(): JSX.Element {
     metricsRequestSeq.current += 1;
     const requestSeq = metricsRequestSeq.current;
     setLoadingMetrics(true);
-    const scopeKey = selectedProvider;
-    const cachedSeries = sparklineCacheRef.current[scopeKey];
+    const scopeKey = `${projectId}:${selectedProvider}`;
+    const cachedSeries = seriesByScopeRef.current[scopeKey];
     setRequestsSeries(cachedSeries?.requests ?? []);
     setTokensSeries(cachedSeries?.tokens ?? []);
     const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
+    const providerKeys = providers.filter((provider) => provider !== "all");
 
     const loadMetrics = async (): Promise<void> => {
       try {
-        const data = await fetchMetrics(projectId, providerQuery);
+        const data =
+          selectedProvider === "all" && providerKeys.length > 0
+            ? await fetchAggregatedMetrics(projectId, providerKeys)
+            : await fetchMetrics(projectId, providerQuery);
         if (cancelled || requestSeq !== metricsRequestSeq.current) {
           return;
         }
@@ -158,10 +167,10 @@ export function Dashboard(): JSX.Element {
         setGlobalBanner(null);
         setMetricsFetchFailed(false);
         setLastMetricsSuccessAt(new Date().toISOString());
-        const currentSeries = sparklineCacheRef.current[scopeKey] ?? { requests: [], tokens: [] };
+        const currentSeries = seriesByScopeRef.current[scopeKey] ?? { requests: [], tokens: [] };
         const nextRequests = [...currentSeries.requests.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.requests_60s];
         const nextTokens = [...currentSeries.tokens.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.tokens_60s];
-        sparklineCacheRef.current[scopeKey] = {
+        seriesByScopeRef.current[scopeKey] = {
           requests: nextRequests,
           tokens: nextTokens,
         };
@@ -193,7 +202,29 @@ export function Dashboard(): JSX.Element {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [projectId, selectedProvider]);
+  }, [projectId, selectedProvider, providers]);
+
+  async function fetchAggregatedMetrics(project: string, providersList: string[]): Promise<RealtimeMetrics> {
+    const rows = await Promise.all(providersList.map(async (provider) => ({ provider, metrics: await fetchMetrics(project, provider) })));
+    let totalReq = 0;
+    let totalTok = 0;
+    for (const row of rows) {
+      const providerScopeKey = `${project}:${row.provider}`;
+      const providerSeries = seriesByScopeRef.current[providerScopeKey] ?? { requests: [], tokens: [] };
+      const providerNextRequests = [...providerSeries.requests.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), row.metrics.requests_60s];
+      const providerNextTokens = [...providerSeries.tokens.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), row.metrics.tokens_60s];
+      seriesByScopeRef.current[providerScopeKey] = {
+        requests: providerNextRequests,
+        tokens: providerNextTokens,
+      };
+      totalReq += row.metrics.requests_60s;
+      totalTok += row.metrics.tokens_60s;
+    }
+    return {
+      requests_60s: totalReq,
+      tokens_60s: totalTok,
+    };
+  }
 
   useEffect(() => {
     if (!projectId) {
@@ -281,7 +312,7 @@ export function Dashboard(): JSX.Element {
                 <select
                   id="dashboard-provider-select"
                   value={selectedProvider}
-                  onChange={(event) => setSelectedProvider(event.target.value)}
+                  onChange={(event) => setSelectedProvider(normalizeProviderValue(event.target.value))}
                   onFocus={() => {
                     void refreshProviders();
                   }}

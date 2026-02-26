@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { fetchProjectProtect, updateProjectProtect, type ProjectProtectSettings } from "../api/client";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
+import { InfoTooltip } from "../components/InfoTooltip";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
 
@@ -107,7 +108,7 @@ export function Protect(): JSX.Element {
     return (
       <main className="dashboard">
         <div className="dashboard-content page-stack">
-          <h1 className="page-title">Protect</h1>
+          <h1 className="page-title">Project settings</h1>
           <section className="empty">Select a project to configure protection rules.</section>
         </div>
       </main>
@@ -118,15 +119,15 @@ export function Protect(): JSX.Element {
     <main className="dashboard">
       <div className="dashboard-content page-stack">
         <section>
-          <h1 className="page-title">Protection</h1>
-          <p className="page-subtitle">Enable or disable protection and configure limits</p>
+          <h1 className="page-title">Project settings</h1>
+          <p className="page-subtitle">Configure limits and protection behavior</p>
         </section>
 
         <Card className="form-card card--form">
-          <h2 className="section-title">Protect configuration</h2>
+          <h2 className="section-title">Project configuration</h2>
           <FormColumn testId="protect-form-column">
             <div className="form-field protect-mode">
-              <label htmlFor="protect-mode-select">Mode</label>
+              <label htmlFor="protect-mode-select">Project mode</label>
               <select
                 id="protect-mode-select"
                 value={protectEnabledInput ? "protect" : "observe"}
@@ -139,7 +140,10 @@ export function Protect(): JSX.Element {
             </div>
 
             <div className="form-field protect-req">
-              <label htmlFor="protect-max-req">Max requests per minute</label>
+              <label htmlFor="protect-max-req" className="label-with-tooltip">
+                <span>Max requests per minute</span>
+                <InfoTooltip text="Applied per provider." />
+              </label>
               <input
                 id="protect-max-req"
                 className="text-input"
@@ -152,7 +156,10 @@ export function Protect(): JSX.Element {
             </div>
 
             <div className="form-field">
-              <label htmlFor="protect-max-tok">Max tokens per minute</label>
+              <label htmlFor="protect-max-tok" className="label-with-tooltip">
+                <span>Max tokens per minute</span>
+                <InfoTooltip text="Applied per provider." />
+              </label>
               <input
                 id="protect-max-tok"
                 className="text-input"
@@ -165,7 +172,7 @@ export function Protect(): JSX.Element {
             </div>
 
             <fieldset className={`protect-fail-mode ${failModeDisabled ? "is-disabled" : ""}`} disabled={failModeDisabled}>
-              <legend>Fail mode</legend>
+              <legend>On guard error</legend>
               <label>
                 <input
                   type="radio"
@@ -175,7 +182,7 @@ export function Protect(): JSX.Element {
                   onChange={() => setProtectFailModeInput("open")}
                   disabled={failModeDisabled}
                 />
-                Fail-open
+                Allow LLM request
               </label>
               <label>
                 <input
@@ -186,7 +193,7 @@ export function Protect(): JSX.Element {
                   onChange={() => setProtectFailModeInput("closed")}
                   disabled={failModeDisabled}
                 />
-                Fail-closed
+                Block LLM request
               </label>
             </fieldset>
 

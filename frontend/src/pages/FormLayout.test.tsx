@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -76,5 +76,14 @@ describe("Form column layout", () => {
     render(<Protect />);
     const node = await screen.findByTestId("protect-form-column");
     expect(node.className).toContain("form-column");
+  });
+
+  it("renders accessible info tooltips for per-provider limits", async () => {
+    render(<Protect />);
+    const infoButtons = await screen.findAllByRole("button", { name: "More info" });
+    expect(infoButtons).toHaveLength(2);
+
+    fireEvent.focus(infoButtons[0]);
+    expect(screen.getByRole("tooltip").textContent).toContain("Applied per provider.");
   });
 });

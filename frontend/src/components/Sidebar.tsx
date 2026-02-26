@@ -9,7 +9,7 @@ const navItems = [
   { to: "/", label: "Dashboard" },
   { to: "/projects", label: "Projects" },
   { to: "/incidents", label: "Incidents" },
-  { to: "/protect", label: "Mode" },
+  { to: "/settings", label: "Settings" },
   { to: "/keys", label: "Keys" },
   { to: "/alerts", label: "Alerts" },
   { to: "/docs", label: "Docs" },

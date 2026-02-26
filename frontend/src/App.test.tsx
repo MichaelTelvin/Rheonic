@@ -145,10 +145,11 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("link", { name: "Alerts" }));
     expect(await screen.findByText("Alerts Page")).toBeDefined();
 
-    fireEvent.click(screen.getByRole("link", { name: "Mode" }));
+    fireEvent.click(screen.getByRole("link", { name: "Settings" }));
     expect(await screen.findByText("Protect Page")).toBeDefined();
 
     fireEvent.click(screen.getByRole("link", { name: "Docs" }));
     expect(await screen.findByText("Architecture Page")).toBeDefined();
   });
+
 });

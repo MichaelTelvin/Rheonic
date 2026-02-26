@@ -34,7 +34,7 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
             <Route path="/projects" element={<Projects />} />
             <Route path="/keys" element={<Keys />} />
             <Route path="/alerts" element={<Alerts />} />
-            <Route path="/protect" element={<Protect />} />
+            <Route path="/settings" element={<Protect />} />
             <Route path="/docs" element={<Architecture />} />
             <Route path="/documentation" element={<Navigate to="/docs" replace />} />
             <Route path="/architecture" element={<Navigate to="/docs" replace />} />
