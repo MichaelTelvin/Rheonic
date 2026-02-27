@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.incident_repository import IncidentRepository
+from app.application.interfaces.project_repository import ProjectRepository
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.domain.models.incident import Incident
@@ -19,11 +20,13 @@ class DetectIncidentsService:
         incident_repository: IncidentRepository,
         realtime_counters: RealtimeCounterStore,
         webhook_dispatcher: WebhookDispatcher | None = None,
+        project_repository: ProjectRepository | None = None,
     ) -> None:
         # Initialize dependencies.
         self._incident_repository = incident_repository
         self._realtime_counters = realtime_counters
         self._webhook_dispatcher = webhook_dispatcher
+        self._project_repository = project_repository
 
     def detect(self) -> list[object]:
         # Detect incidents and return incident DTOs.
@@ -83,6 +86,8 @@ class DetectIncidentsService:
         # Enqueue webhook for incident resolution state changes.
         if self._webhook_dispatcher is None:
             return
+        if not self._is_protect_mode_enabled(incident.project_id):
+            return
         provider, model, environment = _incident_dimensions(incident)
         resolved_at = incident.resolved_at or datetime.now(timezone.utc)
         payload = {
@@ -107,6 +112,12 @@ class DetectIncidentsService:
             )
         except Exception:
             logger.exception("Failed to enqueue manual incident resolved webhook", extra={"incident_id": incident.id})
+
+    def _is_protect_mode_enabled(self, project_id: str) -> bool:
+        if self._project_repository is None:
+            return False
+        project = self._project_repository.get_project(project_id)
+        return bool(project is not None and project.protect_enabled)
 
 
 def _incident_dimensions(incident: Incident) -> tuple[str | None, str | None, str | None]:

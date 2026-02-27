@@ -44,9 +44,12 @@ Protect mode
 Alerts (webhook)
 - Project webhook config + test API
 - Webhook dispatch on:
-- warn incidents in protect mode (`incident.warn`)
-- block actions / cap breach (`incident.block`)
-- incident resolved (manual/auto)
+- protect decision warns (`decision.warn`)
+- warn incident opens in protect mode (`incident.warn`, non-breach ingest signals)
+- protect decision blocks (`incident.block`)
+- incident resolved in protect mode (manual/auto)
+- policy-gap first-seen tuples in protect mode (`policy_gap.detected`)
+- webhook test (`webhook.test`, mode-independent)
 - Delivery status tracking
 
 Frontend/docs

@@ -75,7 +75,9 @@ Observe mode is telemetry-only: SDK skips preflight by default.
 - `POST /api/v1/projects/{project_id}/webhook/test`
 
 Webhook event types:
-- `incident.warn` (protect mode only)
-- `incident.block`
-- `incident.resolved`
-- `policy_gap.detected`
+- `decision.warn` (protect mode only)
+- `incident.warn` (protect mode only; ingest non-breach opens)
+- `incident.block` (protect mode only)
+- `incident.resolved` (protect mode only)
+- `policy_gap.detected` (protect mode only)
+- `webhook.test` (mode independent)

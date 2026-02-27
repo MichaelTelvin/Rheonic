@@ -120,7 +120,7 @@ def _usage() -> None:
     print("Example:")
     print("  LLMTBG_PROVIDER=openai")
     print("  LLMTBG_MODEL=gpt-4o-mini")
-    print("  LLMTBG_DEMO_CASE=steady|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all")
+    print("  LLMTBG_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all")
     print("  LLMTBG_STEP_SLEEP_MS=200")
     print("  LLMTBG_RETRY_STORM_COUNT=6")
     print("  LLMTBG_LOOP_COUNT=7")
@@ -128,6 +128,7 @@ def _usage() -> None:
     print("  LLMTBG_CAP_BREACH_TOKENS=4000")
     print("  LLMTBG_CAP_BREACH_REQ_COUNT=6")
     print("  LLMTBG_CAP_BREACH_REQ_TOKENS=1")
+    print("  LLMTBG_NEAR_CAP_TOKENS=3200")
     print("  Optional snapshot/incident summary: LLMTBG_AUTH_TOKEN, LLMTBG_PROJECT_ID")
 
 
@@ -168,6 +169,7 @@ def main() -> None:
     cap_breach_tokens = int(os.getenv("LLMTBG_CAP_BREACH_TOKENS", "4000"))
     cap_breach_req_count = int(os.getenv("LLMTBG_CAP_BREACH_REQ_COUNT", "6"))
     cap_breach_req_tokens = int(os.getenv("LLMTBG_CAP_BREACH_REQ_TOKENS", "1"))
+    near_cap_tokens = int(os.getenv("LLMTBG_NEAR_CAP_TOKENS", "3200"))
 
     auth_token = os.getenv("LLMTBG_AUTH_TOKEN", "")
     project_id = os.getenv("LLMTBG_PROJECT_ID", "")
@@ -189,6 +191,7 @@ def main() -> None:
             f"retry_storm_count={retry_storm_count} loop_count={loop_count} "
             f"token_explosion_tokens={token_explosion_tokens} cap_breach_tokens={cap_breach_tokens} "
             f"cap_breach_req_count={cap_breach_req_count} cap_breach_req_tokens={cap_breach_req_tokens} "
+            f"near_cap_tokens={near_cap_tokens} "
             f"step_sleep_ms={step_sleep_ms}"
         )
 
@@ -199,6 +202,13 @@ def main() -> None:
             _send_event(provider, model, endpoint, 42, "steady-2", environment)
             client.flush()
             _print_phase("steady", project_id, auth_token, provider)
+
+        def run_near_cap() -> None:
+            print("\n[STEP] Near-cap logging (observe)")
+            print("[STEP] Requires project token/request cap configured in Settings page.")
+            _send_event(provider, model, endpoint, near_cap_tokens, "near-cap", environment)
+            client.flush()
+            _print_phase("near_cap", project_id, auth_token, provider)
 
         def run_retry_storm() -> None:
             print("\n[STEP] Retry storm")
@@ -259,6 +269,7 @@ def main() -> None:
 
         if demo_case == "all":
             run_steady()
+            run_near_cap()
             run_retry_storm()
             run_loop_suspect()
             run_token_explosion()
@@ -266,6 +277,8 @@ def main() -> None:
             run_req_cap_breach()
         elif demo_case == "steady":
             run_steady()
+        elif demo_case == "near_cap":
+            run_near_cap()
         elif demo_case == "retry_storm":
             run_retry_storm()
         elif demo_case == "loop_suspect":

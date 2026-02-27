@@ -96,6 +96,21 @@ class FakeProjectService:
             name="Demo",
             user_id="u1",
             created_at=datetime.now(timezone.utc),
+            protect_enabled=True,
+        )
+
+
+class FakeProjectRepository:
+    # Minimal project repository view for protect-mode webhook gating.
+    def get_project(self, project_id: str) -> Project | None:
+        if project_id != "p1":
+            return None
+        return Project(
+            id="p1",
+            name="Demo",
+            user_id="u1",
+            created_at=datetime.now(timezone.utc),
+            protect_enabled=True,
         )
 
 
@@ -108,6 +123,7 @@ def test_resolve_endpoint_marks_resolved_and_deletes_lock() -> None:
         incident_repository=repo,  # type: ignore[arg-type]
         realtime_counters=realtime,  # type: ignore[arg-type]
         webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
+        project_repository=FakeProjectRepository(),  # type: ignore[arg-type]
     )
 
     app.dependency_overrides[get_detect_incidents_service] = lambda: service

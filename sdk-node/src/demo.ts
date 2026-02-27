@@ -112,7 +112,7 @@ function printUsageExamples(): void {
   console.log("Example:");
   console.log("  LLMTBG_PROVIDER=openai");
   console.log("  LLMTBG_MODEL=gpt-4o-mini");
-  console.log("  LLMTBG_DEMO_CASE=steady|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all");
+  console.log("  LLMTBG_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all");
   console.log("  LLMTBG_STEP_SLEEP_MS=200");
   console.log("  LLMTBG_RETRY_STORM_COUNT=6");
   console.log("  LLMTBG_LOOP_COUNT=7");
@@ -120,6 +120,7 @@ function printUsageExamples(): void {
   console.log("  LLMTBG_CAP_BREACH_TOKENS=4000");
   console.log("  LLMTBG_CAP_BREACH_REQ_COUNT=6");
   console.log("  LLMTBG_CAP_BREACH_REQ_TOKENS=1");
+  console.log("  LLMTBG_NEAR_CAP_TOKENS=3200");
   console.log("  Optional snapshot/incident summary:");
   console.log("  LLMTBG_AUTH_TOKEN=<jwt> LLMTBG_PROJECT_ID=<project_id>");
 }
@@ -165,6 +166,7 @@ async function runDemo(): Promise<void> {
   const capBreachTokens = Number(process.env.LLMTBG_CAP_BREACH_TOKENS ?? 4000);
   const capBreachReqCount = Number(process.env.LLMTBG_CAP_BREACH_REQ_COUNT ?? 6);
   const capBreachReqTokens = Number(process.env.LLMTBG_CAP_BREACH_REQ_TOKENS ?? 1);
+  const nearCapTokens = Number(process.env.LLMTBG_NEAR_CAP_TOKENS ?? 3200);
 
   const authToken = process.env.LLMTBG_AUTH_TOKEN ?? "";
   const projectId = process.env.LLMTBG_PROJECT_ID ?? "";
@@ -180,7 +182,7 @@ async function runDemo(): Promise<void> {
   console.log(`[DEMO] provider=${provider} model=${model} case=${demoCase}`);
   console.log(`[DEMO] environment=${environment}`);
   console.log(
-    `[DEMO] params retry_storm_count=${retryStormCount} loop_count=${loopCount} token_explosion_tokens=${tokenExplosionTokens} cap_breach_tokens=${capBreachTokens} cap_breach_req_count=${capBreachReqCount} cap_breach_req_tokens=${capBreachReqTokens} step_sleep_ms=${stepSleepMs}`,
+    `[DEMO] params retry_storm_count=${retryStormCount} loop_count=${loopCount} token_explosion_tokens=${tokenExplosionTokens} cap_breach_tokens=${capBreachTokens} cap_breach_req_count=${capBreachReqCount} cap_breach_req_tokens=${capBreachReqTokens} near_cap_tokens=${nearCapTokens} step_sleep_ms=${stepSleepMs}`,
   );
 
   const runSteady = async (): Promise<void> => {
@@ -204,6 +206,14 @@ async function runDemo(): Promise<void> {
     }
     await client.flush();
     await printPhase("retry_storm", projectId, authToken, provider);
+  };
+
+  const runNearCap = async (): Promise<void> => {
+    console.log("\n[STEP] Near-cap logging (observe)");
+    console.log("[STEP] Requires project token/request cap configured in Settings page.");
+    await sendEvent(client, provider, model, endpoint, nearCapTokens, "near-cap");
+    await client.flush();
+    await printPhase("near_cap", projectId, authToken, provider);
   };
 
   const runLoopSuspect = async (): Promise<void> => {
@@ -247,6 +257,7 @@ async function runDemo(): Promise<void> {
 
   if (demoCase === "all") {
     await runSteady();
+    await runNearCap();
     await runRetryStorm();
     await runLoopSuspect();
     await runTokenExplosion();
@@ -254,6 +265,8 @@ async function runDemo(): Promise<void> {
     await runReqCapBreach();
   } else if (demoCase === "steady") {
     await runSteady();
+  } else if (demoCase === "near_cap") {
+    await runNearCap();
   } else if (demoCase === "retry_storm") {
     await runRetryStorm();
   } else if (demoCase === "loop_suspect") {

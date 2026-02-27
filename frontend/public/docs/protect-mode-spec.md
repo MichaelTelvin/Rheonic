@@ -17,6 +17,7 @@ Dashboard endpoints keep project totals and can optionally filter by provider.
 - SDK does not run preflight token estimation.
 - Provider call proceeds.
 - Ingest still records incidents.
+- No webhook events are dispatched from runtime detection/decision paths.
 
 ### Protect
 - SDK calls `/api/v1/protect/decision` before provider call.
@@ -61,12 +62,13 @@ Incident behavior:
 
 ## Webhooks
 - Protect mode:
-  - `incident.warn` for warn-type incident detections
-  - `incident.block` for block actions / cap breaches
-- All modes:
+  - `decision.warn` for protect decision warn outcomes (including `near_cap`)
+  - `incident.warn` for non-breach incident opens from ingest (`retry_storm` / `loop_suspect` / `token_explosion`)
+  - `incident.block` for protect decision block outcomes (`req_cap_breach` / `tok_cap_breach` / `cooldown_active`)
   - `incident.resolved` on manual/auto resolve
-- Policy gap:
   - `policy_gap.detected` once per first-seen `(project, provider, model)`
+- Mode independent:
+  - `webhook.test` from `/api/v1/projects/{project_id}/webhook/test`
 
 ## Metrics
 - Realtime: `GET /api/v1/metrics/realtime?project_id=...&provider?`

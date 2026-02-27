@@ -5,8 +5,6 @@ from app.domain.detectors.detector import Detector
 class NearCapDetector(Detector):
     # Warn detector for preflight near-cap conditions.
     def detect(self, ctx: DetectionContext) -> list[Signal]:
-        if not ctx.protect_enabled:
-            return []
         req_ratio = None
         tok_ratio = None
         req_near = False

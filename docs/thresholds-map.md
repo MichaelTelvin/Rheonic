@@ -16,10 +16,12 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 
 ## Protect Near-Cap Threshold
 - `protect_near_cap_factor`: warn ratio used by preflight near-cap checks.
-- Near-cap warn checks (protect mode only):
+- Near-cap checks:
   - tokens: `tokens_60s + estimated_next_tokens >= tok_cap * protect_near_cap_factor`
   - requests: `requests_60s + 1 >= req_cap * protect_near_cap_factor`
-- When it applies: preflight only, and only when protect is enabled.
+- When it applies:
+  - Protect preflight: decision `warn` with webhook `decision.warn`.
+  - Ingest (observe/protect): incident signal/logging for `near_cap`.
 
 ## Retry Storm Detector
 - `retry_storm_window_seconds`: lookback window for failure burst detection.
@@ -55,17 +57,18 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - No preflight call.
 - No token estimation for preflight.
 - Never returns warn/block action to SDK.
-- Ingest still logs incidents (`retry_storm`, `loop_suspect`, `token_explosion`, `cap_breach` when caps exist).
-- Warn webhooks are not sent in observe mode.
+- Ingest still logs incidents (`near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`, `cap_breach` when caps exist).
+- No runtime detector/decision webhooks are sent in observe mode.
 
 ## Webhook Triggers
 - Protect mode only:
-  - `incident.warn` for warn-type incidents
-  - `incident.block` for cap-breach/block actions
-- All modes:
+  - `decision.warn` for protect decision warn outcomes
+  - `incident.warn` for non-breach incident opens from ingest (`retry_storm`, `loop_suspect`, `token_explosion`)
+  - `incident.block` for protect decision block outcomes
   - `incident.resolved` for manual and auto resolve
-- Policy gap:
   - `policy_gap.detected` once per first-seen `(project_id, provider, model)`
+- Mode independent:
+  - `webhook.test`
 
 ## Tuning Checklist
 ### Too many warnings

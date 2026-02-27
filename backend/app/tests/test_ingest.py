@@ -363,6 +363,24 @@ def test_cap_breach_repeated_events_update_same_incident_within_dedup_window() -
     assert int(cap_rows[0].evidence.get("count", 0)) == 2
 
 
+def test_near_cap_opens_incident_in_observe_without_webhook() -> None:
+    service, incidents, webhook = _service(protect_enabled=False, req_cap=None, tok_cap=1000)
+    service.ingest(_event("p1", total_tokens=600, offset_seconds=0))
+
+    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
+    assert len(near_cap_rows) == 1
+    assert all(event_type not in {"incident.warn", "incident.block"} for _, event_type, _ in webhook.calls)
+
+
+def test_near_cap_in_protect_mode_does_not_emit_incident_warn_webhook() -> None:
+    service, incidents, webhook = _service(protect_enabled=True, req_cap=None, tok_cap=1000)
+    service.ingest(_event("p1", total_tokens=600, offset_seconds=0))
+
+    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
+    assert len(near_cap_rows) == 1
+    assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
+
+
 def test_token_explosion_incident_emits_warn_in_protect_mode() -> None:
     service, incidents, webhook = _service(protect_enabled=True, tok_cap=10_000, token_explosion_abs=1500)
     service.ingest(_event("p1", total_tokens=1800, offset_seconds=0))
@@ -382,7 +400,7 @@ def test_cap_breach_suppresses_token_explosion_for_same_event() -> None:
     assert incident.incident_type == "cap_breach"
     assert incident.evidence.get("tok_cap_breach") is True
     assert all(row.incident_type != "token_explosion" for row in incidents.rows)
-    assert any(event_type == "incident.block" for _, event_type, _ in webhook.calls)
+    assert all(event_type != "incident.block" for _, event_type, _ in webhook.calls)
 
 
 def test_policy_gap_first_seen_webhook_only_once_and_no_incident() -> None:
@@ -392,4 +410,12 @@ def test_policy_gap_first_seen_webhook_only_once_and_no_incident() -> None:
 
     policy_gap_calls = [call for call in webhook.calls if call[1] == "policy_gap.detected"]
     assert len(policy_gap_calls) == 1
+    assert incidents.rows == []
+
+
+def test_policy_gap_webhook_not_sent_in_observe_mode() -> None:
+    service, incidents, webhook = _service(protect_enabled=False)
+    service.ingest(_event("p1", provider="openai", model="gpt-4o-mini", total_tokens=10, offset_seconds=0))
+
+    assert all(event_type != "policy_gap.detected" for _, event_type, _ in webhook.calls)
     assert incidents.rows == []

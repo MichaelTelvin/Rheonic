@@ -10,6 +10,7 @@ All API paths remain under `/api/v1/...`.
 - Realtime counters move.
 - No preflight decision call.
 - Incidents may be logged by deterministic detectors; no protect warn/block action is returned to SDK.
+- No runtime detector/decision webhook should be sent in observe mode.
 
 ### 2) Protect allow path
 1. Set mode Protect and high caps.
@@ -41,10 +42,11 @@ Run protect demo with:
 Expected:
 - Decision response `warn` with matching reason.
 - Provider stub is still called.
+- Webhook event `decision.warn` is dispatched in protect mode.
 
 ### 6) Incident lifecycle
 1. Trigger an incident type in observe or protect mode.
 2. Resolve manually from `/api/v1/incidents/{incident_id}/resolve` or wait for auto-close cooldown.
 3. Expected:
 - Incident status transitions `open` -> `resolved` or `auto_resolved`.
-- Resolution webhook event is emitted when webhook is configured.
+- Resolution webhook event is emitted only in protect mode when webhook is configured.

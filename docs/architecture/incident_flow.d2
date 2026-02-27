@@ -32,7 +32,7 @@ counters: "Rolling Counters\nrequests_60s / tokens_60s\nscope: project+provider"
   }
 }
 
-detectors: "Detector(s)\nretry_storm\nloop_suspect\ntoken_explosion\n+ cap_breach logging from counters" {
+detectors: "Detector(s)\nnear_cap\nretry_storm\nloop_suspect\ntoken_explosion\n+ cap_breach logging from counters" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -52,7 +52,7 @@ incident_manager: "IncidentManager\nopen / update\n(project+provider+incident_ty
   }
 }
 
-webhooks: "Webhook hooks\nprotect mode only: incident.warn\nall modes: incident.resolved\npolicy_gap.detected (first-seen provider+model)" {
+webhooks: "Webhook hooks\nprotect mode only:\ndecision.warn / incident.warn / incident.block\nincident.resolved / policy_gap.detected\n(webhook.test is mode-independent)" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"

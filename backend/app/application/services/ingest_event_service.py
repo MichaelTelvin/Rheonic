@@ -12,6 +12,7 @@ from app.application.services.incident_manager import IncidentManager
 from app.config import app_config
 from app.domain.detectors.contracts import DetectionContext, Signal
 from app.domain.detectors.loop_suspect_detector import LoopSuspectDetector
+from app.domain.detectors.near_cap_detector import NearCapDetector
 from app.domain.detectors.registry import DetectorRegistry
 from app.domain.detectors.retry_storm_detector import RetryStormDetector
 from app.domain.detectors.token_explosion_detector import TokenExplosionDetector
@@ -51,6 +52,7 @@ class IngestEventService:
         self._token_explosion_abs = token_explosion_abs
         self._detector_registry = DetectorRegistry(
             detectors=[
+                NearCapDetector(),
                 RetryStormDetector(),
                 LoopSuspectDetector(),
                 TokenExplosionDetector(),
@@ -108,7 +110,7 @@ class IngestEventService:
             cap_breach_signals = self._cap_breach_signal_if_any(ctx)
             if cap_breach_signals:
                 # Prevent duplicate anomaly incidents for the same ingest event.
-                signals = [signal for signal in signals if signal.detector != "token_explosion"]
+                signals = [signal for signal in signals if signal.detector not in {"token_explosion", "near_cap"}]
             signals.extend(cap_breach_signals)
             self._incident_manager.process_signals(
                 project_id=event.project_id,
@@ -185,7 +187,8 @@ class IngestEventService:
                 "first_seen_at": first_seen_at.isoformat(),
             },
         )
-        if self._webhook_dispatcher is not None:
+        project = self._project_repository.get_project(event.project_id)
+        if self._webhook_dispatcher is not None and project is not None and bool(project.protect_enabled):
             try:
                 self._webhook_dispatcher.enqueue(
                     project_id=event.project_id,

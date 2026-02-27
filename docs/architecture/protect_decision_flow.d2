@@ -92,6 +92,16 @@ block: "block\nLLMTBGBlockedError\nprovider call prevented" {
   }
 }
 
+decision_webhooks: "Protect webhooks\nwarn -> decision.warn\nblock -> incident.block" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 13
+  }
+}
+
 provider: "Provider call" {
   style: {
     fill: "#e8eef9"
@@ -140,8 +150,10 @@ inputs -> caps
 caps -> block: "block"
 caps -> warn_signals: "no block"
 warn_signals -> allow_warn: "warn / allow"
+warn_signals -> decision_webhooks: "warn"
+block -> decision_webhooks: "block"
 allow_warn -> provider
 provider -> ingest
-block -> metrics
+decision_webhooks -> metrics
 ingest -> incident_pipeline
 ingest -> metrics

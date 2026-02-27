@@ -203,6 +203,16 @@ class ProtectService:
             warn_signal = warn_signals[0]
             reason = str(warn_signal.detector)
             self._protect_action_store.record(project_id=scoped_id, decision="warn", reason=reason)
+            self._enqueue_warn_webhook(
+                project_id=project_id,
+                provider=provider,
+                reason=reason,
+                requests_60s=requests_60s,
+                tokens_60s=tokens_60s,
+                max_req=max_req,
+                max_tok=max_tok,
+                estimated_next_tokens=estimated_next_tokens,
+            )
             return project_id, ProtectDecision(
                 decision="warn",
                 reason=reason,
@@ -339,6 +349,43 @@ class ProtectService:
             self._webhook_dispatcher.enqueue(
                 project_id=project_id,
                 event_type="incident.block",
+                payload=payload,
+            )
+        except Exception:
+            # Decision path must never fail because webhook dispatch fails.
+            pass
+
+    def _enqueue_warn_webhook(
+        self,
+        *,
+        project_id: str,
+        provider: str,
+        reason: str,
+        requests_60s: int,
+        tokens_60s: int,
+        max_req: int | None,
+        max_tok: int | None,
+        estimated_next_tokens: int | None,
+    ) -> None:
+        if self._webhook_dispatcher is None:
+            return
+        now = self._now_provider()
+        payload = {
+            "event": "decision.warn",
+            "project_id": project_id,
+            "provider": provider,
+            "reason": reason,
+            "requests_60s": requests_60s,
+            "tokens_60s": tokens_60s,
+            "req_cap": max_req,
+            "tok_cap": max_tok,
+            "estimated_next_tokens": estimated_next_tokens,
+            "sent_at": now.isoformat(),
+        }
+        try:
+            self._webhook_dispatcher.enqueue(
+                project_id=project_id,
+                event_type="decision.warn",
                 payload=payload,
             )
         except Exception:

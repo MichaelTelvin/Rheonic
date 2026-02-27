@@ -9,6 +9,7 @@
 1. Persist event.
 2. Update rolling 60s counters (`requests_60s`, `tokens_60s`) for `(project, provider)`.
 3. Run deterministic detectors:
+- `near_cap`
 - `retry_storm`
 - `loop_suspect`
 - `token_explosion`
@@ -17,9 +18,11 @@
 - create/open incident when no recent matching open fingerprint
 - otherwise update existing incident (count, last_seen, evidence)
 5. Webhook hooks:
-- protect mode warn incidents -> `incident.warn`
-- all mode resolution events -> `incident.resolved`
-- policy-gap first-seen tuple -> `policy_gap.detected`
+- protect mode decision warns -> `decision.warn`
+- protect mode ingest non-breach incident opens -> `incident.warn`
+- protect mode decision blocks -> `incident.block`
+- protect mode resolution events -> `incident.resolved`
+- protect mode policy-gap first-seen tuple -> `policy_gap.detected`
 6. Auto-close resolves stale open incidents by inactivity cooldown.
 
 ## Protect decision pipeline

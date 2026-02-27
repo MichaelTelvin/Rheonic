@@ -237,6 +237,19 @@ def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
 
     with session_factory.create_session() as session:
         session.add(
+            ProjectRecord(
+                id="p1",
+                name="AutoClose",
+                user_id="u1",
+                protect_enabled=True,
+                protect_fail_mode="open",
+                protect_max_req_per_min=None,
+                protect_max_tok_per_min=None,
+                protect_decision_timeout_ms=100,
+                created_at=now,
+            )
+        )
+        session.add(
             IncidentRecord(
                 id="inc-old-webhook",
                 project_id="p1",
@@ -255,6 +268,7 @@ def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
         incident_repository=IncidentRepositoryImpl(session_factory=session_factory),
         cooldown_seconds=300,
         webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
+        project_repository=ProjectRepositoryImpl(session_factory=session_factory),
     )
     resolved_count = service.auto_close(now=now)
     assert resolved_count == 1

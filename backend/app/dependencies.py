@@ -151,6 +151,7 @@ def get_detect_incidents_service() -> DetectIncidentsService:
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
             webhook_dispatcher=get_webhook_dispatcher(),
+            project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )
         logger.debug("Detect incidents service provided")
         return service

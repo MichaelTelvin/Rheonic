@@ -110,6 +110,24 @@ class FakeEventRepository:
         return [event for event in self.events if event.project_id == project_id][-limit:]
 
 
+class FakeWebhookDispatcher:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, dict[str, object]]] = []
+
+    def enqueue(
+        self,
+        project_id: str,
+        payload: dict[str, object],
+        event_type: str,
+        *,
+        override_url: str | None = None,
+        override_secret: str | None = None,
+        force_send: bool = False,
+    ) -> None:
+        _ = (override_url, override_secret, force_send)
+        self.calls.append((project_id, event_type, payload))
+
+
 def _cleanup_overrides() -> None:
     app.dependency_overrides.clear()
 
@@ -121,7 +139,12 @@ def _reset_overrides() -> None:
     app.dependency_overrides.clear()
 
 
-def _make_client(tmp_path, *, cooldown_seconds: int = 60) -> tuple[TestClient, RollingWindow, FakeEventRepository]:
+def _make_client(
+    tmp_path,
+    *,
+    cooldown_seconds: int = 60,
+    webhook_dispatcher: FakeWebhookDispatcher | None = None,
+) -> tuple[TestClient, RollingWindow, FakeEventRepository]:
     db_url = f"sqlite:///{tmp_path}/protect_decision.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)
@@ -142,6 +165,7 @@ def _make_client(tmp_path, *, cooldown_seconds: int = 60) -> tuple[TestClient, R
         realtime_counters=rolling_window,
         protect_action_store=protect_action_store,
         protect_block_cooldown_seconds=cooldown_seconds,
+        webhook_dispatcher=webhook_dispatcher,  # type: ignore[arg-type]
     )
     metrics_service = MetricsService(
         realtime_counters=rolling_window,
@@ -263,6 +287,27 @@ def test_near_cap_warns_when_predictive_reaches_warn_ratio(tmp_path) -> None:
     )
     assert decision["decision"] == "warn"
     assert decision["reason"] == "near_cap"
+    _cleanup_overrides()
+
+
+def test_near_cap_warn_dispatches_decision_warn_webhook(tmp_path) -> None:
+    dispatcher = FakeWebhookDispatcher()
+    client, rolling_window, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Webhook")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=150)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 10},
+    )
+    assert decision["decision"] == "warn"
+    warn_calls = [call for call in dispatcher.calls if call[1] == "decision.warn"]
+    assert len(warn_calls) == 1
+    _, _, payload = warn_calls[0]
+    assert payload["event"] == "decision.warn"
+    assert payload["reason"] == "near_cap"
     _cleanup_overrides()
 
 

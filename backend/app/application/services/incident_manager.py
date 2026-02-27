@@ -100,7 +100,10 @@ class IncidentManager:
         if mode != "protect":
             return
         incident_type = incident.incident_type
-        event_type = "incident.block" if incident_type == "cap_breach" else "incident.warn"
+        # cap_breach block and near_cap warn webhooks are emitted by protect decision path.
+        if incident_type in {"cap_breach", "near_cap"}:
+            return
+        event_type = "incident.warn"
         payload = {
             "event": event_type,
             "project_id": incident.project_id,

@@ -248,7 +248,7 @@ def test_policy_gap_never_creates_incident_even_when_protect_disabled(tmp_path) 
         )
     assert models_count == 1
     assert incidents_count == 0
-    assert len(dispatcher.calls) == 1
+    assert len(dispatcher.calls) == 0
 
 
 def test_webhook_dispatched_on_policy_gap_contains_required_fields(tmp_path) -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from app.application.interfaces.incident_repository import IncidentRepository
+from app.application.interfaces.project_repository import ProjectRepository
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.domain.models.incident import Incident
 from app.logger import get_logger
@@ -19,10 +20,12 @@ class AutoCloseIncidentsService:
         incident_repository: IncidentRepository,
         cooldown_seconds: int,
         webhook_dispatcher: WebhookDispatcher | None = None,
+        project_repository: ProjectRepository | None = None,
     ) -> None:
         self._incident_repository = incident_repository
         self._cooldown_seconds = max(int(cooldown_seconds), 1)
         self._webhook_dispatcher = webhook_dispatcher
+        self._project_repository = project_repository
 
     def auto_close(self, now: datetime | None = None) -> int:
         # Resolve stale incidents and return number of rows changed.
@@ -40,6 +43,8 @@ class AutoCloseIncidentsService:
     def _enqueue_incident_resolved_webhook(self, *, incident: Incident, resolved_by: str) -> None:
         # Enqueue webhook for auto-resolved incidents.
         if self._webhook_dispatcher is None:
+            return
+        if not self._is_protect_mode_enabled(incident.project_id):
             return
         provider, model, environment = _incident_dimensions(incident)
         resolved_at = incident.resolved_at or datetime.now(timezone.utc)
@@ -65,6 +70,12 @@ class AutoCloseIncidentsService:
             )
         except Exception:
             logger.exception("Failed to enqueue auto incident resolved webhook", extra={"incident_id": incident.id})
+
+    def _is_protect_mode_enabled(self, project_id: str) -> bool:
+        if self._project_repository is None:
+            return False
+        project = self._project_repository.get_project(project_id)
+        return bool(project is not None and project.protect_enabled)
 
 
 def _incident_dimensions(incident: Incident) -> tuple[str | None, str | None, str | None]:
