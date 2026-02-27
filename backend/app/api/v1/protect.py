@@ -92,14 +92,21 @@ def protect_decision(
                 environment=payload.environment,
                 provider=payload.provider,
                 model=payload.model,
+                feature=payload.feature,
             ),
         )
         if decision is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
         latency_ms = int((perf_counter() - start) * 1000)
         if project_id:
+            scoped_id = scoped_project_provider_id(project_id, payload.provider)
+            protect_action_store.record(
+                project_id=scoped_id,
+                decision=decision.decision,
+                reason=decision.reason,
+            )
             protect_action_store.record_health(
-                project_id=scoped_project_provider_id(project_id, payload.provider),
+                project_id=scoped_id,
                 latency_ms=latency_ms,
                 timed_out=False,
             )

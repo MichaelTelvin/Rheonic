@@ -54,6 +54,16 @@ Incident types:
 - `loop_suspect`
 - `token_explosion`
 
+Near-cap incidents are fingerprint-split into subtypes:
+- `near_cap(req)`
+- `near_cap(tok)`
+- `near_cap(both)`
+
+Evidence fields include:
+- `req_near_cap: bool`
+- `tok_near_cap: bool`
+- `near_cap_type: "req" | "tok" | "both"`
+
 Incident behavior:
 - create on first detection
 - dedup+update within `incident_dedup_window_seconds`

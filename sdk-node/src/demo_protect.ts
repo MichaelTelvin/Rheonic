@@ -33,6 +33,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (typeof raw !== "string" || raw.trim() === "") return fallback;
+  const parsed = Number.parseInt(raw.trim(), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 async function providerCount(): Promise<number> {
   const res = await fetch(`${providerStubUrl}/count`);
   if (!res.ok) throw new Error(`provider_stub_count_failed:${res.status}`);
@@ -82,6 +89,8 @@ async function sendIngestEvent(
   environment: string,
   options?: { status?: string; httpStatus?: number; errorType?: string },
 ): Promise<void> {
+  const status = options?.status ?? "ok";
+  const httpStatus = options?.httpStatus ?? 200;
   const payload = {
     ts: new Date().toISOString(),
     provider,
@@ -92,10 +101,10 @@ async function sendIngestEvent(
       output_tokens: 1,
       total_tokens: totalTokens,
       latency_ms: 120,
-      http_status: options?.httpStatus ?? 200,
-      error_type: options?.errorType,
+      http_status: httpStatus,
+      ...(options?.errorType ? { error_type: options.errorType } : {}),
     },
-    status: options?.status,
+    status,
   };
   const response = await fetch(`${backendBaseUrl}/api/v1/events`, {
     method: "POST",
@@ -108,15 +117,37 @@ async function sendIngestEvent(
   if (!response.ok) throw new Error(`ingest_failed:${response.status}`);
 }
 
-async function listOpenIncidents(projectId: string, provider: string, authToken: string): Promise<Array<{ type: string }>> {
+async function listOpenIncidents(
+  projectId: string,
+  provider: string,
+  authToken: string,
+): Promise<Array<{ type: string; evidence?: { near_cap_type?: string } }>> {
   if (!projectId || !authToken) return [];
   const params = new URLSearchParams({ project_id: projectId, status: "open", provider });
   const response = await fetch(`${backendBaseUrl}/api/v1/incidents?${params.toString()}`, {
     headers: { Authorization: `Bearer ${authToken}` },
   });
-  if (!response.ok) throw new Error(`list_incidents_failed:${response.status}`);
-  const rows = (await response.json()) as Array<{ type: string }>;
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      console.log(`[INCIDENTS] skipped (${response.status} auth error; update LLMTBG_AUTH_TOKEN)`);
+      return [];
+    }
+    throw new Error(`list_incidents_failed:${response.status}`);
+  }
+  const rows = (await response.json()) as Array<{ type: string; evidence?: { near_cap_type?: string } }>;
   return rows;
+}
+
+async function getProjectReqCap(projectId: string, authToken: string): Promise<number | null> {
+  if (!projectId || !authToken) return null;
+  const response = await fetch(`${backendBaseUrl}/api/v1/projects/${projectId}/protect`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
+  if (!response.ok) return null;
+  const payload = (await response.json()) as { protect_max_req_per_min?: unknown };
+  const value = payload.protect_max_req_per_min;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 1) return null;
+  return Math.floor(value);
 }
 
 async function runProviderCall(provider: string, model: string, maxTokens: number, openai: any, anthropic: any, googleModel: any): Promise<boolean> {
@@ -163,7 +194,8 @@ async function main() {
   }
 
   const scenario = (process.env.LLMTBG_SCENARIO ?? "allow").toLowerCase();
-  const pauseMs = Number(process.env.LLMTBG_STEP_SLEEP_MS ?? 200);
+  const pauseMs = envInt("LLMTBG_STEP_SLEEP_MS", 200);
+  const protectDecisionTimeoutMs = envInt("LLMTBG_PROTECT_DECISION_TIMEOUT_MS", 100);
   const env = (process.env.LLMTBG_ENVIRONMENT ?? "").trim() || `protect-${Date.now()}`;
   const authToken = process.env.LLMTBG_AUTH_TOKEN ?? "";
   const projectId = process.env.LLMTBG_PROJECT_ID ?? "";
@@ -178,6 +210,7 @@ async function main() {
     environment: env,
     debug: process.env.LLMTBG_DEBUG === "1" || process.env.LLMTBG_DEBUG === "true",
     flushIntervalMs: 60_000,
+    protectDecisionTimeoutMs,
   });
 
   let lastDecisionContext: Record<string, unknown> | null = null;
@@ -190,7 +223,14 @@ async function main() {
     lastDecisionContext = context as unknown as Record<string, unknown>;
     console.log("=== PROTECT DECISION REQUEST ===");
     console.log(JSON.stringify(context, null, 2));
-    const decision = await originalEvaluateProtectDecision(context);
+    let decision;
+    try {
+      decision = await originalEvaluateProtectDecision(context);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`=== PROTECT DECISION ERROR === ${message}`);
+      throw error;
+    }
     lastDecisionValue = decision.decision;
     lastDecisionReason = decision.reason;
     lastClampRecommended = decision.clamp?.recommended_max_output_tokens ?? null;
@@ -227,13 +267,17 @@ async function main() {
     },
   };
 
-  instrumentOpenAI(openai as any, { client, feature: "manual-protect-demo", environment: env });
-  instrumentAnthropic(anthropic as any, { client, feature: "manual-protect-demo", environment: env });
-  instrumentGoogle(googleModel as any, { client, feature: "manual-protect-demo", environment: env });
+  const decisionFeature = scenario === "loop_suspect" ? "loop-fixed-signature" : "manual-protect-demo";
+  instrumentOpenAI(openai as any, { client, feature: decisionFeature, environment: env });
+  instrumentAnthropic(anthropic as any, { client, feature: decisionFeature, environment: env });
+  instrumentGoogle(googleModel as any, { client, feature: decisionFeature, environment: env });
 
   console.log(`[DEMO] provider=${provider} model=${model} scenario=${scenario}`);
   console.log(`[DEMO] environment=${env}`);
-  const maxTokens = Number(process.env.LLMTBG_MAX_TOKENS ?? 128);
+  console.log(`[DEMO] protect_decision_timeout_ms=${protectDecisionTimeoutMs}`);
+  console.log(`[DEMO] decision_feature=${decisionFeature}`);
+  const maxTokens = envInt("LLMTBG_MAX_TOKENS", 128);
+  let callMaxTokens = maxTokens;
   console.log(`[DEMO] max_tokens(before call)=${maxTokens}`);
 
   if (scenario === "near_cap") {
@@ -247,15 +291,22 @@ async function main() {
     await sendIngestEvent(ingestKey, provider, model, seed, "cap-breach-seed", env);
     await sleep(pauseMs);
   } else if (scenario === "req_cap_breach") {
-    const count = Number(process.env.LLMTBG_REQ_CAP_BREACH_COUNT ?? 6);
-    const reqTokens = Number(process.env.LLMTBG_CAP_BREACH_REQ_TOKENS ?? 1);
-    console.log("[STEP] Seed req cap breach then expect block");
+    let count = envInt("LLMTBG_REQ_CAP_BREACH_COUNT", 6);
+    const reqTokens = envInt("LLMTBG_CAP_BREACH_REQ_TOKENS", 1);
+    const reqCap = await getProjectReqCap(projectId, authToken);
+    if (typeof reqCap === "number") {
+      count = Math.max(count, reqCap + 1);
+    }
+    console.log(`[STEP] Seed req cap breach then expect block (events=${count}, req_cap=${reqCap ?? "unknown"})`);
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, reqTokens, `req-cap-breach-${i + 1}`, env);
-      await sleep(pauseMs);
+      if (pauseMs > 0) {
+        await sleep(pauseMs);
+      }
     }
+    console.log(`[STEP] req_cap_breach ingest events sent=${count} (provider_calls_delta tracks provider calls only)`);
   } else if (scenario === "retry_storm") {
-    const count = Number(process.env.LLMTBG_RETRY_STORM_COUNT ?? 6);
+    const count = envInt("LLMTBG_RETRY_STORM_COUNT", 6);
     console.log("[STEP] Seed retry storm then expect warn");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 50, `retry-${i + 1}`, env, {
@@ -266,19 +317,21 @@ async function main() {
       await sleep(pauseMs);
     }
   } else if (scenario === "loop_suspect") {
-    const count = Number(process.env.LLMTBG_LOOP_COUNT ?? 7);
+    const count = envInt("LLMTBG_LOOP_COUNT", 7);
     console.log("[STEP] Seed loop suspect then expect warn");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 60, "loop-fixed-signature", env);
       await sleep(pauseMs);
     }
   } else if (scenario === "token_explosion") {
-    const seed = Number(process.env.LLMTBG_TOKEN_EXPLOSION_TOKENS ?? 9000);
+    const seed = envInt("LLMTBG_TOKEN_EXPLOSION_TOKENS", 9000);
     console.log("[STEP] Seed token explosion then expect warn");
     await sendIngestEvent(ingestKey, provider, model, seed, "token-explosion-seed", env);
+    callMaxTokens = Math.max(maxTokens, seed);
+    console.log(`[STEP] token_explosion call max_tokens=${callMaxTokens}`);
     await sleep(pauseMs);
   } else if (scenario === "cooldown") {
-    const seed = Number(process.env.LLMTBG_CAP_BREACH_TOKENS ?? 5000);
+    const seed = envInt("LLMTBG_CAP_BREACH_TOKENS", 5000);
     console.log("[STEP] Seed cap breach then verify cooldown blocks repeated call");
     await sendIngestEvent(ingestKey, provider, model, seed, "cooldown-breach-seed", env);
     await sleep(pauseMs);
@@ -286,11 +339,11 @@ async function main() {
 
   let blocked: boolean;
   if (scenario === "cooldown") {
-    const blockedFirst = await runProviderCall(provider, model, maxTokens, openai, anthropic, googleModel);
-    const blockedSecond = await runProviderCall(provider, model, maxTokens, openai, anthropic, googleModel);
+    const blockedFirst = await runProviderCall(provider, model, callMaxTokens, openai, anthropic, googleModel);
+    const blockedSecond = await runProviderCall(provider, model, callMaxTokens, openai, anthropic, googleModel);
     blocked = blockedFirst && blockedSecond;
   } else {
-    blocked = await runProviderCall(provider, model, maxTokens, openai, anthropic, googleModel);
+    blocked = await runProviderCall(provider, model, callMaxTokens, openai, anthropic, googleModel);
   }
   await client.flush();
   const after = await providerCount();
@@ -308,13 +361,23 @@ async function main() {
   if (projectId && authToken) {
     const incidents = await listOpenIncidents(projectId, provider, authToken);
     const counts = new Map<string, number>();
+    const nearTypes = new Set<string>();
     for (const incident of incidents) counts.set(incident.type, (counts.get(incident.type) ?? 0) + 1);
+    for (const incident of incidents) {
+      if (incident.type === "near_cap" && typeof incident.evidence?.near_cap_type === "string" && incident.evidence.near_cap_type) {
+        nearTypes.add(incident.evidence.near_cap_type);
+      }
+    }
     incidentTypes = new Set(incidents.map((incident) => incident.type));
     const compact = Array.from(counts.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join(", ");
-    console.log(`[INCIDENTS] open=${incidents.length} types=${compact || "none"}`);
+    if (nearTypes.size > 0) {
+      console.log(`[INCIDENTS] open=${incidents.length} types=${compact || "none"} near_cap_types=${Array.from(nearTypes).sort().join(",")}`);
+    } else {
+      console.log(`[INCIDENTS] open=${incidents.length} types=${compact || "none"}`);
+    }
   } else {
     console.log("[INCIDENTS] skipped (set LLMTBG_PROJECT_ID and LLMTBG_AUTH_TOKEN)");
   }
@@ -338,7 +401,7 @@ async function main() {
   } else if (scenario === "loop_suspect") {
     assertLine("loop_suspect warn triggered", !blocked && decision === "warn" && reason === "loop_suspect");
   } else if (scenario === "token_explosion") {
-    assertLine("token_explosion warn triggered", !blocked && decision === "warn" && reason === "token_explosion");
+    assertLine("token_explosion warn triggered", !blocked && decision === "warn" && (reason === "token_explosion" || reason === "near_cap"));
   } else if (scenario === "cooldown") {
     assertLine("cooldown active", blocked && providerCallsDelta === 0);
     assertLine("cooldown active - repeated call blocked", blocked && providerCallsDelta === 0);

@@ -46,17 +46,14 @@ class EventRepositoryImpl(EventRepository):
             logger.exception("Failed to persist event", extra={"project_id": event.project_id})
             raise
 
-    def list_recent(self, project_id: str, limit: int = 100) -> list[Event]:
+    def list_recent(self, project_id: str, limit: int = 100, provider: str | None = None) -> list[Event]:
         # Fetch recent events for a project.
         try:
             with self._session_factory.create_session() as session:
-                records = (
-                    session.query(EventRecord)
-                    .filter(EventRecord.project_id == project_id)
-                    .order_by(EventRecord.created_at.desc())
-                    .limit(limit)
-                    .all()
-                )
+                query = session.query(EventRecord).filter(EventRecord.project_id == project_id)
+                if provider:
+                    query = query.filter(EventRecord.provider == provider)
+                records = query.order_by(EventRecord.ts.desc()).limit(limit).all()
             return [
                 Event(
                     id=record.id,

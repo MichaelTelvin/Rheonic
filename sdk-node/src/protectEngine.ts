@@ -17,6 +17,7 @@ interface ProtectDecisionResponse {
   fail_mode?: unknown;
   protect_decision_timeout_ms?: unknown;
   blocked_until?: unknown;
+  snapshot?: unknown;
   apply_clamp_enabled?: unknown;
   clamp?: unknown;
 }
@@ -24,6 +25,7 @@ interface ProtectDecisionResponse {
 export interface ProtectEvaluation {
   decision: ProtectDecision;
   reason: string;
+  snapshot?: Record<string, unknown>;
   applyClampEnabled?: boolean;
   clamp?: {
     recommended_max_output_tokens: number;
@@ -128,6 +130,7 @@ export class ProtectEngine {
       return {
         decision,
         reason,
+        snapshot: parseSnapshot(parsed.snapshot),
         applyClampEnabled: typeof parsed.apply_clamp_enabled === "boolean" ? parsed.apply_clamp_enabled : undefined,
         clamp: parseClamp(parsed.clamp),
       };
@@ -170,6 +173,13 @@ function parseClamp(value: unknown): { recommended_max_output_tokens: number; ap
     recommended_max_output_tokens: Math.floor(candidate.recommended_max_output_tokens),
     applied: typeof candidate.applied === "boolean" ? candidate.applied : false,
   };
+}
+
+function parseSnapshot(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
 }
 
 function parseBlockedUntilMs(value: unknown): number | null {

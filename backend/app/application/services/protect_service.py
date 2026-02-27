@@ -41,6 +41,7 @@ class ProtectDecisionContext:
     environment: str | None = None
     provider: str | None = None
     model: str | None = None
+    feature: str | None = None
 
 
 class ProtectService:
@@ -97,7 +98,6 @@ class ProtectService:
         if not project.protect_enabled:
             decision = "allow"
             reason = "ok"
-            self._protect_action_store.record(project_id=scoped_id, decision=decision, reason=reason)
             return project_id, ProtectDecision(
                 decision=decision,
                 reason=reason,
@@ -182,12 +182,19 @@ class ProtectService:
             input_estimate = max(ctx.input_tokens_estimate, 0)
             output_estimate = max(ctx.max_output_tokens, 0) if isinstance(ctx.max_output_tokens, int) else 0
             estimated_next_tokens = input_estimate + output_estimate
-        recent_events = self._event_repository.list_recent(project_id=project_id, limit=200) if self._event_repository is not None else []
+        recent_limit = max(int(app_config.retry_storm_count), int(app_config.loop_count)) + 8
+        recent_events = (
+            self._event_repository.list_recent(project_id=project_id, limit=recent_limit, provider=provider)
+            if self._event_repository is not None
+            else []
+        )
         detector_ctx = DetectionContext(
             project_id=project_id,
             provider=provider,
             model=ctx.model,
             environment=ctx.environment,
+            request_endpoint="/chat/completions",
+            request_feature=ctx.feature,
             now=now,
             current_requests_60s=requests_60s,
             current_tokens_60s=tokens_60s,
@@ -216,7 +223,6 @@ class ProtectService:
                 max_output_tokens=ctx.max_output_tokens,
                 estimated_next_tokens=estimated_next_tokens,
             )
-            self._protect_action_store.record(project_id=scoped_id, decision="warn", reason=reason)
             self._enqueue_warn_webhook(
                 project_id=project_id,
                 provider=provider,
@@ -258,7 +264,6 @@ class ProtectService:
 
         decision = "allow"
         reason = "ok"
-        self._protect_action_store.record(project_id=scoped_id, decision=decision, reason=reason)
         return project_id, ProtectDecision(
             decision=decision,
             reason=reason,
@@ -308,7 +313,6 @@ class ProtectService:
             blocked_until_ms=blocked_until_ms,
             cooldown_seconds=cooldown_seconds,
         )
-        self._protect_action_store.record(project_id=scoped_id, decision="block", reason=reason)
         self._enqueue_block_webhook(
             project_id=project_id,
             provider=provider,

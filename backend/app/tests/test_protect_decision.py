@@ -106,8 +106,11 @@ class FakeEventRepository:
     def add_recent(self, event: Event) -> None:
         self.events.append(event)
 
-    def list_recent(self, project_id: str, limit: int = 100) -> list[Event]:
-        return [event for event in self.events if event.project_id == project_id][-limit:]
+    def list_recent(self, project_id: str, limit: int = 100, provider: str | None = None) -> list[Event]:
+        rows = [event for event in self.events if event.project_id == project_id]
+        if provider:
+            rows = [event for event in rows if event.provider == provider]
+        return rows[-limit:]
 
 
 class FakeWebhookDispatcher:
@@ -234,7 +237,18 @@ def _decision(client: TestClient, ingest_key: str, body: dict[str, object] | Non
     return response.json()
 
 
-def _event(project_id: str, provider: str, model: str, *, status: str, http_status: int, total_tokens: int, created_at: datetime) -> Event:
+def _event(
+    project_id: str,
+    provider: str,
+    model: str,
+    *,
+    status: str,
+    http_status: int,
+    total_tokens: int,
+    created_at: datetime,
+    request_endpoint: str = "/chat/completions",
+    request_feature: str = "manual-protect-demo",
+) -> Event:
     return Event(
         id=f"evt-{project_id}-{provider}-{model}-{created_at.timestamp()}",
         ts=created_at,
@@ -250,7 +264,15 @@ def _event(project_id: str, provider: str, model: str, *, status: str, http_stat
         error_type="provider_error" if status == "error" else None,
         http_status=http_status,
         created_at=created_at,
+        request_endpoint=request_endpoint,
+        request_feature=request_feature,
     )
+
+
+def _protect_metrics(client: TestClient, project_id: str, provider: str = "openai") -> dict[str, object]:
+    response = client.get(f"/api/v1/metrics/protect?project_id={project_id}&provider={provider}")
+    assert response.status_code == 200
+    return response.json()
 
 
 def test_protect_disabled_returns_allow_and_predictive_disabled(tmp_path) -> None:
@@ -353,6 +375,68 @@ def test_retry_storm_warns_in_preflight(tmp_path) -> None:
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "warn"
     assert decision["reason"] == "retry_storm"
+    _cleanup_overrides()
+
+
+def test_loop_suspect_warns_in_preflight_when_feature_matches(tmp_path) -> None:
+    client, _, events = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    now = datetime.now(timezone.utc)
+    for offset in range(7):
+        events.add_recent(
+            _event(
+                project_id,
+                "openai",
+                "gpt-4o-mini",
+                status="ok",
+                http_status=200,
+                total_tokens=60,
+                created_at=now - timedelta(seconds=6 - offset),
+                request_feature="manual-protect-demo",
+            )
+        )
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={"provider": "openai", "model": "gpt-4o-mini", "feature": "manual-protect-demo"},
+    )
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "loop_suspect"
+    _cleanup_overrides()
+
+
+def test_protect_decision_records_allow_warn_block_outcomes(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+
+    allow_project_id, allow_ingest_key = _create_project_and_key(client, "Protect Outcome Allow")
+    _set_protect(client, allow_project_id, protect_enabled=True, protect_max_req_per_min=1000, protect_max_tok_per_min=1000)
+    allow_before = int(_protect_metrics(client, allow_project_id)["allowed_60m"])
+    _decision(client, allow_ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    allow_after = int(_protect_metrics(client, allow_project_id)["allowed_60m"])
+    assert allow_after == allow_before + 1
+
+    warn_project_id, warn_ingest_key = _create_project_and_key(client, "Protect Outcome Warn")
+    _set_protect(client, warn_project_id, protect_enabled=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(warn_project_id, "openai"), total_tokens=170)
+    warn_before = int(_protect_metrics(client, warn_project_id)["warned_60m"])
+    _decision(
+        client,
+        warn_ingest_key,
+        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 20},
+    )
+    warn_after = int(_protect_metrics(client, warn_project_id)["warned_60m"])
+    assert warn_after == warn_before + 1
+
+    block_project_id, block_ingest_key = _create_project_and_key(client, "Protect Outcome Block")
+    _set_protect(client, block_project_id, protect_enabled=True, protect_max_req_per_min=1, protect_max_tok_per_min=1000)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(block_project_id, "openai"), total_tokens=1)
+    block_before = int(_protect_metrics(client, block_project_id)["blocked_60m"])
+    _decision(client, block_ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    block_after = int(_protect_metrics(client, block_project_id)["blocked_60m"])
+    assert block_after == block_before + 1
     _cleanup_overrides()
 
 

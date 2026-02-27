@@ -14,7 +14,7 @@ class EventRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def list_recent(self, project_id: str, limit: int = 100) -> list[Event]:
+    def list_recent(self, project_id: str, limit: int = 100, provider: str | None = None) -> list[Event]:
         # Return the most recent events for a project.
         raise NotImplementedError
 

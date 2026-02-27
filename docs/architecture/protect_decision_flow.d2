@@ -62,7 +62,7 @@ caps: "Caps check (block)\nrequests_60s >= req_cap -> req_cap_breach\ntokens_60s
   }
 }
 
-warn_signals: "Warn signals (protect mode only)\nnear_cap (predictive)\nretry_storm\nloop_suspect\ntoken_explosion" {
+warn_signals: "Warn signals (protect mode only)\nnear_cap (predictive: req|tok|both)\nretry_storm\nloop_suspect\ntoken_explosion" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"

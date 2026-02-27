@@ -27,6 +27,8 @@ class DetectionContext:
     req_cap: int | None
     tok_cap: int | None
     protect_enabled: bool
+    request_endpoint: str | None = None
+    request_feature: str | None = None
     estimated_next_tokens: int | None = None
     current_event: Event | None = None
     recent_events: list[Event] = field(default_factory=list)

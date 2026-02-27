@@ -312,7 +312,10 @@ export function Dashboard(): JSX.Element {
                 <select
                   id="dashboard-provider-select"
                   value={selectedProvider}
-                  onChange={(event) => setSelectedProvider(normalizeProviderValue(event.target.value))}
+                  onChange={(event) => {
+                    setSelectedProvider(normalizeProviderValue(event.target.value));
+                    event.currentTarget.blur();
+                  }}
                   onFocus={() => {
                     void refreshProviders();
                   }}

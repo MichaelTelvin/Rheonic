@@ -54,6 +54,7 @@ def instrument_openai(
                     {
                         "provider": "openai",
                         "model": requested_model,
+                        "environment": environment or resolved_client.environment,
                         "feature": feature,
                         **(
                             {"input_tokens_estimate": estimated_input_tokens}
@@ -110,6 +111,7 @@ def instrument_openai(
                 {
                     "provider": "openai",
                     "model": requested_model,
+                    "environment": environment or resolved_client.environment,
                     "feature": feature,
                     **(
                         {"input_tokens_estimate": estimated_input_tokens}

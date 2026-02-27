@@ -17,6 +17,7 @@ class NearCapDetector(Detector):
             tok_near = tok_ratio >= ctx.warn_ratio
         if not (req_near or tok_near):
             return []
+        near_cap_type = "both" if req_near and tok_near else ("req" if req_near else "tok")
         evidence: dict[str, object] = {
             "provider": ctx.provider,
             "model": ctx.model,
@@ -27,15 +28,18 @@ class NearCapDetector(Detector):
             "tok_cap": ctx.tok_cap,
             "warn_ratio": ctx.warn_ratio,
             "estimated_next_tokens": ctx.estimated_next_tokens,
-            "req_ratio_to_cap": req_ratio,
-            "tok_ratio_to_cap": tok_ratio,
+            "req_ratio_to_cap": _round_ratio(req_ratio),
+            "tok_ratio_to_cap": _round_ratio(tok_ratio),
+            "req_near_cap": req_near,
+            "tok_near_cap": tok_near,
+            "near_cap_type": near_cap_type,
             "reason": "near_cap",
         }
         return [
             Signal(
                 detector="near_cap",
                 scope_provider=ctx.provider,
-                fingerprint=f"{ctx.project_id}:{ctx.provider}:near_cap",
+                fingerprint=f"{ctx.project_id}:{ctx.provider}:near_cap:{near_cap_type}",
                 evidence=evidence,
                 tags=_tags(ctx),
             )
@@ -47,3 +51,9 @@ def _tags(ctx: DetectionContext) -> dict[str, str]:
     if ctx.model:
         tags["model"] = ctx.model
     return tags
+
+
+def _round_ratio(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return round(value, 4)

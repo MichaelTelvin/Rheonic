@@ -164,7 +164,10 @@ export function Incidents(): JSX.Element {
                 <select
                   id="incidents-provider-select"
                   value={selectedProvider}
-                  onChange={(event) => onProviderChange(event.target.value)}
+                  onChange={(event) => {
+                    onProviderChange(event.target.value);
+                    event.currentTarget.blur();
+                  }}
                   onFocus={() => {
                     void refreshProviders();
                   }}
@@ -180,7 +183,14 @@ export function Incidents(): JSX.Element {
 
               <div className="incidents-filter-field">
                 <label htmlFor="incidents-type-select">Type</label>
-                <select id="incidents-type-select" value={selectedType} onChange={(event) => setSelectedType(event.target.value)}>
+                <select
+                  id="incidents-type-select"
+                  value={selectedType}
+                  onChange={(event) => {
+                    setSelectedType(event.target.value);
+                    event.currentTarget.blur();
+                  }}
+                >
                   <option value="all">All</option>
                   <option value="near_cap">Near cap</option>
                   <option value="cap_breach">Cap breach</option>
@@ -195,7 +205,10 @@ export function Incidents(): JSX.Element {
                 <select
                   id="incidents-status-select"
                   value={selectedStatus}
-                  onChange={(event) => setSelectedStatus(event.target.value as "all" | "open" | "resolved")}
+                  onChange={(event) => {
+                    setSelectedStatus(event.target.value as "all" | "open" | "resolved");
+                    event.currentTarget.blur();
+                  }}
                 >
                   <option value="open">Open</option>
                   <option value="resolved">Resolved</option>

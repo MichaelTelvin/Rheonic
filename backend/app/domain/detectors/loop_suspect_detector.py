@@ -8,13 +8,7 @@ class LoopSuspectDetector(Detector):
         if not ctx.recent_events or _is_error_event(ctx.current_event):
             return []
         cutoff = ctx.now.timestamp() - float(ctx.loop_window_seconds)
-        signature = _signature(
-            project_id=ctx.project_id,
-            provider=ctx.provider,
-            model=ctx.model,
-            environment=ctx.environment,
-            event=ctx.current_event,
-        )
+        signature = _context_signature(ctx)
         hit_count = 0
         for event in ctx.recent_events:
             if event.provider != ctx.provider:
@@ -66,6 +60,12 @@ def _signature(*, project_id: str, provider: str, model: str | None, environment
     endpoint = (event.request_endpoint or "na").strip()
     feature = (event.request_feature or "unknown").strip() or "unknown"
     return f"{project_id}:{provider}:{model or 'na'}:{environment or 'na'}:{endpoint}:{feature}"
+
+
+def _context_signature(ctx: DetectionContext) -> str:
+    endpoint = (ctx.request_endpoint or "na").strip()
+    feature = (ctx.request_feature or "unknown").strip() or "unknown"
+    return f"{ctx.project_id}:{ctx.provider}:{ctx.model or 'na'}:{ctx.environment or 'na'}:{endpoint}:{feature}"
 
 
 def _is_error_event(event) -> bool:

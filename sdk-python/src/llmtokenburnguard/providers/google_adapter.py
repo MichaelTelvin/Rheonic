@@ -52,6 +52,7 @@ def instrument_google(
                 requested_model=requested_model,
                 estimated_input_tokens=estimated_input_tokens,
                 max_output_tokens=_extract_max_output_tokens(args, kwargs),
+                environment=environment or resolved_client.environment,
                 feature=feature,
             )
             if protect_decision.get("decision") == "block":
@@ -103,6 +104,7 @@ def instrument_google(
             requested_model=requested_model,
             estimated_input_tokens=estimated_input_tokens,
             max_output_tokens=_extract_max_output_tokens(args, kwargs),
+            environment=environment or resolved_client.environment,
             feature=feature,
         )
         if protect_decision.get("decision") == "block":
@@ -147,6 +149,7 @@ def _preflight(
     requested_model: str | None,
     estimated_input_tokens: int | None,
     max_output_tokens: int | None,
+    environment: str | None,
     feature: str | None,
 ) -> dict[str, object]:
     if not sdk_client.should_preflight_decision():
@@ -155,6 +158,7 @@ def _preflight(
         {
             "provider": "google",
             "model": requested_model,
+            "environment": environment,
             "feature": feature,
             **({"input_tokens_estimate": estimated_input_tokens} if isinstance(estimated_input_tokens, int) else {}),
             "max_output_tokens": max_output_tokens,

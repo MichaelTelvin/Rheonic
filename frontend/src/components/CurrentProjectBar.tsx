@@ -63,7 +63,10 @@ export function CurrentProjectBar(): JSX.Element {
           <select
             id="global-project-select"
             value={projectId ?? ""}
-            onChange={(event) => setProjectId(event.target.value || null)}
+            onChange={(event) => {
+              setProjectId(event.target.value || null);
+              event.currentTarget.blur();
+            }}
             disabled={loadingProjects || projects.length === 0}
           >
             {projectId ? null : <option value="">Select project</option>}

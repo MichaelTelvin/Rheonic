@@ -16,8 +16,8 @@ class FakeEventRepository:
     def add(self, event: Event) -> None:
         _ = event
 
-    def list_recent(self, project_id: str, limit: int = 100) -> list[Event]:
-        _ = project_id, limit
+    def list_recent(self, project_id: str, limit: int = 100, provider: str | None = None) -> list[Event]:
+        _ = project_id, limit, provider
         return []
 
     def purge_older_than(self, cutoff: datetime) -> int:

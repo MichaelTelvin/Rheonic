@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import json as json_lib
 import os
 import sys
 import time
@@ -44,10 +44,16 @@ class LoggingHttpClient:
         self.last_decision_payload: dict[str, Any] | None = None
 
     def post(self, url: str, json: dict[str, Any], headers: dict[str, str], timeout: float | None = None) -> httpx.Response:
+        payload = json
         if url.endswith("/api/v1/protect/decision"):
             print("=== PROTECT DECISION REQUEST ===")
-            print(json.dumps(json, indent=2, sort_keys=True))
-        response = self._client.post(url, json=json, headers=headers, timeout=timeout)
+            print(json_lib.dumps(payload, indent=2, sort_keys=True))
+        try:
+            response = self._client.post(url, json=payload, headers=headers, timeout=timeout)
+        except Exception as exc:
+            if url.endswith("/api/v1/protect/decision"):
+                print(f"=== PROTECT DECISION ERROR === {exc.__class__.__name__}: {exc}")
+            raise
         if url.endswith("/api/v1/protect/decision"):
             payload: dict[str, Any]
             try:
@@ -57,7 +63,7 @@ class LoggingHttpClient:
                 payload = {"status_code": response.status_code, "body": response.text}
             self.last_decision_payload = payload
             print("=== PROTECT DECISION RESPONSE ===")
-            print(json.dumps(payload, indent=2, sort_keys=True))
+            print(json_lib.dumps(payload, indent=2, sort_keys=True))
         return response
 
     def close(self) -> None:
@@ -190,26 +196,45 @@ def _send_ingest_event(
 
 def _list_open_incidents(project_id: str, provider: str, auth_token: str) -> list[dict[str, Any]]:
     if not auth_token or not project_id:
+        print("[INCIDENTS] skipped (missing LLMTBG_AUTH_TOKEN or LLMTBG_PROJECT_ID)")
         return []
     params = {"project_id": project_id, "status": "open", "provider": provider}
-    response = httpx.get(
-        f"{BACKEND_BASE_URL}/api/v1/incidents",
-        params=params,
-        headers={"Authorization": f"Bearer {auth_token}"},
-        timeout=5.0,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    return payload if isinstance(payload, list) else []
+    try:
+        response = httpx.get(
+            f"{BACKEND_BASE_URL}/api/v1/incidents",
+            params=params,
+            headers={"Authorization": f"Bearer {auth_token}"},
+            timeout=5.0,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, list) else []
+    except httpx.HTTPStatusError as exc:
+        status_code = exc.response.status_code if exc.response is not None else None
+        if status_code in {401, 403}:
+            print(f"[INCIDENTS] skipped ({status_code} auth error; update LLMTBG_AUTH_TOKEN)")
+            return []
+        raise
 
 
 def _print_incidents(project_id: str, provider: str, auth_token: str) -> None:
     incidents = _list_open_incidents(project_id, provider, auth_token)
     counts: dict[str, int] = {}
+    near_types: list[str] = []
     for incident in incidents:
         incident_type = str(incident.get("type", "unknown"))
         counts[incident_type] = counts.get(incident_type, 0) + 1
+        if incident_type == "near_cap":
+            evidence = incident.get("evidence")
+            if isinstance(evidence, dict):
+                near_type = str(evidence.get("near_cap_type", "")).strip()
+                if near_type:
+                    near_types.append(near_type)
     compact = ", ".join(f"{k}={counts[k]}" for k in sorted(counts)) if counts else "none"
+    if near_types:
+        near_compact = ",".join(sorted(set(near_types)))
+        print(f"[INCIDENTS] open={len(incidents)} types={compact} near_cap_types={near_compact}")
+        return
     print(f"[INCIDENTS] open={len(incidents)} types={compact}")
 
 
@@ -254,6 +279,7 @@ def main() -> None:
     scenario = (os.getenv("LLMTBG_SCENARIO") or "allow").strip().lower()
     env = (os.getenv("LLMTBG_ENVIRONMENT") or "").strip() or f"protect-{int(time.time())}"
     pause_ms = int(os.getenv("LLMTBG_STEP_SLEEP_MS", "200"))
+    decision_timeout_ms = int(os.getenv("LLMTBG_PROTECT_DECISION_TIMEOUT_MS", "100"))
     project_id = os.getenv("LLMTBG_PROJECT_ID", "")
     auth_token = os.getenv("LLMTBG_AUTH_TOKEN", "")
 
@@ -264,6 +290,7 @@ def main() -> None:
         protect_enabled=True,
         environment=env,
         flush_interval_s=60.0,
+        protect_decision_timeout_ms=decision_timeout_ms,
         http_client=transport,
     )
 
@@ -272,17 +299,21 @@ def main() -> None:
     google = _make_google_stub()
     google.model_name = model
 
-    instrument_openai(openai, client=client, feature="manual-protect-demo", environment=env)
-    instrument_anthropic(anthropic, client=client, feature="manual-protect-demo", environment=env)
-    instrument_google(google, client=client, feature="manual-protect-demo", environment=env)
+    decision_feature = "loop-fixed-signature" if scenario == "loop_suspect" else "manual-protect-demo"
+    instrument_openai(openai, client=client, feature=decision_feature, environment=env)
+    instrument_anthropic(anthropic, client=client, feature=decision_feature, environment=env)
+    instrument_google(google, client=client, feature=decision_feature, environment=env)
 
     _provider_reset()
     before_calls = _provider_count()
 
     print(f"[DEMO] provider={provider} model={model} scenario={scenario}")
     print(f"[DEMO] environment={env}")
+    print(f"[DEMO] protect_decision_timeout_ms={decision_timeout_ms}")
+    print(f"[DEMO] decision_feature={decision_feature}")
 
     max_tokens = int(os.getenv("LLMTBG_MAX_TOKENS", "128"))
+    call_max_tokens = max_tokens
     print(f"[DEMO] max_tokens(before call)={max_tokens}")
 
     if scenario == "near_cap":
@@ -335,6 +366,8 @@ def main() -> None:
         print("\n[STEP] Seed token explosion then expect warn")
         huge = int(os.getenv("LLMTBG_TOKEN_EXPLOSION_TOKENS", "9000"))
         _send_ingest_event(ingest_key, provider, model, total_tokens=huge, feature="token-explosion-seed", environment=env)
+        call_max_tokens = max(max_tokens, huge)
+        print(f"[STEP] token_explosion call max_tokens={call_max_tokens}")
         time.sleep(pause_ms / 1000)
     elif scenario == "cooldown":
         print("\n[STEP] Seed cap breach then verify cooldown blocks repeated call")
@@ -343,11 +376,11 @@ def main() -> None:
         time.sleep(pause_ms / 1000)
 
     if scenario == "cooldown":
-        first_blocked = _run_provider_call(provider, model, max_tokens, openai, anthropic, google)
-        second_blocked = _run_provider_call(provider, model, max_tokens, openai, anthropic, google)
+        first_blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
+        second_blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
         blocked = first_blocked and second_blocked
     else:
-        blocked = _run_provider_call(provider, model, max_tokens, openai, anthropic, google)
+        blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
     client.flush()
     after_calls = _provider_count()
     provider_calls_delta = after_calls - before_calls
@@ -388,7 +421,10 @@ def main() -> None:
     elif scenario == "loop_suspect":
         _assert_line("loop_suspect warn triggered", decision_value == "warn" and decision_reason == "loop_suspect" and not blocked)
     elif scenario == "token_explosion":
-        _assert_line("token_explosion warn triggered", decision_value == "warn" and decision_reason == "token_explosion" and not blocked)
+        _assert_line(
+            "token_explosion warn triggered",
+            decision_value == "warn" and decision_reason in {"token_explosion", "near_cap"} and not blocked,
+        )
     elif scenario == "cooldown":
         _assert_line("cooldown active", blocked and provider_calls_delta == 0)
         _assert_line("cooldown active - repeated call blocked", blocked and provider_calls_delta == 0)

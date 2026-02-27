@@ -137,7 +137,10 @@ export function Protect(): JSX.Element {
                 <select
                   id="protect-mode-select"
                   value={protectEnabledInput ? "protect" : "observe"}
-                  onChange={(event) => setProtectEnabledInput(event.target.value === "protect")}
+                  onChange={(event) => {
+                    setProtectEnabledInput(event.target.value === "protect");
+                    event.currentTarget.blur();
+                  }}
                   title="Observe = telemetry only, Protect = preflight decisions enforced."
                 >
                   <option value="observe">Observe</option>

@@ -46,12 +46,14 @@ export function instrumentAnthropic<T extends Record<string, any>>(
       const protectPayload: {
         provider: string;
         model: string | null;
+        environment?: string;
         feature?: string;
         max_output_tokens?: number;
         input_tokens_estimate?: number;
       } = {
         provider: "anthropic",
         model: requestedModel,
+        environment: options.environment ?? options.client.environment,
         feature: options.feature,
         max_output_tokens: extractMaxOutputTokens(args),
       };

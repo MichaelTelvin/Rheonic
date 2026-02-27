@@ -19,6 +19,10 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - Near-cap checks:
   - tokens: `tokens_60s + estimated_next_tokens >= tok_cap * protect_near_cap_factor`
   - requests: `requests_60s + 1 >= req_cap * protect_near_cap_factor`
+- Near-cap subtypes (same incident type, split fingerprints):
+  - `near_cap(tok)` -> `tok_near_cap=true`, `req_near_cap=false`, `near_cap_type="tok"`
+  - `near_cap(req)` -> `req_near_cap=true`, `tok_near_cap=false`, `near_cap_type="req"`
+  - `near_cap(both)` -> both booleans true, `near_cap_type="both"`
 - When it applies:
   - Protect preflight: decision `warn` with webhook `decision.warn`.
   - Ingest (observe/protect): incident signal/logging for `near_cap`.

@@ -32,7 +32,7 @@ counters: "Rolling Counters\nrequests_60s / tokens_60s\nscope: project+provider"
   }
 }
 
-detectors: "Detector(s)\nnear_cap\nretry_storm\nloop_suspect\ntoken_explosion\n+ cap_breach logging from counters" {
+detectors: "Detector(s)\nnear_cap (req|tok|both)\nretry_storm\nloop_suspect\ntoken_explosion\n+ cap_breach logging from counters" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"

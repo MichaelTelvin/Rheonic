@@ -34,8 +34,11 @@ class FakeEventRepository:
     def add(self, event: Event) -> None:
         self.events.append(event)
 
-    def list_recent(self, project_id: str, limit: int = 100) -> list[Event]:
-        return [event for event in self.events if event.project_id == project_id][-limit:]
+    def list_recent(self, project_id: str, limit: int = 100, provider: str | None = None) -> list[Event]:
+        rows = [event for event in self.events if event.project_id == project_id]
+        if provider:
+            rows = [event for event in rows if event.provider == provider]
+        return rows[-limit:]
 
     def purge_older_than(self, cutoff: datetime) -> int:
         before = len(self.events)
@@ -371,6 +374,10 @@ def test_near_cap_opens_incident_in_observe_without_webhook() -> None:
 
     near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
     assert len(near_cap_rows) == 1
+    assert near_cap_rows[0].evidence.get("near_cap_type") == "tok"
+    assert near_cap_rows[0].evidence.get("req_near_cap") is False
+    assert near_cap_rows[0].evidence.get("tok_near_cap") is True
+    assert near_cap_rows[0].fingerprint and near_cap_rows[0].fingerprint.endswith(":tok")
     assert all(event_type not in {"incident.warn", "incident.block"} for _, event_type, _ in webhook.calls)
 
 
@@ -381,6 +388,51 @@ def test_near_cap_in_protect_mode_does_not_emit_incident_warn_webhook() -> None:
     near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
     assert len(near_cap_rows) == 1
     assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
+
+
+def test_near_cap_req_only_evidence_and_fingerprint() -> None:
+    service, incidents, _ = _service(protect_enabled=False, req_cap=10, tok_cap=10_000)
+    for i in range(8):
+        service.ingest(_event("p1", total_tokens=1, offset_seconds=i))
+
+    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
+    assert len(near_cap_rows) == 1
+    row = near_cap_rows[0]
+    assert row.evidence.get("near_cap_type") == "req"
+    assert row.evidence.get("req_near_cap") is True
+    assert row.evidence.get("tok_near_cap") is False
+    assert row.fingerprint and row.fingerprint.endswith(":req")
+
+
+def test_near_cap_both_evidence_and_fingerprint() -> None:
+    service, incidents, _ = _service(protect_enabled=False, req_cap=2, tok_cap=1000)
+    service.ingest(_event("p1", total_tokens=900, offset_seconds=0))
+
+    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
+    assert len(near_cap_rows) == 1
+    row = near_cap_rows[0]
+    assert row.evidence.get("near_cap_type") == "both"
+    assert row.evidence.get("req_near_cap") is True
+    assert row.evidence.get("tok_near_cap") is True
+    assert row.fingerprint and row.fingerprint.endswith(":both")
+
+
+def test_near_cap_dedupes_per_subtype_req_and_tok_are_separate() -> None:
+    service, incidents, _ = _service(protect_enabled=False, req_cap=10, tok_cap=1000)
+
+    # tok-only subtype first
+    service.ingest(_event("p1", total_tokens=600, offset_seconds=0))
+    # req-only subtype later
+    for i in range(1, 9):
+        service.ingest(_event("p1", total_tokens=1, offset_seconds=i))
+
+    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap" and row.status == "open"]
+    assert len(near_cap_rows) == 2
+    types = sorted(str(row.evidence.get("near_cap_type")) for row in near_cap_rows)
+    assert types == ["req", "tok"]
+    fingerprints = sorted(str(row.fingerprint) for row in near_cap_rows)
+    assert any(fp.endswith(":req") for fp in fingerprints)
+    assert any(fp.endswith(":tok") for fp in fingerprints)
 
 
 def test_token_explosion_incident_emits_warn_in_protect_mode() -> None:
