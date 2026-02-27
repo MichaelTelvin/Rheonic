@@ -27,6 +27,7 @@ loadLlmtbgEnvFromDotenv();
 
 const backendBaseUrl = process.env.LLMTBG_BACKEND_URL ?? "http://localhost:8000";
 const providerStubUrl = process.env.LLMTBG_PROVIDER_URL ?? "http://localhost:8099";
+let lastProviderCall: Record<string, unknown> | null = null;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -45,12 +46,31 @@ async function resetProvider(): Promise<void> {
 }
 
 async function callProviderStub(payload: unknown): Promise<void> {
+  if (payload && typeof payload === "object") {
+    lastProviderCall = payload as Record<string, unknown>;
+  }
   const res = await fetch(`${providerStubUrl}/call`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`provider_stub_call_failed:${res.status}`);
+}
+
+function providerLastCall(): Record<string, unknown> | null {
+  return lastProviderCall;
+}
+
+function extractUsedMaxTokens(payload: Record<string, unknown> | null): number | null {
+  if (!payload) return null;
+  const value = payload.max_tokens;
+  if (typeof value === "number" && Number.isFinite(value)) return Math.floor(value);
+  return null;
+}
+
+function assertLine(label: string, passed: boolean): void {
+  // deterministic, human-readable checks.
+  console.log(passed ? `[ASSERT] ${label}` : `[ASSERT] ${label} (FAILED)`);
 }
 
 async function sendIngestEvent(
@@ -160,6 +180,26 @@ async function main() {
     flushIntervalMs: 60_000,
   });
 
+  let lastDecisionContext: Record<string, unknown> | null = null;
+  let lastDecisionValue = "";
+  let lastDecisionReason = "";
+  let lastClampRecommended: number | null = null;
+  let lastClampApplied: boolean | null = null;
+  const originalEvaluateProtectDecision = client.evaluateProtectDecision.bind(client);
+  client.evaluateProtectDecision = async (context: Parameters<typeof originalEvaluateProtectDecision>[0]) => {
+    lastDecisionContext = context as unknown as Record<string, unknown>;
+    console.log("=== PROTECT DECISION REQUEST ===");
+    console.log(JSON.stringify(context, null, 2));
+    const decision = await originalEvaluateProtectDecision(context);
+    lastDecisionValue = decision.decision;
+    lastDecisionReason = decision.reason;
+    lastClampRecommended = decision.clamp?.recommended_max_output_tokens ?? null;
+    lastClampApplied = decision.clamp?.applied ?? null;
+    console.log("=== PROTECT DECISION RESPONSE ===");
+    console.log(JSON.stringify(decision, null, 2));
+    return decision;
+  };
+
   const openai = {
     chat: {
       completions: {
@@ -193,6 +233,8 @@ async function main() {
 
   console.log(`[DEMO] provider=${provider} model=${model} scenario=${scenario}`);
   console.log(`[DEMO] environment=${env}`);
+  const maxTokens = Number(process.env.LLMTBG_MAX_TOKENS ?? 128);
+  console.log(`[DEMO] max_tokens(before call)=${maxTokens}`);
 
   if (scenario === "near_cap") {
     const seed = Number(process.env.LLMTBG_NEAR_CAP_SEED_TOKENS ?? 1600);
@@ -204,6 +246,14 @@ async function main() {
     console.log("[STEP] Seed cap breach then expect block");
     await sendIngestEvent(ingestKey, provider, model, seed, "cap-breach-seed", env);
     await sleep(pauseMs);
+  } else if (scenario === "req_cap_breach") {
+    const count = Number(process.env.LLMTBG_REQ_CAP_BREACH_COUNT ?? 6);
+    const reqTokens = Number(process.env.LLMTBG_CAP_BREACH_REQ_TOKENS ?? 1);
+    console.log("[STEP] Seed req cap breach then expect block");
+    for (let i = 0; i < count; i += 1) {
+      await sendIngestEvent(ingestKey, provider, model, reqTokens, `req-cap-breach-${i + 1}`, env);
+      await sleep(pauseMs);
+    }
   } else if (scenario === "retry_storm") {
     const count = Number(process.env.LLMTBG_RETRY_STORM_COUNT ?? 6);
     console.log("[STEP] Seed retry storm then expect warn");
@@ -227,19 +277,39 @@ async function main() {
     console.log("[STEP] Seed token explosion then expect warn");
     await sendIngestEvent(ingestKey, provider, model, seed, "token-explosion-seed", env);
     await sleep(pauseMs);
+  } else if (scenario === "cooldown") {
+    const seed = Number(process.env.LLMTBG_CAP_BREACH_TOKENS ?? 5000);
+    console.log("[STEP] Seed cap breach then verify cooldown blocks repeated call");
+    await sendIngestEvent(ingestKey, provider, model, seed, "cooldown-breach-seed", env);
+    await sleep(pauseMs);
   }
 
-  const maxTokens = Number(process.env.LLMTBG_MAX_TOKENS ?? 128);
-  const blocked = await runProviderCall(provider, model, maxTokens, openai, anthropic, googleModel);
+  let blocked: boolean;
+  if (scenario === "cooldown") {
+    const blockedFirst = await runProviderCall(provider, model, maxTokens, openai, anthropic, googleModel);
+    const blockedSecond = await runProviderCall(provider, model, maxTokens, openai, anthropic, googleModel);
+    blocked = blockedFirst && blockedSecond;
+  } else {
+    blocked = await runProviderCall(provider, model, maxTokens, openai, anthropic, googleModel);
+  }
   await client.flush();
   const after = await providerCount();
+  const providerCallsDelta = after - before;
+  const usedMaxTokens = extractUsedMaxTokens(providerLastCall());
+  const clampRecommended = lastClampRecommended;
+  const clampApplied = lastClampApplied;
 
-  console.log(`[RESULT] blocked=${blocked} provider_calls_delta=${after - before}`);
+  console.log(`[RESULT] blocked=${blocked} provider_calls_delta=${providerCallsDelta}`);
+  if (scenario === "near_cap") {
+    console.log(`[CLAMP] recommended=${clampRecommended} applied=${clampApplied} used_max_tokens=${usedMaxTokens}`);
+  }
 
+  let incidentTypes = new Set<string>();
   if (projectId && authToken) {
     const incidents = await listOpenIncidents(projectId, provider, authToken);
     const counts = new Map<string, number>();
     for (const incident of incidents) counts.set(incident.type, (counts.get(incident.type) ?? 0) + 1);
+    incidentTypes = new Set(incidents.map((incident) => incident.type));
     const compact = Array.from(counts.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
@@ -247,6 +317,31 @@ async function main() {
     console.log(`[INCIDENTS] open=${incidents.length} types=${compact || "none"}`);
   } else {
     console.log("[INCIDENTS] skipped (set LLMTBG_PROJECT_ID and LLMTBG_AUTH_TOKEN)");
+  }
+
+  const decision = lastDecisionValue;
+  const reason = lastDecisionReason;
+  if (scenario === "allow") {
+    assertLine("allow passed", !blocked && providerCallsDelta >= 1 && decision === "allow");
+  } else if (scenario === "near_cap") {
+    assertLine("near_cap warn triggered", !blocked && decision === "warn" && reason === "near_cap");
+    const clampSuggested = typeof clampRecommended === "number" && clampRecommended > 0;
+    const clampEnforced = clampSuggested && usedMaxTokens === clampRecommended && providerCallsDelta >= 1;
+    assertLine("clamp applied / clamp suggested", clampSuggested || clampEnforced);
+  } else if (scenario === "cap_breach") {
+    assertLine("cap breach blocked", blocked && providerCallsDelta === 0 && incidentTypes.has("cap_breach"));
+  } else if (scenario === "req_cap_breach") {
+    assertLine("req_cap breach blocked", blocked && providerCallsDelta === 0 && incidentTypes.has("cap_breach"));
+    assertLine("req_cap breach triggered block", blocked && providerCallsDelta === 0);
+  } else if (scenario === "retry_storm") {
+    assertLine("retry_storm warn triggered", !blocked && decision === "warn" && reason === "retry_storm");
+  } else if (scenario === "loop_suspect") {
+    assertLine("loop_suspect warn triggered", !blocked && decision === "warn" && reason === "loop_suspect");
+  } else if (scenario === "token_explosion") {
+    assertLine("token_explosion warn triggered", !blocked && decision === "warn" && reason === "token_explosion");
+  } else if (scenario === "cooldown") {
+    assertLine("cooldown active", blocked && providerCallsDelta === 0);
+    assertLine("cooldown active - repeated call blocked", blocked && providerCallsDelta === 0);
   }
 
   await client.flush();

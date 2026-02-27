@@ -23,7 +23,7 @@ class AppConfig:
     loop_count: int = 6
     token_explosion_ratio: float = 0.8
     token_explosion_abs: int = 6000
-    protect_near_cap_factor: float = 0.8
+    protect_near_cap_factor: float = 0.85
     protect_action_counter_ttl_seconds: int = 3600
     webhook_retry_max_attempts: int = 3
     webhook_retry_intervals_seconds: tuple[int, int, int] = (5, 20, 60)
