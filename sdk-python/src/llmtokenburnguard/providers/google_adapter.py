@@ -56,8 +56,9 @@ def instrument_google(
             )
             if protect_decision.get("decision") == "block":
                 raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
+            call_args, call_kwargs = _apply_google_clamp(args, kwargs, protect_decision)
             try:
-                response = await original_generate(*args, **kwargs)
+                response = await original_generate(*call_args, **call_kwargs)
                 _capture_success(
                     sdk_client=resolved_client,
                     response=response,
@@ -106,8 +107,9 @@ def instrument_google(
         )
         if protect_decision.get("decision") == "block":
             raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
+        call_args, call_kwargs = _apply_google_clamp(args, kwargs, protect_decision)
         try:
-            response = original_generate(*args, **kwargs)
+            response = original_generate(*call_args, **call_kwargs)
             _capture_success(
                 sdk_client=resolved_client,
                 response=response,
@@ -320,3 +322,50 @@ def _extract_http_status(exc: Exception) -> int | None:
         if isinstance(response_status, int):
             return response_status
     return None
+
+
+def _apply_google_clamp(
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    protect_decision: dict[str, object],
+) -> tuple[tuple[Any, ...], dict[str, Any]]:
+    if str(protect_decision.get("decision") or "") != "warn":
+        return args, kwargs
+    if str(protect_decision.get("reason") or "") != "near_cap":
+        return args, kwargs
+    if protect_decision.get("apply_clamp_enabled") is not True:
+        return args, kwargs
+    clamp = protect_decision.get("clamp")
+    if not isinstance(clamp, dict):
+        return args, kwargs
+    recommended = clamp.get("recommended_max_output_tokens")
+    if not isinstance(recommended, int) or recommended < 1:
+        return args, kwargs
+
+    next_args = list(args)
+    next_kwargs = dict(kwargs)
+
+    if isinstance(next_kwargs.get("generation_config"), dict):
+        generation_config = dict(next_kwargs["generation_config"])
+        if isinstance(generation_config.get("max_output_tokens"), int):
+            generation_config["max_output_tokens"] = min(int(generation_config["max_output_tokens"]), recommended)
+        else:
+            generation_config["max_output_tokens"] = recommended
+        next_kwargs["generation_config"] = generation_config
+        return tuple(next_args), next_kwargs
+
+    if next_args and isinstance(next_args[0], dict):
+        payload = dict(next_args[0])
+        generation_config = dict(payload.get("generation_config")) if isinstance(payload.get("generation_config"), dict) else {}
+        if isinstance(generation_config.get("max_output_tokens"), int):
+            generation_config["max_output_tokens"] = min(int(generation_config["max_output_tokens"]), recommended)
+        else:
+            generation_config["max_output_tokens"] = recommended
+        payload["generation_config"] = generation_config
+        next_args[0] = payload
+        return tuple(next_args), next_kwargs
+
+    generation_config = dict(next_kwargs.get("generation_config")) if isinstance(next_kwargs.get("generation_config"), dict) else {}
+    generation_config["max_output_tokens"] = recommended
+    next_kwargs["generation_config"] = generation_config
+    return tuple(next_args), next_kwargs

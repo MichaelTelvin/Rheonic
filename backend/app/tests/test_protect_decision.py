@@ -204,6 +204,7 @@ def _set_protect(
     project_id: str,
     *,
     protect_enabled: bool,
+    apply_clamp: bool = False,
     protect_fail_mode: str = "open",
     protect_max_req_per_min: int | None = None,
     protect_max_tok_per_min: int | None = None,
@@ -214,6 +215,7 @@ def _set_protect(
         json={
             "protect_enabled": protect_enabled,
             "protect_fail_mode": protect_fail_mode,
+            "apply_clamp": apply_clamp,
             "protect_max_req_per_min": protect_max_req_per_min,
             "protect_max_tok_per_min": protect_max_tok_per_min,
             "protect_decision_timeout_ms": protect_decision_timeout_ms,
@@ -287,6 +289,29 @@ def test_near_cap_warns_when_predictive_reaches_warn_ratio(tmp_path) -> None:
     )
     assert decision["decision"] == "warn"
     assert decision["reason"] == "near_cap"
+    assert decision["apply_clamp_enabled"] is False
+    assert isinstance(decision["clamp"], dict)
+    assert int(decision["clamp"]["recommended_max_output_tokens"]) > 0
+    assert decision["clamp"]["applied"] is False
+    _cleanup_overrides()
+
+
+def test_near_cap_warn_includes_apply_clamp_flag_when_enabled(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Clamp")
+    _set_protect(client, project_id, protect_enabled=True, apply_clamp=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=150)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 10, "max_output_tokens": 64},
+    )
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "near_cap"
+    assert decision["apply_clamp_enabled"] is True
+    assert decision["clamp"]["applied"] is False
+    assert int(decision["clamp"]["recommended_max_output_tokens"]) <= 64
     _cleanup_overrides()
 
 
@@ -308,6 +333,8 @@ def test_near_cap_warn_dispatches_decision_warn_webhook(tmp_path) -> None:
     _, _, payload = warn_calls[0]
     assert payload["event"] == "decision.warn"
     assert payload["reason"] == "near_cap"
+    assert payload["apply_clamp_enabled"] is False
+    assert isinstance(payload["clamp"], dict)
     _cleanup_overrides()
 
 

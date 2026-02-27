@@ -175,6 +175,7 @@ class FakeProjectRepository:
         project_id: str,
         protect_enabled: bool,
         protect_fail_mode: str,
+        apply_clamp: bool,
         protect_max_req_per_min: int | None,
         protect_max_tok_per_min: int | None,
         protect_decision_timeout_ms: int,
@@ -183,6 +184,7 @@ class FakeProjectRepository:
             return None
         self.project.protect_enabled = protect_enabled
         self.project.protect_fail_mode = protect_fail_mode
+        self.project.apply_clamp = apply_clamp
         self.project.protect_max_req_per_min = protect_max_req_per_min
         self.project.protect_max_tok_per_min = protect_max_tok_per_min
         self.project.protect_decision_timeout_ms = protect_decision_timeout_ms

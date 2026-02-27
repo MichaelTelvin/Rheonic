@@ -63,9 +63,10 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
     if (protectDecision.decision === "block") {
       throw new LLMTBGBlockedError(protectDecision.reason);
     }
+    const callArgs = maybeApplyGoogleClamp(args, protectDecision);
 
     try {
-      const response = await originalGenerate(...args);
+      const response = await originalGenerate(...callArgs);
       void options.client.captureEvent(
         buildEvent({
           provider: "google",
@@ -196,4 +197,46 @@ function extractHttpStatus(error: unknown): number | undefined {
     return withStatus.response.status;
   }
   return undefined;
+}
+
+function maybeApplyGoogleClamp(args: unknown[], decision: ProtectEvaluation): unknown[] {
+  if (decision.decision !== "warn" || decision.reason !== "near_cap") {
+    return args;
+  }
+  if (!decision.applyClampEnabled) {
+    return args;
+  }
+  const recommended = decision.clamp?.recommended_max_output_tokens;
+  if (typeof recommended !== "number" || recommended < 1) {
+    return args;
+  }
+  const nextArgs = [...args];
+  const firstArg = nextArgs[0];
+  if (firstArg && typeof firstArg === "object") {
+    const payload = { ...(firstArg as Record<string, unknown>) };
+    const existingConfig =
+      payload.generationConfig && typeof payload.generationConfig === "object"
+        ? (payload.generationConfig as Record<string, unknown>)
+        : {};
+    const existingMax = existingConfig.maxOutputTokens;
+    payload.generationConfig = {
+      ...existingConfig,
+      maxOutputTokens: typeof existingMax === "number" ? Math.min(existingMax, recommended) : recommended,
+    };
+    nextArgs[0] = payload;
+    return nextArgs;
+  }
+
+  const secondArg = nextArgs[1];
+  const existingConfig =
+    secondArg && typeof secondArg === "object" ? ({ ...(secondArg as Record<string, unknown>) } as Record<string, unknown>) : {};
+  const generationConfig =
+    existingConfig.generationConfig && typeof existingConfig.generationConfig === "object"
+      ? ({ ...(existingConfig.generationConfig as Record<string, unknown>) } as Record<string, unknown>)
+      : {};
+  const existingMax = generationConfig.maxOutputTokens;
+  generationConfig.maxOutputTokens = typeof existingMax === "number" ? Math.min(existingMax, recommended) : recommended;
+  existingConfig.generationConfig = generationConfig;
+  nextArgs[1] = existingConfig;
+  return nextArgs;
 }

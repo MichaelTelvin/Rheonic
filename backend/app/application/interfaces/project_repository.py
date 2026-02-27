@@ -44,6 +44,7 @@ class ProjectRepository(ABC):
         project_id: str,
         protect_enabled: bool,
         protect_fail_mode: str,
+        apply_clamp: bool,
         protect_max_req_per_min: int | None,
         protect_max_tok_per_min: int | None,
         protect_decision_timeout_ms: int,

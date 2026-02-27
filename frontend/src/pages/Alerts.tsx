@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { ApiError, fetchProjectWebhook, testProjectWebhook, updateProjectWebhook, type ProjectWebhookSettings } from "../api/client";
+import {
+  ApiError,
+  fetchProjectProtect,
+  fetchProjectWebhook,
+  testProjectWebhook,
+  updateProjectWebhook,
+  type ProjectWebhookSettings,
+} from "../api/client";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
 import { useProjectContext } from "../context/ProjectContext";
@@ -32,13 +39,15 @@ export function Alerts(): JSX.Element {
   const [webhookTesting, setWebhookTesting] = useState<boolean>(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
   const [testStatus, setTestStatus] = useState<TestStatus>({ kind: "idle", message: "" });
+  const [protectEnabled, setProtectEnabled] = useState<boolean>(false);
 
   const reloadWebhookSettings = async (preserveInputs = false): Promise<void> => {
     if (!projectId) {
       return;
     }
-    const settings = await fetchProjectWebhook(projectId);
+    const [settings, protectSettings] = await Promise.all([fetchProjectWebhook(projectId), fetchProjectProtect(projectId)]);
     setWebhookSettings(settings);
+    setProtectEnabled(Boolean(protectSettings.protect_enabled));
     if (!preserveInputs) {
       setWebhookEnabledInput(settings.enabled);
       setWebhookUrlInput(settings.url ?? "");
@@ -50,17 +59,22 @@ export function Alerts(): JSX.Element {
     if (!projectId) {
       setWebhookSettings(null);
       setWebhookError(null);
+      setProtectEnabled(false);
       return;
     }
 
     let cancelled = false;
     const loadSettings = async (): Promise<void> => {
       try {
-        const settings = await fetchProjectWebhook(projectId);
+        const [settings, protectSettings] = await Promise.all([
+          fetchProjectWebhook(projectId),
+          fetchProjectProtect(projectId),
+        ]);
         if (cancelled) {
           return;
         }
         setWebhookSettings(settings);
+        setProtectEnabled(Boolean(protectSettings.protect_enabled));
         setWebhookEnabledInput(settings.enabled);
         setWebhookUrlInput(settings.url ?? "");
         setWebhookSecretInput("");
@@ -80,12 +94,19 @@ export function Alerts(): JSX.Element {
   }, [projectId]);
 
   const canTestWebhook = useMemo(
-    () => Boolean(projectId) && webhookEnabledInput && webhookUrlInput.trim().length > 0 && !webhookTesting && !webhookSaving,
-    [projectId, webhookEnabledInput, webhookUrlInput, webhookTesting, webhookSaving],
+    () =>
+      Boolean(projectId)
+      && protectEnabled
+      && webhookEnabledInput
+      && webhookUrlInput.trim().length > 0
+      && !webhookTesting
+      && !webhookSaving,
+    [projectId, protectEnabled, webhookEnabledInput, webhookUrlInput, webhookTesting, webhookSaving],
   );
+  const controlsDisabled = !projectId || webhookSaving || webhookTesting || !protectEnabled;
 
   const saveWebhookSettings = async (): Promise<void> => {
-    if (!projectId) {
+    if (!projectId || !protectEnabled) {
       return;
     }
     setWebhookSaving(true);
@@ -111,7 +132,7 @@ export function Alerts(): JSX.Element {
   };
 
   const onTestWebhook = async (): Promise<void> => {
-    if (!projectId) {
+    if (!projectId || !protectEnabled) {
       return;
     }
     setTestStatus({ kind: "sending", message: "Saving settings..." });
@@ -162,16 +183,21 @@ export function Alerts(): JSX.Element {
         <Card className="form-card card--form">
           <h2 className="section-title">Webhook</h2>
           <FormColumn testId="alerts-form-column">
-            <div className="alerts-grid">
+            <div className={`alerts-grid ${controlsDisabled ? "is-disabled" : ""}`}>
               <div className="form-field alerts-enabled">
-                <label className="alerts-toggle">
-                  <input
-                    type="checkbox"
-                    checked={webhookEnabledInput}
-                    disabled={!projectId || webhookSaving}
-                    onChange={(event) => setWebhookEnabledInput(event.target.checked)}
-                  />
-                  Enabled
+                <label htmlFor="alerts-enabled-toggle" className="alerts-toggle-row">
+                  <span className="toggle-switch">
+                    <input
+                      id="alerts-enabled-toggle"
+                      type="checkbox"
+                      checked={webhookEnabledInput}
+                      disabled={controlsDisabled}
+                      onChange={(event) => setWebhookEnabledInput(event.target.checked)}
+                      role="switch"
+                    />
+                    <span className="toggle-switch-track" aria-hidden="true" />
+                  </span>
+                  <span>{webhookEnabledInput ? "On" : "Off"}</span>
                 </label>
               </div>
               <div className="form-field alerts-url">
@@ -185,7 +211,7 @@ export function Alerts(): JSX.Element {
                   placeholder="https://..."
                   value={webhookUrlInput}
                   onChange={(event) => setWebhookUrlInput(event.target.value)}
-                  disabled={!projectId || webhookSaving}
+                  disabled={controlsDisabled}
                 />
               </div>
               <div className="form-field">
@@ -199,7 +225,7 @@ export function Alerts(): JSX.Element {
                   placeholder={webhookSettings?.has_secret ? "•••••••• (leave blank to keep)" : "optional"}
                   value={webhookSecretInput}
                   onChange={(event) => setWebhookSecretInput(event.target.value)}
-                  disabled={!projectId || webhookSaving}
+                  disabled={controlsDisabled}
                 />
               </div>
               <p className="form-error-slot">{webhookError ?? "\u00A0"}</p>
@@ -225,7 +251,7 @@ export function Alerts(): JSX.Element {
                   type="button"
                   className="modal-button modal-primary action-btn"
                   onClick={() => void onSaveWebhookSettings()}
-                  disabled={!projectId || webhookSaving}
+                  disabled={controlsDisabled}
                 >
                   {webhookSaving ? "Saving..." : "Save"}
                 </button>

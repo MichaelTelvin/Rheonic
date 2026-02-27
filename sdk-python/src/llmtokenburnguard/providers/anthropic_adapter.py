@@ -57,8 +57,9 @@ def instrument_anthropic(
             )
             if protect_decision.get("decision") == "block":
                 raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
+            call_args, call_kwargs = _apply_anthropic_clamp(args, kwargs, protect_decision)
             try:
-                response = await original_create(*args, **kwargs)
+                response = await original_create(*call_args, **call_kwargs)
                 _capture_success(
                     sdk_client=resolved_client,
                     response=response,
@@ -107,8 +108,9 @@ def instrument_anthropic(
         )
         if protect_decision.get("decision") == "block":
             raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
+        call_args, call_kwargs = _apply_anthropic_clamp(args, kwargs, protect_decision)
         try:
-            response = original_create(*args, **kwargs)
+            response = original_create(*call_args, **call_kwargs)
             _capture_success(
                 sdk_client=resolved_client,
                 response=response,
@@ -297,3 +299,37 @@ def _extract_http_status(exc: Exception) -> int | None:
         if isinstance(response_status, int):
             return response_status
     return None
+
+
+def _apply_anthropic_clamp(
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    protect_decision: dict[str, object],
+) -> tuple[tuple[Any, ...], dict[str, Any]]:
+    if str(protect_decision.get("decision") or "") != "warn":
+        return args, kwargs
+    if str(protect_decision.get("reason") or "") != "near_cap":
+        return args, kwargs
+    if protect_decision.get("apply_clamp_enabled") is not True:
+        return args, kwargs
+    clamp = protect_decision.get("clamp")
+    if not isinstance(clamp, dict):
+        return args, kwargs
+    recommended = clamp.get("recommended_max_output_tokens")
+    if not isinstance(recommended, int) or recommended < 1:
+        return args, kwargs
+
+    next_kwargs = dict(kwargs)
+    next_args = list(args)
+    if "max_tokens" in next_kwargs and isinstance(next_kwargs.get("max_tokens"), int):
+        next_kwargs["max_tokens"] = min(int(next_kwargs["max_tokens"]), recommended)
+    elif next_args and isinstance(next_args[0], dict):
+        payload = dict(next_args[0])
+        if isinstance(payload.get("max_tokens"), int):
+            payload["max_tokens"] = min(int(payload["max_tokens"]), recommended)
+        else:
+            payload["max_tokens"] = recommended
+        next_args[0] = payload
+    else:
+        next_kwargs["max_tokens"] = recommended
+    return tuple(next_args), next_kwargs

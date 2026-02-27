@@ -57,6 +57,7 @@ describe("App", () => {
     mockFetchProjectProtect.mockResolvedValue({
       protect_enabled: false,
       protect_fail_mode: "open",
+      apply_clamp: false,
       protect_max_req_per_min: null,
       protect_max_tok_per_min: null,
       protect_decision_timeout_ms: 100,

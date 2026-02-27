@@ -42,12 +42,15 @@ class ProtectDecisionOut(BaseModel):
     retry_after_seconds: int | None = None
     blocked_until: str | None = None
     snapshot: dict[str, int | str | bool | None | dict[str, int | bool | None]]
+    apply_clamp_enabled: bool = False
+    clamp: dict[str, int | bool] | None = None
 
 
 class ProjectProtectOut(BaseModel):
     # Project protect settings response payload.
     protect_enabled: bool
     protect_fail_mode: str
+    apply_clamp: bool
     protect_max_req_per_min: int | None
     protect_max_tok_per_min: int | None
     protect_decision_timeout_ms: int
@@ -57,6 +60,7 @@ class ProjectProtectIn(BaseModel):
     # Project protect settings update payload.
     protect_enabled: bool
     protect_fail_mode: str = Field(pattern="^(open|closed)$")
+    apply_clamp: bool = False
     protect_max_req_per_min: int | None = Field(default=None, ge=1)
     protect_max_tok_per_min: int | None = Field(default=None, ge=1)
     protect_decision_timeout_ms: int = Field(default=100, ge=10, le=10_000)
@@ -107,6 +111,8 @@ def protect_decision(
             retry_after_seconds=decision.retry_after_seconds,
             blocked_until=decision.blocked_until,
             snapshot=decision.snapshot,
+            apply_clamp_enabled=decision.apply_clamp_enabled,
+            clamp=decision.clamp,
         )
     except HTTPException:
         raise
@@ -153,6 +159,7 @@ def get_project_protect(
         return ProjectProtectOut(
             protect_enabled=project.protect_enabled,
             protect_fail_mode=project.protect_fail_mode,
+            apply_clamp=project.apply_clamp,
             protect_max_req_per_min=project.protect_max_req_per_min,
             protect_max_tok_per_min=project.protect_max_tok_per_min,
             protect_decision_timeout_ms=project.protect_decision_timeout_ms,
@@ -178,6 +185,7 @@ def update_project_protect(
             user_id=current_user.id,
             protect_enabled=payload.protect_enabled,
             protect_fail_mode=payload.protect_fail_mode,
+            apply_clamp=payload.apply_clamp,
             protect_max_req_per_min=payload.protect_max_req_per_min,
             protect_max_tok_per_min=payload.protect_max_tok_per_min,
             protect_decision_timeout_ms=payload.protect_decision_timeout_ms,
@@ -185,6 +193,7 @@ def update_project_protect(
         return ProjectProtectOut(
             protect_enabled=updated.protect_enabled,
             protect_fail_mode=updated.protect_fail_mode,
+            apply_clamp=updated.apply_clamp,
             protect_max_req_per_min=updated.protect_max_req_per_min,
             protect_max_tok_per_min=updated.protect_max_tok_per_min,
             protect_decision_timeout_ms=updated.protect_decision_timeout_ms,

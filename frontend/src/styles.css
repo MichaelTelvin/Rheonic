@@ -471,20 +471,15 @@ select {
   margin-top: 12px;
 }
 
-.alerts-toggle {
+.form-field label.alerts-toggle-row {
   display: inline-flex;
+  width: fit-content;
   align-items: center;
-  gap: 0;
-  color: var(--muted);
+  gap: 14px;
+  color: var(--text);
   font-size: 0.9rem;
   margin: 0;
-}
-
-.alerts-toggle input {
-  width: 20px;
-  height: 20px;
-  margin: 0 12px 0 0;
-  flex: 0 0 20px;
+  line-height: 1;
 }
 
 .alerts-actions {
@@ -1406,14 +1401,29 @@ pre {
 .label-with-tooltip {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+}
+
+.tooltip-label-unified {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+
+.tooltip-label-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .info-tooltip-wrap {
   position: relative;
   display: inline-flex;
-  margin-left: 4px;
-  transform: translateY(-6px);
+  margin-left: 0;
+  margin-top: 0;
+  top: -4px;
+  transform: none;
 }
 
 .info-tooltip-trigger {
@@ -1561,6 +1571,103 @@ pre {
 
 .form-card .section-title {
   margin-bottom: 12px;
+}
+
+.protect-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+  margin-top: 26px;
+}
+
+.protect-settings-grid .form-column {
+  max-width: none;
+}
+
+.clamp-toggle-field {
+  margin-top: 6px;
+}
+
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  position: relative;
+}
+
+.toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle-switch-track {
+  width: 42px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.55);
+  background: rgba(109, 40, 217, 0.16);
+  position: relative;
+  transition: all 140ms ease;
+}
+
+.toggle-switch-track::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  background: rgba(167, 139, 250, 0.95);
+  transition: transform 140ms ease;
+}
+
+.toggle-switch input:checked + .toggle-switch-track {
+  border-color: rgba(167, 139, 250, 0.78);
+  background: rgba(109, 40, 217, 0.44);
+}
+
+.toggle-switch input:checked + .toggle-switch-track::after {
+  transform: translateX(20px);
+}
+
+.toggle-switch input:focus-visible + .toggle-switch-track {
+  outline: 2px solid rgba(167, 139, 250, 0.5);
+  outline-offset: 2px;
+}
+
+.clamp-toggle-fieldset {
+  margin-top: 10px;
+}
+
+.clamp-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.clamp-toggle-fieldset.is-disabled {
+  opacity: 0.6;
+}
+
+.protect-fail-mode legend.label-with-tooltip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+
+.alerts-grid.is-disabled {
+  opacity: 0.6;
+}
+
+@media (max-width: 860px) {
+  .protect-settings-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
 }
 
 .card--form {

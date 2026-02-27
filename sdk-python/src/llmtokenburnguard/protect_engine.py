@@ -101,7 +101,20 @@ class ProtectEngine:
                 self._cooldown_reason = None
             if decision not in {"allow", "warn", "block"}:
                 decision = "allow"
-            return {"decision": decision, "reason": reason}
+            result: dict[str, object] = {"decision": decision, "reason": reason}
+            apply_clamp_enabled = payload.get("apply_clamp_enabled")
+            if isinstance(apply_clamp_enabled, bool):
+                result["apply_clamp_enabled"] = apply_clamp_enabled
+            clamp_payload = payload.get("clamp")
+            if isinstance(clamp_payload, dict):
+                recommended = clamp_payload.get("recommended_max_output_tokens")
+                applied = clamp_payload.get("applied")
+                if isinstance(recommended, int) and recommended > 0:
+                    result["clamp"] = {
+                        "recommended_max_output_tokens": recommended,
+                        "applied": bool(applied) if isinstance(applied, bool) else False,
+                    }
+            return result
         except Exception:
             if self._is_timeout_error():
                 provider = context.get("provider")

@@ -64,9 +64,10 @@ export function instrumentAnthropic<T extends Record<string, any>>(
     if (protectDecision.decision === "block") {
       throw new LLMTBGBlockedError(protectDecision.reason);
     }
+    const callArgs = maybeApplyAnthropicClamp(args, protectDecision);
 
     try {
-      const response = await originalCreate(...args);
+      const response = await originalCreate(...callArgs);
       void options.client.captureEvent(
         buildEvent({
           provider: "anthropic",
@@ -181,4 +182,31 @@ function extractHttpStatus(error: unknown): number | undefined {
     return withStatus.response.status;
   }
   return undefined;
+}
+
+function maybeApplyAnthropicClamp(args: unknown[], decision: ProtectEvaluation): unknown[] {
+  if (decision.decision !== "warn" || decision.reason !== "near_cap") {
+    return args;
+  }
+  if (!decision.applyClampEnabled) {
+    return args;
+  }
+  const recommended = decision.clamp?.recommended_max_output_tokens;
+  if (typeof recommended !== "number" || recommended < 1) {
+    return args;
+  }
+  const firstArg = args[0];
+  if (!firstArg || typeof firstArg !== "object") {
+    return args;
+  }
+  const payload = { ...(firstArg as Record<string, unknown>) };
+  const maxTokens = payload.max_tokens;
+  if (typeof maxTokens === "number") {
+    payload.max_tokens = Math.min(maxTokens, recommended);
+  } else {
+    payload.max_tokens = recommended;
+  }
+  const nextArgs = [...args];
+  nextArgs[0] = payload;
+  return nextArgs;
 }

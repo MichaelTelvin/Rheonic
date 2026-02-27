@@ -17,11 +17,18 @@ interface ProtectDecisionResponse {
   fail_mode?: unknown;
   protect_decision_timeout_ms?: unknown;
   blocked_until?: unknown;
+  apply_clamp_enabled?: unknown;
+  clamp?: unknown;
 }
 
 export interface ProtectEvaluation {
   decision: ProtectDecision;
   reason: string;
+  applyClampEnabled?: boolean;
+  clamp?: {
+    recommended_max_output_tokens: number;
+    applied: boolean;
+  };
 }
 
 export class LLMTBGBlockedError extends Error {
@@ -118,7 +125,12 @@ export class ProtectEngine {
         this.cooldownUntilMs = null;
         this.cooldownReason = null;
       }
-      return { decision, reason };
+      return {
+        decision,
+        reason,
+        applyClampEnabled: typeof parsed.apply_clamp_enabled === "boolean" ? parsed.apply_clamp_enabled : undefined,
+        clamp: parseClamp(parsed.clamp),
+      };
     } catch (error) {
       clearTimeout(timeout);
       if (isAbortError(error)) {
@@ -144,6 +156,20 @@ export class ProtectEngine {
       // Swallow timeout reporting errors; protect evaluation must never throw here.
     }
   }
+}
+
+function parseClamp(value: unknown): { recommended_max_output_tokens: number; applied: boolean } | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const candidate = value as { recommended_max_output_tokens?: unknown; applied?: unknown };
+  if (typeof candidate.recommended_max_output_tokens !== "number" || candidate.recommended_max_output_tokens < 1) {
+    return undefined;
+  }
+  return {
+    recommended_max_output_tokens: Math.floor(candidate.recommended_max_output_tokens),
+    applied: typeof candidate.applied === "boolean" ? candidate.applied : false,
+  };
 }
 
 function parseBlockedUntilMs(value: unknown): number | null {

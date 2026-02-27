@@ -17,7 +17,9 @@ export function Protect(): JSX.Element {
   const [protectMaxReqInput, setProtectMaxReqInput] = useState<string>("");
   const [protectMaxTokInput, setProtectMaxTokInput] = useState<string>("");
   const [protectFailModeInput, setProtectFailModeInput] = useState<"open" | "closed">("open");
+  const [applyClampInput, setApplyClampInput] = useState<boolean>(false);
   const failModeDisabled = !protectEnabledInput;
+  const sanitizeDigits = (value: string): string => value.replace(/\D+/g, "");
 
   useEffect(() => {
     if (!projectId) {
@@ -46,6 +48,7 @@ export function Protect(): JSX.Element {
             : String(settings.protect_max_tok_per_min),
         );
         setProtectFailModeInput(settings.protect_fail_mode === "closed" ? "closed" : "open");
+        setApplyClampInput(Boolean(settings.apply_clamp));
         setProtectError(null);
       } catch (error) {
         if (!cancelled) {
@@ -85,6 +88,7 @@ export function Protect(): JSX.Element {
       const updated = await updateProjectProtect(projectId, {
         protect_enabled: protectEnabledInput,
         protect_fail_mode: protectFailModeInput,
+        apply_clamp: applyClampInput,
         protect_max_req_per_min,
         protect_max_tok_per_min,
         protect_decision_timeout_ms:
@@ -92,6 +96,7 @@ export function Protect(): JSX.Element {
       });
       setProtectSettings(updated);
       setProtectEnabledInput(Boolean(updated.protect_enabled));
+      setApplyClampInput(Boolean(updated.apply_clamp));
       window.dispatchEvent(
         new CustomEvent("llmtbg:protect-mode-updated", {
           detail: { projectId, protect_enabled: Boolean(updated.protect_enabled) },
@@ -125,90 +130,122 @@ export function Protect(): JSX.Element {
 
         <Card className="form-card card--form">
           <h2 className="section-title">Project configuration</h2>
-          <FormColumn testId="protect-form-column">
-            <div className="form-field protect-mode">
-              <label htmlFor="protect-mode-select">Project mode</label>
-              <select
-                id="protect-mode-select"
-                value={protectEnabledInput ? "protect" : "observe"}
-                onChange={(event) => setProtectEnabledInput(event.target.value === "protect")}
-                title="Observe = telemetry only, Protect = preflight decisions enforced."
-              >
-                <option value="observe">Observe</option>
-                <option value="protect">Protect</option>
-              </select>
-            </div>
+          <div className="protect-settings-grid" data-testid="protect-form-column">
+            <FormColumn>
+              <div className="form-field protect-mode">
+                <label htmlFor="protect-mode-select">Project mode</label>
+                <select
+                  id="protect-mode-select"
+                  value={protectEnabledInput ? "protect" : "observe"}
+                  onChange={(event) => setProtectEnabledInput(event.target.value === "protect")}
+                  title="Observe = telemetry only, Protect = preflight decisions enforced."
+                >
+                  <option value="observe">Observe</option>
+                  <option value="protect">Protect</option>
+                </select>
+              </div>
 
-            <div className="form-field protect-req">
-              <label htmlFor="protect-max-req" className="label-with-tooltip">
-                <span>Max requests per minute</span>
-                <InfoTooltip text="Applied per provider." />
-              </label>
-              <input
-                id="protect-max-req"
-                className="text-input"
-                type="number"
-                min={1}
-                placeholder="Unlimited"
-                value={protectMaxReqInput}
-                onChange={(event) => setProtectMaxReqInput(event.target.value)}
-              />
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="protect-max-tok" className="label-with-tooltip">
-                <span>Max tokens per minute</span>
-                <InfoTooltip text="Applied per provider." />
-              </label>
-              <input
-                id="protect-max-tok"
-                className="text-input"
-                type="number"
-                min={1}
-                placeholder="Unlimited"
-                value={protectMaxTokInput}
-                onChange={(event) => setProtectMaxTokInput(event.target.value)}
-              />
-            </div>
-
-            <fieldset className={`protect-fail-mode ${failModeDisabled ? "is-disabled" : ""}`} disabled={failModeDisabled}>
-              <legend>On guard error</legend>
-              <label>
+              <div className="form-field protect-req">
+                <label htmlFor="protect-max-req" className="label-with-tooltip tooltip-label-unified">
+                  <span className="tooltip-label-inline">
+                    <span>Max requests per minute</span>
+                    <InfoTooltip text="Applied per provider." />
+                  </span>
+                </label>
                 <input
-                  type="radio"
-                  name="protect-fail-mode"
-                  value="open"
-                  checked={protectFailModeInput === "open"}
-                  onChange={() => setProtectFailModeInput("open")}
-                  disabled={failModeDisabled}
+                  id="protect-max-req"
+                  className="text-input"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Unlimited"
+                  value={protectMaxReqInput}
+                  onChange={(event) => setProtectMaxReqInput(sanitizeDigits(event.target.value))}
                 />
-                Allow LLM request
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="protect-fail-mode"
-                  value="closed"
-                  checked={protectFailModeInput === "closed"}
-                  onChange={() => setProtectFailModeInput("closed")}
-                  disabled={failModeDisabled}
-                />
-                Block LLM request
-              </label>
-            </fieldset>
+              </div>
 
-            <p className="form-error-slot">{protectError ?? "\u00A0"}</p>
-            <div className="modal-actions form-actions">
-              <button
-                type="button"
-                className="modal-button modal-primary action-btn"
-                onClick={() => void onSaveProtectSettings()}
-                disabled={savingProtect || !projectId}
-              >
-                {savingProtect ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </FormColumn>
+              <div className="form-field">
+                <label htmlFor="protect-max-tok" className="label-with-tooltip tooltip-label-unified">
+                  <span className="tooltip-label-inline">
+                    <span>Max tokens per minute</span>
+                    <InfoTooltip text="Applied per provider." />
+                  </span>
+                </label>
+                <input
+                  id="protect-max-tok"
+                  className="text-input"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Unlimited"
+                  value={protectMaxTokInput}
+                  onChange={(event) => setProtectMaxTokInput(sanitizeDigits(event.target.value))}
+                />
+              </div>
+            </FormColumn>
+
+            <FormColumn>
+              <fieldset className={`protect-fail-mode ${failModeDisabled ? "is-disabled" : ""}`} disabled={failModeDisabled}>
+                <legend>On guard error</legend>
+                <label>
+                  <input
+                    type="radio"
+                    name="protect-fail-mode"
+                    value="open"
+                    checked={protectFailModeInput === "open"}
+                    onChange={() => setProtectFailModeInput("open")}
+                    disabled={failModeDisabled}
+                  />
+                  Allow LLM request
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="protect-fail-mode"
+                    value="closed"
+                    checked={protectFailModeInput === "closed"}
+                    onChange={() => setProtectFailModeInput("closed")}
+                    disabled={failModeDisabled}
+                  />
+                  Block LLM request
+                </label>
+              </fieldset>
+
+              <fieldset className={`protect-fail-mode clamp-toggle-fieldset ${failModeDisabled ? "is-disabled" : ""}`} disabled={failModeDisabled}>
+                <legend>
+                  <span className="label-with-tooltip tooltip-label-unified tooltip-label-inline">
+                    <span>Auto token clamp</span>
+                    <InfoTooltip text="Apply output token clamp when near limit" />
+                  </span>
+                </legend>
+                <label htmlFor="apply-clamp-toggle" className="clamp-toggle-row">
+                  <span className="toggle-switch">
+                    <input
+                      id="apply-clamp-toggle"
+                      type="checkbox"
+                      checked={applyClampInput}
+                      onChange={(event) => setApplyClampInput(event.target.checked)}
+                      disabled={failModeDisabled}
+                      role="switch"
+                    />
+                    <span className="toggle-switch-track" aria-hidden="true" />
+                  </span>
+                  <span>{applyClampInput ? "On" : "Off"}</span>
+                </label>
+              </fieldset>
+            </FormColumn>
+          </div>
+          <p className="form-error-slot">{protectError ?? "\u00A0"}</p>
+          <div className="modal-actions form-actions">
+            <button
+              type="button"
+              className="modal-button modal-primary action-btn"
+              onClick={() => void onSaveProtectSettings()}
+              disabled={savingProtect || !projectId}
+            >
+              {savingProtect ? "Saving..." : "Save"}
+            </button>
+          </div>
         </Card>
       </div>
     </main>

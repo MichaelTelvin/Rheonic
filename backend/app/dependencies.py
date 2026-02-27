@@ -256,6 +256,8 @@ def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
             connection.execute(text("ALTER TABLE projects ADD COLUMN protect_enabled BOOLEAN DEFAULT FALSE NOT NULL"))
         if "protect_fail_mode" not in project_columns:
             connection.execute(text("ALTER TABLE projects ADD COLUMN protect_fail_mode VARCHAR(16) DEFAULT 'open' NOT NULL"))
+        if "apply_clamp" not in project_columns:
+            connection.execute(text("ALTER TABLE projects ADD COLUMN apply_clamp BOOLEAN DEFAULT FALSE NOT NULL"))
         if "protect_max_req_per_min" not in project_columns:
             connection.execute(text("ALTER TABLE projects ADD COLUMN protect_max_req_per_min INTEGER"))
         if "protect_max_tok_per_min" not in project_columns:

@@ -128,6 +128,8 @@ def test_project_webhook(
     # Enqueue a webhook test payload for an owned project.
     try:
         project = project_service.get_project_webhook_settings(project_id=project_id, user_id=current_user.id)
+        if not bool(project.protect_enabled):
+            raise HTTPException(status_code=409, detail="webhook test is available only in protect mode")
         override_url = normalize_webhook_url(str(payload.url) if payload and payload.url is not None else None)
         target_url = override_url or project.webhook_url
         if not target_url:

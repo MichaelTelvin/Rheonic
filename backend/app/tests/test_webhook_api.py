@@ -54,6 +54,8 @@ def test_project_webhook_owner_get_put_and_test(tmp_path) -> None:
     client, dispatcher = _make_client(tmp_path)
     project = client.post("/api/v1/projects", json={"name": "Webhook Demo"}).json()
     project_id = project["id"]
+    protect_response = client.put(f"/api/v1/projects/{project_id}/protect", json={"protect_enabled": True})
+    assert protect_response.status_code == 200
 
     put_response = client.put(
         f"/api/v1/projects/{project_id}/webhook",
@@ -127,6 +129,8 @@ def test_project_webhook_validation_errors(tmp_path) -> None:
 def test_project_webhook_rejects_private_hosts(tmp_path) -> None:
     client, _ = _make_client(tmp_path)
     project_id = client.post("/api/v1/projects", json={"name": "Unsafe Host Validation"}).json()["id"]
+    protect_response = client.put(f"/api/v1/projects/{project_id}/protect", json={"protect_enabled": True})
+    assert protect_response.status_code == 200
 
     private_host = client.put(
         f"/api/v1/projects/{project_id}/webhook",
@@ -141,7 +145,7 @@ def test_project_webhook_rejects_private_hosts(tmp_path) -> None:
     _cleanup_overrides()
 
 
-def test_project_webhook_test_works_when_disabled_and_uses_override_url(tmp_path) -> None:
+def test_project_webhook_test_requires_protect_mode(tmp_path) -> None:
     client, dispatcher = _make_client(tmp_path)
     project_id = client.post("/api/v1/projects", json={"name": "Webhook Test Override"}).json()["id"]
 
@@ -156,13 +160,8 @@ def test_project_webhook_test_works_when_disabled_and_uses_override_url(tmp_path
         f"/api/v1/projects/{project_id}/webhook/test",
         json={"url": "https://draft.test/hook", "secret": "draft-secret"},
     )
-    assert test_response.status_code == 202
-    assert len(dispatcher.calls) == 1
-    call = dispatcher.calls[0]
-    assert call[2] == "webhook.test"
-    assert call[3] == "https://draft.test/hook"
-    assert call[4] == "draft-secret"
-    assert call[5] is True
+    assert test_response.status_code == 409
+    assert len(dispatcher.calls) == 0
 
     _cleanup_overrides()
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -49,6 +49,7 @@ describe("Form column layout", () => {
     mocks.fetchProjectProtect.mockResolvedValue({
       protect_enabled: false,
       protect_fail_mode: "open",
+      apply_clamp: false,
       protect_max_req_per_min: null,
       protect_max_tok_per_min: null,
       protect_decision_timeout_ms: 100,
@@ -75,15 +76,38 @@ describe("Form column layout", () => {
   it("constrains Protect form", async () => {
     render(<Protect />);
     const node = await screen.findByTestId("protect-form-column");
-    expect(node.className).toContain("form-column");
+    expect(node.className).toContain("protect-settings-grid");
   });
 
   it("renders accessible info tooltips for per-provider limits", async () => {
     render(<Protect />);
     const infoButtons = await screen.findAllByRole("button", { name: "More info" });
-    expect(infoButtons).toHaveLength(2);
+    expect(infoButtons).toHaveLength(3);
 
     fireEvent.focus(infoButtons[0]);
     expect(screen.getByRole("tooltip").textContent).toContain("Applied per provider.");
+
+    fireEvent.blur(infoButtons[0]);
+    fireEvent.focus(infoButtons[2]);
+    expect(screen.getByRole("tooltip").textContent).toBe("Apply output token clamp when near limit");
+  });
+
+  it("disables clamp toggle in Observe mode and enables it in Protect mode", async () => {
+    render(<Protect />);
+    const toggle = await screen.findByRole("switch");
+    expect(toggle.getAttribute("disabled")).not.toBeNull();
+
+    cleanup();
+    mocks.fetchProjectProtect.mockResolvedValueOnce({
+      protect_enabled: true,
+      protect_fail_mode: "open",
+      apply_clamp: false,
+      protect_max_req_per_min: null,
+      protect_max_tok_per_min: null,
+      protect_decision_timeout_ms: 100,
+    });
+    render(<Protect />);
+    const toggleEnabled = await screen.findByRole("switch");
+    expect(toggleEnabled.getAttribute("disabled")).toBeNull();
   });
 });

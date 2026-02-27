@@ -61,9 +61,10 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
     if (protectDecision.decision === "block") {
       throw new LLMTBGBlockedError(protectDecision.reason);
     }
+    const callArgs = maybeApplyOpenAIClamp(args, protectDecision);
 
     try {
-      const response = await originalCreate(...args);
+      const response = await originalCreate(...callArgs);
       void options.client.captureEvent(
         buildEvent({
           provider: "openai",
@@ -138,6 +139,41 @@ function extractMaxOutputTokens(args: unknown[]): number | undefined {
     return (firstArg as { max_output_tokens: number }).max_output_tokens;
   }
   return undefined;
+}
+
+function maybeApplyOpenAIClamp(args: unknown[], decision: ProtectEvaluation): unknown[] {
+  if (decision.decision !== "warn" || decision.reason !== "near_cap") {
+    return args;
+  }
+  if (!decision.applyClampEnabled) {
+    return args;
+  }
+  const recommended = decision.clamp?.recommended_max_output_tokens;
+  if (typeof recommended !== "number" || recommended < 1) {
+    return args;
+  }
+  const firstArg = args[0];
+  if (!firstArg || typeof firstArg !== "object") {
+    return args;
+  }
+  const payload = { ...(firstArg as Record<string, unknown>) };
+  let updated = false;
+  const maxTokens = payload.max_tokens;
+  if (typeof maxTokens === "number") {
+    payload.max_tokens = Math.min(maxTokens, recommended);
+    updated = true;
+  }
+  const maxOutputTokens = payload.max_output_tokens;
+  if (typeof maxOutputTokens === "number") {
+    payload.max_output_tokens = Math.min(maxOutputTokens, recommended);
+    updated = true;
+  }
+  if (!updated) {
+    payload.max_tokens = recommended;
+  }
+  const nextArgs = [...args];
+  nextArgs[0] = payload;
+  return nextArgs;
 }
 
 function extractResponseModel(response: unknown): string | null {

@@ -34,6 +34,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(length=64), nullable=True),
         sa.Column("protect_enabled", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("protect_fail_mode", sa.String(length=16), server_default="open", nullable=False),
+        sa.Column("apply_clamp", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("protect_max_req_per_min", sa.Integer(), nullable=True),
         sa.Column("protect_max_tok_per_min", sa.Integer(), nullable=True),
         sa.Column("protect_decision_timeout_ms", sa.Integer(), server_default="100", nullable=False),

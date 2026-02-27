@@ -29,6 +29,8 @@ class ProtectDecision:
     retry_after_seconds: int | None
     blocked_until: str | None
     snapshot: dict[str, int | str | bool | None | dict[str, int | bool | None]]
+    apply_clamp_enabled: bool
+    clamp: dict[str, int | bool] | None = None
 
 
 @dataclass(slots=True)
@@ -88,6 +90,7 @@ class ProtectService:
         max_req = project.protect_max_req_per_min
         max_tok = project.protect_max_tok_per_min
         fail_mode = project.protect_fail_mode
+        apply_clamp_enabled = bool(project.apply_clamp)
         decision_timeout_ms = project.protect_decision_timeout_ms
         requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=scoped_id)
 
@@ -114,6 +117,7 @@ class ProtectService:
                         "would_exceed_tokens_cap": False,
                     },
                 },
+                apply_clamp_enabled=apply_clamp_enabled,
             )
 
         cooldown_until_ms = self._protect_action_store.get_block_cooldown_until_ms(project_id=scoped_id)
@@ -138,6 +142,7 @@ class ProtectService:
                         "would_exceed_tokens_cap": False,
                     },
                 },
+                apply_clamp_enabled=apply_clamp_enabled,
             )
 
         # Caps-first block path.
@@ -154,6 +159,7 @@ class ProtectService:
                 fail_mode=fail_mode,
                 decision_timeout_ms=decision_timeout_ms,
                 now_ms=now_ms,
+                apply_clamp_enabled=apply_clamp_enabled,
             )
         if max_req is not None and requests_60s >= max_req:
             return project_id, self._build_block_decision(
@@ -168,6 +174,7 @@ class ProtectService:
                 fail_mode=fail_mode,
                 decision_timeout_ms=decision_timeout_ms,
                 now_ms=now_ms,
+                apply_clamp_enabled=apply_clamp_enabled,
             )
 
         estimated_next_tokens: int | None = None
@@ -202,6 +209,13 @@ class ProtectService:
         if warn_signals:
             warn_signal = warn_signals[0]
             reason = str(warn_signal.detector)
+            clamp = self._build_clamp(
+                reason=reason,
+                max_tok=max_tok,
+                current_tokens_60s=tokens_60s,
+                max_output_tokens=ctx.max_output_tokens,
+                estimated_next_tokens=estimated_next_tokens,
+            )
             self._protect_action_store.record(project_id=scoped_id, decision="warn", reason=reason)
             self._enqueue_warn_webhook(
                 project_id=project_id,
@@ -212,6 +226,8 @@ class ProtectService:
                 max_req=max_req,
                 max_tok=max_tok,
                 estimated_next_tokens=estimated_next_tokens,
+                apply_clamp_enabled=apply_clamp_enabled,
+                clamp=clamp,
             )
             return project_id, ProtectDecision(
                 decision="warn",
@@ -236,6 +252,8 @@ class ProtectService:
                         ),
                     },
                 },
+                apply_clamp_enabled=apply_clamp_enabled,
+                clamp=clamp,
             )
 
         decision = "allow"
@@ -262,6 +280,7 @@ class ProtectService:
                     ),
                 },
             },
+            apply_clamp_enabled=apply_clamp_enabled,
         )
 
     def _build_block_decision(
@@ -278,6 +297,7 @@ class ProtectService:
         fail_mode: str,
         decision_timeout_ms: int,
         now_ms: int,
+        apply_clamp_enabled: bool,
     ) -> ProtectDecision:
         cooldown_seconds = max(int(self._protect_block_cooldown_seconds), 1)
         blocked_until_ms = now_ms + (cooldown_seconds * 1000)
@@ -317,6 +337,7 @@ class ProtectService:
                     "would_exceed_tokens_cap": False,
                 },
             },
+            apply_clamp_enabled=apply_clamp_enabled,
         )
 
     def _enqueue_block_webhook(
@@ -366,6 +387,8 @@ class ProtectService:
         max_req: int | None,
         max_tok: int | None,
         estimated_next_tokens: int | None,
+        apply_clamp_enabled: bool,
+        clamp: dict[str, int | bool] | None,
     ) -> None:
         if self._webhook_dispatcher is None:
             return
@@ -380,6 +403,8 @@ class ProtectService:
             "req_cap": max_req,
             "tok_cap": max_tok,
             "estimated_next_tokens": estimated_next_tokens,
+            "apply_clamp_enabled": apply_clamp_enabled,
+            "clamp": clamp,
             "sent_at": now.isoformat(),
         }
         try:
@@ -391,3 +416,33 @@ class ProtectService:
         except Exception:
             # Decision path must never fail because webhook dispatch fails.
             pass
+
+    def _build_clamp(
+        self,
+        *,
+        reason: str,
+        max_tok: int | None,
+        current_tokens_60s: int,
+        max_output_tokens: int | None,
+        estimated_next_tokens: int | None,
+    ) -> dict[str, int | bool] | None:
+        if reason != "near_cap":
+            return None
+        if max_tok is None or max_tok <= 0:
+            return None
+        if not isinstance(max_output_tokens, int) or max_output_tokens <= 0:
+            return None
+        if not isinstance(estimated_next_tokens, int):
+            return None
+        input_estimate = estimated_next_tokens - max_output_tokens
+        if input_estimate < 0:
+            input_estimate = 0
+        available_for_output = max_tok - current_tokens_60s - input_estimate
+        if available_for_output < 1:
+            recommended = 1
+        else:
+            recommended = min(max_output_tokens, available_for_output)
+        return {
+            "recommended_max_output_tokens": int(recommended),
+            "applied": False,
+        }

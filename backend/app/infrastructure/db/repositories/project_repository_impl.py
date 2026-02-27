@@ -70,6 +70,7 @@ class ProjectRepositoryImpl(ProjectRepository):
                     user_id=project.user_id,
                     protect_enabled=project.protect_enabled,
                     protect_fail_mode=project.protect_fail_mode,
+                    apply_clamp=project.apply_clamp,
                     protect_max_req_per_min=project.protect_max_req_per_min,
                     protect_max_tok_per_min=project.protect_max_tok_per_min,
                     protect_decision_timeout_ms=project.protect_decision_timeout_ms,
@@ -113,6 +114,7 @@ class ProjectRepositoryImpl(ProjectRepository):
         project_id: str,
         protect_enabled: bool,
         protect_fail_mode: str,
+        apply_clamp: bool,
         protect_max_req_per_min: int | None,
         protect_max_tok_per_min: int | None,
         protect_decision_timeout_ms: int,
@@ -125,6 +127,7 @@ class ProjectRepositoryImpl(ProjectRepository):
                     return None
                 record.protect_enabled = protect_enabled
                 record.protect_fail_mode = protect_fail_mode
+                record.apply_clamp = apply_clamp
                 record.protect_max_req_per_min = protect_max_req_per_min
                 record.protect_max_tok_per_min = protect_max_tok_per_min
                 record.protect_decision_timeout_ms = protect_decision_timeout_ms
@@ -256,6 +259,7 @@ def _to_domain(record: ProjectRecord, settings: Settings | None = None) -> Proje
         created_at=record.created_at,
         protect_enabled=bool(getattr(record, "protect_enabled", False)),
         protect_fail_mode=str(getattr(record, "protect_fail_mode", "open") or "open"),
+        apply_clamp=bool(getattr(record, "apply_clamp", False)),
         protect_max_req_per_min=getattr(record, "protect_max_req_per_min", None),
         protect_max_tok_per_min=getattr(record, "protect_max_tok_per_min", None),
         protect_decision_timeout_ms=int(getattr(record, "protect_decision_timeout_ms", 100) or 100),

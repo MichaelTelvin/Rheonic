@@ -48,6 +48,7 @@ export interface ProjectProvidersResponse {
 export interface ProjectProtectSettings {
   protect_enabled: boolean;
   protect_fail_mode: "open" | "closed" | string;
+  apply_clamp: boolean;
   protect_max_req_per_min: number | null;
   protect_max_tok_per_min: number | null;
   protect_decision_timeout_ms: number;
@@ -76,6 +77,7 @@ export interface TestProjectWebhookInput {
 export interface UpdateProjectProtectInput {
   protect_enabled: boolean;
   protect_fail_mode: "open" | "closed";
+  apply_clamp: boolean;
   protect_max_req_per_min: number | null;
   protect_max_tok_per_min: number | null;
   protect_decision_timeout_ms: number;
