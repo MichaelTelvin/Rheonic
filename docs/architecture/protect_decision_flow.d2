@@ -72,6 +72,16 @@ warn_signals: "Warn signals (protect mode only)\nnear_cap (predictive: req|tok|b
   }
 }
 
+ingest_note: "Ingest dominance (incident emission)\nL3 cap_breach > L2 near_cap > L1 behavioral\n(does not change decision order)" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 13
+  }
+}
+
 allow_warn: "allow / warn\nprovider call proceeds" {
   style: {
     fill: "#f6efd8"
@@ -147,6 +157,7 @@ sdk_mode -> preflight: "Protect"
 observe -> provider
 preflight -> inputs
 inputs -> caps
+inputs -> ingest_note
 caps -> block: "block"
 caps -> warn_signals: "no block"
 warn_signals -> allow_warn: "warn / allow"

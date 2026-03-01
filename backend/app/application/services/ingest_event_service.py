@@ -111,9 +111,14 @@ class IngestEventService:
             signals = self._detector_registry.detect(ctx)
             cap_breach_signals = self._cap_breach_signal_if_any(ctx)
             if cap_breach_signals:
-                # Prevent duplicate anomaly incidents for the same ingest event.
-                signals = [signal for signal in signals if signal.detector not in {"token_explosion", "near_cap"}]
-            signals.extend(cap_breach_signals)
+                # Dominance L3: cap_breach suppresses all other signals for this ingest event.
+                signals = cap_breach_signals
+            else:
+                near_cap_signals = [signal for signal in signals if signal.detector == "near_cap"]
+                if near_cap_signals:
+                    # Dominance L2: near_cap suppresses behavioral signals for this ingest event.
+                    signals = near_cap_signals
+                # Dominance L1: behavioral signals may coexist.
             self._incident_manager.process_signals(
                 project_id=event.project_id,
                 provider=provider,

@@ -32,7 +32,7 @@ counters: "Rolling Counters\nrequests_60s / tokens_60s\nscope: project+provider"
   }
 }
 
-detectors: "Detector(s)\nnear_cap (req|tok|both)\nretry_storm\nloop_suspect\ntoken_explosion\n+ cap_breach logging from counters" {
+detectors: "Detector(s)\nnear_cap (req|tok|both)\nretry_storm\nloop_suspect\ntoken_explosion\n+ cap_breach logging from counters\n\nDominance per event:\nL3 cap_breach > L2 near_cap > L1 behavioral" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"

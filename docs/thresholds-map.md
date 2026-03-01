@@ -14,6 +14,14 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - `incident_auto_close_seconds`: inactivity cooldown before open incidents are auto-resolved.
 - `auto_close_run_interval_seconds`: scheduler cadence for running auto-close.
 
+## Ingest Dominance (per event)
+- Dominance level 3: `cap_breach`
+  - suppresses: `near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`
+- Dominance level 2: `near_cap` (only when no cap breach)
+  - suppresses: `retry_storm`, `loop_suspect`, `token_explosion`
+- Dominance level 1: `retry_storm`, `loop_suspect`, `token_explosion`
+  - coexistence allowed when neither `cap_breach` nor `near_cap` dominates
+
 ## Protect Near-Cap Threshold
 - `protect_near_cap_factor`: warn ratio used by preflight near-cap checks.
 - Near-cap checks:

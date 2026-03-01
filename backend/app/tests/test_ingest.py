@@ -457,6 +457,95 @@ def test_cap_breach_suppresses_token_explosion_for_same_event() -> None:
     assert all(event_type != "incident.block" for _, event_type, _ in webhook.calls)
 
 
+def test_dominance_cap_breach_suppresses_retry_storm() -> None:
+    service, incidents, _ = _service(protect_enabled=True, req_cap=1, tok_cap=10_000, retry_storm_count=1)
+    service.ingest(
+        _event(
+            "p1",
+            total_tokens=50,
+            status="error",
+            http_status=500,
+            error_type="provider_5xx",
+            feature="dominance-cap-retry",
+            offset_seconds=0,
+        )
+    )
+
+    assert len(incidents.rows) == 1
+    assert incidents.rows[0].incident_type == "cap_breach"
+    assert all(row.incident_type != "retry_storm" for row in incidents.rows)
+
+
+def test_dominance_cap_breach_suppresses_near_cap() -> None:
+    service, incidents, _ = _service(protect_enabled=True, req_cap=1, tok_cap=1000, retry_storm_count=10)
+    service.ingest(_event("p1", total_tokens=600, feature="dominance-cap-near", offset_seconds=0))
+
+    assert len(incidents.rows) == 1
+    assert incidents.rows[0].incident_type == "cap_breach"
+    assert all(row.incident_type != "near_cap" for row in incidents.rows)
+
+
+def test_dominance_near_cap_suppresses_behavioral_signals() -> None:
+    service, incidents, _ = _service(protect_enabled=True, req_cap=100, tok_cap=1000, retry_storm_count=1, loop_count=1)
+    service.ingest(
+        _event(
+            "p1",
+            total_tokens=600,
+            status="error",
+            http_status=500,
+            error_type="provider_5xx",
+            feature="dominance-near-retry",
+            offset_seconds=0,
+        )
+    )
+
+    assert len(incidents.rows) == 1
+    assert incidents.rows[0].incident_type == "near_cap"
+    assert all(row.incident_type not in {"retry_storm", "loop_suspect", "token_explosion"} for row in incidents.rows)
+
+
+def test_dominance_behavioral_retry_and_loop_can_coexist() -> None:
+    service, incidents, _ = _service(protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, loop_count=1)
+    service.ingest(
+        _event(
+            "p1",
+            total_tokens=60,
+            status="error",
+            http_status=500,
+            error_type="provider_5xx",
+            feature="dominance-retry-loop",
+            offset_seconds=0,
+        )
+    )
+    service.ingest(_event("p1", total_tokens=60, feature="dominance-retry-loop", offset_seconds=1))
+
+    incident_types = sorted({row.incident_type for row in incidents.rows})
+    assert "retry_storm" in incident_types
+    assert "loop_suspect" in incident_types
+    assert all(row.incident_type != "near_cap" for row in incidents.rows)
+    assert all(row.incident_type != "cap_breach" for row in incidents.rows)
+
+
+def test_dominance_behavioral_token_explosion_and_retry_can_coexist_without_caps() -> None:
+    service, incidents, _ = _service(protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, token_explosion_abs=1500)
+    service.ingest(
+        _event(
+            "p1",
+            total_tokens=1800,
+            status="error",
+            http_status=500,
+            error_type="provider_5xx",
+            feature="dominance-token-retry",
+            offset_seconds=0,
+        )
+    )
+
+    incident_types = sorted(row.incident_type for row in incidents.rows)
+    assert incident_types == ["retry_storm", "token_explosion"]
+    assert all(row.incident_type != "near_cap" for row in incidents.rows)
+    assert all(row.incident_type != "cap_breach" for row in incidents.rows)
+
+
 def test_policy_gap_first_seen_webhook_only_once_and_no_incident() -> None:
     service, incidents, webhook = _service(protect_enabled=True)
     service.ingest(_event("p1", provider="openai", model="gpt-4o-mini", total_tokens=10, offset_seconds=0))
