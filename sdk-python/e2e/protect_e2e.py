@@ -185,6 +185,12 @@ def run() -> None:
 
     protect_metrics = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
     assert int(protect_metrics.get("warned_60m") or 0) >= 1
+    open_incidents = _api(
+        f"/api/v1/incidents?project_id={auth.project_id}&status=open&provider=openai",
+        token=auth.token,
+    )
+    assert isinstance(open_incidents, list)
+    assert any(str(row.get("type")) == "near_cap" for row in open_incidents)
 
     client.close()
     print("python protect e2e PASSED")

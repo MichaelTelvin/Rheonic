@@ -50,12 +50,26 @@ def _make_client(tmp_path, current_user: User | None = None) -> tuple[TestClient
     return TestClient(app), dispatcher
 
 
+def _set_protect_enabled(client: TestClient, project_id: str) -> None:
+    response = client.put(
+        f"/api/v1/projects/{project_id}/protect",
+        json={
+            "protect_enabled": True,
+            "protect_fail_mode": "open",
+            "apply_clamp": False,
+            "protect_max_req_per_min": None,
+            "protect_max_tok_per_min": None,
+            "protect_decision_timeout_ms": 100,
+        },
+    )
+    assert response.status_code == 200
+
+
 def test_project_webhook_owner_get_put_and_test(tmp_path) -> None:
     client, dispatcher = _make_client(tmp_path)
     project = client.post("/api/v1/projects", json={"name": "Webhook Demo"}).json()
     project_id = project["id"]
-    protect_response = client.put(f"/api/v1/projects/{project_id}/protect", json={"protect_enabled": True})
-    assert protect_response.status_code == 200
+    _set_protect_enabled(client, project_id)
 
     put_response = client.put(
         f"/api/v1/projects/{project_id}/webhook",
@@ -129,8 +143,7 @@ def test_project_webhook_validation_errors(tmp_path) -> None:
 def test_project_webhook_rejects_private_hosts(tmp_path) -> None:
     client, _ = _make_client(tmp_path)
     project_id = client.post("/api/v1/projects", json={"name": "Unsafe Host Validation"}).json()["id"]
-    protect_response = client.put(f"/api/v1/projects/{project_id}/protect", json={"protect_enabled": True})
-    assert protect_response.status_code == 200
+    _set_protect_enabled(client, project_id)
 
     private_host = client.put(
         f"/api/v1/projects/{project_id}/webhook",

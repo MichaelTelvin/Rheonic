@@ -28,16 +28,6 @@ class DetectIncidentsService:
         self._webhook_dispatcher = webhook_dispatcher
         self._project_repository = project_repository
 
-    def detect(self) -> list[object]:
-        # Detect incidents and return incident DTOs.
-        try:
-            # TODO: Run domain detectors and persist incidents.
-            logger.debug("Detect incidents service called")
-            return []
-        except Exception:
-            logger.exception("Detect incidents service failed")
-            raise
-
     def list_incidents(
         self,
         project_id: str,

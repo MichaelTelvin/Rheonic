@@ -246,7 +246,7 @@ def _event(
     http_status: int,
     total_tokens: int,
     created_at: datetime,
-    request_endpoint: str = "/chat/completions",
+    request_endpoint: str | None = "/chat/completions",
     request_feature: str = "manual-protect-demo",
 ) -> Event:
     return Event(
@@ -307,7 +307,12 @@ def test_near_cap_warns_when_predictive_reaches_warn_ratio(tmp_path) -> None:
     decision = _decision(
         client,
         ingest_key,
-        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 15},
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "input_tokens_estimate": 15,
+            "max_output_tokens": 64,
+        },
     )
     assert decision["decision"] == "warn"
     assert decision["reason"] == "near_cap"
@@ -347,7 +352,12 @@ def test_near_cap_warn_dispatches_decision_warn_webhook(tmp_path) -> None:
     decision = _decision(
         client,
         ingest_key,
-        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 10},
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "input_tokens_estimate": 10,
+            "max_output_tokens": 64,
+        },
     )
     assert decision["decision"] == "warn"
     warn_calls = [call for call in dispatcher.calls if call[1] == "decision.warn"]
@@ -401,7 +411,12 @@ def test_loop_suspect_warns_in_preflight_when_feature_matches(tmp_path) -> None:
     decision = _decision(
         client,
         ingest_key,
-        body={"provider": "openai", "model": "gpt-4o-mini", "feature": "manual-protect-demo"},
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "feature": "manual-protect-demo",
+        },
     )
     assert decision["decision"] == "warn"
     assert decision["reason"] == "loop_suspect"

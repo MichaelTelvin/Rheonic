@@ -311,7 +311,7 @@ def test_loop_suspect_opens_incident_in_observe_without_warn_webhook() -> None:
     assert all(event_type not in {"incident.warn", "incident.block"} for _, event_type, _ in webhook.calls)
 
 
-def test_loop_detector_ignores_error_events_and_retry_storm_still_triggers() -> None:
+def test_loop_suspect_ignores_error_events_and_retry_storm_still_triggers() -> None:
     service, incidents, webhook = _service(protect_enabled=True, retry_storm_count=3, loop_count=3)
     for i in range(3):
         service.ingest(

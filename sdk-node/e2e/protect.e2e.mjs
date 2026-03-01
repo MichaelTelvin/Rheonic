@@ -157,6 +157,12 @@ async function main() {
     headers: authHeaders,
   });
   assert.ok(Number(protectMetrics.warned_60m ?? 0) >= 1);
+  const openIncidents = await api(
+    `/api/v1/incidents?project_id=${encodeURIComponent(project.id)}&status=open&provider=openai`,
+    { headers: authHeaders },
+  );
+  assert.ok(Array.isArray(openIncidents));
+  assert.ok(openIncidents.some((row) => row.type === "near_cap"));
 
   client.close();
   console.log("node protect e2e PASSED");

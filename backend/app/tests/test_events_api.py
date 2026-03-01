@@ -57,14 +57,8 @@ class FakeIngestKeyService:
             ),
         ]
         _ = self._records
-        self._legacy_hash = hash_key("legacy-unowned-key")
-        self.last_allow_unowned_project: bool | None = None
-
-    def resolve_project_id(self, plaintext_key: str, allow_unowned_project: bool = False) -> str | None:
-        self.last_allow_unowned_project = allow_unowned_project
+    def resolve_project_id(self, plaintext_key: str) -> str | None:
         key_hash = hash_key(plaintext_key)
-        if key_hash == self._legacy_hash:
-            return "p-legacy" if allow_unowned_project else None
         if key_hash in self._revoked_hashes:
             return None
         return self._hash_to_project.get(key_hash)
@@ -144,7 +138,6 @@ def test_ingest_event_accepts_active_key_and_maps_to_project() -> None:
     assert response.json() == {"status": "accepted"}
     assert len(ingest_service.ingested) == 1
     assert getattr(ingest_service.ingested[0], "project_id") == "p1"
-    assert key_service.last_allow_unowned_project is False
     app.dependency_overrides.clear()
 
 
@@ -171,35 +164,4 @@ def test_ingest_event_accepts_quoted_and_env_style_ingest_keys() -> None:
     )
     assert env_style.status_code == 202
     assert len(ingest_service.ingested) == 2
-    app.dependency_overrides.clear()
-
-
-def test_ingest_event_unowned_project_path_requires_explicit_opt_in() -> None:
-    # Legacy unowned-project ingest is denied by default and allowed only when explicitly enabled.
-    ingest_service = FakeIngestService()
-    key_service = FakeIngestKeyService()
-    app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
-    app.dependency_overrides[get_ingest_key_service] = lambda: key_service
-    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev", ingest_allow_unowned_project=False)
-    client = TestClient(app)
-
-    denied = client.post(
-        "/api/v1/events",
-        json=_payload(),
-        headers={"X-Project-Ingest-Key": "legacy-unowned-key"},
-    )
-    assert denied.status_code == 401
-    assert denied.json() == {"error": {"code": "unauthorized", "message": "invalid ingest key"}}
-    assert key_service.last_allow_unowned_project is False
-
-    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev", ingest_allow_unowned_project=True)
-    allowed = client.post(
-        "/api/v1/events",
-        json=_payload(),
-        headers={"X-Project-Ingest-Key": "legacy-unowned-key"},
-    )
-    assert allowed.status_code == 202
-    assert allowed.json() == {"status": "accepted"}
-    assert key_service.last_allow_unowned_project is True
-    assert getattr(ingest_service.ingested[-1], "project_id") == "p-legacy"
     app.dependency_overrides.clear()

@@ -33,7 +33,7 @@ This map reflects the deterministic anomaly model now used by ingest and protect
   - `near_cap(both)` -> both booleans true, `near_cap_type="both"`
 - When it applies:
   - Protect preflight: decision `warn` with webhook `decision.warn`.
-  - Ingest (observe/protect): incident signal/logging for `near_cap`.
+  - Ingest (observe/protect): emits `near_cap` incident only when no `cap_breach` dominates that same event.
 
 ## Retry Storm Detector
 - `retry_storm_window_seconds`: lookback window for failure burst detection.
@@ -69,7 +69,10 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - No preflight call.
 - No token estimation for preflight.
 - Never returns warn/block action to SDK.
-- Ingest still logs incidents (`near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`, `cap_breach` when caps exist).
+- Ingest still logs incidents with dominance applied per event:
+  - `cap_breach` dominates all
+  - else `near_cap` dominates behavioral signals
+  - else behavioral signals may coexist
 - No runtime detector/decision webhooks are sent in observe mode.
 
 ## Webhook Triggers

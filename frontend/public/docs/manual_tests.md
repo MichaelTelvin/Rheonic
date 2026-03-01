@@ -26,11 +26,34 @@ All API paths remain under `/api/v1/...`.
 - Decision response `warn` and reason `near_cap`.
 - Provider stub is still called.
 
+### 3a) Protect near-cap clamp OFF
+1. Set mode Protect and disable Auto token clamp in Settings.
+2. Run protect demo with `LLMTBG_SCENARIO=near_cap`.
+3. Expected:
+- Decision response includes `clamp.recommended_max_output_tokens`.
+- `clamp.applied=false` in response.
+- Provider call proceeds with original `max_output_tokens`.
+
+### 3b) Protect near-cap clamp ON
+1. Set mode Protect and enable Auto token clamp in Settings.
+2. Run protect demo with `LLMTBG_SCENARIO=near_cap`.
+3. Expected:
+- Decision response includes `clamp.recommended_max_output_tokens`.
+- Demo output shows effective provider request uses clamped max output tokens.
+- Provider stub is still called.
+
 ### 4) Protect cap breach block
 1. Set mode Protect and low req/tok cap.
 2. Run protect demo with `LLMTBG_SCENARIO=cap_breach`.
 3. Expected:
 - Decision response `block` with `req_cap_breach` or `tok_cap_breach`.
+- Provider stub is not called for blocked step.
+
+### 4a) Protect request-cap breach block
+1. Set mode Protect and set low request cap.
+2. Run protect demo with `LLMTBG_SCENARIO=req_cap_breach`.
+3. Expected:
+- Decision response `block` with `req_cap_breach`.
 - Provider stub is not called for blocked step.
 
 ### 5) Protect warn-only detector signals
@@ -50,3 +73,10 @@ Expected:
 3. Expected:
 - Incident status transitions `open` -> `resolved` or `auto_resolved`.
 - Resolution webhook event is emitted only in protect mode when webhook is configured.
+
+### 7) Protect cooldown after block
+1. Run protect demo with `LLMTBG_SCENARIO=cooldown`.
+2. Expected:
+- First decision blocks on cap breach path.
+- Immediate follow-up decision blocks with `cooldown_active`.
+- Provider stub remains uncalled while cooldown block is active.

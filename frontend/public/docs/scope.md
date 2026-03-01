@@ -45,7 +45,7 @@ Alerts (webhook)
 - Project webhook config + test API
 - Webhook dispatch on:
 - protect decision warns (`decision.warn`)
-- warn incident opens in protect mode (`incident.warn`, non-breach ingest signals)
+- warn incident opens in protect mode (`incident.warn`, non-breach ingest signals after ingest dominance suppression)
 - protect decision blocks (`incident.block`)
 - incident resolved in protect mode (manual/auto)
 - policy-gap first-seen tuples in protect mode (`policy_gap.detected`)

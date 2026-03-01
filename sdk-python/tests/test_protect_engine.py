@@ -297,7 +297,7 @@ def test_preflight_predictive_near_cap_warn_allows_provider_call() -> None:
         http_client=FakeHttpClient(  # type: ignore[arg-type]
             {
                 "decision": "warn",
-                "reason": "predictive_near_cap",
+                "reason": "near_cap",
                 "fail_mode": "open",
                 "protect_decision_timeout_ms": 100,
             }
@@ -315,7 +315,7 @@ def test_preflight_warn_allows_provider_call_and_tags_telemetry() -> None:
     transport = FakeHttpClient(  # type: ignore[arg-type]
         {
             "decision": "warn",
-            "reason": "incident_medium",
+            "reason": "loop_suspect",
             "fail_mode": "open",
             "protect_decision_timeout_ms": 100,
         }
@@ -336,7 +336,7 @@ def test_preflight_warn_allows_provider_call_and_tags_telemetry() -> None:
     assert len(transport.ingested_events) == 1
     request_payload = transport.ingested_events[0].get("request") or {}
     assert request_payload.get("protect_decision") == "warn"
-    assert request_payload.get("protect_reason") == "incident_medium"
+    assert request_payload.get("protect_reason") == "loop_suspect"
     client.close()
 
 

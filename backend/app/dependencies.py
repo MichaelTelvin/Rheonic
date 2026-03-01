@@ -3,7 +3,6 @@ from functools import lru_cache
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import inspect, text
 
 from app.application.services.auth_service import AuthService
 from app.application.services.detect_incidents_service import DetectIncidentsService
@@ -38,7 +37,6 @@ def get_db_session_factory() -> DatabaseSessionFactory:
     try:
         session_factory = DatabaseSessionFactory()
         Base.metadata.create_all(bind=session_factory.engine)
-        _ensure_legacy_schema(session_factory)
         logger.info("Database session factory initialized")
         return session_factory
     except Exception:
@@ -237,143 +235,3 @@ def get_current_user(
     if user is None:
         raise HTTPException(status_code=401, detail="invalid token")
     return user
-
-
-def _ensure_legacy_schema(session_factory: DatabaseSessionFactory) -> None:
-    # Add backward-compatible columns for dev databases created before tenancy/auth.
-    inspector = inspect(session_factory.engine)
-    table_names = set(inspector.get_table_names())
-    if "projects" not in table_names:
-        return
-    project_columns = {column["name"] for column in inspector.get_columns("projects")}
-    if "user_id" in project_columns:
-        pass
-    else:
-        with session_factory.engine.begin() as connection:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN user_id VARCHAR(64)"))
-    with session_factory.engine.begin() as connection:
-        if "protect_enabled" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_enabled BOOLEAN DEFAULT FALSE NOT NULL"))
-        if "protect_fail_mode" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_fail_mode VARCHAR(16) DEFAULT 'open' NOT NULL"))
-        if "apply_clamp" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN apply_clamp BOOLEAN DEFAULT FALSE NOT NULL"))
-        if "protect_max_req_per_min" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_max_req_per_min INTEGER"))
-        if "protect_max_tok_per_min" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_max_tok_per_min INTEGER"))
-        if "protect_decision_timeout_ms" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN protect_decision_timeout_ms INTEGER DEFAULT 100 NOT NULL"))
-        if "webhook_enabled" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_enabled BOOLEAN DEFAULT FALSE NOT NULL"))
-        if "webhook_url" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_url VARCHAR(2048)"))
-        if "webhook_secret" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_secret VARCHAR(512)"))
-        if "webhook_last_status" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_last_status VARCHAR(16)"))
-        if "webhook_last_at" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_last_at TIMESTAMP"))
-        if "webhook_last_error" not in project_columns:
-            connection.execute(text("ALTER TABLE projects ADD COLUMN webhook_last_error VARCHAR(512)"))
-        connection.execute(
-            text(
-                "CREATE TABLE IF NOT EXISTS project_models ("
-                "id VARCHAR(64) PRIMARY KEY, "
-                "project_id VARCHAR(64) NOT NULL, "
-                "provider VARCHAR(64) NOT NULL, "
-                "model VARCHAR(255) NOT NULL, "
-                "first_seen_at TIMESTAMP NOT NULL, "
-                "FOREIGN KEY(project_id) REFERENCES projects(id), "
-                "CONSTRAINT uq_project_models_project_provider_model UNIQUE(project_id, provider, model)"
-                ")"
-            )
-        )
-        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_project_models_project_id ON project_models (project_id)"))
-        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_project_models_provider ON project_models (provider)"))
-        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_project_models_model ON project_models (model)"))
-
-    if "incidents" not in table_names:
-        return
-    incident_columns = {column["name"] for column in inspector.get_columns("incidents")}
-    with session_factory.engine.begin() as connection:
-        if "severity" in incident_columns:
-            try:
-                connection.execute(text("ALTER TABLE incidents DROP COLUMN severity"))
-            except Exception:
-                logger.warning("Unable to drop legacy incidents.severity column automatically; run migrations")
-        if "fingerprint" not in incident_columns:
-            connection.execute(text("ALTER TABLE incidents ADD COLUMN fingerprint VARCHAR(255)"))
-        if "last_seen_at" not in incident_columns:
-            connection.execute(text("ALTER TABLE incidents ADD COLUMN last_seen_at TIMESTAMP"))
-        if "provider" not in incident_columns:
-            connection.execute(text("ALTER TABLE incidents ADD COLUMN provider VARCHAR(64)"))
-        # Best-effort provider backfill from incident evidence provider field.
-        if connection.engine.dialect.name == "postgresql":
-            connection.execute(
-                text(
-                    "UPDATE incidents "
-                    "SET provider = NULLIF(TRIM(evidence ->> 'provider'), '') "
-                    "WHERE provider IS NULL OR provider = ''"
-                )
-            )
-        else:
-            connection.execute(
-                text(
-                    "UPDATE incidents "
-                    "SET provider = NULLIF(TRIM(json_extract(evidence, '$.provider')), '') "
-                    "WHERE provider IS NULL OR provider = ''"
-                )
-            )
-        connection.execute(text("UPDATE incidents SET provider = 'unknown' WHERE provider IS NULL OR provider = ''"))
-
-    incident_indexes = {index["name"] for index in inspector.get_indexes("incidents")}
-    if "ix_incidents_project_status_fingerprint" not in incident_indexes:
-        with session_factory.engine.begin() as connection:
-            connection.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_incidents_project_status_fingerprint "
-                    "ON incidents (project_id, status, fingerprint)"
-                )
-            )
-    try:
-        with session_factory.engine.begin() as connection:
-            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_events_project_id_ts ON events (project_id, ts)"))
-            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_events_ts ON events (ts)"))
-            event_columns = {column["name"] for column in inspector.get_columns("events")} if "events" in table_names else set()
-            if "request_endpoint" not in event_columns:
-                connection.execute(text("ALTER TABLE events ADD COLUMN request_endpoint VARCHAR(255)"))
-            if "request_feature" not in event_columns:
-                connection.execute(text("ALTER TABLE events ADD COLUMN request_feature VARCHAR(255)"))
-            connection.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_incidents_project_status_created_at "
-                    "ON incidents (project_id, status, created_at)"
-                )
-            )
-            connection.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_incidents_project_provider_status_created_at "
-                    "ON incidents (project_id, provider, status, created_at)"
-                )
-            )
-            connection.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_incidents_project_provider_last_seen_at "
-                    "ON incidents (project_id, provider, last_seen_at)"
-                )
-            )
-            connection.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_ingest_keys_project_status "
-                    "ON ingest_keys (project_id, status)"
-                )
-            )
-            connection.execute(
-                text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_projects_user_id_name "
-                    "ON projects (user_id, name)"
-                )
-            )
-    except Exception:
-        logger.warning("Skipping one or more legacy index backfills; dev DB may require reset")

@@ -103,7 +103,6 @@ def ingest_event(
             raise HTTPException(status_code=401, detail="missing ingest key")
         project_id = ingest_key_service.resolve_project_id(
             normalized_ingest_key,
-            allow_unowned_project=settings.ingest_allow_unowned_project,
         )
         if project_id is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")

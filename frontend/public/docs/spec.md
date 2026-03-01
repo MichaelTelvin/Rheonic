@@ -53,6 +53,7 @@ No severity levels are used in runtime logic.
 Fields:
 - `protect_enabled`
 - `protect_fail_mode` (`open` | `closed`)
+- `apply_clamp`
 - `protect_max_req_per_min`
 - `protect_max_tok_per_min`
 - `protect_decision_timeout_ms`
@@ -66,6 +67,12 @@ Decision order in protect mode:
 2. req/tok cap breach -> `block`
 3. warn signals (`near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`) -> `warn`
 4. otherwise `allow`
+
+Protect decision response fields include:
+- `apply_clamp_enabled`
+- `clamp`:
+  - `recommended_max_output_tokens`
+  - `applied` (backend recommendation payload; SDK may apply clamp before provider call when enabled)
 
 Observe mode is telemetry-only: SDK skips preflight by default.
 

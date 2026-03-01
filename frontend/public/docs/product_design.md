@@ -1,5 +1,7 @@
 # LLMTokenBurnGuard — Product Design (v1)
 
+This document describes product direction and positioning. For exact implemented runtime behavior and API semantics, use `protect-mode-spec.md`, `thresholds-map.md`, and `spec.md`.
+
 ## 1) One-liner
 A runtime safety layer for LLM applications that detects runaway usage patterns (loops, retry storms, spend spikes) and optionally applies guardrail policies (downgrade, cap, rate-limit, cooldown, cache) across OpenAI, Anthropic, and Google models — with minimal integration and an incident-first dashboard.
 

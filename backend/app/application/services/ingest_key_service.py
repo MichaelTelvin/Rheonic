@@ -27,14 +27,14 @@ class IngestKeyService:
         self._ingest_key_repository = ingest_key_repository
         self._project_repository = project_repository
 
-    def resolve_project_id(self, plaintext_key: str, allow_unowned_project: bool = False) -> str | None:
+    def resolve_project_id(self, plaintext_key: str) -> str | None:
         # Resolve active key to project id.
-        project = self.resolve_project(plaintext_key=plaintext_key, allow_unowned_project=allow_unowned_project)
+        project = self.resolve_project(plaintext_key=plaintext_key)
         if project is None:
             return None
         return project.id
 
-    def resolve_project(self, plaintext_key: str, allow_unowned_project: bool = False) -> Project | None:
+    def resolve_project(self, plaintext_key: str) -> Project | None:
         # Resolve active key to project.
         key_hash = hash_key(plaintext_key)
         key = self._ingest_key_repository.get_active_by_hash(key_hash)
@@ -43,7 +43,7 @@ class IngestKeyService:
         project = self._project_repository.get_project(key.project_id)
         if project is None:
             return None
-        if project.user_id is None and not allow_unowned_project:
+        if project.user_id is None:
             return None
         return project
 
