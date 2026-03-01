@@ -1,0 +1,53 @@
+<svg width="1280" height="760" viewBox="0 0 1280 760" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0E1A32"/>
+      <stop offset="1" stop-color="#152B50"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="540" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17355E"/>
+      <stop offset="1" stop-color="#142B4C"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="2" y="2" width="1276" height="756" rx="28" fill="url(#bg)" stroke="#36547E" stroke-width="2"/>
+
+  <text x="52" y="68" fill="#EDF3FF" font-family="Arial, sans-serif" font-size="48" font-weight="700">LLM Control Center</text>
+  <text x="52" y="108" fill="#B9CCE8" font-family="Arial, sans-serif" font-size="29">Real-time monitoring and protection</text>
+
+  <rect x="906" y="28" width="330" height="122" rx="18" fill="#162E52" stroke="#36537B"/>
+  <text x="932" y="64" fill="#ABC2E3" font-family="Arial, sans-serif" font-size="24">API</text>
+  <text x="1110" y="64" fill="#AEEBC4" font-family="Arial, sans-serif" font-size="24">Connected</text>
+  <text x="932" y="96" fill="#C2D5EE" font-family="Arial, sans-serif" font-size="22">Metrics updated</text>
+  <text x="1110" y="96" fill="#D3DEF1" font-family="Arial, sans-serif" font-size="22">8:45 PM</text>
+
+  <rect x="52" y="146" width="1132" height="2" fill="#2A456A"/>
+
+  <text x="52" y="208" fill="#B8CAE5" font-family="Arial, sans-serif" font-size="34">Provider</text>
+  <rect x="198" y="172" width="360" height="64" rx="16" fill="#162F54" stroke="#33527D"/>
+  <text x="228" y="214" fill="#EAF1FE" font-family="Arial, sans-serif" font-size="31">All</text>
+
+  <rect x="52" y="274" width="560" height="206" rx="22" fill="url(#card)" stroke="#355179"/>
+  <text x="82" y="326" fill="#ECF3FF" font-family="Arial, sans-serif" font-size="42" font-weight="600">Requests (60s)</text>
+  <text x="82" y="392" fill="#F4F8FF" font-family="Arial, sans-serif" font-size="78" font-weight="700">1</text>
+  <path d="M86 426 C165 426 182 426 220 426 C248 426 270 405 295 378 C315 358 332 346 360 346 L528 346" stroke="#67D6FF" stroke-width="7" stroke-linecap="round"/>
+
+  <rect x="668" y="274" width="560" height="206" rx="22" fill="url(#card)" stroke="#355179"/>
+  <text x="698" y="326" fill="#ECF3FF" font-family="Arial, sans-serif" font-size="42" font-weight="600">Tokens (60s)</text>
+  <text x="698" y="392" fill="#F4F8FF" font-family="Arial, sans-serif" font-size="78" font-weight="700">5,000</text>
+  <path d="M702 426 C770 426 786 426 820 426 C847 426 868 405 894 378 C913 358 931 346 957 346 L1124 346" stroke="#AF96FF" stroke-width="7" stroke-linecap="round"/>
+
+  <rect x="52" y="510" width="560" height="206" rx="22" fill="url(#card)" stroke="#355179"/>
+  <text x="82" y="564" fill="#ECF3FF" font-family="Arial, sans-serif" font-size="42" font-weight="600">Incidents</text>
+  <text x="82" y="614" fill="#B4C7E3" font-family="Arial, sans-serif" font-size="30">Near cap</text>
+  <text x="574" y="614" fill="#DBE6F8" font-family="Arial, sans-serif" font-size="30" text-anchor="end">0</text>
+  <text x="82" y="656" fill="#B4C7E3" font-family="Arial, sans-serif" font-size="30">Cap breach</text>
+  <text x="574" y="656" fill="#FFBCC8" font-family="Arial, sans-serif" font-size="30" text-anchor="end">1</text>
+
+  <rect x="668" y="510" width="560" height="206" rx="22" fill="url(#card)" stroke="#355179"/>
+  <text x="698" y="564" fill="#ECF3FF" font-family="Arial, sans-serif" font-size="42" font-weight="600">Protect decisions (60m)</text>
+  <text x="698" y="614" fill="#B4C7E3" font-family="Arial, sans-serif" font-size="30">Allowed</text>
+  <text x="1192" y="614" fill="#DBE6F8" font-family="Arial, sans-serif" font-size="30" text-anchor="end">2</text>
+  <text x="698" y="656" fill="#B4C7E3" font-family="Arial, sans-serif" font-size="30">Blocked</text>
+  <text x="1192" y="656" fill="#FFBCC8" font-family="Arial, sans-serif" font-size="30" text-anchor="end">1</text>
+</svg>

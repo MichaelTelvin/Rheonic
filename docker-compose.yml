@@ -52,6 +52,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
     volumes:
       - ./backend:/app
     command: >
@@ -71,6 +73,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
     volumes:
       - ./backend:/app
     command: >
@@ -86,8 +90,12 @@ services:
       APP_ENV: ${APP_ENV}
       AUTO_CLOSE_RUN_INTERVAL_SECONDS: ${AUTO_CLOSE_RUN_INTERVAL_SECONDS:-60}
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
     volumes:
       - ./backend:/app
     command: >
@@ -110,6 +118,28 @@ services:
       sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     depends_on:
       - backend
+
+  db_init:
+    build: ./backend
+    container_name: llmtbg_db_init
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      APP_ENV: ${APP_ENV}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "python -m app.infrastructure.db.migrate && echo 'db_init complete'"
+    restart: "no"
 
   sdk_node:
     image: node:20-alpine

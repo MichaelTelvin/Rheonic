@@ -11,11 +11,13 @@ import { Architecture } from "./pages/Architecture";
 import { Alerts } from "./pages/Alerts";
 import { Dashboard } from "./pages/Dashboard";
 import { Incidents } from "./pages/Incidents";
-import { Landing } from "./pages/Landing";
+import { LandingPage } from "./pages/LandingPage";
 import { Keys } from "./pages/Keys";
 import { Login } from "./pages/Login";
+import { NotFound } from "./pages/NotFound";
 import { Projects } from "./pages/Projects";
 import { Protect } from "./pages/Protect";
+import { QuickstartPage } from "./pages/QuickstartPage";
 
 interface AuthenticatedAppLayoutProps {
   userEmail: string | null;
@@ -37,7 +39,7 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
             <Route path="alerts" element={<Alerts />} />
             <Route path="settings" element={<Protect />} />
             <Route path="docs" element={<Architecture />} />
-            <Route path="*" element={<Navigate to="/app" replace />} />
+            <Route path="*" element={<NotFound inApp />} />
           </Routes>
         </div>
       </div>
@@ -96,9 +98,15 @@ export function App(): JSX.Element {
 
   return (
     <Routes>
-      <Route path="/" element={<Landing />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/quickstart" element={<QuickstartPage />} />
+      <Route path="/docs" element={<Navigate to="/app/docs" replace />} />
       <Route
         path="/login"
+        element={token ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />}
+      />
+      <Route
+        path="/signup"
         element={token ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />}
       />
       <Route
@@ -111,7 +119,7 @@ export function App(): JSX.Element {
           </RequireAuth>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

@@ -42,7 +42,7 @@ vi.mock("./pages/Alerts", () => ({ Alerts: () => <div>Alerts Page</div> }));
 vi.mock("./pages/Protect", () => ({ Protect: () => <div>Protect Page</div> }));
 vi.mock("./pages/Architecture", () => ({ Architecture: () => <div>Architecture Page</div> }));
 vi.mock("./pages/Incidents", () => ({ Incidents: () => <div>Incidents Page</div> }));
-vi.mock("./pages/Landing", () => ({ Landing: () => <div>Landing Page</div> }));
+vi.mock("./pages/NotFound", () => ({ NotFound: () => <div>Page not found</div> }));
 
 import { App } from "./App";
 import { frontendConfig } from "./config";
@@ -65,13 +65,27 @@ describe("App", () => {
     });
   });
 
-  it("renders landing on public root when token is missing", () => {
+  it("renders landing on public root with CTA buttons", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Landing Page")).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Guardrails and visibility for runaway token burn." })).toBeDefined();
+    expect(screen.getAllByRole("link", { name: "Quickstart" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Sign in" }).length).toBeGreaterThan(0);
+  });
+
+  it("renders quickstart page on /quickstart", () => {
+    render(
+      <MemoryRouter initialEntries={["/quickstart"]}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "Quickstart" })).toBeDefined();
+    expect(screen.getByText(/npm install/i)).toBeDefined();
+    fireEvent.click(screen.getAllByRole("button", { name: "Python" })[0]);
+    expect(screen.getByText(/pip install/i)).toBeDefined();
   });
 
   it("stores auth payload and renders dashboard after login success", async () => {
@@ -114,7 +128,7 @@ describe("App", () => {
     expect(await screen.findByText("Dashboard Page")).toBeDefined();
   });
 
-  it("redirects unknown non-app routes to public landing", async () => {
+  it("renders not found page for unknown non-app routes", async () => {
     window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
     window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
     window.sessionStorage.setItem(
@@ -128,7 +142,24 @@ describe("App", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("Landing Page")).toBeDefined();
+    expect(await screen.findByText("Page not found")).toBeDefined();
+  });
+
+  it("renders not found page for unknown app routes", async () => {
+    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
+    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
+    window.sessionStorage.setItem(
+      frontendConfig.authUserStorageKey,
+      JSON.stringify({ id: "u1", email: "persisted@example.com", created_at: new Date().toISOString() }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/app/unknown"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Page not found")).toBeDefined();
   });
 
   it("renders authenticated layout from existing storage and signs out", async () => {
