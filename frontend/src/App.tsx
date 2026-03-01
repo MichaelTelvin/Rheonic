@@ -11,6 +11,7 @@ import { Architecture } from "./pages/Architecture";
 import { Alerts } from "./pages/Alerts";
 import { Dashboard } from "./pages/Dashboard";
 import { Incidents } from "./pages/Incidents";
+import { Landing } from "./pages/Landing";
 import { Keys } from "./pages/Keys";
 import { Login } from "./pages/Login";
 import { Projects } from "./pages/Projects";
@@ -29,21 +30,31 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
         <CurrentProjectBar />
         <div className="app-routes">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/incidents" element={<Incidents />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/keys" element={<Keys />} />
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/settings" element={<Protect />} />
-            <Route path="/docs" element={<Architecture />} />
-            <Route path="/documentation" element={<Navigate to="/docs" replace />} />
-            <Route path="/architecture" element={<Navigate to="/docs" replace />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route index element={<Dashboard />} />
+            <Route path="incidents" element={<Incidents />} />
+            <Route path="projects" element={<Projects />} />
+            <Route path="keys" element={<Keys />} />
+            <Route path="alerts" element={<Alerts />} />
+            <Route path="settings" element={<Protect />} />
+            <Route path="docs" element={<Architecture />} />
+            <Route path="*" element={<Navigate to="/app" replace />} />
           </Routes>
         </div>
       </div>
     </div>
   );
+}
+
+interface RequireAuthProps {
+  token: string | null;
+  children: JSX.Element;
+}
+
+function RequireAuth({ token, children }: RequireAuthProps): JSX.Element {
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
 }
 
 export function App(): JSX.Element {
@@ -83,13 +94,24 @@ export function App(): JSX.Element {
     setUser(auth.user);
   };
 
-  if (!token) {
-    return <Login onAuthSuccess={onAuthSuccess} />;
-  }
-
   return (
-    <ProjectProvider>
-      <AuthenticatedAppLayout userEmail={user?.email ?? null} onSignOut={signOut} />
-    </ProjectProvider>
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route
+        path="/login"
+        element={token ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />}
+      />
+      <Route
+        path="/app/*"
+        element={
+          <RequireAuth token={token}>
+            <ProjectProvider>
+              <AuthenticatedAppLayout userEmail={user?.email ?? null} onSignOut={signOut} />
+            </ProjectProvider>
+          </RequireAuth>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

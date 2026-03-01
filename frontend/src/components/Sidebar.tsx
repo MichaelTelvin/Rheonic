@@ -6,13 +6,13 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { to: "/", label: "Dashboard" },
-  { to: "/projects", label: "Projects" },
-  { to: "/incidents", label: "Incidents" },
-  { to: "/settings", label: "Settings" },
-  { to: "/keys", label: "Keys" },
-  { to: "/alerts", label: "Alerts" },
-  { to: "/docs", label: "Docs" },
+  { to: "/app", label: "Dashboard" },
+  { to: "/app/projects", label: "Projects" },
+  { to: "/app/incidents", label: "Incidents" },
+  { to: "/app/settings", label: "Settings" },
+  { to: "/app/keys", label: "Keys" },
+  { to: "/app/alerts", label: "Alerts" },
+  { to: "/app/docs", label: "Docs" },
 ];
 
 export function Sidebar({ userEmail, onSignOut }: SidebarProps): JSX.Element {
@@ -26,7 +26,7 @@ export function Sidebar({ userEmail, onSignOut }: SidebarProps): JSX.Element {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === "/"}
+              end={item.to === "/app"}
               className={({ isActive }) => `sidebar-link${isActive ? " is-active" : ""}`}
             >
               {item.label}

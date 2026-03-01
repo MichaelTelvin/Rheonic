@@ -42,6 +42,7 @@ vi.mock("./pages/Alerts", () => ({ Alerts: () => <div>Alerts Page</div> }));
 vi.mock("./pages/Protect", () => ({ Protect: () => <div>Protect Page</div> }));
 vi.mock("./pages/Architecture", () => ({ Architecture: () => <div>Architecture Page</div> }));
 vi.mock("./pages/Incidents", () => ({ Incidents: () => <div>Incidents Page</div> }));
+vi.mock("./pages/Landing", () => ({ Landing: () => <div>Landing Page</div> }));
 
 import { App } from "./App";
 import { frontendConfig } from "./config";
@@ -64,18 +65,18 @@ describe("App", () => {
     });
   });
 
-  it("renders login when token is missing", () => {
+  it("renders landing on public root when token is missing", () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/"]}>
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("button", { name: "Mock Login" })).toBeDefined();
+    expect(screen.getByText("Landing Page")).toBeDefined();
   });
 
   it("stores auth payload and renders dashboard after login success", async () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/login"]}>
         <App />
       </MemoryRouter>,
     );
@@ -87,6 +88,49 @@ describe("App", () => {
     expect(await screen.findByText("Dashboard Page")).toBeDefined();
   });
 
+  it("redirects unauthenticated user from /app to /login", async () => {
+    render(
+      <MemoryRouter initialEntries={["/app"]}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("button", { name: "Mock Login" })).toBeDefined();
+  });
+
+  it("redirects authenticated user from /login to /app", async () => {
+    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
+    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
+    window.sessionStorage.setItem(
+      frontendConfig.authUserStorageKey,
+      JSON.stringify({ id: "u1", email: "persisted@example.com", created_at: new Date().toISOString() }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Dashboard Page")).toBeDefined();
+  });
+
+  it("redirects unknown non-app routes to public landing", async () => {
+    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
+    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
+    window.sessionStorage.setItem(
+      frontendConfig.authUserStorageKey,
+      JSON.stringify({ id: "u1", email: "persisted@example.com", created_at: new Date().toISOString() }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/incidents"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Landing Page")).toBeDefined();
+  });
+
   it("renders authenticated layout from existing storage and signs out", async () => {
     window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
     window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
@@ -96,7 +140,7 @@ describe("App", () => {
     );
 
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/app"]}>
         <App />
       </MemoryRouter>,
     );
@@ -130,7 +174,7 @@ describe("App", () => {
     );
 
     render(
-      <MemoryRouter initialEntries={["/"]}>
+      <MemoryRouter initialEntries={["/app"]}>
         <App />
       </MemoryRouter>,
     );
