@@ -70,6 +70,15 @@ Incident behavior:
 - increment count in evidence
 - manual resolve and auto-resolve supported
 
+### Ingest Dominance (strict)
+For a single ingested event, incident emission follows this dominance:
+1. `cap_breach` dominates all
+   - suppresses `near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`
+2. `near_cap` dominates behavioral signals when no cap breach exists
+   - suppresses `retry_storm`, `loop_suspect`, `token_explosion`
+3. Behavioral coexistence is allowed
+   - `retry_storm`, `loop_suspect`, `token_explosion` may coexist
+
 ## Webhooks
 - Protect mode:
   - `decision.warn` for protect decision warn outcomes (including `near_cap`)

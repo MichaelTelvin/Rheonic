@@ -8,10 +8,8 @@ import re
 
 
 SVG_PATHS = (
-    Path("docs/architecture/incident_flow.svg"),
-    Path("docs/architecture/protect_decision_flow.svg"),
-    Path("frontend/public/architecture/incident_flow.svg"),
-    Path("frontend/public/architecture/protect_decision_flow.svg"),
+    Path("frontend/public/docs/architecture/incident_flow.svg"),
+    Path("frontend/public/docs/architecture/protect_decision_flow.svg"),
 )
 
 

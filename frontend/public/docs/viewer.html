@@ -283,7 +283,7 @@
           if (chartTab) chartTab.classList.add("active");
           panel.classList.add("chart", chart);
           target.className = "doc chart-doc";
-          const src = chart === "protect" ? "/architecture/protect_decision_flow.svg" : "/architecture/incident_flow.svg";
+          const src = chart === "protect" ? "/docs/architecture/protect_decision_flow.svg" : "/docs/architecture/incident_flow.svg";
           const alt = chart === "protect" ? "Protect decision flow" : "Incident flow";
           target.innerHTML = '<img class="chart-image" src="' + src + '" alt="' + alt + '" />';
           return;
