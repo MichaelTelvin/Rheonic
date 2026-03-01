@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install backend dependencies from pyproject for reproducible builds.
 COPY pyproject.toml ./
+COPY alembic.ini ./
+COPY alembic ./alembic
 COPY app ./app
 RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir ".[dev]"

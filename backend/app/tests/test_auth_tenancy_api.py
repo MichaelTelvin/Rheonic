@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.dependencies import get_db_session_factory, get_settings
-from app.infrastructure.db.models import IncidentRecord
+from app.infrastructure.db.models import Base, IncidentRecord
 from app.main import app
 
 
@@ -17,6 +17,8 @@ def _make_client(tmp_path) -> TestClient:
     os.environ["APP_ENV"] = "dev"
     get_db_session_factory.cache_clear()
     get_settings.cache_clear()
+    session_factory = get_db_session_factory()
+    Base.metadata.create_all(bind=session_factory.engine)
     return TestClient(app)
 
 

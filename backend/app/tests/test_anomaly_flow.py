@@ -2,7 +2,15 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
+from app.dependencies import get_db_session_factory
+from app.infrastructure.db.models import Base
 from app.main import app
+
+
+def _make_client() -> TestClient:
+    session_factory = get_db_session_factory()
+    Base.metadata.create_all(bind=session_factory.engine)
+    return TestClient(app)
 
 
 def _event_payload(total_tokens: int, provider: str, model: str, env: str = "dev") -> dict[str, object]:
@@ -39,7 +47,7 @@ def _create_project_and_key(client: TestClient, name: str, headers: dict[str, st
 
 
 def test_incidents_provider_filter_returns_scoped_rows() -> None:
-    client = TestClient(app)
+    client = _make_client()
     headers = _auth_headers(client)
     project_id, ingest_key = _create_project_and_key(client, "provider filter", headers)
 
@@ -92,7 +100,7 @@ def test_incidents_provider_filter_returns_scoped_rows() -> None:
 
 
 def test_incident_dedup_updates_existing_row_count() -> None:
-    client = TestClient(app)
+    client = _make_client()
     headers = _auth_headers(client)
     project_id, ingest_key = _create_project_and_key(client, "dedup updates", headers)
 
@@ -126,7 +134,7 @@ def test_incident_dedup_updates_existing_row_count() -> None:
 
 
 def test_retry_storm_ingest_returns_202_and_incident_is_listed() -> None:
-    client = TestClient(app)
+    client = _make_client()
     headers = _auth_headers(client)
     project_id, ingest_key = _create_project_and_key(client, "retry storm ingest", headers)
 

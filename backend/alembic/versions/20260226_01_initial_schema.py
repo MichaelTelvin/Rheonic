@@ -71,6 +71,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index("ix_events_project_id", "events", ["project_id"], unique=False)
     op.create_index("ix_events_project_id_ts", "events", ["project_id", "ts"], unique=False)
     op.create_index("ix_events_ts", "events", ["ts"], unique=False)
 
@@ -174,6 +175,7 @@ def downgrade() -> None:
 
     op.drop_index("ix_events_ts", table_name="events")
     op.drop_index("ix_events_project_id_ts", table_name="events")
+    op.drop_index("ix_events_project_id", table_name="events")
     op.drop_table("events")
 
     op.drop_index("ix_projects_user_id", table_name="projects")

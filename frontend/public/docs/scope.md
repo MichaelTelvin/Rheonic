@@ -1,6 +1,6 @@
 LLMTokenBurnGuard — Scope (Current State)
 
-Status: Core platform, protect mode, scheduler jobs, webhook alerts, provider scoping, and docs viewer are implemented.
+Status: MVP Core is complete. Core platform, protect mode, scheduler jobs, webhook alerts, provider scoping, and docs viewer are implemented.
 
 ========================================
 Implemented
@@ -59,20 +59,24 @@ Frontend/docs
 - Docs page + docs/chart viewer and flow charts
 
 ========================================
-V1 Launch Required
+MVP Core Complete
 ========================================
 
 Core quality and launch gating
-- Keep auth + project isolation enforcement complete and tested
-- Keep ingest/protect/incidents/webhook paths stable under `/api/v1/...`
-- Ensure provider-scoped incidents/counters/decisions remain isolated with no cross-provider bleed
-- Maintain coherent docs set (API spec, protect spec, thresholds, diagrams) aligned to runtime behavior
-- Run and keep green: backend tests, SDK tests, frontend tests, and existing e2e target
+- Auth + project isolation enforcement complete and tested
+- Ingest/protect/incidents/webhook paths stable under `/api/v1/...`
+- Provider-scoped incidents/counters/decisions isolated with no cross-provider bleed
+- Coherent docs set (API spec, protect spec, thresholds, diagrams) aligned to runtime behavior
+- Backend tests, SDK tests, frontend tests, and existing e2e target green
 
 Operational readiness
-- Final pass on dashboard/incident UX polish for MVP operator workflows
+- Dashboard/incident UX polished for MVP operator workflows
 - Baseline alerting runbook for webhook failures (status visibility and retry behavior)
-- Smoke-test scripts/demos for launch validation scenarios (allow, near-cap warn, cap-breach block, retry storm, loop suspect, token explosion, lifecycle)
+- Smoke-test scripts/demos for launch validation scenarios implemented (allow, near-cap warn, cap-breach block, retry storm, loop suspect, token explosion, lifecycle)
+
+========================================
+V1 Next Phase (Active)
+========================================
 
 Productization and deployment
 - Integrate Stripe for billing and subscription lifecycle required for launch

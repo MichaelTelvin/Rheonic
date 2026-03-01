@@ -14,7 +14,6 @@ from app.application.services.project_service import ProjectService
 from app.config import Settings
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
-from app.infrastructure.db.models import Base
 from app.infrastructure.db.repositories.event_repository_impl import EventRepositoryImpl
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
@@ -36,7 +35,6 @@ def get_db_session_factory() -> DatabaseSessionFactory:
     # Provide a shared database session factory.
     try:
         session_factory = DatabaseSessionFactory()
-        Base.metadata.create_all(bind=session_factory.engine)
         logger.info("Database session factory initialized")
         return session_factory
     except Exception:

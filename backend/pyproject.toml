@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Backend service for LLMTokenBurnGuard"
 requires-python = ">=3.11"
 dependencies = [
+  "alembic>=1.13.0",
   "fastapi>=0.115.0",
   "pydantic>=2.0.0",
   "pydantic-settings>=2.0.0",
@@ -26,3 +27,6 @@ dev = [
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
