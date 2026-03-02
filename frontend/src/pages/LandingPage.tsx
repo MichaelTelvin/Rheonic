@@ -121,38 +121,115 @@ export function LandingPage(): JSX.Element {
 
         <section className="landing-v2-section reveal-on-scroll">
           <h2>Agentic systems don’t fail quietly.</h2>
-          <article className="landing-v2-problem-panel">
-            <ul>
-              <li>Traffic spikes without warning</li>
-              <li>Retries multiply silently</li>
-              <li>
-                One bad loop can <span className="landing-v2-danger-underline">drain budget</span> in minutes
-              </li>
-            </ul>
-            <p>Traditional logs show it too late. You need a control layer.</p>
-          </article>
+          <div className="landing-v2-pain-grid">
+            <article className="landing-v2-pain-timeline">
+              <p className="landing-v2-pain-kicker">Failure sequence</p>
+              <div className="landing-v2-pain-track">
+                <article className="landing-v2-pain-step reveal-on-scroll">
+                  <div className="landing-v2-pain-step-copy">
+                    <p className="landing-v2-pain-time">T+00:20</p>
+                    <h3>Spike</h3>
+                    <p>Traffic jumps without warning.</p>
+                  </div>
+                  <span className="landing-v2-pain-chip">+320% req/min</span>
+                </article>
+                <article className="landing-v2-pain-step reveal-on-scroll">
+                  <div className="landing-v2-pain-step-copy">
+                    <p className="landing-v2-pain-time">T+00:45</p>
+                    <h3>Retry storm</h3>
+                    <p>Transient errors multiply into load.</p>
+                  </div>
+                  <span className="landing-v2-pain-chip">15 retries</span>
+                </article>
+                <article className="landing-v2-pain-step reveal-on-scroll">
+                  <div className="landing-v2-pain-step-copy">
+                    <p className="landing-v2-pain-time">T+01:10</p>
+                    <h3>Loop runaway</h3>
+                    <p>One bug keeps calling until it hurts.</p>
+                  </div>
+                  <span className="landing-v2-pain-chip">1,200 calls</span>
+                </article>
+                <article className="landing-v2-pain-step reveal-on-scroll">
+                  <div className="landing-v2-pain-step-copy">
+                    <p className="landing-v2-pain-time">T+01:40</p>
+                    <h3>Budget drain</h3>
+                    <p>Minutes later, the bill is real.</p>
+                  </div>
+                  <span className="landing-v2-pain-chip">$ / cap breach</span>
+                </article>
+              </div>
+            </article>
+
+            <article className="landing-v2-pain-compare">
+              <div className="landing-v2-pain-compare-block">
+                <p className="landing-v2-pain-compare-label">Without a control layer</p>
+                <h3>Logs</h3>
+                <p>You see it after the damage.</p>
+                <p>Incidents show up when costs already landed.</p>
+                <p>You can’t stop the next call.</p>
+              </div>
+              <div className="landing-v2-pain-compare-block is-positive">
+                <p className="landing-v2-pain-compare-label">With Rheonic</p>
+                <h3>Control layer</h3>
+                <p>See anomalies in real time.</p>
+                <p>Preflight decisions before expensive calls.</p>
+                <p>Warn or block with cooldown when needed.</p>
+              </div>
+
+              <div className="landing-v2-pain-mini-flow">
+                <span className="landing-v2-pain-mini-node">
+                  <Workflow size={13} />
+                  <em>Agent</em>
+                </span>
+                <span className="landing-v2-pain-mini-arrow">→</span>
+                <span className="landing-v2-pain-mini-node">
+                  <Wrench size={13} />
+                  <em>SDK</em>
+                </span>
+                <span className="landing-v2-pain-mini-arrow">→</span>
+                <span className="landing-v2-pain-mini-node is-core">
+                  <Signal size={13} />
+                  <em>Rheonic</em>
+                </span>
+                <span className="landing-v2-pain-mini-arrow">→</span>
+                <span className="landing-v2-pain-mini-node">
+                  <DatabaseZap size={13} />
+                  <em>Provider</em>
+                </span>
+              </div>
+            </article>
+          </div>
         </section>
 
         <section className="landing-v2-section reveal-on-scroll">
           <h2>A control layer between your agents and model providers.</h2>
           <div className="landing-v2-capabilities">
             <article className="landing-v2-cap-card">
-              <span className="landing-v2-icon-circle telemetry">
-                <Gauge size={16} />
-              </span>
-              <h3>Realtime per-provider telemetry</h3>
+              <div className="landing-v2-cap-head">
+                <span className="landing-v2-icon-circle telemetry">
+                  <Gauge size={16} />
+                </span>
+                <h3>Per-provider telemetry</h3>
+              </div>
+              <p>Real-time request and token rates per provider and project—so you see drift immediately.</p>
             </article>
             <article className="landing-v2-cap-card">
-              <span className="landing-v2-icon-circle anomaly">
-                <Activity size={16} />
-              </span>
-              <h3>Anomaly detection (near cap, retry storms, token explosions)</h3>
+              <div className="landing-v2-cap-head">
+                <span className="landing-v2-icon-circle anomaly">
+                  <Activity size={16} />
+                </span>
+                <h3>Incident detection</h3>
+              </div>
+              <p>Automatic incidents for near-cap, retry storms, loop suspects, and token explosions—before they cascade.</p>
             </article>
             <article className="landing-v2-cap-card">
-              <span className="landing-v2-icon-circle enforcement">
-                <ShieldCheck size={16} />
-              </span>
-              <h3>Optional preflight enforcement (warn / block / cooldown)</h3>
+              <div className="landing-v2-cap-head">
+                <span className="landing-v2-icon-circle enforcement">
+                  <ShieldCheck size={16} />
+                </span>
+                <h3>Preflight enforcement</h3>
+              </div>
+              <p>Apply allow / warn / block decisions before provider calls, with cooldown to stop repeat bursts.</p>
             </article>
           </div>
         </section>
@@ -200,22 +277,22 @@ export function LandingPage(): JSX.Element {
             <article className="landing-v2-engineer-card">
               <Layers size={16} />
               <h3>No backend refactor</h3>
-              <p>Drop in SDK instrumentation and start with observe mode.</p>
+              <p>Drop in the SDK and start in observe mode. No architectural rewrite required.</p>
             </article>
             <article className="landing-v2-engineer-card">
               <DatabaseZap size={16} />
-              <h3>Works per provider</h3>
-              <p>Separate controls for OpenAI, Anthropic, and Google traffic.</p>
+              <h3>Provider-scoped controls</h3>
+              <p>Independent monitoring and enforcement across OpenAI, Anthropic, and Google.</p>
             </article>
             <article className="landing-v2-engineer-card">
               <Workflow size={16} />
-              <h3>SDK-first</h3>
-              <p>Typed client workflows for runtime telemetry and protect calls.</p>
+              <h3>SDK-first integration</h3>
+              <p>Typed client workflows built for runtime telemetry and protection.</p>
             </article>
             <article className="landing-v2-engineer-card">
               <Activity size={16} />
               <h3>Real signals</h3>
-              <p>Detect near-cap, retry storms, and loop patterns before escalation.</p>
+              <p>Detect loop patterns and cost acceleration before they become incidents.</p>
             </article>
           </div>
         </section>
