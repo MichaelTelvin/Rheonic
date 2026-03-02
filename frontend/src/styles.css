@@ -4550,19 +4550,24 @@ html {
 .landing-v2-engineer-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
+  grid-auto-rows: 1fr;
 }
 
 .landing-v2-engineer-card {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  padding: 18px 16px 24px;
+  padding: 22px 18px 26px;
   background:
     radial-gradient(180px 80px at 82% 0%, rgba(129, 140, 248, 0.08), transparent 70%),
     linear-gradient(180deg, rgba(22, 34, 60, 0.86), rgba(15, 25, 46, 0.8));
   backdrop-filter: blur(12px);
   transition: transform 180ms ease, border-color 180ms ease;
   box-shadow: 0 20px 40px rgba(6, 10, 20, 0.34);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  align-content: start;
+  min-height: 220px;
 }
 
 .landing-v2-engineer-card:hover {
@@ -4572,21 +4577,29 @@ html {
 
 .landing-v2-engineer-card svg {
   color: #b6d6ff;
+  width: 18px;
+  height: 18px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(147, 197, 253, 0.36);
+  background: linear-gradient(180deg, rgba(56, 78, 118, 0.48), rgba(40, 58, 92, 0.42));
+  box-sizing: content-box;
 }
 
 .landing-v2-engineer-card h3 {
-  margin: 14px 0 0;
+  margin: 22px 0 13px;
   color: #eef4ff;
-  font-size: 1rem;
-  font-weight: 620;
+  font-size: 1.02rem;
+  font-weight: 600;
 }
 
 .landing-v2-engineer-card p {
-  margin: 12px 0 8px;
-  color: rgba(206, 220, 246, 0.76);
+  margin: 0;
+  max-width: min(420px, 34ch);
+  color: rgba(206, 220, 246, 0.85);
   font-size: 0.89rem;
-  line-height: 1.5;
-  font-weight: 430;
+  line-height: 1.52;
+  font-weight: 420;
 }
 
 .landing-v2-final-cta {

@@ -290,22 +290,38 @@ export function LandingPage(): JSX.Element {
             <article className="landing-v2-engineer-card">
               <Layers size={16} />
               <h3>No backend refactor</h3>
-              <p>Drop in the SDK and start in observe mode. No architectural rewrite required.</p>
+              <p>
+                Drop in the SDK and start in observe mode.
+                <br />
+                No architectural rewrite required.
+              </p>
             </article>
             <article className="landing-v2-engineer-card">
               <DatabaseZap size={16} />
               <h3>Provider-scoped controls</h3>
-              <p>Independent monitoring and enforcement across OpenAI, Anthropic, and Google.</p>
+              <p>
+                Independent monitoring and enforcement
+                <br />
+                per provider.
+              </p>
             </article>
             <article className="landing-v2-engineer-card">
               <Workflow size={16} />
               <h3>SDK-first integration</h3>
-              <p>Typed client workflows built for runtime telemetry and protection.</p>
+              <p>
+                Typed client workflows for runtime
+                <br />
+                telemetry and protection.
+              </p>
             </article>
             <article className="landing-v2-engineer-card">
               <Activity size={16} />
               <h3>Real signals</h3>
-              <p>Detect loop patterns and cost acceleration before they become incidents.</p>
+              <p>
+                Detect loop patterns and cost acceleration
+                <br />
+                before incidents.
+              </p>
             </article>
           </div>
         </section>
