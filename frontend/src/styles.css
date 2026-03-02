@@ -3588,6 +3588,7 @@ html {
   height: 50px !important;
   min-height: 50px !important;
   padding: 0 20px !important;
+  border-width: 1px;
   font-size: 1rem;
   font-weight: 600;
   line-height: 1;
@@ -3606,22 +3607,24 @@ html {
 .landing-v2 .landing-link-button {
   min-width: 170px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(18, 31, 56, 0.48);
+  border: 1px solid rgba(138, 162, 220, 0.38);
+  background: linear-gradient(180deg, rgba(36, 52, 86, 0.74), rgba(30, 45, 76, 0.7));
   color: #edf3ff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   transition: transform 180ms ease, border-color 180ms ease, background-position 220ms ease;
 }
 
 .landing-v2 .landing-link-button:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(167, 189, 241, 0.56);
 }
 
 .landing-v2 .landing-link-button.modal-primary {
-  border-color: transparent;
+  border-color: rgba(58, 83, 138, 0.92);
   background: linear-gradient(120deg, #60a5fa 0%, #6366f1 50%, #8b5cf6 100%);
   background-size: 180% 100%;
   color: #f8fbff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
 .landing-v2 .landing-link-button.modal-primary:hover {
