@@ -60,25 +60,60 @@ export function LandingPage(): JSX.Element {
                 <span />
                 <span />
               </div>
-              <div className="landing-v2-mock-grid">
-                <article>
-                  <p>Requests / min</p>
-                  <strong>2,148</strong>
-                </article>
-                <article>
-                  <p>Tokens / min</p>
-                  <strong>1.7M</strong>
-                </article>
-                <article className="landing-v2-graph-card">
-                  <p>Realtime anomaly pulse</p>
-                  <div className="landing-v2-graph-track">
-                    <span className="landing-v2-graph-line" />
+              <div className="landing-v2-mock-content">
+                <div className="landing-v2-mock-head">
+                  <div>
+                    <p className="landing-v2-mock-title">LLM Control Center</p>
+                    <p className="landing-v2-mock-sub">Real-time monitoring and protection</p>
                   </div>
-                </article>
-                <article>
-                  <p>Preflight state</p>
-                  <strong>Protect: Warn</strong>
-                </article>
+                  <article className="landing-v2-mock-status">
+                    <p className="landing-v2-mock-status-line">
+                      <span>API:</span>
+                      <strong>Connected</strong>
+                    </p>
+                  </article>
+                </div>
+
+                <div className="landing-v2-mock-filter">
+                  <span>Provider</span>
+                  <button type="button">Anthropic</button>
+                </div>
+
+                <div className="landing-v2-mock-kpi-grid">
+                  <article className="landing-v2-mock-kpi">
+                    <h4>Requests (60s)</h4>
+                    <strong>42</strong>
+                    <p>Last 60 seconds</p>
+                    <div className="landing-v2-graph-track req">
+                      <span className="landing-v2-graph-line req" />
+                    </div>
+                  </article>
+                  <article className="landing-v2-mock-kpi">
+                    <h4>Tokens (60s)</h4>
+                    <strong>128,400</strong>
+                    <p>Last 60 seconds</p>
+                    <div className="landing-v2-graph-track tok">
+                      <span className="landing-v2-graph-line tok" />
+                    </div>
+                  </article>
+                </div>
+
+                <div className="landing-v2-mock-bottom-grid">
+                  <article className="landing-v2-mock-list-card">
+                    <h4>Incidents</h4>
+                    <p><span>Near cap</span><strong>0</strong></p>
+                    <p><span>Retry storm</span><strong>0</strong></p>
+                    <p><span>Loop suspect</span><strong>0</strong></p>
+                    <p><span>Token explosion</span><strong>0</strong></p>
+                    <p><span>Cap breach</span><strong>1</strong></p>
+                  </article>
+                  <article className="landing-v2-mock-list-card">
+                    <h4>Preflight decisions (60m)</h4>
+                    <p><span>Allowed</span><strong>2</strong></p>
+                    <p><span>Warned</span><strong>0</strong></p>
+                    <p><span>Blocked</span><strong>1</strong></p>
+                  </article>
+                </div>
               </div>
             </div>
           </div>

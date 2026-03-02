@@ -44,7 +44,9 @@ export function PublicLayout({
     <main className={`public-page${isV2Surface ? " public-page-v2" : ""}`}>
       <div className={`public-shell${shellClassName ? ` ${shellClassName}` : ""}`}>
         <header className={`public-nav public-nav-sticky${scrolled ? " is-scrolled" : ""}`}>
-          <p className="public-brand">Rheonic</p>
+          <Link className="public-brand" to="/">
+            Rheonic
+          </Link>
           <nav className="public-nav-links">
             {showHomeLink ? <Link to="/">Home</Link> : null}
             {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
