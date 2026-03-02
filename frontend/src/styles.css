@@ -4315,155 +4315,145 @@ html {
 }
 
 .landing-v2-flow {
+  --flow-gap: 22px;
+  --flow-node-height: 112px;
+  --flow-line-base: rgba(130, 146, 229, 0.42);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
-  padding: 24px;
+  padding: 22px;
   background:
     linear-gradient(0deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px),
-    radial-gradient(320px 120px at 10% 0%, rgba(129, 140, 248, 0.08), transparent 72%),
+    radial-gradient(360px 150px at 12% 0%, rgba(129, 140, 248, 0.1), transparent 72%),
     linear-gradient(180deg, rgba(22, 34, 60, 0.86), rgba(15, 25, 46, 0.8));
   background-size: 22px 22px, 22px 22px, auto, auto;
   backdrop-filter: blur(12px);
   box-shadow: 0 22px 44px rgba(6, 10, 20, 0.34);
+  overflow: hidden;
   display: grid;
-  row-gap: 14px;
+  gap: 14px;
+  height: 180px;
 }
 
-.landing-v2-flow-schematic {
-  width: 100%;
+.landing-v2-flow-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(86px, auto));
-  column-gap: 76px;
-  row-gap: 26px;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: var(--flow-gap);
   align-items: stretch;
 }
 
+.landing-v2-flow--large-rheonic .landing-v2-flow-grid {
+  grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) minmax(188px, 1.35fr) minmax(130px, 1fr);
+}
+
 .landing-v2-flow-node {
-  width: 86%;
-  justify-self: center;
-  min-height: 78px;
+  min-height: var(--flow-node-height);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(44, 63, 98, 0.72), rgba(33, 49, 78, 0.66));
+  background:
+    radial-gradient(140px 86px at 88% 0%, rgba(129, 140, 248, 0.08), transparent 72%),
+    linear-gradient(180deg, rgba(46, 66, 103, 0.76), rgba(34, 50, 80, 0.7));
   color: rgba(232, 240, 255, 0.9);
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 12px 10px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 16px rgba(8, 13, 28, 0.18);
-  z-index: 2;
+  padding: 9px 11px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 18px rgba(8, 13, 28, 0.2);
 }
 
-.landing-v2-flow-node svg {
-  width: 19px;
-  height: 19px;
+.landing-v2-flow-node:not(:last-child)::before {
+  content: "";
   position: absolute;
-  top: 12px;
-  left: 12px;
-  padding: 7px;
-  border-radius: 8px;
-  border: 1px solid rgba(147, 197, 253, 0.4);
-  background: linear-gradient(180deg, rgba(52, 73, 112, 0.78), rgba(38, 54, 86, 0.74));
-  color: rgba(219, 233, 255, 0.94);
-  box-shadow: 0 0 10px rgba(96, 165, 250, 0.32);
-  box-sizing: content-box;
+  top: 50%;
+  left: calc(100% + 1px);
+  width: var(--flow-gap);
+  height: 3px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.2), var(--flow-line-base), rgba(96, 165, 250, 0.2));
+  pointer-events: none;
 }
 
-.landing-v2-flow-node span {
-  transform: none;
+.landing-v2-flow-node-label {
+  margin: 0;
+  font-size: 1.32rem;
+  line-height: 1.2;
+  font-weight: 620;
+  color: rgba(236, 243, 255, 0.96);
 }
 
-.landing-v2-flow-node-core {
-  border-color: rgba(129, 140, 248, 0.58);
+.landing-v2-flow-node-rheonic {
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 9px 11px;
+  border-color: rgba(129, 140, 248, 0.62);
   box-shadow:
-    0 0 0 1px rgba(129, 140, 248, 0.28),
-    0 0 30px rgba(99, 102, 241, 0.28),
+    0 0 0 1px rgba(129, 140, 248, 0.25),
+    0 0 20px rgba(99, 102, 241, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.landing-v2-flow-schematic .flow-agent {
-  grid-column: 1;
-  grid-row: 1;
+.landing-v2-flow-rheonic-shell {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  justify-items: stretch;
 }
 
-.landing-v2-flow-schematic .flow-observe {
-  grid-column: 2;
-  grid-row: 1;
+.landing-v2-flow-rheonic-head {
+  margin: 0;
+  width: 100%;
+  border: 1px solid rgba(176, 194, 255, 0.44);
+  border-radius: 6px;
+  text-align: center;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.14rem;
+  line-height: 1.2;
+  font-weight: 620;
+  color: rgba(240, 245, 255, 0.97);
+  background: linear-gradient(180deg, rgba(66, 86, 126, 0.52), rgba(49, 66, 102, 0.5));
 }
 
-.landing-v2-flow-schematic .flow-protect {
-  grid-column: 3;
-  grid-row: 1;
+.landing-v2-flow-rheonic-modes {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.landing-v2-flow-schematic .flow-sdk {
-  grid-column: 1;
-  grid-row: 2;
+.landing-v2-flow-rheonic-modes span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 8px;
+  border: 1px solid rgba(176, 194, 255, 0.36);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(58, 77, 114, 0.46), rgba(43, 59, 91, 0.44));
+  color: rgba(222, 233, 252, 0.9);
+  font-size: 0.72rem;
+  font-weight: 560;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
-.landing-v2-flow-schematic .flow-rheonic {
-  grid-column: 2;
-  grid-row: 2;
+.landing-v2-flow--large-rheonic .landing-v2-flow-node-rheonic {
+  min-height: 132px;
+  padding: 9px 11px;
 }
 
-.landing-v2-flow-schematic .flow-provider {
-  grid-column: 3;
-  grid-row: 2;
-}
-
-.landing-v2-flow-schematic .flow-protect {
-  border-color: rgba(129, 140, 248, 0.36);
-  background: linear-gradient(180deg, rgba(71, 66, 184, 0.44), rgba(44, 43, 120, 0.42));
-}
-
-.landing-v2-flow-schematic .flow-agent::before,
-.landing-v2-flow-schematic .flow-sdk::before,
-.landing-v2-flow-schematic .flow-rheonic::before,
-.landing-v2-flow-schematic .flow-observe::before,
-.landing-v2-flow-schematic .flow-protect::before {
-  content: "";
-  position: absolute;
-  z-index: 1;
-  background: linear-gradient(90deg, rgba(96, 165, 250, 0.2), rgba(129, 140, 248, 0.88), rgba(139, 92, 246, 0.22));
-}
-
-.landing-v2-flow-schematic .flow-agent::before {
-  left: 50%;
-  top: calc(100% - 1px);
-  transform: translateX(-50%);
-  width: 3px;
-  height: 34px;
-  background: linear-gradient(180deg, rgba(129, 140, 248, 0.86), rgba(96, 165, 250, 0.22));
-}
-
-.landing-v2-flow-schematic .flow-sdk::before,
-.landing-v2-flow-schematic .flow-observe::before {
-  top: 50%;
-  right: -120px;
-  transform: translateY(-50%);
-  width: 120px;
-  height: 3px;
-}
-
-.landing-v2-flow-schematic .flow-rheonic::before {
-  left: 50%;
-  top: -34px;
-  transform: translateX(-50%);
-  width: 3px;
-  height: 34px;
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.2), rgba(129, 140, 248, 0.88));
-}
-
-.landing-v2-flow-schematic .flow-protect::before {
-  left: 50%;
-  top: calc(100% - 1px);
-  transform: translateX(-50%);
-  width: 3px;
-  height: 34px;
-  background: linear-gradient(180deg, rgba(129, 140, 248, 0.86), rgba(96, 165, 250, 0.22));
+.landing-v2-flow--large-rheonic .landing-v2-flow-rheonic-shell {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
 }
 
 .landing-v2-engineer-grid {
@@ -4771,6 +4761,28 @@ html {
   }
 }
 
+@keyframes rheonicScan {
+  0%,
+  100% {
+    background-position: 110% 0;
+    opacity: 0.35;
+  }
+  50% {
+    background-position: -20% 0;
+    opacity: 0.8;
+  }
+}
+
+@keyframes rheonicProtectPulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.12), 0 0 0 0 rgba(129, 140, 248, 0.18);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.24), 0 0 0 10px rgba(129, 140, 248, 0.06);
+  }
+}
+
 @keyframes ctaGlow {
   0%,
   100% {
@@ -4876,34 +4888,23 @@ html {
     grid-template-columns: 1fr;
   }
 
-  .landing-v2-flow-schematic {
-    grid-template-columns: 1fr;
-    grid-template-rows: none;
-    row-gap: 12px;
-    column-gap: 0;
+  .landing-v2-flow {
+    --flow-gap: 16px;
+    --flow-node-height: 106px;
+    height: 172px;
   }
 
-  .landing-v2-flow-schematic .flow-agent,
-  .landing-v2-flow-schematic .flow-observe,
-  .landing-v2-flow-schematic .flow-protect,
-  .landing-v2-flow-schematic .flow-sdk,
-  .landing-v2-flow-schematic .flow-rheonic,
-  .landing-v2-flow-schematic .flow-provider {
-    grid-column: 1;
-    grid-row: auto;
+  .landing-v2-flow-grid {
+    grid-template-columns: repeat(4, minmax(112px, 1fr));
   }
 
-  .landing-v2-flow-schematic .flow-agent::before,
-  .landing-v2-flow-schematic .flow-sdk::before,
-  .landing-v2-flow-schematic .flow-rheonic::before,
-  .landing-v2-flow-schematic .flow-observe::before,
-  .landing-v2-flow-schematic .flow-protect::before,
-  .landing-v2-flow-schematic .flow-agent::after,
-  .landing-v2-flow-schematic .flow-sdk::after,
-  .landing-v2-flow-schematic .flow-rheonic::after,
-  .landing-v2-flow-schematic .flow-observe::after,
-  .landing-v2-flow-schematic .flow-protect::after {
-    display: none;
+  .landing-v2-flow--large-rheonic .landing-v2-flow-grid {
+    grid-template-columns: minmax(112px, 1fr) minmax(112px, 1fr) minmax(148px, 1.28fr) minmax(112px, 1fr);
+  }
+
+  .landing-v2-flow-node-label,
+  .landing-v2-flow-rheonic-head {
+    font-size: 1.14rem;
   }
 
   .landing-v2-engineer-grid {
@@ -4922,6 +4923,30 @@ html {
 @media (max-width: 900px) {
   .landing-v2-pain-grid {
     grid-template-columns: 1fr;
+  }
+
+  .landing-v2-flow {
+    --flow-node-height: 102px;
+    height: auto;
+  }
+
+  .landing-v2-flow-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .landing-v2-flow-node:not(:last-child)::before {
+    width: 3px;
+    height: 12px;
+    left: 50%;
+    top: calc(100% + 1px);
+    transform: translateX(-50%);
+    background: linear-gradient(180deg, rgba(96, 165, 250, 0.2), var(--flow-line-base), rgba(96, 165, 250, 0.2));
+  }
+
+  .landing-v2-flow-node-label,
+  .landing-v2-flow-rheonic-head {
+    font-size: 1.18rem;
   }
 }
 

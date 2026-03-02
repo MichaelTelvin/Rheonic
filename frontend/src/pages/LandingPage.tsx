@@ -6,6 +6,7 @@ import { PublicLayout } from "../components/PublicLayout";
 
 export function LandingPage(): JSX.Element {
   const rootRef = useRef<HTMLElement | null>(null);
+  const flowVariant: "equal" | "large-rheonic" = "equal";
 
   useEffect(() => {
     if (!rootRef.current || typeof IntersectionObserver === "undefined") {
@@ -236,33 +237,26 @@ export function LandingPage(): JSX.Element {
 
         <section className="landing-v2-section reveal-on-scroll">
           <h2>Visual flow</h2>
-          <div className="landing-v2-flow">
-            <div className="landing-v2-flow-schematic">
-              <div className="landing-v2-flow-node flow-agent">
-                <Workflow size={15} />
-                <span>Agent</span>
-              </div>
-              <div className="landing-v2-flow-node flow-observe">
-                <Gauge size={15} />
-                <span>Observe</span>
-              </div>
-              <div className="landing-v2-flow-node flow-protect">
-                <ShieldCheck size={15} />
-                <span>Protect</span>
-              </div>
-              <div className="landing-v2-flow-node flow-sdk">
-                <Wrench size={15} />
-                <span>SDK</span>
-              </div>
-              <div className="landing-v2-flow-node landing-v2-flow-node-core flow-rheonic">
-                <Signal size={15} />
-                <span>Rheonic</span>
-              </div>
-              <div className="landing-v2-flow-node flow-provider">
-                <DatabaseZap size={15} />
-                <span>Provider</span>
-              </div>
-
+          <div className={`landing-v2-flow landing-v2-flow--${flowVariant}`}>
+            <div className="landing-v2-flow-grid">
+              <article className="landing-v2-flow-node landing-v2-flow-node-basic">
+                <p className="landing-v2-flow-node-label">Agent</p>
+              </article>
+              <article className="landing-v2-flow-node landing-v2-flow-node-basic">
+                <p className="landing-v2-flow-node-label">SDK</p>
+              </article>
+              <article className="landing-v2-flow-node landing-v2-flow-node-rheonic">
+                <div className="landing-v2-flow-rheonic-shell">
+                  <h3 className="landing-v2-flow-rheonic-head">Rheonic</h3>
+                  <div className="landing-v2-flow-rheonic-modes" aria-label="Rheonic modes">
+                    <span>Observe</span>
+                    <span>Protect</span>
+                  </div>
+                </div>
+              </article>
+              <article className="landing-v2-flow-node landing-v2-flow-node-basic">
+                <p className="landing-v2-flow-node-label">Provider</p>
+              </article>
             </div>
           </div>
         </section>
