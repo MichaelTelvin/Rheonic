@@ -240,22 +240,45 @@ export function LandingPage(): JSX.Element {
           <div className={`landing-v2-flow landing-v2-flow--${flowVariant}`}>
             <div className="landing-v2-flow-grid">
               <article className="landing-v2-flow-node landing-v2-flow-node-basic">
-                <p className="landing-v2-flow-node-label">Agent</p>
+                <div className="landing-v2-flow-node-content">
+                  <span className="landing-v2-flow-node-icon">
+                    <Workflow size={14} />
+                  </span>
+                  <p className="landing-v2-flow-node-label">Agent</p>
+                </div>
               </article>
+              <span className="landing-v2-flow-link" aria-hidden />
               <article className="landing-v2-flow-node landing-v2-flow-node-basic">
-                <p className="landing-v2-flow-node-label">SDK</p>
+                <div className="landing-v2-flow-node-content">
+                  <span className="landing-v2-flow-node-icon">
+                    <Wrench size={14} />
+                  </span>
+                  <p className="landing-v2-flow-node-label">SDK</p>
+                </div>
               </article>
+              <span className="landing-v2-flow-link" aria-hidden />
               <article className="landing-v2-flow-node landing-v2-flow-node-rheonic">
                 <div className="landing-v2-flow-rheonic-shell">
-                  <h3 className="landing-v2-flow-rheonic-head">Rheonic</h3>
+                  <h3 className="landing-v2-flow-rheonic-head">
+                    <span className="landing-v2-flow-node-icon">
+                      <Signal size={14} />
+                    </span>
+                    <span>Rheonic</span>
+                  </h3>
                   <div className="landing-v2-flow-rheonic-modes" aria-label="Rheonic modes">
                     <span>Observe</span>
                     <span>Protect</span>
                   </div>
                 </div>
               </article>
+              <span className="landing-v2-flow-link" aria-hidden />
               <article className="landing-v2-flow-node landing-v2-flow-node-basic">
-                <p className="landing-v2-flow-node-label">Provider</p>
+                <div className="landing-v2-flow-node-content">
+                  <span className="landing-v2-flow-node-icon">
+                    <DatabaseZap size={14} />
+                  </span>
+                  <p className="landing-v2-flow-node-label">Provider</p>
+                </div>
               </article>
             </div>
           </div>
