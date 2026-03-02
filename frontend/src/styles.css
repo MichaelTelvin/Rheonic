@@ -4322,8 +4322,8 @@ html {
   border-radius: 18px;
   padding: 22px 34px;
   background:
-    linear-gradient(0deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(148, 163, 184, 0.034) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.034) 1px, transparent 1px),
     radial-gradient(360px 150px at 12% 0%, rgba(129, 140, 248, 0.1), transparent 72%),
     linear-gradient(180deg, rgba(22, 34, 60, 0.86), rgba(15, 25, 46, 0.8));
   background-size: 22px 22px, 22px 22px, auto, auto;
@@ -4369,11 +4369,43 @@ html {
   height: 3px;
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(96, 165, 250, 0.2), var(--flow-line-base), rgba(96, 165, 250, 0.2));
+  position: relative;
+  overflow: hidden;
+}
+
+.landing-v2-flow-link.is-core {
+  background: linear-gradient(90deg, rgba(124, 165, 255, 0.26), rgba(152, 174, 255, 0.62), rgba(124, 165, 255, 0.26));
+}
+
+.landing-v2-flow-link::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: -24%;
+  width: 22%;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent 0%, rgba(210, 228, 255, 0.58) 50%, transparent 100%);
+  box-shadow: 0 0 8px rgba(188, 215, 255, 0.26);
+  opacity: 0;
+  animation: flowSignalPulse 9.6s linear infinite;
+}
+
+.landing-v2-flow-link.link-1::after {
+  animation-delay: 0s;
+}
+
+.landing-v2-flow-link.link-2::after {
+  animation-delay: 3.2s;
+}
+
+.landing-v2-flow-link.link-3::after {
+  animation-delay: 6.4s;
 }
 
 .landing-v2-flow-node-label {
   margin: 0;
-  font-size: 1.32rem;
+  font-size: 1.14rem;
   line-height: 1.2;
   font-weight: 620;
   color: rgba(236, 243, 255, 0.96);
@@ -4481,6 +4513,27 @@ html {
   font-weight: 560;
   line-height: 1.1;
   white-space: nowrap;
+}
+
+@keyframes flowSignalPulse {
+  0% {
+    left: -24%;
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.42;
+  }
+  22% {
+    left: 104%;
+    opacity: 0.42;
+  }
+  30% {
+    opacity: 0;
+  }
+  100% {
+    left: 104%;
+    opacity: 0;
+  }
 }
 
 .landing-v2-flow--large-rheonic .landing-v2-flow-node-rheonic {
@@ -4954,10 +5007,6 @@ html {
     font-size: 1.14rem;
   }
 
-  .landing-v2-flow-node-basic .landing-v2-flow-node-label {
-    font-size: 1rem;
-  }
-
   .landing-v2-engineer-grid {
     grid-template-columns: 1fr;
   }
@@ -4998,9 +5047,6 @@ html {
     font-size: 1.18rem;
   }
 
-  .landing-v2-flow-node-basic .landing-v2-flow-node-label {
-    font-size: 1rem;
-  }
 }
 
 @media (max-width: 760px) {

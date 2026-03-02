@@ -247,7 +247,7 @@ export function LandingPage(): JSX.Element {
                   <p className="landing-v2-flow-node-label">Agent</p>
                 </div>
               </article>
-              <span className="landing-v2-flow-link" aria-hidden />
+              <span className="landing-v2-flow-link link-1" aria-hidden />
               <article className="landing-v2-flow-node landing-v2-flow-node-basic">
                 <div className="landing-v2-flow-node-content">
                   <span className="landing-v2-flow-node-icon">
@@ -256,7 +256,7 @@ export function LandingPage(): JSX.Element {
                   <p className="landing-v2-flow-node-label">SDK</p>
                 </div>
               </article>
-              <span className="landing-v2-flow-link" aria-hidden />
+              <span className="landing-v2-flow-link link-2 is-core" aria-hidden />
               <article className="landing-v2-flow-node landing-v2-flow-node-rheonic">
                 <div className="landing-v2-flow-rheonic-shell">
                   <h3 className="landing-v2-flow-rheonic-head">
@@ -271,7 +271,7 @@ export function LandingPage(): JSX.Element {
                   </div>
                 </div>
               </article>
-              <span className="landing-v2-flow-link" aria-hidden />
+              <span className="landing-v2-flow-link link-3 is-core" aria-hidden />
               <article className="landing-v2-flow-node landing-v2-flow-node-basic">
                 <div className="landing-v2-flow-node-content">
                   <span className="landing-v2-flow-node-icon">
