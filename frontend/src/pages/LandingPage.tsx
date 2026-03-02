@@ -1,25 +1,33 @@
-import { motion } from "framer-motion";
-import { Activity, BellRing, Gauge, ShieldCheck, Workflow } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Activity, Gauge, ShieldCheck, Workflow, Wrench, Layers, Signal, DatabaseZap } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { PublicLayout } from "../components/PublicLayout";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 22 },
-  visible: { opacity: 1, y: 0 },
-};
-
-const stagger = {
-  hidden: {},
-  visible: {
-    transition: {
-      staggerChildren: 0.12,
-      delayChildren: 0.12,
-    },
-  },
-};
-
 export function LandingPage(): JSX.Element {
+  const rootRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!rootRef.current || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const targets = rootRef.current.querySelectorAll(".reveal-on-scroll");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      { threshold: 0.18, rootMargin: "0px 0px -8% 0px" },
+    );
+
+    targets.forEach((target) => observer.observe(target));
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <PublicLayout
       navAuthHref="/login"
@@ -27,218 +35,162 @@ export function LandingPage(): JSX.Element {
       shellClassName="public-shell-marketing"
       showDocsLink={false}
     >
-      <section className="landing-marketing">
-        <motion.section
-          className="landing-hero"
-          initial="hidden"
-          animate="visible"
-          variants={stagger}
-        >
-          <motion.div className="landing-hero-left" variants={fadeUp}>
-            <p className="landing-kicker">Runtime spend control for LLM apps</p>
-            <h1>Guardrails and visibility for runaway token burn.</h1>
-            <p className="landing-subline">
-              Monitor provider traffic in realtime and enforce preflight decisions before cost spikes hit production.
+      <section className="landing-marketing landing-v2" ref={rootRef}>
+        <section className="landing-v2-hero reveal-on-scroll">
+          <div className="landing-v2-hero-copy">
+            <h1>Control your agent traffic before it controls your bill.</h1>
+            <p>
+              Monitor model behavior per provider, detect anomalies early, and enforce preflight guardrails before
+              expensive calls are sent.
             </p>
-            <div className="landing-hero-cta">
+            <div className="landing-v2-hero-cta">
               <Link className="landing-link-button modal-primary" to="/login">
-                Sign in
+                Start testing
               </Link>
               <Link className="landing-link-button" to="/quickstart">
-                Quickstart
+                View quickstart
               </Link>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div className="landing-hero-right" variants={fadeUp}>
-            <img
-              className="landing-real-screenshot"
-              src="/landing/dashboard-preview.svg?v=3"
-              alt="Rheonic dashboard"
-            />
-          </motion.div>
-        </motion.section>
-
-        <motion.section
-          className="landing-chip-row"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          variants={stagger}
-        >
-          {[
-            "Per-provider telemetry",
-            "Realtime counters",
-            "Incident timelines",
-            "Preflight allow/warn/block",
-          ].map((label) => (
-            <motion.p key={label} variants={fadeUp}>
-              {label}
-            </motion.p>
-          ))}
-        </motion.section>
-
-        <motion.section
-          className="landing-two-col"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          variants={stagger}
-        >
-          <motion.article className="landing-panel" variants={fadeUp}>
-            <h2>Why it exists</h2>
-            <p>
-              Teams discover LLM overspend too late. Token spikes and retry storms accumulate in minutes while apps keep
-              calling providers.
-            </p>
-          </motion.article>
-          <motion.article className="landing-panel" variants={fadeUp}>
-            <h2>What you get</h2>
-            <p>
-              One control plane for counters, incidents, and protect actions across OpenAI, Anthropic, and Google
-              providers.
-            </p>
-          </motion.article>
-        </motion.section>
-
-        <section className="landing-section">
-          <h2>Core capabilities</h2>
-          <motion.div
-            className="landing-feature-grid"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-70px" }}
-            variants={stagger}
-          >
-            <motion.article className="landing-feature-card" variants={fadeUp}>
-              <span className="landing-feature-icon">
-                <Gauge size={18} />
-              </span>
-              <h3>Realtime counters</h3>
-              <p>Track requests and tokens in rolling 60-second windows per provider.</p>
-            </motion.article>
-            <motion.article className="landing-feature-card" variants={fadeUp}>
-              <span className="landing-feature-icon">
-                <Activity size={18} />
-              </span>
-              <h3>Incident detection</h3>
-              <p>Detect near_cap, cap_breach, retry_storm, loop_suspect, and token_explosion patterns.</p>
-            </motion.article>
-            <motion.article className="landing-feature-card" variants={fadeUp}>
-              <span className="landing-feature-icon">
-                <ShieldCheck size={18} />
-              </span>
-              <h3>Protect decisions</h3>
-              <p>Run preflight allow, warn, or block with cooldown before provider calls are sent.</p>
-            </motion.article>
-            <motion.article className="landing-feature-card" variants={fadeUp}>
-              <span className="landing-feature-icon">
-                <BellRing size={18} />
-              </span>
-              <h3>Webhook delivery</h3>
-              <p>Dispatch protect-mode alerts with decision context and clamp recommendation details.</p>
-            </motion.article>
-          </motion.div>
+          <div className="landing-v2-hero-visual">
+            <div className="landing-v2-dashboard-mock" aria-label="Mocked Rheonic dashboard preview">
+              <div className="landing-v2-mock-topbar">
+                <span />
+                <span />
+                <span />
+              </div>
+              <div className="landing-v2-mock-grid">
+                <article>
+                  <p>Requests / min</p>
+                  <strong>2,148</strong>
+                </article>
+                <article>
+                  <p>Tokens / min</p>
+                  <strong>1.7M</strong>
+                </article>
+                <article className="landing-v2-graph-card">
+                  <p>Realtime anomaly pulse</p>
+                  <div className="landing-v2-graph-track">
+                    <span className="landing-v2-graph-line" />
+                  </div>
+                </article>
+                <article>
+                  <p>Preflight state</p>
+                  <strong>Protect: Warn</strong>
+                </article>
+              </div>
+            </div>
+          </div>
         </section>
 
-        <section className="landing-section">
-          <h2>How it works</h2>
-          <motion.div
-            className="landing-steps"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-60px" }}
-            variants={stagger}
-          >
-            <motion.article className="landing-step-card" variants={fadeUp}>
-              <span>1</span>
-              <h3>Install SDK</h3>
-              <p>Configure backend URL and ingest key in your app runtime.</p>
-            </motion.article>
-            <motion.article className="landing-step-card" variants={fadeUp}>
-              <span>2</span>
-              <h3>Capture events</h3>
-              <p>Send provider call telemetry for rolling counters and incidenting.</p>
-            </motion.article>
-            <motion.article className="landing-step-card" variants={fadeUp}>
-              <span>3</span>
-              <h3>Enable Protect</h3>
-              <p>Turn on preflight decisions to warn or block before expensive calls execute.</p>
-            </motion.article>
-          </motion.div>
+        <section className="landing-v2-section reveal-on-scroll">
+          <h2>Agentic systems don’t fail quietly.</h2>
+          <article className="landing-v2-problem-panel">
+            <ul>
+              <li>Traffic spikes without warning</li>
+              <li>Retries multiply silently</li>
+              <li>
+                One bad loop can <span className="landing-v2-danger-underline">drain budget</span> in minutes
+              </li>
+            </ul>
+            <p>Traditional logs show it too late. You need a control layer.</p>
+          </article>
         </section>
 
-        <section className="landing-section">
-          <h2>Runtime schematic</h2>
-          <motion.div
-            className="landing-schematic-compact"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4 }}
-          >
-            <div className="landing-schematic-node">
+        <section className="landing-v2-section reveal-on-scroll">
+          <h2>A control layer between your agents and model providers.</h2>
+          <div className="landing-v2-capabilities">
+            <article className="landing-v2-cap-card">
+              <span className="landing-v2-icon-circle telemetry">
+                <Gauge size={16} />
+              </span>
+              <h3>Realtime per-provider telemetry</h3>
+            </article>
+            <article className="landing-v2-cap-card">
+              <span className="landing-v2-icon-circle anomaly">
+                <Activity size={16} />
+              </span>
+              <h3>Anomaly detection (near cap, retry storms, token explosions)</h3>
+            </article>
+            <article className="landing-v2-cap-card">
+              <span className="landing-v2-icon-circle enforcement">
+                <ShieldCheck size={16} />
+              </span>
+              <h3>Optional preflight enforcement (warn / block / cooldown)</h3>
+            </article>
+          </div>
+        </section>
+
+        <section className="landing-v2-section reveal-on-scroll">
+          <h2>Visual flow</h2>
+          <div className="landing-v2-flow">
+            <div className="landing-v2-flow-chain">
+              <div className="landing-v2-flow-node">
+                <Workflow size={15} />
+                <span>Agent</span>
+              </div>
+              <span className="landing-v2-flow-arrow" />
+              <div className="landing-v2-flow-node">
+                <Wrench size={15} />
+                <span>SDK</span>
+              </div>
+              <span className="landing-v2-flow-arrow" />
+              <div className="landing-v2-flow-node landing-v2-flow-node-core">
+                <Signal size={15} />
+                <span>Rheonic</span>
+              </div>
+              <span className="landing-v2-flow-arrow" />
+              <div className="landing-v2-flow-node">
+                <DatabaseZap size={15} />
+                <span>Provider</span>
+              </div>
+            </div>
+            <div className="landing-v2-mode-toggle">
+              <article>
+                <h3>Observe</h3>
+                <p>Visibility</p>
+              </article>
+              <article className="is-active">
+                <h3>Protect</h3>
+                <p>Enforcement</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-v2-section reveal-on-scroll">
+          <h2>Why it works in practice</h2>
+          <div className="landing-v2-engineer-grid">
+            <article className="landing-v2-engineer-card">
+              <Layers size={16} />
+              <h3>No backend refactor</h3>
+              <p>Drop in SDK instrumentation and start with observe mode.</p>
+            </article>
+            <article className="landing-v2-engineer-card">
+              <DatabaseZap size={16} />
+              <h3>Works per provider</h3>
+              <p>Separate controls for OpenAI, Anthropic, and Google traffic.</p>
+            </article>
+            <article className="landing-v2-engineer-card">
               <Workflow size={16} />
-              <p>SDK ingest events</p>
-            </div>
-            <span className="landing-schematic-arrow" />
-            <div className="landing-schematic-node">
-              <Gauge size={16} />
-              <p>Counters + detectors</p>
-            </div>
-            <span className="landing-schematic-arrow" />
-            <div className="landing-schematic-node">
-              <BellRing size={16} />
-              <p>Incidents + webhooks</p>
-            </div>
-            <span className="landing-schematic-arrow" />
-            <div className="landing-schematic-node">
-              <ShieldCheck size={16} />
-              <p>Protect preflight</p>
-            </div>
-          </motion.div>
+              <h3>SDK-first</h3>
+              <p>Typed client workflows for runtime telemetry and protect calls.</p>
+            </article>
+            <article className="landing-v2-engineer-card">
+              <Activity size={16} />
+              <h3>Real signals</h3>
+              <p>Detect near-cap, retry storms, and loop patterns before escalation.</p>
+            </article>
+          </div>
         </section>
 
-        <motion.section
-          className="landing-section"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          variants={stagger}
-        >
-          <h2>Observe vs Protect</h2>
-          <div className="landing-compare">
-            <motion.article className="landing-panel" variants={fadeUp}>
-              <h3>Observe</h3>
-              <p>Visibility mode. Logs incidents and counters, never blocks application traffic.</p>
-            </motion.article>
-            <motion.article className="landing-panel" variants={fadeUp}>
-              <h3>Protect</h3>
-              <p>Control mode. Executes preflight decisions, cooldown, and webhook dispatch for operations.</p>
-            </motion.article>
-          </div>
-        </motion.section>
-
-        <motion.section
-          className="landing-final-cta"
-          initial={{ opacity: 0, y: 14 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.38 }}
-        >
-          <div>
-            <h2>Start with guardrails before scaling usage</h2>
-            <p>Connect telemetry now, then enable protect enforcement when thresholds are calibrated.</p>
-          </div>
-          <div className="landing-hero-cta">
-            <Link className="landing-link-button modal-primary" to="/login">
-              Sign in
-            </Link>
-            <Link className="landing-link-button" to="/quickstart">
-              Quickstart
-            </Link>
-          </div>
-        </motion.section>
+        <section className="landing-v2-final-cta reveal-on-scroll">
+          <h2>Add guardrails before your next agent experiment.</h2>
+          <Link className="landing-link-button modal-primary" to="/login">
+            Start testing
+          </Link>
+        </section>
       </section>
     </PublicLayout>
   );

@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from "react";
+import { useEffect, useState, type PropsWithChildren } from "react";
 import { Link } from "react-router-dom";
 import { getAuthItem } from "../authStorage";
 import { frontendConfig } from "../config";
@@ -23,11 +23,27 @@ export function PublicLayout({
 }: PublicLayoutProps): JSX.Element {
   const token = getAuthItem(frontendConfig.authTokenStorageKey);
   const docsHref = token ? "/docs" : "/login";
+  const [scrolled, setScrolled] = useState(false);
+  const isV2Surface = shellClassName?.includes("public-shell-marketing") || shellClassName?.includes("quickstart-v2-shell");
+
+  useEffect(() => {
+    if (!isV2Surface) {
+      return;
+    }
+
+    const onScroll = (): void => {
+      setScrolled(window.scrollY > 8);
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [isV2Surface]);
 
   return (
-    <main className="public-page">
+    <main className={`public-page${isV2Surface ? " public-page-v2" : ""}`}>
       <div className={`public-shell${shellClassName ? ` ${shellClassName}` : ""}`}>
-        <header className="public-nav public-nav-sticky">
+        <header className={`public-nav public-nav-sticky${scrolled ? " is-scrolled" : ""}`}>
           <p className="public-brand">Rheonic</p>
           <nav className="public-nav-links">
             {showHomeLink ? <Link to="/">Home</Link> : null}
@@ -46,7 +62,7 @@ export function PublicLayout({
             {showHomeLink ? <Link to="/">Home</Link> : null}
             {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
             {showDocsLink ? <Link to={docsHref}>Docs (dashboard)</Link> : null}
-            <Link to="/login">Login</Link>
+            <Link to="/login">Sign in</Link>
           </div>
           <p>© {new Date().getFullYear()} Rheonic</p>
         </footer>

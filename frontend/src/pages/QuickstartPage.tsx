@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { CodeBlock } from "../components/CodeBlock";
@@ -8,6 +8,46 @@ type Runtime = "node" | "python";
 
 export function QuickstartPage(): JSX.Element {
   const [runtime, setRuntime] = useState<Runtime>("node");
+  const [activeSection, setActiveSection] = useState("problem");
+  const sectionIds = ["problem", "install", "ingest", "protect", "env", "next"] as const;
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const sections = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter((section): section is HTMLElement => section !== null);
+    if (sections.length === 0) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (visible[0]) {
+          setActiveSection(visible[0].target.id);
+        }
+      },
+      { rootMargin: "-28% 0px -58% 0px", threshold: [0.1, 0.3, 0.5, 0.7] },
+    );
+
+    sections.forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
+
+  const onTocClick = (event: MouseEvent<HTMLAnchorElement>, id: string): void => {
+    event.preventDefault();
+    const section = document.getElementById(id);
+    if (!section) {
+      return;
+    }
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.history.replaceState(null, "", `#${id}`);
+  };
 
   const install = useMemo(
     () =>
@@ -114,20 +154,24 @@ except RHEONICBlockedError:
     <PublicLayout
       navAuthHref="/login"
       navAuthLabel="Sign in"
+      shellClassName="quickstart-v2-shell"
       showHomeLink
       showQuickstartLink={false}
       showDocsLink
     >
-      <section className="quickstart-page">
+      <section className="quickstart-page quickstart-v2">
         <div className="quickstart-docs-layout">
           <article className="quickstart-docs-content">
             <h1>Quickstart</h1>
+            <p className="quickstart-v2-lede">
+              Instrument provider traffic first, then enable protect mode once thresholds are calibrated.
+            </p>
 
             <section id="problem">
-              <h2>What problem it solves</h2>
+              <h2>What this gives you</h2>
               <p>
-                Rheonic prevents runaway LLM spend by combining provider-scoped telemetry with optional
-                preflight decisioning, so you can detect and stop anomalies before costs escalate.
+                Rheonic adds a control layer between agent calls and model providers so runaway traffic is visible and
+                enforceable before spend spikes.
               </p>
             </section>
 
@@ -145,7 +189,7 @@ except RHEONICBlockedError:
             </section>
 
             <section id="ingest">
-              <h2>Minimal ingest only</h2>
+              <h2>Capture telemetry</h2>
               <div className="runtime-tabs">
                 <button type="button" className={runtime === "node" ? "is-active" : ""} onClick={() => setRuntime("node")}>
                   Node
@@ -158,7 +202,7 @@ except RHEONICBlockedError:
             </section>
 
             <section id="protect">
-              <h2>Minimal protect wrapper</h2>
+              <h2>Enable protect wrapper</h2>
               <div className="runtime-tabs">
                 <button type="button" className={runtime === "node" ? "is-active" : ""} onClick={() => setRuntime("node")}>
                   Node
@@ -180,13 +224,14 @@ RHEONIC_BACKEND_URL=http://localhost:8000`}
             </section>
 
             <section id="next" className="quickstart-next-links">
-              <h2>Next links</h2>
+              <h2>Next step</h2>
+              <p className="quickstart-v2-next-copy">Verify events are flowing in observe mode, then move to protect mode.</p>
               <div className="quickstart-next-row">
                 <Link className="landing-link-button modal-primary" to="/login">
-                  Sign in
+                  Start testing
                 </Link>
                 <Link className="landing-link-button" to="/docs">
-                  Full docs inside dashboard
+                  Open dashboard docs
                 </Link>
               </div>
             </section>
@@ -194,12 +239,40 @@ RHEONIC_BACKEND_URL=http://localhost:8000`}
 
           <aside className="quickstart-toc-panel">
             <h3>On this page</h3>
-            <a href="#problem">What problem it solves</a>
-            <a href="#install">Install</a>
-            <a href="#ingest">Minimal ingest only</a>
-            <a href="#protect">Minimal protect wrapper</a>
-            <a href="#env">Required env vars</a>
-            <a href="#next">Next links</a>
+            <a
+              href="#problem"
+              className={activeSection === "problem" ? "is-active" : ""}
+              onClick={(event) => onTocClick(event, "problem")}
+            >
+              What this gives you
+            </a>
+            <a
+              href="#install"
+              className={activeSection === "install" ? "is-active" : ""}
+              onClick={(event) => onTocClick(event, "install")}
+            >
+              Install
+            </a>
+            <a
+              href="#ingest"
+              className={activeSection === "ingest" ? "is-active" : ""}
+              onClick={(event) => onTocClick(event, "ingest")}
+            >
+              Capture telemetry
+            </a>
+            <a
+              href="#protect"
+              className={activeSection === "protect" ? "is-active" : ""}
+              onClick={(event) => onTocClick(event, "protect")}
+            >
+              Enable protect wrapper
+            </a>
+            <a href="#env" className={activeSection === "env" ? "is-active" : ""} onClick={(event) => onTocClick(event, "env")}>
+              Required env vars
+            </a>
+            <a href="#next" className={activeSection === "next" ? "is-active" : ""} onClick={(event) => onTocClick(event, "next")}>
+              Next step
+            </a>
           </aside>
         </div>
       </section>
