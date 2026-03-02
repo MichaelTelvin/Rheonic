@@ -4452,20 +4452,19 @@ html {
   align-self: stretch;
   align-items: stretch;
   justify-content: center;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-color: rgba(129, 140, 248, 0.62);
   box-shadow:
     0 0 0 1px rgba(129, 140, 248, 0.25),
-    0 0 20px rgba(99, 102, 241, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 0 20px rgba(99, 102, 241, 0.22);
 }
 
 .landing-v2-flow-rheonic-shell {
   width: 100%;
   flex: 1 1 auto;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
+  grid-template-rows: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 8px;
   align-items: stretch;
   justify-items: stretch;
   min-height: 0;
@@ -4475,10 +4474,10 @@ html {
   margin: 0;
   width: 100%;
   min-height: 0;
-  border: 1px solid rgba(176, 194, 255, 0.44);
+  border: 1px solid rgba(176, 194, 255, 0.3);
   border-radius: 6px;
   text-align: center;
-  padding: 0 10px;
+  padding: 2px 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4487,7 +4486,7 @@ html {
   line-height: 1.2;
   font-weight: 620;
   color: rgba(240, 245, 255, 0.97);
-  background: linear-gradient(180deg, rgba(66, 86, 126, 0.52), rgba(49, 66, 102, 0.5));
+  background: linear-gradient(180deg, rgba(66, 86, 126, 0.34), rgba(49, 66, 102, 0.3));
 }
 
 .landing-v2-flow-rheonic-modes {
@@ -4504,15 +4503,28 @@ html {
   justify-content: center;
   text-align: center;
   min-height: 0;
-  padding: 0 8px;
-  border: 1px solid rgba(176, 194, 255, 0.36);
+  padding: 0 6px;
+  border: 1px solid rgba(176, 194, 255, 0.24);
   border-radius: 6px;
-  background: linear-gradient(180deg, rgba(58, 77, 114, 0.46), rgba(43, 59, 91, 0.44));
-  color: rgba(222, 233, 252, 0.9);
-  font-size: 0.72rem;
+  background: rgba(59, 77, 114, 0.14);
+  color: rgba(214, 226, 249, 0.82);
+  font-size: 0.7rem;
   font-weight: 560;
   line-height: 1.1;
   white-space: nowrap;
+}
+
+.landing-v2-flow-rheonic-modes span.is-active {
+  border-color: rgba(176, 194, 255, 0.42);
+  background: rgba(99, 102, 241, 0.1);
+  color: rgba(228, 238, 255, 0.92);
+  box-shadow: 0 0 10px rgba(129, 140, 248, 0.2);
+}
+
+.landing-v2-flow-rheonic-modes span.is-protect {
+  border-color: rgba(134, 239, 172, 0.36);
+  background: rgba(134, 239, 172, 0.07);
+  box-shadow: 0 0 8px rgba(134, 239, 172, 0.14);
 }
 
 @keyframes flowSignalPulse {
@@ -4538,7 +4550,7 @@ html {
 
 .landing-v2-flow--large-rheonic .landing-v2-flow-node-rheonic {
   min-height: 148px;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .landing-v2-flow--large-rheonic .landing-v2-flow-rheonic-shell {

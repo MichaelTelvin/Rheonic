@@ -266,8 +266,8 @@ export function LandingPage(): JSX.Element {
                     <span>Rheonic</span>
                   </h3>
                   <div className="landing-v2-flow-rheonic-modes" aria-label="Rheonic modes">
-                    <span>Observe</span>
-                    <span>Protect</span>
+                    <span className="is-active">Observe</span>
+                    <span className="is-protect">Protect</span>
                   </div>
                 </div>
               </article>
