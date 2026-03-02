@@ -49,9 +49,9 @@ export function CurrentProjectBar(): JSX.Element {
       }
     };
 
-    window.addEventListener("llmtbg:protect-mode-updated", onModeUpdated as EventListener);
+    window.addEventListener("rheonic:protect-mode-updated", onModeUpdated as EventListener);
     return () => {
-      window.removeEventListener("llmtbg:protect-mode-updated", onModeUpdated as EventListener);
+      window.removeEventListener("rheonic:protect-mode-updated", onModeUpdated as EventListener);
     };
   }, [projectId]);
 

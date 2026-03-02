@@ -6,13 +6,13 @@ from dataclasses import dataclass
 
 import httpx
 
-from llmtokenburnguard import LLMTBGBlockedError, create_client
-from llmtokenburnguard.providers.anthropic_adapter import instrument_anthropic
-from llmtokenburnguard.providers.google_adapter import instrument_google
-from llmtokenburnguard.providers.openai_adapter import instrument_openai
+from rheonic import RHEONICBlockedError, create_client
+from rheonic.providers.anthropic_adapter import instrument_anthropic
+from rheonic.providers.google_adapter import instrument_google
+from rheonic.providers.openai_adapter import instrument_openai
 
-BACKEND_BASE_URL = os.getenv("LLMTBG_E2E_BACKEND_URL", "http://backend_test:8000")
-PROVIDER_STUB_URL = os.getenv("LLMTBG_E2E_PROVIDER_URL", "http://provider_stub_test:8099")
+BACKEND_BASE_URL = os.getenv("RHEONIC_E2E_BACKEND_URL", "http://backend_test:8000")
+PROVIDER_STUB_URL = os.getenv("RHEONIC_E2E_PROVIDER_URL", "http://provider_stub_test:8099")
 
 
 @dataclass
@@ -178,7 +178,7 @@ def run() -> None:
             max_tokens=2000,
             messages=[{"role": "user", "content": "Predictive warning near cap check for python e2e."}],
         )
-    except LLMTBGBlockedError:
+    except RHEONICBlockedError:
         blocked = True
     assert blocked is False
     assert _provider_count() - initial_provider_calls == 4

@@ -11,18 +11,18 @@ export function QuickstartPage(): JSX.Element {
 
   const install = useMemo(
     () =>
-      runtime === "node" ? "npm install llmtokenburnguard-node" : "pip install llmtokenburnguard",
+      runtime === "node" ? "npm install rheonic-node" : "pip install rheonic",
     [runtime],
   );
 
   const ingest = useMemo(
     () =>
       runtime === "node"
-        ? `import { createClient, buildEvent } from "llmtokenburnguard-node";
+        ? `import { createClient, buildEvent } from "rheonic-node";
 
 const client = createClient({
-  baseUrl: process.env.LLMTBG_BACKEND_URL,
-  ingestKey: process.env.LLMTBG_INGEST_KEY!,
+  baseUrl: process.env.RHEONIC_BACKEND_URL,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
   protectEnabled: false,
 });
 
@@ -35,11 +35,11 @@ await client.captureEvent(
   }),
 );`
         : `import os
-from llmtokenburnguard import create_client, build_event
+from rheonic import create_client, build_event
 
 client = create_client(
-    base_url=os.environ["LLMTBG_BACKEND_URL"],
-    ingest_key=os.environ["LLMTBG_INGEST_KEY"],
+    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
     protect_enabled=False,
 )
 
@@ -58,11 +58,11 @@ client.capture_event(
     () =>
       runtime === "node"
         ? `import OpenAI from "openai";
-import { createClient, instrumentOpenAI, LLMTBGBlockedError } from "llmtokenburnguard-node";
+import { createClient, instrumentOpenAI, RHEONICBlockedError } from "rheonic-node";
 
 const burnguard = createClient({
-  baseUrl: process.env.LLMTBG_BACKEND_URL,
-  ingestKey: process.env.LLMTBG_INGEST_KEY!,
+  baseUrl: process.env.RHEONIC_BACKEND_URL,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
   protectEnabled: true,
 });
 
@@ -79,17 +79,17 @@ try {
     max_tokens: 256,
   });
 } catch (error) {
-  if (error instanceof LLMTBGBlockedError) {
+  if (error instanceof RHEONICBlockedError) {
     console.log("Blocked by protect preflight");
   }
 }`
         : `import os
 from openai import OpenAI
-from llmtokenburnguard import create_client, instrument_openai, LLMTBGBlockedError
+from rheonic import create_client, instrument_openai, RHEONICBlockedError
 
 burnguard = create_client(
-    base_url=os.environ["LLMTBG_BACKEND_URL"],
-    ingest_key=os.environ["LLMTBG_INGEST_KEY"],
+    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
     protect_enabled=True,
 )
 openai_client = instrument_openai(
@@ -105,7 +105,7 @@ try:
         messages=[{"role": "user", "content": "hello"}],
         max_tokens=256,
     )
-except LLMTBGBlockedError:
+except RHEONICBlockedError:
     print("Blocked by protect preflight")`,
     [runtime],
   );
@@ -126,7 +126,7 @@ except LLMTBGBlockedError:
             <section id="problem">
               <h2>What problem it solves</h2>
               <p>
-                LLMTokenBurnGuard prevents runaway LLM spend by combining provider-scoped telemetry with optional
+                Rheonic prevents runaway LLM spend by combining provider-scoped telemetry with optional
                 preflight decisioning, so you can detect and stop anomalies before costs escalate.
               </p>
             </section>
@@ -173,8 +173,8 @@ except LLMTBGBlockedError:
             <section id="env">
               <h2>Required env vars</h2>
               <CodeBlock
-                code={`LLMTBG_INGEST_KEY=<your_project_ingest_key>
-LLMTBG_BACKEND_URL=http://localhost:8000`}
+                code={`RHEONIC_INGEST_KEY=<your_project_ingest_key>
+RHEONIC_BACKEND_URL=http://localhost:8000`}
                 language="bash"
               />
             </section>

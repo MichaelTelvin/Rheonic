@@ -54,7 +54,7 @@ export function LandingPage(): JSX.Element {
             <img
               className="landing-real-screenshot"
               src="/landing/dashboard-preview.svg?v=3"
-              alt="LLMTokenBurnGuard dashboard"
+              alt="Rheonic dashboard"
             />
           </motion.div>
         </motion.section>

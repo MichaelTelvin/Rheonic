@@ -1,14 +1,16 @@
+name: rheonic_test
+
 services:
   postgres_test:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: llmtbg_test
-      POSTGRES_USER: llmtbg
-      POSTGRES_PASSWORD: llmtbg
+      POSTGRES_DB: rheonic_test
+      POSTGRES_USER: rheonic
+      POSTGRES_PASSWORD: rheonic
     volumes:
       - postgres-test-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U llmtbg -d llmtbg_test"]
+      test: ["CMD-SHELL", "pg_isready -U rheonic -d rheonic_test"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -27,7 +29,7 @@ services:
   backend_test:
     build: ./backend
     environment:
-      DATABASE_URL: postgresql+psycopg://llmtbg:llmtbg@postgres_test:5432/llmtbg_test
+      DATABASE_URL: postgresql+psycopg://rheonic:rheonic@postgres_test:5432/rheonic_test
       REDIS_URL: redis://redis_test:6379/0
       APP_ENV: test
       JWT_SECRET: test-secret
@@ -62,8 +64,8 @@ services:
     image: node:20-alpine
     working_dir: /app
     environment:
-      LLMTBG_E2E_BACKEND_URL: http://backend_test:8000
-      LLMTBG_E2E_PROVIDER_URL: http://provider_stub_test:8099
+      RHEONIC_E2E_BACKEND_URL: http://backend_test:8000
+      RHEONIC_E2E_PROVIDER_URL: http://provider_stub_test:8099
     volumes:
       - ./sdk-node:/app
     command: >
@@ -80,8 +82,8 @@ services:
     image: python:3.12-alpine
     working_dir: /app
     environment:
-      LLMTBG_E2E_BACKEND_URL: http://backend_test:8000
-      LLMTBG_E2E_PROVIDER_URL: http://provider_stub_test:8099
+      RHEONIC_E2E_BACKEND_URL: http://backend_test:8000
+      RHEONIC_E2E_PROVIDER_URL: http://provider_stub_test:8099
     volumes:
       - ./sdk-python:/app
     command: >

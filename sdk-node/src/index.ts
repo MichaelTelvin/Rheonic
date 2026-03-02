@@ -1,7 +1,7 @@
 import { Client, type ClientConfig, type ClientStats, type OverflowPolicy } from "./client.js";
 import { buildEvent, type BuildEventInput, type EventPayload } from "./eventBuilder.js";
-import { LLMTBGBlockedError } from "./protectEngine.js";
-import { LLMTBGValidationError } from "./providerModelValidation.js";
+import { RHEONICBlockedError } from "./protectEngine.js";
+import { RHEONICValidationError } from "./providerModelValidation.js";
 import { instrumentOpenAI as instrumentOpenAIProvider, type OpenAIInstrumentationOptions } from "./providers/openaiAdapter.js";
 import { instrumentAnthropic as instrumentAnthropicProvider, type AnthropicInstrumentationOptions } from "./providers/anthropicAdapter.js";
 import { instrumentGoogle as instrumentGoogleProvider, type GoogleInstrumentationOptions } from "./providers/googleAdapter.js";
@@ -10,8 +10,8 @@ let defaultClient: Client | null = null;
 
 export {
   Client,
-  LLMTBGBlockedError,
-  LLMTBGValidationError,
+  RHEONICBlockedError,
+  RHEONICValidationError,
   type ClientConfig,
   type ClientStats,
   type OverflowPolicy,

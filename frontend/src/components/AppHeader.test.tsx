@@ -6,7 +6,7 @@ import { AppHeader } from "./AppHeader";
 describe("AppHeader", () => {
   it("renders brand text", () => {
     render(<AppHeader />);
-    expect(screen.getByText("LLMTokenBurnGuard")).toBeDefined();
+    expect(screen.getByText("Rheonic")).toBeDefined();
   });
 
   it("renders user email and signs out", () => {

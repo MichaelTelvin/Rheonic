@@ -1,7 +1,7 @@
 import type { Client } from "../client.js";
 import { buildEvent } from "../eventBuilder.js";
 import { validateProviderModel } from "../providerModelValidation.js";
-import { LLMTBGBlockedError, type ProtectEvaluation } from "../protectEngine.js";
+import { RHEONICBlockedError, type ProtectEvaluation } from "../protectEngine.js";
 import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
 
 export interface GoogleInstrumentationOptions {
@@ -63,7 +63,7 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
     }
 
     if (protectDecision.decision === "block") {
-      throw new LLMTBGBlockedError(protectDecision.reason);
+      throw new RHEONICBlockedError(protectDecision.reason);
     }
     const callArgs = maybeApplyGoogleClamp(args, protectDecision);
 

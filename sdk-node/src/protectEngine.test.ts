@@ -6,8 +6,8 @@ import {
   instrumentAnthropic,
   instrumentGoogle,
   instrumentOpenAI,
-  LLMTBGBlockedError,
-  LLMTBGValidationError,
+  RHEONICBlockedError,
+  RHEONICValidationError,
 } from "./index.js";
 import { validateProviderModel } from "./providerModelValidation.js";
 import { __setInputTokenEstimatorForTests as __setAnthropicEstimatorForTests } from "./providers/anthropicAdapter.js";
@@ -136,7 +136,7 @@ test("decision block prevents provider call", async () => {
     const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
-    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
+    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
     assert.equal(calls.length, 0);
     client.close();
   } finally {
@@ -170,8 +170,8 @@ test("blocked_until short-circuits subsequent decision calls locally", async () 
     const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
-    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
-    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
+    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
+    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
     assert.equal(decisionCalls, 1);
     client.close();
   } finally {
@@ -207,7 +207,7 @@ test("parallel calls during active cooldown block locally without backend decisi
     instrumentOpenAI(openai, { client });
 
     // Prime cooldown from backend once.
-    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
+    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
     assert.equal(decisionCalls, 1);
 
     // During active cooldown, both concurrent calls should short-circuit locally.
@@ -521,7 +521,7 @@ test("decision timeout fail-closed blocks provider call", async () => {
     });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
-    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
+    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
     assert.equal(calls.length, 0);
     assert.equal(timeoutReports.length, 1);
     assert.equal(timeoutReports[0].environment, "staging");
@@ -566,7 +566,7 @@ test("decision 500 fail-closed blocks provider call", async () => {
     const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
-    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
+    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
     assert.equal(calls.length, 0);
     client.close();
   } finally {
@@ -612,7 +612,7 @@ test("invalid JSON fail-closed blocks provider call", async () => {
     const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
-    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), LLMTBGBlockedError);
+    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
     assert.equal(calls.length, 0);
     client.close();
   } finally {
@@ -674,7 +674,7 @@ test("anthropic block path prevents provider call", async () => {
     instrumentAnthropic(anthropic, { client });
     await assert.rejects(
       () => anthropic.messages.create({ model: "claude-3-5-sonnet", max_tokens: 128, messages: [{ role: "user", content: "hello" }] }),
-      LLMTBGBlockedError,
+      RHEONICBlockedError,
     );
     assert.equal(calls.length, 0);
     client.close();
@@ -767,7 +767,7 @@ test("google block path prevents provider call", async () => {
     const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
     const { googleModel, calls } = makeGoogleStub();
     instrumentGoogle(googleModel, { client });
-    await assert.rejects(() => googleModel.generateContent("hello"), LLMTBGBlockedError);
+    await assert.rejects(() => googleModel.generateContent("hello"), RHEONICBlockedError);
     assert.equal(calls.length, 0);
     client.close();
   } finally {
@@ -878,7 +878,7 @@ test("provider/model validation rejects anthropic call when model is missing", a
           max_tokens: 64,
           messages: [{ role: "user", content: "hello" }],
         }),
-      LLMTBGValidationError,
+      RHEONICValidationError,
     );
     assert.equal(calls.length, 0);
     assert.equal(decisionCalls, 0);
@@ -908,7 +908,7 @@ test("provider/model validation rejects openai call when model is missing", asyn
           messages: [{ role: "user", content: "hello" }],
           max_tokens: 64,
         }),
-      LLMTBGValidationError,
+      RHEONICValidationError,
     );
     assert.equal(calls.length, 0);
     assert.equal(decisionCalls, 0);
@@ -934,7 +934,7 @@ test("provider/model validation rejects google call when model is missing", asyn
     (googleModel as { model?: string; modelName?: string }).model = "";
     (googleModel as { model?: string; modelName?: string }).modelName = "";
     instrumentGoogle(googleModel, { client });
-    await assert.rejects(() => googleModel.generateContent("hello"), LLMTBGValidationError);
+    await assert.rejects(() => googleModel.generateContent("hello"), RHEONICValidationError);
     assert.equal(calls.length, 0);
     assert.equal(decisionCalls, 0);
     client.close();
@@ -944,9 +944,9 @@ test("provider/model validation rejects google call when model is missing", asyn
 });
 
 test("provider/model validation rejects missing provider", async () => {
-  assert.throws(() => validateProviderModel("", "any-model"), LLMTBGValidationError);
+  assert.throws(() => validateProviderModel("", "any-model"), RHEONICValidationError);
 });
 
 test("provider/model validation rejects unknown provider", async () => {
-  assert.throws(() => validateProviderModel("cohere", "command-r"), LLMTBGValidationError);
+  assert.throws(() => validateProviderModel("cohere", "command-r"), RHEONICValidationError);
 });

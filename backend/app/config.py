@@ -35,7 +35,7 @@ class AppConfig:
     webhook_timeout_pool_seconds: float = 5.0
     webhook_max_error_chars: int = 240
     webhook_secret_prefix: str = "enc:v1:"
-    webhook_secret_default_fallback_key: str = "llmtbg-webhook-secret-default"
+    webhook_secret_default_fallback_key: str = "rheonic-webhook-secret-default"
     scheduler_default_result_ttl_seconds: int = 3600
     scheduler_default_failure_ttl_seconds: int = 86400
     purge_interval_seconds: int = 24 * 60 * 60
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     # Runtime settings container for the backend service.
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = "LLMTokenBurnGuard API"
+    app_name: str = "Rheonic API"
     api_prefix: str = "/api"
     app_env: str = "dev"
     jwt_secret: str = ""

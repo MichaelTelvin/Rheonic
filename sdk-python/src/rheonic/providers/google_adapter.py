@@ -1,14 +1,14 @@
-# Anthropic instrumentation wrapper.
+# Google provider instrumentation wrapper.
 import inspect
 from time import perf_counter
 from typing import Any
 
-from llmtokenburnguard.client import Client, get_default_client
-from llmtokenburnguard.event_builder import build_event
-from llmtokenburnguard.logger import get_logger
-from llmtokenburnguard.provider_model_validation import validate_provider_model
-from llmtokenburnguard.protect_engine import LLMTBGBlockedError
-from llmtokenburnguard.token_estimator import estimate_input_tokens
+from rheonic.client import Client, get_default_client
+from rheonic.event_builder import build_event
+from rheonic.logger import get_logger
+from rheonic.provider_model_validation import validate_provider_model
+from rheonic.protect_engine import RHEONICBlockedError
+from rheonic.token_estimator import estimate_input_tokens
 
 logger = get_logger(__name__)
 
@@ -21,30 +21,29 @@ def _set_token_estimator_for_tests(estimator: Any | None) -> None:
     _token_estimator_override_for_tests = estimator
 
 
-def instrument_anthropic(
-    anthropic_client: Any,
+def instrument_google(
+    google_model: Any,
     client: Client | None = None,
     environment: str | None = None,
     endpoint: str | None = None,
     feature: str | None = None,
 ) -> Any:
-    # Instrument messages.create and emit usage events.
+    # Instrument generate_content and emit usage events.
     resolved_client = client or get_default_client()
     if resolved_client is None:
-        return anthropic_client
+        return google_model
 
-    messages = getattr(anthropic_client, "messages", None)
-    original_create = getattr(messages, "create", None)
-    if messages is None or not callable(original_create):
-        return anthropic_client
+    original_generate = getattr(google_model, "generate_content", None)
+    if not callable(original_generate):
+        return google_model
 
-    if inspect.iscoroutinefunction(original_create):
+    if inspect.iscoroutinefunction(original_generate):
 
-        async def wrapped_create(*args: Any, **kwargs: Any) -> Any:
+        async def wrapped_generate(*args: Any, **kwargs: Any) -> Any:
             started_at = perf_counter()
-            request_payload = _extract_request_payload(args, kwargs)
-            requested_model = _extract_requested_model(args, kwargs)
-            validate_provider_model("anthropic", requested_model)
+            requested_model = _extract_requested_model(google_model, args, kwargs)
+            validate_provider_model("google", requested_model)
+            request_payload = _extract_request_payload(requested_model, args, kwargs)
             estimated_input_tokens: int | None = None
             if resolved_client.should_preflight_decision():
                 estimated_input_tokens = _estimate_input_tokens(request_payload)
@@ -57,10 +56,10 @@ def instrument_anthropic(
                 feature=feature,
             )
             if protect_decision.get("decision") == "block":
-                raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
-            call_args, call_kwargs = _apply_anthropic_clamp(args, kwargs, protect_decision)
+                raise RHEONICBlockedError(str(protect_decision.get("reason") or "blocked"))
+            call_args, call_kwargs = _apply_google_clamp(args, kwargs, protect_decision)
             try:
-                response = await original_create(*call_args, **call_kwargs)
+                response = await original_generate(*call_args, **call_kwargs)
                 _capture_success(
                     sdk_client=resolved_client,
                     response=response,
@@ -89,14 +88,14 @@ def instrument_anthropic(
                 )
                 raise
 
-        messages.create = wrapped_create
-        return anthropic_client
+        google_model.generate_content = wrapped_generate
+        return google_model
 
-    def wrapped_create(*args: Any, **kwargs: Any) -> Any:
+    def wrapped_generate(*args: Any, **kwargs: Any) -> Any:
         started_at = perf_counter()
-        request_payload = _extract_request_payload(args, kwargs)
-        requested_model = _extract_requested_model(args, kwargs)
-        validate_provider_model("anthropic", requested_model)
+        requested_model = _extract_requested_model(google_model, args, kwargs)
+        validate_provider_model("google", requested_model)
+        request_payload = _extract_request_payload(requested_model, args, kwargs)
         estimated_input_tokens: int | None = None
         if resolved_client.should_preflight_decision():
             estimated_input_tokens = _estimate_input_tokens(request_payload)
@@ -109,10 +108,10 @@ def instrument_anthropic(
             feature=feature,
         )
         if protect_decision.get("decision") == "block":
-            raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
-        call_args, call_kwargs = _apply_anthropic_clamp(args, kwargs, protect_decision)
+            raise RHEONICBlockedError(str(protect_decision.get("reason") or "blocked"))
+        call_args, call_kwargs = _apply_google_clamp(args, kwargs, protect_decision)
         try:
-            response = original_create(*call_args, **call_kwargs)
+            response = original_generate(*call_args, **call_kwargs)
             _capture_success(
                 sdk_client=resolved_client,
                 response=response,
@@ -141,9 +140,8 @@ def instrument_anthropic(
             )
             raise
 
-    messages.create = wrapped_create
-    return anthropic_client
-
+    google_model.generate_content = wrapped_generate
+    return google_model
 
 def _preflight(
     *,
@@ -158,7 +156,7 @@ def _preflight(
         return {"decision": "allow", "reason": "protect_disabled"}
     return sdk_client.preflight_protect_decision(
         {
-            "provider": "anthropic",
+            "provider": "google",
             "model": requested_model,
             "environment": environment,
             "feature": feature,
@@ -181,18 +179,10 @@ def _capture_success(
     protect_reason: str,
 ) -> None:
     try:
-        response_model = getattr(response, "model", None)
-        usage = getattr(response, "usage", None)
-        total_tokens = getattr(usage, "total_tokens", None)
-        if not isinstance(total_tokens, int):
-            input_tokens = getattr(usage, "input_tokens", None)
-            output_tokens = getattr(usage, "output_tokens", None)
-            if isinstance(input_tokens, int) and isinstance(output_tokens, int):
-                total_tokens = input_tokens + output_tokens
         sdk_client.capture_event(
             build_event(
-                provider="anthropic",
-                model=response_model if isinstance(response_model, str) else requested_model,
+                provider="google",
+                model=requested_model,
                 environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,
@@ -203,13 +193,13 @@ def _capture_success(
                 },
                 response={
                     "latency_ms": latency_ms,
-                    "total_tokens": total_tokens if isinstance(total_tokens, int) else None,
+                    "total_tokens": _extract_total_tokens(response),
                     "http_status": 200,
                 },
             )
         )
     except Exception:
-        logger.exception("Failed to capture Anthropic success event")
+        logger.exception("Failed to capture Google success event")
 
 
 def _capture_failure(
@@ -227,7 +217,7 @@ def _capture_failure(
     try:
         sdk_client.capture_event(
             build_event(
-                provider="anthropic",
+                provider="google",
                 model=requested_model,
                 environment=environment or sdk_client.environment,
                 request={
@@ -245,36 +235,51 @@ def _capture_failure(
             )
         )
     except Exception:
-        logger.exception("Failed to capture Anthropic failure event")
+        logger.exception("Failed to capture Google failure event")
 
 
-def _extract_request_payload(args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
-    if args and isinstance(args[0], dict):
-        return dict(args[0])
-    return dict(kwargs)
-
-
-def _extract_requested_model(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
-    model = kwargs.get("model")
-    if isinstance(model, str):
-        return model
-    first = args[0] if args else None
-    if isinstance(first, dict):
-        first_model = first.get("model")
-        if isinstance(first_model, str):
-            return first_model
+def _extract_requested_model(google_model: Any, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
+    for key in ("model", "model_name"):
+        value = getattr(google_model, key, None)
+        if isinstance(value, str):
+            return value
+    for source in (kwargs, args[0] if args and isinstance(args[0], dict) else None):
+        if isinstance(source, dict):
+            model = source.get("model")
+            if isinstance(model, str):
+                return model
     return None
 
 
+def _extract_request_payload(model: str | None, args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
+    if args:
+        first = args[0]
+        if isinstance(first, str):
+            return {"model": model, "prompt": first}
+        if isinstance(first, dict):
+            payload = dict(first)
+            if model and "model" not in payload:
+                payload["model"] = model
+            return payload
+    payload = dict(kwargs)
+    if model and "model" not in payload:
+        payload["model"] = model
+    return payload
+
+
 def _extract_max_output_tokens(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
-    max_tokens = kwargs.get("max_tokens")
-    if isinstance(max_tokens, int):
-        return max_tokens
+    generation_config = kwargs.get("generation_config")
+    if isinstance(generation_config, dict):
+        max_out = generation_config.get("max_output_tokens")
+        if isinstance(max_out, int):
+            return max_out
     first = args[0] if args else None
     if isinstance(first, dict):
-        first_max_tokens = first.get("max_tokens")
-        if isinstance(first_max_tokens, int):
-            return first_max_tokens
+        config = first.get("generation_config")
+        if isinstance(config, dict):
+            max_out = config.get("max_output_tokens")
+            if isinstance(max_out, int):
+                return max_out
     return None
 
 
@@ -288,6 +293,24 @@ def _estimate_input_tokens(payload: dict[str, Any]) -> int | None:
         return estimate_input_tokens(payload)
     except Exception:
         return None
+
+
+def _extract_total_tokens(response: Any) -> int | None:
+    usage = getattr(response, "usage_metadata", None)
+    if usage is None:
+        nested_response = getattr(response, "response", None)
+        if nested_response is not None:
+            usage = getattr(nested_response, "usage_metadata", None)
+    if usage is None:
+        return None
+    total = getattr(usage, "total_token_count", None)
+    if isinstance(total, int):
+        return total
+    prompt = getattr(usage, "prompt_token_count", None)
+    candidates = getattr(usage, "candidates_token_count", None)
+    if isinstance(prompt, int) and isinstance(candidates, int):
+        return prompt + candidates
+    return None
 
 
 def _extract_http_status(exc: Exception) -> int | None:
@@ -305,7 +328,7 @@ def _extract_http_status(exc: Exception) -> int | None:
     return None
 
 
-def _apply_anthropic_clamp(
+def _apply_google_clamp(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
     protect_decision: dict[str, object],
@@ -323,17 +346,30 @@ def _apply_anthropic_clamp(
     if not isinstance(recommended, int) or recommended < 1:
         return args, kwargs
 
-    next_kwargs = dict(kwargs)
     next_args = list(args)
-    if "max_tokens" in next_kwargs and isinstance(next_kwargs.get("max_tokens"), int):
-        next_kwargs["max_tokens"] = min(int(next_kwargs["max_tokens"]), recommended)
-    elif next_args and isinstance(next_args[0], dict):
-        payload = dict(next_args[0])
-        if isinstance(payload.get("max_tokens"), int):
-            payload["max_tokens"] = min(int(payload["max_tokens"]), recommended)
+    next_kwargs = dict(kwargs)
+
+    if isinstance(next_kwargs.get("generation_config"), dict):
+        generation_config = dict(next_kwargs["generation_config"])
+        if isinstance(generation_config.get("max_output_tokens"), int):
+            generation_config["max_output_tokens"] = min(int(generation_config["max_output_tokens"]), recommended)
         else:
-            payload["max_tokens"] = recommended
+            generation_config["max_output_tokens"] = recommended
+        next_kwargs["generation_config"] = generation_config
+        return tuple(next_args), next_kwargs
+
+    if next_args and isinstance(next_args[0], dict):
+        payload = dict(next_args[0])
+        generation_config = dict(payload.get("generation_config")) if isinstance(payload.get("generation_config"), dict) else {}
+        if isinstance(generation_config.get("max_output_tokens"), int):
+            generation_config["max_output_tokens"] = min(int(generation_config["max_output_tokens"]), recommended)
+        else:
+            generation_config["max_output_tokens"] = recommended
+        payload["generation_config"] = generation_config
         next_args[0] = payload
-    else:
-        next_kwargs["max_tokens"] = recommended
+        return tuple(next_args), next_kwargs
+
+    generation_config = dict(next_kwargs.get("generation_config")) if isinstance(next_kwargs.get("generation_config"), dict) else {}
+    generation_config["max_output_tokens"] = recommended
+    next_kwargs["generation_config"] = generation_config
     return tuple(next_args), next_kwargs

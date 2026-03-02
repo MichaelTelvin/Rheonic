@@ -33,12 +33,12 @@ export interface ProtectEvaluation {
   };
 }
 
-export class LLMTBGBlockedError extends Error {
+export class RHEONICBlockedError extends Error {
   public readonly reason: string;
 
   public constructor(reason: string) {
-    super(`Request blocked by LLMTokenBurnGuard: ${reason}`);
-    this.name = "LLMTBGBlockedError";
+    super(`Request blocked by Rheonic: ${reason}`);
+    this.name = "RHEONICBlockedError";
     this.reason = reason;
   }
 }

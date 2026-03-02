@@ -1,8 +1,8 @@
-# LLMTokenBurnGuard
+# Rheonic
 
 Runtime safety layer for LLM applications.
 
-LLMTokenBurnGuard detects runaway usage patterns (retry storms, loops, spend spikes) 
+Rheonic detects runaway usage patterns (retry storms, loops, spend spikes) 
 and optionally applies guardrail policies (model downgrade, token caps, rate limiting, cooldown, cache)
 across OpenAI, Anthropic, and Google models.
 

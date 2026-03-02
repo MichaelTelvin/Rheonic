@@ -98,7 +98,7 @@ export function Protect(): JSX.Element {
       setProtectEnabledInput(Boolean(updated.protect_enabled));
       setApplyClampInput(Boolean(updated.apply_clamp));
       window.dispatchEvent(
-        new CustomEvent("llmtbg:protect-mode-updated", {
+        new CustomEvent("rheonic:protect-mode-updated", {
           detail: { projectId, protect_enabled: Boolean(updated.protect_enabled) },
         }),
       );

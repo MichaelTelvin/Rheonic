@@ -27,12 +27,12 @@ def test_scheduler_bootstrap_is_idempotent() -> None:
     scheduler = _FakeScheduler()
     jobs = [
         RecurringJob(
-            job_id="llmtbg_auto_close_incidents",
+            job_id="rheonic_auto_close_incidents",
             func_path="app.infrastructure.jobs.auto_close_incidents_job.auto_close_incidents",
             interval_seconds=60,
         ),
         RecurringJob(
-            job_id="llmtbg_purge_old_events",
+            job_id="rheonic_purge_old_events",
             func_path="app.infrastructure.jobs.purge_events_job.purge_old_events",
             interval_seconds=86400,
         ),

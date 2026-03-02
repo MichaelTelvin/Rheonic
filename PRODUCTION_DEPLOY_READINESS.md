@@ -4,7 +4,7 @@
 
 ### Runtime services
 - Backend API: `uvicorn app.main:app` (`docker-compose.yml`, `backend/app/main.py`)
-- Background worker: `rq worker --url "$REDIS_URL" llmtbg` (`docker-compose.yml`)
+- Background worker: `rq worker --url "$REDIS_URL" rheonic` (`docker-compose.yml`)
 - Scheduler: `python -m app.workers.scheduler_bootstrap && python -m app.workers.scheduler` (`docker-compose.yml`, `backend/app/workers/scheduler*.py`)
 - Postgres: `postgres:16-alpine`
 - Redis: `redis:7-alpine`
@@ -45,7 +45,7 @@
 - `LOG_LEVEL`
 
 ### Dev/test/demo only
-- `LLMTBG_*` demo/e2e variables (sdk demos/e2e scripts)
+- `RHEONIC_*` demo/e2e variables (sdk demos/e2e scripts)
 
 ## DB Migration/Schema status
 

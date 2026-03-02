@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-function loadLlmtbgEnvFromDotenv(): void {
+function loadRheonicEnvFromDotenv(): void {
   const currentFile = fileURLToPath(import.meta.url);
   const dotenvPath = resolve(dirname(currentFile), "../../.env");
   let content = "";
@@ -17,7 +17,7 @@ function loadLlmtbgEnvFromDotenv(): void {
     if (!line || line.startsWith("#") || !line.includes("=")) continue;
     const index = line.indexOf("=");
     const key = line.slice(0, index).trim();
-    if (!key.startsWith("LLMTBG_")) continue;
+    if (!key.startsWith("RHEONIC_")) continue;
     const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
     process.env[key] = value;
   }
@@ -110,43 +110,43 @@ async function sendEvent(
 
 function printUsageExamples(): void {
   console.log("Example:");
-  console.log("  LLMTBG_PROVIDER=openai");
-  console.log("  LLMTBG_MODEL=gpt-4o-mini");
-  console.log("  LLMTBG_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all");
-  console.log("  LLMTBG_STEP_SLEEP_MS=200");
-  console.log("  LLMTBG_RETRY_STORM_COUNT=6");
-  console.log("  LLMTBG_LOOP_COUNT=7");
-  console.log("  LLMTBG_TOKEN_EXPLOSION_TOKENS=9000");
-  console.log("  LLMTBG_CAP_BREACH_TOKENS=4000");
-  console.log("  LLMTBG_CAP_BREACH_REQ_COUNT=6");
-  console.log("  LLMTBG_CAP_BREACH_REQ_TOKENS=1");
-  console.log("  LLMTBG_NEAR_CAP_TOKENS=3200");
+  console.log("  RHEONIC_PROVIDER=openai");
+  console.log("  RHEONIC_MODEL=gpt-4o-mini");
+  console.log("  RHEONIC_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all");
+  console.log("  RHEONIC_STEP_SLEEP_MS=200");
+  console.log("  RHEONIC_RETRY_STORM_COUNT=6");
+  console.log("  RHEONIC_LOOP_COUNT=7");
+  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=9000");
+  console.log("  RHEONIC_CAP_BREACH_TOKENS=4000");
+  console.log("  RHEONIC_CAP_BREACH_REQ_COUNT=6");
+  console.log("  RHEONIC_CAP_BREACH_REQ_TOKENS=1");
+  console.log("  RHEONIC_NEAR_CAP_TOKENS=3200");
   console.log("  Optional snapshot/incident summary:");
-  console.log("  LLMTBG_AUTH_TOKEN=<jwt> LLMTBG_PROJECT_ID=<project_id>");
+  console.log("  RHEONIC_AUTH_TOKEN=<jwt> RHEONIC_PROJECT_ID=<project_id>");
 }
 
 async function runDemo(): Promise<void> {
-  loadLlmtbgEnvFromDotenv();
+  loadRheonicEnvFromDotenv();
 
-  const ingestKey = process.env.LLMTBG_INGEST_KEY;
+  const ingestKey = process.env.RHEONIC_INGEST_KEY;
   if (!ingestKey) {
-    console.error("LLMTBG_INGEST_KEY is required. Create a key in dashboard Keys page.");
+    console.error("RHEONIC_INGEST_KEY is required. Create a key in dashboard Keys page.");
     printUsageExamples();
     process.exitCode = 1;
     return;
   }
 
-  const provider = (process.env.LLMTBG_PROVIDER ?? "").trim().toLowerCase();
+  const provider = (process.env.RHEONIC_PROVIDER ?? "").trim().toLowerCase();
   if (!provider || !["openai", "anthropic", "google"].includes(provider)) {
-    console.error("LLMTBG_PROVIDER is required (openai | anthropic | google).");
+    console.error("RHEONIC_PROVIDER is required (openai | anthropic | google).");
     printUsageExamples();
     process.exitCode = 1;
     return;
   }
 
-  const model = (process.env.LLMTBG_MODEL ?? "").trim();
+  const model = (process.env.RHEONIC_MODEL ?? "").trim();
   if (!model) {
-    console.error(`LLMTBG_MODEL is required for provider ${provider}.`);
+    console.error(`RHEONIC_MODEL is required for provider ${provider}.`);
     printUsageExamples();
     process.exitCode = 1;
     return;
@@ -158,25 +158,25 @@ async function runDemo(): Promise<void> {
     google: "/v1beta/models/generateContent",
   };
   const endpoint = endpointByProvider[provider] ?? "/chat/completions";
-  const demoCase = (process.env.LLMTBG_DEMO_CASE ?? "steady").toLowerCase();
-  const stepSleepMs = Number(process.env.LLMTBG_STEP_SLEEP_MS ?? 200);
-  const retryStormCount = Number(process.env.LLMTBG_RETRY_STORM_COUNT ?? 6);
-  const loopCount = Number(process.env.LLMTBG_LOOP_COUNT ?? 7);
-  const tokenExplosionTokens = Number(process.env.LLMTBG_TOKEN_EXPLOSION_TOKENS ?? 9000);
-  const capBreachTokens = Number(process.env.LLMTBG_CAP_BREACH_TOKENS ?? 4000);
-  const capBreachReqCount = Number(process.env.LLMTBG_CAP_BREACH_REQ_COUNT ?? 6);
-  const capBreachReqTokens = Number(process.env.LLMTBG_CAP_BREACH_REQ_TOKENS ?? 1);
-  const nearCapTokens = Number(process.env.LLMTBG_NEAR_CAP_TOKENS ?? 3200);
+  const demoCase = (process.env.RHEONIC_DEMO_CASE ?? "steady").toLowerCase();
+  const stepSleepMs = Number(process.env.RHEONIC_STEP_SLEEP_MS ?? 200);
+  const retryStormCount = Number(process.env.RHEONIC_RETRY_STORM_COUNT ?? 6);
+  const loopCount = Number(process.env.RHEONIC_LOOP_COUNT ?? 7);
+  const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 9000);
+  const capBreachTokens = Number(process.env.RHEONIC_CAP_BREACH_TOKENS ?? 4000);
+  const capBreachReqCount = Number(process.env.RHEONIC_CAP_BREACH_REQ_COUNT ?? 6);
+  const capBreachReqTokens = Number(process.env.RHEONIC_CAP_BREACH_REQ_TOKENS ?? 1);
+  const nearCapTokens = Number(process.env.RHEONIC_NEAR_CAP_TOKENS ?? 3200);
 
-  const authToken = process.env.LLMTBG_AUTH_TOKEN ?? "";
-  const projectId = process.env.LLMTBG_PROJECT_ID ?? "";
-  const environment = (process.env.LLMTBG_ENVIRONMENT ?? "").trim() || `demo-${Date.now()}`;
+  const authToken = process.env.RHEONIC_AUTH_TOKEN ?? "";
+  const projectId = process.env.RHEONIC_PROJECT_ID ?? "";
+  const environment = (process.env.RHEONIC_ENVIRONMENT ?? "").trim() || `demo-${Date.now()}`;
 
   const client: Client = createClient({
     ingestKey,
     protectEnabled: false,
     environment,
-    debug: process.env.LLMTBG_DEBUG === "1" || process.env.LLMTBG_DEBUG === "true",
+    debug: process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true",
   });
 
   console.log(`[DEMO] provider=${provider} model=${model} case=${demoCase}`);
@@ -278,7 +278,7 @@ async function runDemo(): Promise<void> {
   } else if (demoCase === "req_cap_breach") {
     await runReqCapBreach();
   } else {
-    console.error(`Unsupported LLMTBG_DEMO_CASE: ${demoCase}`);
+    console.error(`Unsupported RHEONIC_DEMO_CASE: ${demoCase}`);
     printUsageExamples();
     process.exitCode = 1;
   }

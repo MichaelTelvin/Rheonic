@@ -14,9 +14,9 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     httpx = None  # type: ignore[assignment]
 
-from llmtokenburnguard.logger import configure_logging, get_logger
-from llmtokenburnguard.config import sdk_config
-from llmtokenburnguard.protect_engine import ProtectEngine
+from rheonic.logger import configure_logging, get_logger
+from rheonic.config import sdk_config
+from rheonic.protect_engine import ProtectEngine
 
 logger = get_logger(__name__)
 
@@ -96,12 +96,12 @@ class Client:
     ) -> None:
         # Initialize client queue, worker thread, and HTTP transport.
         try:
-            env_debug = os.getenv("LLMTBG_DEBUG", "").lower() in {"1", "true", "yes"}
+            env_debug = os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"}
             self._debug_enabled = debug or env_debug
             configure_logging(level="DEBUG" if self._debug_enabled else None)
 
             self.ingest_key = ingest_key
-            resolved_base_url = base_url or os.getenv("LLMTBG_BASE_URL", sdk_config.default_base_url)
+            resolved_base_url = base_url or os.getenv("RHEONIC_BASE_URL", sdk_config.default_base_url)
             self.base_url = resolved_base_url.rstrip("/")
             self.environment = environment
             self.protect_enabled = bool(protect_enabled)
@@ -227,7 +227,7 @@ class Client:
         feature: str | None = None,
     ) -> Any:
         # Convenience wrapper that instruments an OpenAI client with this SDK client.
-        from llmtokenburnguard.providers.openai_adapter import instrument_openai
+        from rheonic.providers.openai_adapter import instrument_openai
 
         return instrument_openai(
             openai_client,
@@ -245,7 +245,7 @@ class Client:
         feature: str | None = None,
     ) -> Any:
         # Convenience wrapper that instruments an Anthropic client with this SDK client.
-        from llmtokenburnguard.providers.anthropic_adapter import instrument_anthropic
+        from rheonic.providers.anthropic_adapter import instrument_anthropic
 
         return instrument_anthropic(
             anthropic_client,
@@ -263,7 +263,7 @@ class Client:
         feature: str | None = None,
     ) -> Any:
         # Convenience wrapper that instruments a Google client with this SDK client.
-        from llmtokenburnguard.providers.google_adapter import instrument_google
+        from rheonic.providers.google_adapter import instrument_google
 
         return instrument_google(
             google_client,
@@ -322,7 +322,7 @@ class Client:
             return False, True
 
 
-LLMTokenBurnGuardClient = Client
+RheonicClient = Client
 
 
 def create_client(

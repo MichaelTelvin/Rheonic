@@ -1,9 +1,9 @@
 export const frontendConfig = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000",
   dashboardSelectedProjectStorageKey: "selected_project_id",
-  authTokenStorageKey: "llmtbg_token",
-  authRefreshTokenStorageKey: "llmtbg_refresh_token",
-  authUserStorageKey: "llmtbg_user",
+  authTokenStorageKey: "rheonic_token",
+  authRefreshTokenStorageKey: "rheonic_refresh_token",
+  authUserStorageKey: "rheonic_user",
   dashboardMaxSeriesPoints: 60,
   dashboardClockTickMs: 1000,
   dashboardProtectStatsPollMs: 2000,

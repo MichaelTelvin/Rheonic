@@ -1,5 +1,5 @@
 # SDK rate limiter scaffolding.
-from llmtokenburnguard.logger import get_logger
+from rheonic.logger import get_logger
 
 logger = get_logger(__name__)
 

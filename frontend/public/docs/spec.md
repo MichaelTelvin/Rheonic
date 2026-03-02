@@ -1,4 +1,4 @@
-# LLMTokenBurnGuard API Spec (Current)
+# Rheonic API Spec (Current)
 
 All routes are under `/api/v1/...`.
 

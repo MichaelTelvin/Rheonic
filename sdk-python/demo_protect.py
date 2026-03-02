@@ -9,14 +9,14 @@ from typing import Any
 
 import httpx
 
-from llmtokenburnguard.client import Client
-from llmtokenburnguard.protect_engine import LLMTBGBlockedError
-from llmtokenburnguard.providers.anthropic_adapter import instrument_anthropic
-from llmtokenburnguard.providers.google_adapter import instrument_google
-from llmtokenburnguard.providers.openai_adapter import instrument_openai
+from rheonic.client import Client
+from rheonic.protect_engine import RHEONICBlockedError
+from rheonic.providers.anthropic_adapter import instrument_anthropic
+from rheonic.providers.google_adapter import instrument_google
+from rheonic.providers.openai_adapter import instrument_openai
 
 
-def _load_llmtbg_env_from_dotenv() -> None:
+def _load_rheonic_env_from_dotenv() -> None:
     dotenv_path = Path(__file__).resolve().parents[1] / ".env"
     if not dotenv_path.exists():
         return
@@ -26,15 +26,15 @@ def _load_llmtbg_env_from_dotenv() -> None:
             continue
         key, value = line.split("=", 1)
         key = key.strip()
-        if not key.startswith("LLMTBG_"):
+        if not key.startswith("RHEONIC_"):
             continue
         os.environ[key] = value.strip().strip('"').strip("'")
 
 
-_load_llmtbg_env_from_dotenv()
+_load_rheonic_env_from_dotenv()
 
-BACKEND_BASE_URL = os.getenv("LLMTBG_BACKEND_URL", "http://localhost:8000")
-PROVIDER_STUB_URL = os.getenv("LLMTBG_PROVIDER_URL", "http://localhost:8099")
+BACKEND_BASE_URL = os.getenv("RHEONIC_BACKEND_URL", "http://localhost:8000")
+PROVIDER_STUB_URL = os.getenv("RHEONIC_PROVIDER_URL", "http://localhost:8099")
 _LAST_PROVIDER_CALL: dict[str, Any] | None = None
 
 
@@ -196,7 +196,7 @@ def _send_ingest_event(
 
 def _list_open_incidents(project_id: str, provider: str, auth_token: str) -> list[dict[str, Any]]:
     if not auth_token or not project_id:
-        print("[INCIDENTS] skipped (missing LLMTBG_AUTH_TOKEN or LLMTBG_PROJECT_ID)")
+        print("[INCIDENTS] skipped (missing RHEONIC_AUTH_TOKEN or RHEONIC_PROJECT_ID)")
         return []
     params = {"project_id": project_id, "status": "open", "provider": provider}
     try:
@@ -212,7 +212,7 @@ def _list_open_incidents(project_id: str, provider: str, auth_token: str) -> lis
     except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code if exc.response is not None else None
         if status_code in {401, 403}:
-            print(f"[INCIDENTS] skipped ({status_code} auth error; update LLMTBG_AUTH_TOKEN)")
+            print(f"[INCIDENTS] skipped ({status_code} auth error; update RHEONIC_AUTH_TOKEN)")
             return []
         raise
 
@@ -255,33 +255,33 @@ def _run_provider_call(provider: str, model: str, max_tokens: int, openai: Any, 
                 messages=[{"role": "user", "content": "protect demo request"}],
                 max_tokens=max_tokens,
             )
-    except LLMTBGBlockedError:
+    except RHEONICBlockedError:
         blocked = True
     return blocked
 
 
 def main() -> None:
-    ingest_key = os.getenv("LLMTBG_INGEST_KEY")
+    ingest_key = os.getenv("RHEONIC_INGEST_KEY")
     if not ingest_key:
-        print("LLMTBG_INGEST_KEY is required")
+        print("RHEONIC_INGEST_KEY is required")
         sys.exit(1)
 
-    provider = (os.getenv("LLMTBG_PROVIDER", "") or "").strip().lower()
+    provider = (os.getenv("RHEONIC_PROVIDER", "") or "").strip().lower()
     if provider not in {"openai", "anthropic", "google"}:
-        print("LLMTBG_PROVIDER is required (openai | anthropic | google)")
+        print("RHEONIC_PROVIDER is required (openai | anthropic | google)")
         sys.exit(1)
 
-    model = (os.getenv("LLMTBG_MODEL", "") or "").strip()
+    model = (os.getenv("RHEONIC_MODEL", "") or "").strip()
     if not model:
-        print(f"LLMTBG_MODEL is required for provider {provider}")
+        print(f"RHEONIC_MODEL is required for provider {provider}")
         sys.exit(1)
 
-    scenario = (os.getenv("LLMTBG_SCENARIO") or "allow").strip().lower()
-    env = (os.getenv("LLMTBG_ENVIRONMENT") or "").strip() or f"protect-{int(time.time())}"
-    pause_ms = int(os.getenv("LLMTBG_STEP_SLEEP_MS", "200"))
-    decision_timeout_ms = int(os.getenv("LLMTBG_PROTECT_DECISION_TIMEOUT_MS", "100"))
-    project_id = os.getenv("LLMTBG_PROJECT_ID", "")
-    auth_token = os.getenv("LLMTBG_AUTH_TOKEN", "")
+    scenario = (os.getenv("RHEONIC_SCENARIO") or "allow").strip().lower()
+    env = (os.getenv("RHEONIC_ENVIRONMENT") or "").strip() or f"protect-{int(time.time())}"
+    pause_ms = int(os.getenv("RHEONIC_STEP_SLEEP_MS", "200"))
+    decision_timeout_ms = int(os.getenv("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", "100"))
+    project_id = os.getenv("RHEONIC_PROJECT_ID", "")
+    auth_token = os.getenv("RHEONIC_AUTH_TOKEN", "")
 
     transport = LoggingHttpClient(timeout_s=5.0)
     client = Client(
@@ -312,24 +312,24 @@ def main() -> None:
     print(f"[DEMO] protect_decision_timeout_ms={decision_timeout_ms}")
     print(f"[DEMO] decision_feature={decision_feature}")
 
-    max_tokens = int(os.getenv("LLMTBG_MAX_TOKENS", "128"))
+    max_tokens = int(os.getenv("RHEONIC_MAX_TOKENS", "128"))
     call_max_tokens = max_tokens
     print(f"[DEMO] max_tokens(before call)={max_tokens}")
 
     if scenario == "near_cap":
         print("\n[STEP] Seed near-cap traffic then expect warn")
-        seed_tokens = int(os.getenv("LLMTBG_NEAR_CAP_SEED_TOKENS", "1600"))
+        seed_tokens = int(os.getenv("RHEONIC_NEAR_CAP_SEED_TOKENS", "1600"))
         _send_ingest_event(ingest_key, provider, model, total_tokens=seed_tokens, feature="near-cap-seed", environment=env)
         time.sleep(pause_ms / 1000)
     elif scenario == "cap_breach":
         print("\n[STEP] Seed cap breach then expect block")
-        breach_tokens = int(os.getenv("LLMTBG_CAP_BREACH_TOKENS", "5000"))
+        breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
         _send_ingest_event(ingest_key, provider, model, total_tokens=breach_tokens, feature="cap-breach-seed", environment=env)
         time.sleep(pause_ms / 1000)
     elif scenario == "req_cap_breach":
         print("\n[STEP] Seed req cap breach then expect block")
-        count = int(os.getenv("LLMTBG_REQ_CAP_BREACH_COUNT", "6"))
-        req_tokens = int(os.getenv("LLMTBG_CAP_BREACH_REQ_TOKENS", "1"))
+        count = int(os.getenv("RHEONIC_REQ_CAP_BREACH_COUNT", "6"))
+        req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
         for i in range(count):
             _send_ingest_event(
                 ingest_key,
@@ -342,7 +342,7 @@ def main() -> None:
             time.sleep(pause_ms / 1000)
     elif scenario == "retry_storm":
         print("\n[STEP] Seed retry storm then expect warn")
-        count = int(os.getenv("LLMTBG_RETRY_STORM_COUNT", "6"))
+        count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "6"))
         for i in range(count):
             _send_ingest_event(
                 ingest_key,
@@ -358,20 +358,20 @@ def main() -> None:
             time.sleep(pause_ms / 1000)
     elif scenario == "loop_suspect":
         print("\n[STEP] Seed loop suspect then expect warn")
-        count = int(os.getenv("LLMTBG_LOOP_COUNT", "7"))
+        count = int(os.getenv("RHEONIC_LOOP_COUNT", "7"))
         for _ in range(count):
             _send_ingest_event(ingest_key, provider, model, total_tokens=60, feature="loop-fixed-signature", environment=env)
             time.sleep(pause_ms / 1000)
     elif scenario == "token_explosion":
         print("\n[STEP] Seed token explosion then expect warn")
-        huge = int(os.getenv("LLMTBG_TOKEN_EXPLOSION_TOKENS", "9000"))
+        huge = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "9000"))
         _send_ingest_event(ingest_key, provider, model, total_tokens=huge, feature="token-explosion-seed", environment=env)
         call_max_tokens = max(max_tokens, huge)
         print(f"[STEP] token_explosion call max_tokens={call_max_tokens}")
         time.sleep(pause_ms / 1000)
     elif scenario == "cooldown":
         print("\n[STEP] Seed cap breach then verify cooldown blocks repeated call")
-        breach_tokens = int(os.getenv("LLMTBG_CAP_BREACH_TOKENS", "5000"))
+        breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
         _send_ingest_event(ingest_key, provider, model, total_tokens=breach_tokens, feature="cooldown-breach-seed", environment=env)
         time.sleep(pause_ms / 1000)
 
@@ -399,7 +399,7 @@ def main() -> None:
     if project_id and auth_token:
         _print_incidents(project_id, provider, auth_token)
     else:
-        print("[INCIDENTS] skipped (set LLMTBG_PROJECT_ID and LLMTBG_AUTH_TOKEN)")
+        print("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID and RHEONIC_AUTH_TOKEN)")
 
     if scenario == "allow":
         _assert_line("allow passed", not blocked and provider_calls_delta >= 1 and decision_value == "allow")

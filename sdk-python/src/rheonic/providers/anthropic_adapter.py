@@ -1,14 +1,14 @@
-# OpenAI instrumentation wrapper.
+# Anthropic instrumentation wrapper.
 import inspect
 from time import perf_counter
 from typing import Any
 
-from llmtokenburnguard.client import Client, get_default_client
-from llmtokenburnguard.event_builder import build_event
-from llmtokenburnguard.logger import get_logger
-from llmtokenburnguard.provider_model_validation import validate_provider_model
-from llmtokenburnguard.protect_engine import LLMTBGBlockedError
-from llmtokenburnguard.token_estimator import estimate_input_tokens
+from rheonic.client import Client, get_default_client
+from rheonic.event_builder import build_event
+from rheonic.logger import get_logger
+from rheonic.provider_model_validation import validate_provider_model
+from rheonic.protect_engine import RHEONICBlockedError
+from rheonic.token_estimator import estimate_input_tokens
 
 logger = get_logger(__name__)
 
@@ -21,52 +21,44 @@ def _set_token_estimator_for_tests(estimator: Any | None) -> None:
     _token_estimator_override_for_tests = estimator
 
 
-def instrument_openai(
-    openai_client: Any,
+def instrument_anthropic(
+    anthropic_client: Any,
     client: Client | None = None,
     environment: str | None = None,
     endpoint: str | None = None,
     feature: str | None = None,
 ) -> Any:
-    # Instrument chat.completions.create and emit usage events.
+    # Instrument messages.create and emit usage events.
     resolved_client = client or get_default_client()
     if resolved_client is None:
-        return openai_client
+        return anthropic_client
 
-    chat = getattr(openai_client, "chat", None)
-    completions = getattr(chat, "completions", None)
-    original_create = getattr(completions, "create", None)
-    if completions is None or not callable(original_create):
-        return openai_client
+    messages = getattr(anthropic_client, "messages", None)
+    original_create = getattr(messages, "create", None)
+    if messages is None or not callable(original_create):
+        return anthropic_client
 
     if inspect.iscoroutinefunction(original_create):
 
         async def wrapped_create(*args: Any, **kwargs: Any) -> Any:
-            # Async wrapper for AsyncOpenAI style clients.
             started_at = perf_counter()
+            request_payload = _extract_request_payload(args, kwargs)
             requested_model = _extract_requested_model(args, kwargs)
-            validate_provider_model("openai", requested_model)
-            protect_decision: dict[str, object] = {"decision": "allow", "reason": "protect_disabled"}
+            validate_provider_model("anthropic", requested_model)
+            estimated_input_tokens: int | None = None
             if resolved_client.should_preflight_decision():
-                request_payload = _extract_request_payload(args, kwargs)
                 estimated_input_tokens = _estimate_input_tokens(request_payload)
-                protect_decision = resolved_client.preflight_protect_decision(
-                    {
-                        "provider": "openai",
-                        "model": requested_model,
-                        "environment": environment or resolved_client.environment,
-                        "feature": feature,
-                        **(
-                            {"input_tokens_estimate": estimated_input_tokens}
-                            if isinstance(estimated_input_tokens, int)
-                            else {}
-                        ),
-                        "max_output_tokens": _extract_max_output_tokens(args, kwargs),
-                    }
-                )
+            protect_decision = _preflight(
+                sdk_client=resolved_client,
+                requested_model=requested_model,
+                estimated_input_tokens=estimated_input_tokens,
+                max_output_tokens=_extract_max_output_tokens(args, kwargs),
+                environment=environment or resolved_client.environment,
+                feature=feature,
+            )
             if protect_decision.get("decision") == "block":
-                raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
-            call_args, call_kwargs = _apply_openai_clamp(args, kwargs, protect_decision)
+                raise RHEONICBlockedError(str(protect_decision.get("reason") or "blocked"))
+            call_args, call_kwargs = _apply_anthropic_clamp(args, kwargs, protect_decision)
             try:
                 response = await original_create(*call_args, **call_kwargs)
                 _capture_success(
@@ -74,6 +66,7 @@ def instrument_openai(
                     response=response,
                     latency_ms=int((perf_counter() - started_at) * 1000),
                     requested_model=requested_model,
+                    estimated_input_tokens=estimated_input_tokens,
                     environment=environment,
                     endpoint=endpoint,
                     feature=feature,
@@ -87,6 +80,7 @@ def instrument_openai(
                     exc=exc,
                     latency_ms=int((perf_counter() - started_at) * 1000),
                     requested_model=requested_model,
+                    estimated_input_tokens=estimated_input_tokens,
                     environment=environment,
                     endpoint=endpoint,
                     feature=feature,
@@ -95,35 +89,28 @@ def instrument_openai(
                 )
                 raise
 
-        completions.create = wrapped_create
-        return openai_client
+        messages.create = wrapped_create
+        return anthropic_client
 
     def wrapped_create(*args: Any, **kwargs: Any) -> Any:
-        # Sync wrapper for OpenAI client.
         started_at = perf_counter()
+        request_payload = _extract_request_payload(args, kwargs)
         requested_model = _extract_requested_model(args, kwargs)
-        validate_provider_model("openai", requested_model)
-        protect_decision: dict[str, object] = {"decision": "allow", "reason": "protect_disabled"}
+        validate_provider_model("anthropic", requested_model)
+        estimated_input_tokens: int | None = None
         if resolved_client.should_preflight_decision():
-            request_payload = _extract_request_payload(args, kwargs)
             estimated_input_tokens = _estimate_input_tokens(request_payload)
-            protect_decision = resolved_client.preflight_protect_decision(
-                {
-                    "provider": "openai",
-                    "model": requested_model,
-                    "environment": environment or resolved_client.environment,
-                    "feature": feature,
-                    **(
-                        {"input_tokens_estimate": estimated_input_tokens}
-                        if isinstance(estimated_input_tokens, int)
-                        else {}
-                    ),
-                    "max_output_tokens": _extract_max_output_tokens(args, kwargs),
-                }
-            )
+        protect_decision = _preflight(
+            sdk_client=resolved_client,
+            requested_model=requested_model,
+            estimated_input_tokens=estimated_input_tokens,
+            max_output_tokens=_extract_max_output_tokens(args, kwargs),
+            environment=environment or resolved_client.environment,
+            feature=feature,
+        )
         if protect_decision.get("decision") == "block":
-            raise LLMTBGBlockedError(str(protect_decision.get("reason") or "blocked"))
-        call_args, call_kwargs = _apply_openai_clamp(args, kwargs, protect_decision)
+            raise RHEONICBlockedError(str(protect_decision.get("reason") or "blocked"))
+        call_args, call_kwargs = _apply_anthropic_clamp(args, kwargs, protect_decision)
         try:
             response = original_create(*call_args, **call_kwargs)
             _capture_success(
@@ -131,6 +118,7 @@ def instrument_openai(
                 response=response,
                 latency_ms=int((perf_counter() - started_at) * 1000),
                 requested_model=requested_model,
+                estimated_input_tokens=estimated_input_tokens,
                 environment=environment,
                 endpoint=endpoint,
                 feature=feature,
@@ -144,6 +132,7 @@ def instrument_openai(
                 exc=exc,
                 latency_ms=int((perf_counter() - started_at) * 1000),
                 requested_model=requested_model,
+                estimated_input_tokens=estimated_input_tokens,
                 environment=environment,
                 endpoint=endpoint,
                 feature=feature,
@@ -152,8 +141,31 @@ def instrument_openai(
             )
             raise
 
-    completions.create = wrapped_create
-    return openai_client
+    messages.create = wrapped_create
+    return anthropic_client
+
+
+def _preflight(
+    *,
+    sdk_client: Client,
+    requested_model: str | None,
+    estimated_input_tokens: int | None,
+    max_output_tokens: int | None,
+    environment: str | None,
+    feature: str | None,
+) -> dict[str, object]:
+    if not sdk_client.should_preflight_decision():
+        return {"decision": "allow", "reason": "protect_disabled"}
+    return sdk_client.preflight_protect_decision(
+        {
+            "provider": "anthropic",
+            "model": requested_model,
+            "environment": environment,
+            "feature": feature,
+            **({"input_tokens_estimate": estimated_input_tokens} if isinstance(estimated_input_tokens, int) else {}),
+            "max_output_tokens": max_output_tokens,
+        }
+    )
 
 
 def _capture_success(
@@ -161,25 +173,31 @@ def _capture_success(
     response: Any,
     latency_ms: int,
     requested_model: str | None,
+    estimated_input_tokens: int | None,
     environment: str | None,
     endpoint: str | None,
     feature: str | None,
     protect_decision: str,
     protect_reason: str,
 ) -> None:
-    # Emit success event with usage and latency.
     try:
         response_model = getattr(response, "model", None)
         usage = getattr(response, "usage", None)
         total_tokens = getattr(usage, "total_tokens", None)
+        if not isinstance(total_tokens, int):
+            input_tokens = getattr(usage, "input_tokens", None)
+            output_tokens = getattr(usage, "output_tokens", None)
+            if isinstance(input_tokens, int) and isinstance(output_tokens, int):
+                total_tokens = input_tokens + output_tokens
         sdk_client.capture_event(
             build_event(
-                provider="openai",
+                provider="anthropic",
                 model=response_model if isinstance(response_model, str) else requested_model,
                 environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
+                    "input_tokens_estimate": estimated_input_tokens if isinstance(estimated_input_tokens, int) else None,
                     "protect_decision": "warn" if protect_decision == "warn" else None,
                     "protect_reason": protect_reason if protect_decision == "warn" else None,
                 },
@@ -191,7 +209,7 @@ def _capture_success(
             )
         )
     except Exception:
-        logger.exception("Failed to capture OpenAI success event")
+        logger.exception("Failed to capture Anthropic success event")
 
 
 def _capture_failure(
@@ -199,93 +217,68 @@ def _capture_failure(
     exc: Exception,
     latency_ms: int,
     requested_model: str | None,
+    estimated_input_tokens: int | None,
     environment: str | None,
     endpoint: str | None,
     feature: str | None,
     protect_decision: str,
     protect_reason: str,
 ) -> None:
-    # Emit error event when provider call fails.
     try:
-        http_status = _extract_http_status(exc)
         sdk_client.capture_event(
             build_event(
-                provider="openai",
+                provider="anthropic",
                 model=requested_model,
                 environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
+                    "input_tokens_estimate": estimated_input_tokens if isinstance(estimated_input_tokens, int) else None,
                     "protect_decision": "warn" if protect_decision == "warn" else None,
                     "protect_reason": protect_reason if protect_decision == "warn" else None,
                 },
                 response={
                     "latency_ms": latency_ms,
                     "error_type": exc.__class__.__name__ or "unknown",
-                    "http_status": http_status,
+                    "http_status": _extract_http_status(exc),
                 },
             )
         )
     except Exception:
-        logger.exception("Failed to capture OpenAI failure event")
-
-
-def _extract_requested_model(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
-    # Extract model argument from create call input.
-    model = kwargs.get("model")
-    if isinstance(model, str):
-        return model
-
-    first = args[0] if args else None
-    if isinstance(first, dict):
-        arg_model = first.get("model")
-        if isinstance(arg_model, str):
-            return arg_model
-
-    return None
-
-
-def _extract_http_status(exc: Exception) -> int | None:
-    # Read status code from common OpenAI exception attributes.
-    status_code = getattr(exc, "status_code", None)
-    if isinstance(status_code, int):
-        return status_code
-
-    status = getattr(exc, "status", None)
-    if isinstance(status, int):
-        return status
-
-    response = getattr(exc, "response", None)
-    if response is not None:
-        response_status = getattr(response, "status_code", None)
-        if isinstance(response_status, int):
-            return response_status
-
-    return None
-
-
-def _extract_input_tokens_estimate(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
-    # Best-effort extraction of input token estimate from create arguments.
-    input_tokens = kwargs.get("input_tokens")
-    if isinstance(input_tokens, int):
-        return input_tokens
-    first = args[0] if args else None
-    if isinstance(first, dict):
-        value = first.get("input_tokens")
-        if isinstance(value, int):
-            return value
-    return None
+        logger.exception("Failed to capture Anthropic failure event")
 
 
 def _extract_request_payload(args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
-    # Build payload view for local token estimation.
     if args and isinstance(args[0], dict):
         return dict(args[0])
     return dict(kwargs)
 
 
+def _extract_requested_model(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
+    model = kwargs.get("model")
+    if isinstance(model, str):
+        return model
+    first = args[0] if args else None
+    if isinstance(first, dict):
+        first_model = first.get("model")
+        if isinstance(first_model, str):
+            return first_model
+    return None
+
+
+def _extract_max_output_tokens(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
+    max_tokens = kwargs.get("max_tokens")
+    if isinstance(max_tokens, int):
+        return max_tokens
+    first = args[0] if args else None
+    if isinstance(first, dict):
+        first_max_tokens = first.get("max_tokens")
+        if isinstance(first_max_tokens, int):
+            return first_max_tokens
+    return None
+
+
 def _estimate_input_tokens(payload: dict[str, Any]) -> int | None:
-    # Compute local token count with deterministic test override.
     try:
         if callable(_token_estimator_override_for_tests):
             return _token_estimator_override_for_tests(payload)
@@ -297,26 +290,22 @@ def _estimate_input_tokens(payload: dict[str, Any]) -> int | None:
         return None
 
 
-def _extract_max_output_tokens(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
-    # Best-effort extraction of output cap from create arguments.
-    max_tokens = kwargs.get("max_tokens")
-    if isinstance(max_tokens, int):
-        return max_tokens
-    max_output = kwargs.get("max_output_tokens")
-    if isinstance(max_output, int):
-        return max_output
-    first = args[0] if args else None
-    if isinstance(first, dict):
-        first_max_tokens = first.get("max_tokens")
-        if isinstance(first_max_tokens, int):
-            return first_max_tokens
-        first_max_output = first.get("max_output_tokens")
-        if isinstance(first_max_output, int):
-            return first_max_output
+def _extract_http_status(exc: Exception) -> int | None:
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
+    status = getattr(exc, "status", None)
+    if isinstance(status, int):
+        return status
+    response = getattr(exc, "response", None)
+    if response is not None:
+        response_status = getattr(response, "status_code", None)
+        if isinstance(response_status, int):
+            return response_status
     return None
 
 
-def _apply_openai_clamp(
+def _apply_anthropic_clamp(
     args: tuple[Any, ...],
     kwargs: dict[str, Any],
     protect_decision: dict[str, object],
@@ -338,14 +327,10 @@ def _apply_openai_clamp(
     next_args = list(args)
     if "max_tokens" in next_kwargs and isinstance(next_kwargs.get("max_tokens"), int):
         next_kwargs["max_tokens"] = min(int(next_kwargs["max_tokens"]), recommended)
-    elif "max_output_tokens" in next_kwargs and isinstance(next_kwargs.get("max_output_tokens"), int):
-        next_kwargs["max_output_tokens"] = min(int(next_kwargs["max_output_tokens"]), recommended)
     elif next_args and isinstance(next_args[0], dict):
         payload = dict(next_args[0])
         if isinstance(payload.get("max_tokens"), int):
             payload["max_tokens"] = min(int(payload["max_tokens"]), recommended)
-        elif isinstance(payload.get("max_output_tokens"), int):
-            payload["max_output_tokens"] = min(int(payload["max_output_tokens"]), recommended)
         else:
             payload["max_tokens"] = recommended
         next_args[0] = payload

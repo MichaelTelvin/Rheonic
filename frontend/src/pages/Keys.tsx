@@ -216,7 +216,7 @@ export function Keys(): JSX.Element {
                 <button
                   type="button"
                   className={`modal-button ${copiedAction === "env" ? "copied" : ""}`}
-                  onClick={() => void copyText(`LLMTBG_INGEST_KEY=\"${latestPlaintextKey.key}\"`, "env")}
+                  onClick={() => void copyText(`RHEONIC_INGEST_KEY=\"${latestPlaintextKey.key}\"`, "env")}
                 >
                   Copy env var
                 </button>

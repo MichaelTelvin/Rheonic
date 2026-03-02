@@ -54,7 +54,7 @@ def send_project_webhook(
     body_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
-        "X-LLMTBG-Event-Type": event_type,
+        "X-RHEONIC-Event-Type": event_type,
     }
     signing_secret = override_secret if override_secret is not None else project.webhook_secret
     if signing_secret:
@@ -63,7 +63,7 @@ def send_project_webhook(
             body_bytes,
             hashlib.sha256,
         ).hexdigest()
-        headers["X-LLMTBG-Signature"] = f"sha256={digest}"
+        headers["X-RHEONIC-Signature"] = f"sha256={digest}"
 
     now = datetime.now(timezone.utc)
     try:

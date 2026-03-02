@@ -1,9 +1,9 @@
-import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, LLMTBGBlockedError } from "./index.js";
+import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, RHEONICBlockedError } from "./index.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-function loadLlmtbgEnvFromDotenv(): void {
+function loadRheonicEnvFromDotenv(): void {
   const currentFile = fileURLToPath(import.meta.url);
   const dotenvPath = resolve(dirname(currentFile), "../../.env");
   let content = "";
@@ -17,16 +17,16 @@ function loadLlmtbgEnvFromDotenv(): void {
     if (!line || line.startsWith("#") || !line.includes("=")) continue;
     const index = line.indexOf("=");
     const key = line.slice(0, index).trim();
-    if (!key.startsWith("LLMTBG_")) continue;
+    if (!key.startsWith("RHEONIC_")) continue;
     const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
     process.env[key] = value;
   }
 }
 
-loadLlmtbgEnvFromDotenv();
+loadRheonicEnvFromDotenv();
 
-const backendBaseUrl = process.env.LLMTBG_BACKEND_URL ?? "http://localhost:8000";
-const providerStubUrl = process.env.LLMTBG_PROVIDER_URL ?? "http://localhost:8099";
+const backendBaseUrl = process.env.RHEONIC_BACKEND_URL ?? "http://localhost:8000";
+const providerStubUrl = process.env.RHEONIC_PROVIDER_URL ?? "http://localhost:8099";
 let lastProviderCall: Record<string, unknown> | null = null;
 
 function sleep(ms: number): Promise<void> {
@@ -129,7 +129,7 @@ async function listOpenIncidents(
   });
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      console.log(`[INCIDENTS] skipped (${response.status} auth error; update LLMTBG_AUTH_TOKEN)`);
+      console.log(`[INCIDENTS] skipped (${response.status} auth error; update RHEONIC_AUTH_TOKEN)`);
       return [];
     }
     throw new Error(`list_incidents_failed:${response.status}`);
@@ -169,36 +169,36 @@ async function runProviderCall(provider: string, model: string, maxTokens: numbe
     }
     return false;
   } catch (error) {
-    if (error instanceof LLMTBGBlockedError) return true;
+    if (error instanceof RHEONICBlockedError) return true;
     throw error;
   }
 }
 
 async function main() {
-  const ingestKey = process.env.LLMTBG_INGEST_KEY;
+  const ingestKey = process.env.RHEONIC_INGEST_KEY;
   if (!ingestKey) {
-    console.error("LLMTBG_INGEST_KEY is required.");
+    console.error("RHEONIC_INGEST_KEY is required.");
     process.exit(1);
   }
 
-  const provider = (process.env.LLMTBG_PROVIDER ?? "").trim().toLowerCase();
+  const provider = (process.env.RHEONIC_PROVIDER ?? "").trim().toLowerCase();
   if (!provider || !["openai", "anthropic", "google"].includes(provider)) {
-    console.error("LLMTBG_PROVIDER is required (openai | anthropic | google).");
+    console.error("RHEONIC_PROVIDER is required (openai | anthropic | google).");
     process.exit(1);
   }
 
-  const model = (process.env.LLMTBG_MODEL ?? "").trim();
+  const model = (process.env.RHEONIC_MODEL ?? "").trim();
   if (!model) {
-    console.error(`LLMTBG_MODEL is required for provider ${provider}.`);
+    console.error(`RHEONIC_MODEL is required for provider ${provider}.`);
     process.exit(1);
   }
 
-  const scenario = (process.env.LLMTBG_SCENARIO ?? "allow").toLowerCase();
-  const pauseMs = envInt("LLMTBG_STEP_SLEEP_MS", 200);
-  const protectDecisionTimeoutMs = envInt("LLMTBG_PROTECT_DECISION_TIMEOUT_MS", 100);
-  const env = (process.env.LLMTBG_ENVIRONMENT ?? "").trim() || `protect-${Date.now()}`;
-  const authToken = process.env.LLMTBG_AUTH_TOKEN ?? "";
-  const projectId = process.env.LLMTBG_PROJECT_ID ?? "";
+  const scenario = (process.env.RHEONIC_SCENARIO ?? "allow").toLowerCase();
+  const pauseMs = envInt("RHEONIC_STEP_SLEEP_MS", 200);
+  const protectDecisionTimeoutMs = envInt("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", 100);
+  const env = (process.env.RHEONIC_ENVIRONMENT ?? "").trim() || `protect-${Date.now()}`;
+  const authToken = process.env.RHEONIC_AUTH_TOKEN ?? "";
+  const projectId = process.env.RHEONIC_PROJECT_ID ?? "";
 
   await resetProvider();
   const before = await providerCount();
@@ -208,7 +208,7 @@ async function main() {
     ingestKey,
     protectEnabled: true,
     environment: env,
-    debug: process.env.LLMTBG_DEBUG === "1" || process.env.LLMTBG_DEBUG === "true",
+    debug: process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true",
     flushIntervalMs: 60_000,
     protectDecisionTimeoutMs,
   });
@@ -276,23 +276,23 @@ async function main() {
   console.log(`[DEMO] environment=${env}`);
   console.log(`[DEMO] protect_decision_timeout_ms=${protectDecisionTimeoutMs}`);
   console.log(`[DEMO] decision_feature=${decisionFeature}`);
-  const maxTokens = envInt("LLMTBG_MAX_TOKENS", 128);
+  const maxTokens = envInt("RHEONIC_MAX_TOKENS", 128);
   let callMaxTokens = maxTokens;
   console.log(`[DEMO] max_tokens(before call)=${maxTokens}`);
 
   if (scenario === "near_cap") {
-    const seed = Number(process.env.LLMTBG_NEAR_CAP_SEED_TOKENS ?? 1600);
+    const seed = Number(process.env.RHEONIC_NEAR_CAP_SEED_TOKENS ?? 1600);
     console.log("[STEP] Seed near-cap traffic then expect warn");
     await sendIngestEvent(ingestKey, provider, model, seed, "near-cap-seed", env);
     await sleep(pauseMs);
   } else if (scenario === "cap_breach") {
-    const seed = Number(process.env.LLMTBG_CAP_BREACH_TOKENS ?? 5000);
+    const seed = Number(process.env.RHEONIC_CAP_BREACH_TOKENS ?? 5000);
     console.log("[STEP] Seed cap breach then expect block");
     await sendIngestEvent(ingestKey, provider, model, seed, "cap-breach-seed", env);
     await sleep(pauseMs);
   } else if (scenario === "req_cap_breach") {
-    let count = envInt("LLMTBG_REQ_CAP_BREACH_COUNT", 6);
-    const reqTokens = envInt("LLMTBG_CAP_BREACH_REQ_TOKENS", 1);
+    let count = envInt("RHEONIC_REQ_CAP_BREACH_COUNT", 6);
+    const reqTokens = envInt("RHEONIC_CAP_BREACH_REQ_TOKENS", 1);
     const reqCap = await getProjectReqCap(projectId, authToken);
     if (typeof reqCap === "number") {
       count = Math.max(count, reqCap + 1);
@@ -306,7 +306,7 @@ async function main() {
     }
     console.log(`[STEP] req_cap_breach ingest events sent=${count} (provider_calls_delta tracks provider calls only)`);
   } else if (scenario === "retry_storm") {
-    const count = envInt("LLMTBG_RETRY_STORM_COUNT", 6);
+    const count = envInt("RHEONIC_RETRY_STORM_COUNT", 6);
     console.log("[STEP] Seed retry storm then expect warn");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 50, `retry-${i + 1}`, env, {
@@ -317,21 +317,21 @@ async function main() {
       await sleep(pauseMs);
     }
   } else if (scenario === "loop_suspect") {
-    const count = envInt("LLMTBG_LOOP_COUNT", 7);
+    const count = envInt("RHEONIC_LOOP_COUNT", 7);
     console.log("[STEP] Seed loop suspect then expect warn");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 60, "loop-fixed-signature", env);
       await sleep(pauseMs);
     }
   } else if (scenario === "token_explosion") {
-    const seed = envInt("LLMTBG_TOKEN_EXPLOSION_TOKENS", 9000);
+    const seed = envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 9000);
     console.log("[STEP] Seed token explosion then expect warn");
     await sendIngestEvent(ingestKey, provider, model, seed, "token-explosion-seed", env);
     callMaxTokens = Math.max(maxTokens, seed);
     console.log(`[STEP] token_explosion call max_tokens=${callMaxTokens}`);
     await sleep(pauseMs);
   } else if (scenario === "cooldown") {
-    const seed = envInt("LLMTBG_CAP_BREACH_TOKENS", 5000);
+    const seed = envInt("RHEONIC_CAP_BREACH_TOKENS", 5000);
     console.log("[STEP] Seed cap breach then verify cooldown blocks repeated call");
     await sendIngestEvent(ingestKey, provider, model, seed, "cooldown-breach-seed", env);
     await sleep(pauseMs);
@@ -379,7 +379,7 @@ async function main() {
       console.log(`[INCIDENTS] open=${incidents.length} types=${compact || "none"}`);
     }
   } else {
-    console.log("[INCIDENTS] skipped (set LLMTBG_PROJECT_ID and LLMTBG_AUTH_TOKEN)");
+    console.log("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID and RHEONIC_AUTH_TOKEN)");
   }
 
   const decision = lastDecisionValue;

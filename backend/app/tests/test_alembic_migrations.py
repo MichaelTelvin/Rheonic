@@ -13,7 +13,7 @@ from app.config import Settings
 def test_alembic_upgrade_head_creates_current_schema_on_fresh_database() -> None:
     settings = Settings()
     base_url = make_url(settings.database_url)
-    db_name = f"llmtbg_test_alembic_{uuid.uuid4().hex[:8]}"
+    db_name = f"rheonic_test_alembic_{uuid.uuid4().hex[:8]}"
     admin_url = base_url.set(database="postgres")
     target_url = base_url.set(database=db_name).render_as_string(hide_password=False)
 

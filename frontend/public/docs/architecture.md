@@ -1,4 +1,4 @@
-# LLMTokenBurnGuard Architecture
+# Rheonic Architecture
 
 ## Runtime model
 - Scope: `(project_id, provider)` for counters, incidents, and protect decisions.

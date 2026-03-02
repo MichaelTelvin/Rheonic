@@ -28,7 +28,7 @@ export function PublicLayout({
     <main className="public-page">
       <div className={`public-shell${shellClassName ? ` ${shellClassName}` : ""}`}>
         <header className="public-nav public-nav-sticky">
-          <p className="public-brand">LLMTokenBurnGuard</p>
+          <p className="public-brand">Rheonic</p>
           <nav className="public-nav-links">
             {showHomeLink ? <Link to="/">Home</Link> : null}
             {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
@@ -48,7 +48,7 @@ export function PublicLayout({
             {showDocsLink ? <Link to={docsHref}>Docs (dashboard)</Link> : null}
             <Link to="/login">Login</Link>
           </div>
-          <p>© {new Date().getFullYear()} LLMTokenBurnGuard</p>
+          <p>© {new Date().getFullYear()} Rheonic</p>
         </footer>
       </div>
     </main>

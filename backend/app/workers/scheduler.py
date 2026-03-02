@@ -1,4 +1,4 @@
-"""Run rq-scheduler for the llmtbg queue."""
+"""Run rq-scheduler for the rheonic queue."""
 from __future__ import annotations
 
 from redis import Redis
@@ -13,8 +13,8 @@ logger = get_logger(__name__)
 def main() -> None:
     settings = Settings()
     connection = Redis.from_url(settings.redis_url)
-    scheduler = Scheduler(queue_name="llmtbg", connection=connection, interval=15)
-    logger.info("RQ scheduler started", extra={"queue": "llmtbg", "interval_seconds": 15})
+    scheduler = Scheduler(queue_name="rheonic", connection=connection, interval=15)
+    logger.info("RQ scheduler started", extra={"queue": "rheonic", "interval_seconds": 15})
     scheduler.run()
 
 

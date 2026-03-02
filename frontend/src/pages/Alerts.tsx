@@ -201,7 +201,7 @@ export function Alerts(): JSX.Element {
                 </label>
               </div>
               <div className="form-field alerts-url">
-                <label htmlFor="webhook-url" title="HTTPS endpoint that receives LLMTBG webhook events.">
+                <label htmlFor="webhook-url" title="HTTPS endpoint that receives RHEONIC webhook events.">
                   Webhook URL
                 </label>
                 <input

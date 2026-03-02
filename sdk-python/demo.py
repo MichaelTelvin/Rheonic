@@ -10,10 +10,10 @@ sdk_src = Path(__file__).resolve().parent / "src"
 if str(sdk_src) not in sys.path:
     sys.path.insert(0, str(sdk_src))
 
-from llmtokenburnguard import build_event, capture_event, create_client
+from rheonic import build_event, capture_event, create_client
 
 
-def _load_llmtbg_env_from_dotenv() -> None:
+def _load_rheonic_env_from_dotenv() -> None:
     dotenv_path = Path(__file__).resolve().parents[1] / ".env"
     if not dotenv_path.exists():
         return
@@ -23,7 +23,7 @@ def _load_llmtbg_env_from_dotenv() -> None:
             continue
         key, value = line.split("=", 1)
         key = key.strip()
-        if not key.startswith("LLMTBG_"):
+        if not key.startswith("RHEONIC_"):
             continue
         os.environ[key] = value.strip().strip('"').strip("'")
 
@@ -118,42 +118,42 @@ def _print_phase(phase: str, project_id: str, auth_token: str, provider: str) ->
 
 def _usage() -> None:
     print("Example:")
-    print("  LLMTBG_PROVIDER=openai")
-    print("  LLMTBG_MODEL=gpt-4o-mini")
-    print("  LLMTBG_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all")
-    print("  LLMTBG_STEP_SLEEP_MS=200")
-    print("  LLMTBG_RETRY_STORM_COUNT=6")
-    print("  LLMTBG_LOOP_COUNT=7")
-    print("  LLMTBG_TOKEN_EXPLOSION_TOKENS=9000")
-    print("  LLMTBG_CAP_BREACH_TOKENS=4000")
-    print("  LLMTBG_CAP_BREACH_REQ_COUNT=6")
-    print("  LLMTBG_CAP_BREACH_REQ_TOKENS=1")
-    print("  LLMTBG_NEAR_CAP_TOKENS=3200")
-    print("  Optional snapshot/incident summary: LLMTBG_AUTH_TOKEN, LLMTBG_PROJECT_ID")
+    print("  RHEONIC_PROVIDER=openai")
+    print("  RHEONIC_MODEL=gpt-4o-mini")
+    print("  RHEONIC_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all")
+    print("  RHEONIC_STEP_SLEEP_MS=200")
+    print("  RHEONIC_RETRY_STORM_COUNT=6")
+    print("  RHEONIC_LOOP_COUNT=7")
+    print("  RHEONIC_TOKEN_EXPLOSION_TOKENS=9000")
+    print("  RHEONIC_CAP_BREACH_TOKENS=4000")
+    print("  RHEONIC_CAP_BREACH_REQ_COUNT=6")
+    print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
+    print("  RHEONIC_NEAR_CAP_TOKENS=3200")
+    print("  Optional snapshot/incident summary: RHEONIC_AUTH_TOKEN, RHEONIC_PROJECT_ID")
 
 
 def main() -> None:
-    _load_llmtbg_env_from_dotenv()
+    _load_rheonic_env_from_dotenv()
 
-    ingest_key = os.getenv("LLMTBG_INGEST_KEY")
+    ingest_key = os.getenv("RHEONIC_INGEST_KEY")
     if not ingest_key:
-        print("LLMTBG_INGEST_KEY is required. Create a key in dashboard Keys page.")
+        print("RHEONIC_INGEST_KEY is required. Create a key in dashboard Keys page.")
         _usage()
         return
 
-    provider = (os.getenv("LLMTBG_PROVIDER", "") or "").strip().lower()
+    provider = (os.getenv("RHEONIC_PROVIDER", "") or "").strip().lower()
     if provider not in {"openai", "anthropic", "google"}:
-        print("LLMTBG_PROVIDER is required (openai | anthropic | google)")
+        print("RHEONIC_PROVIDER is required (openai | anthropic | google)")
         _usage()
         return
 
-    model = (os.getenv("LLMTBG_MODEL", "") or "").strip()
+    model = (os.getenv("RHEONIC_MODEL", "") or "").strip()
     if not model:
-        print(f"LLMTBG_MODEL is required for provider {provider}")
+        print(f"RHEONIC_MODEL is required for provider {provider}")
         _usage()
         return
 
-    environment = (os.getenv("LLMTBG_ENVIRONMENT") or "").strip() or f"demo-{int(time.time())}"
+    environment = (os.getenv("RHEONIC_ENVIRONMENT") or "").strip() or f"demo-{int(time.time())}"
     endpoint_by_provider = {
         "openai": "/chat/completions",
         "anthropic": "/v1/messages",
@@ -161,27 +161,27 @@ def main() -> None:
     }
     endpoint = endpoint_by_provider.get(provider, "/chat/completions")
 
-    demo_case = (os.getenv("LLMTBG_DEMO_CASE") or "steady").strip().lower()
-    step_sleep_ms = int(os.getenv("LLMTBG_STEP_SLEEP_MS", "200"))
-    retry_storm_count = int(os.getenv("LLMTBG_RETRY_STORM_COUNT", "6"))
-    loop_count = int(os.getenv("LLMTBG_LOOP_COUNT", "7"))
-    token_explosion_tokens = int(os.getenv("LLMTBG_TOKEN_EXPLOSION_TOKENS", "9000"))
-    cap_breach_tokens = int(os.getenv("LLMTBG_CAP_BREACH_TOKENS", "4000"))
-    cap_breach_req_count = int(os.getenv("LLMTBG_CAP_BREACH_REQ_COUNT", "6"))
-    cap_breach_req_tokens = int(os.getenv("LLMTBG_CAP_BREACH_REQ_TOKENS", "1"))
-    near_cap_tokens = int(os.getenv("LLMTBG_NEAR_CAP_TOKENS", "3200"))
+    demo_case = (os.getenv("RHEONIC_DEMO_CASE") or "steady").strip().lower()
+    step_sleep_ms = int(os.getenv("RHEONIC_STEP_SLEEP_MS", "200"))
+    retry_storm_count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "6"))
+    loop_count = int(os.getenv("RHEONIC_LOOP_COUNT", "7"))
+    token_explosion_tokens = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "9000"))
+    cap_breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "4000"))
+    cap_breach_req_count = int(os.getenv("RHEONIC_CAP_BREACH_REQ_COUNT", "6"))
+    cap_breach_req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
+    near_cap_tokens = int(os.getenv("RHEONIC_NEAR_CAP_TOKENS", "3200"))
 
-    auth_token = os.getenv("LLMTBG_AUTH_TOKEN", "")
-    project_id = os.getenv("LLMTBG_PROJECT_ID", "")
+    auth_token = os.getenv("RHEONIC_AUTH_TOKEN", "")
+    project_id = os.getenv("RHEONIC_PROJECT_ID", "")
 
     client = None
     try:
         client = create_client(
-            base_url=os.getenv("LLMTBG_BASE_URL"),
+            base_url=os.getenv("RHEONIC_BASE_URL"),
             ingest_key=ingest_key,
             protect_enabled=False,
             environment=environment,
-            debug=os.getenv("LLMTBG_DEBUG", "").lower() in {"1", "true", "yes"},
+            debug=os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"},
         )
 
         print(f"[DEMO] provider={provider} model={model} case={demo_case}")
@@ -290,7 +290,7 @@ def main() -> None:
         elif demo_case == "req_cap_breach":
             run_req_cap_breach()
         else:
-            print(f"Unsupported LLMTBG_DEMO_CASE: {demo_case}")
+            print(f"Unsupported RHEONIC_DEMO_CASE: {demo_case}")
             _usage()
             return
 

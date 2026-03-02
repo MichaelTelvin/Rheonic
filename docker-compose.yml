@@ -1,7 +1,9 @@
+name: rheonic
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: llmtbg_postgres
+    container_name: rheonic_postgres
     env_file:
       - .env
     environment:
@@ -20,7 +22,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: llmtbg_redis
+    container_name: rheonic_redis
     env_file:
       - .env
     ports:
@@ -36,7 +38,7 @@ services:
 
   backend:
     build: ./backend
-    container_name: llmtbg_backend
+    container_name: rheonic_backend
     env_file:
       - .env
     environment:
@@ -61,7 +63,7 @@ services:
 
   worker:
     build: ./backend
-    container_name: llmtbg_worker
+    container_name: rheonic_worker
     env_file:
       - .env
     environment:
@@ -78,11 +80,11 @@ services:
     volumes:
       - ./backend:/app
     command: >
-      sh -c "rq worker --url \"$$REDIS_URL\" llmtbg"
+      sh -c "rq worker --url \"$$REDIS_URL\" rheonic"
 
   scheduler:
     build: ./backend
-    container_name: llmtbg_scheduler
+    container_name: rheonic_scheduler
     env_file:
       - .env
     environment:
@@ -104,7 +106,7 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: llmtbg_frontend
+    container_name: rheonic_frontend
     env_file:
       - .env
     environment:
@@ -121,7 +123,7 @@ services:
 
   db_init:
     build: ./backend
-    container_name: llmtbg_db_init
+    container_name: rheonic_db_init
     env_file:
       - .env
     environment:

@@ -4,8 +4,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from llmtokenburnguard.config import sdk_config
-from llmtokenburnguard.logger import get_logger
+from rheonic.config import sdk_config
+from rheonic.logger import get_logger
 
 try:
     import httpx
@@ -15,15 +15,15 @@ except ModuleNotFoundError:  # pragma: no cover
 logger = get_logger(__name__)
 
 
-class LLMTBGBlockedError(RuntimeError):
+class RHEONICBlockedError(RuntimeError):
     # Raised when backend preflight blocks an outbound provider request.
 
     def __init__(self, reason: str) -> None:
-        super().__init__(f"Request blocked by LLMTokenBurnGuard: {reason}")
+        super().__init__(f"Request blocked by Rheonic: {reason}")
         self.reason = reason
 
 
-class LLMTBGValidationError(Exception):
+class RHEONICValidationError(Exception):
     # Raised when provider and model combination is invalid for SDK instrumentation.
 
     pass

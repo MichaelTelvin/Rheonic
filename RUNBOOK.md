@@ -88,7 +88,7 @@ alembic -c alembic.ini revision --autogenerate -m "describe_change"
 
 ### Queue depth and workers
 ```bash
-docker compose -f docker-compose.prod.yml exec redis redis-cli LLEN rq:queue:llmtbg
+docker compose -f docker-compose.prod.yml exec redis redis-cli LLEN rq:queue:rheonic
 docker compose -f docker-compose.prod.yml exec redis redis-cli KEYS "rq:worker:*"
 ```
 

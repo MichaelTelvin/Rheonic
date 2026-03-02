@@ -2,7 +2,7 @@
 import logging
 import os
 
-from llmtokenburnguard.config import sdk_config
+from rheonic.config import sdk_config
 
 
 def configure_logging(level: str | None = None) -> None:

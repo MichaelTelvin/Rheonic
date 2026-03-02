@@ -160,7 +160,7 @@ def test_ingest_event_accepts_quoted_and_env_style_ingest_keys() -> None:
     env_style = client.post(
         "/api/v1/events",
         json=_payload(),
-        headers={"X-Project-Ingest-Key": "LLMTBG_INGEST_KEY=active-test-key"},
+        headers={"X-Project-Ingest-Key": "RHEONIC_INGEST_KEY=active-test-key"},
     )
     assert env_style.status_code == 202
     assert len(ingest_service.ingested) == 2

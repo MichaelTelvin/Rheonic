@@ -29,11 +29,11 @@ function CopyableCodeBlock({ code, language }: { code: string; language: string 
 }
 
 export function Quickstart(): JSX.Element {
-  const nodeIngest = `import { createClient, buildEvent } from "llmtokenburnguard-node";
+  const nodeIngest = `import { createClient, buildEvent } from "rheonic-node";
 
 const client = createClient({
-  baseUrl: process.env.LLMTBG_BACKEND_URL,
-  ingestKey: process.env.LLMTBG_INGEST_KEY!,
+  baseUrl: process.env.RHEONIC_BACKEND_URL,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
   protectEnabled: false,
 });
 
@@ -47,11 +47,11 @@ await client.captureEvent(
 );`;
 
   const pyIngest = `import os
-from llmtokenburnguard import create_client, build_event
+from rheonic import create_client, build_event
 
 client = create_client(
-    base_url=os.environ["LLMTBG_BACKEND_URL"],
-    ingest_key=os.environ["LLMTBG_INGEST_KEY"],
+    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
     protect_enabled=False,
 )
 
@@ -65,11 +65,11 @@ client.capture_event(
 )`;
 
   const nodeProtect = `import OpenAI from "openai";
-import { createClient, instrumentOpenAI, LLMTBGBlockedError } from "llmtokenburnguard-node";
+import { createClient, instrumentOpenAI, RHEONICBlockedError } from "rheonic-node";
 
 const burnguard = createClient({
-  baseUrl: process.env.LLMTBG_BACKEND_URL,
-  ingestKey: process.env.LLMTBG_INGEST_KEY!,
+  baseUrl: process.env.RHEONIC_BACKEND_URL,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
   protectEnabled: true,
 });
 
@@ -86,18 +86,18 @@ try {
     max_tokens: 256,
   });
 } catch (error) {
-  if (error instanceof LLMTBGBlockedError) {
+  if (error instanceof RHEONICBlockedError) {
     console.log("Blocked by protect preflight");
   }
 }`;
 
   const pyProtect = `import os
 from openai import OpenAI
-from llmtokenburnguard import create_client, instrument_openai, LLMTBGBlockedError
+from rheonic import create_client, instrument_openai, RHEONICBlockedError
 
 burnguard = create_client(
-    base_url=os.environ["LLMTBG_BACKEND_URL"],
-    ingest_key=os.environ["LLMTBG_INGEST_KEY"],
+    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
     protect_enabled=True,
 )
 openai_client = instrument_openai(
@@ -113,7 +113,7 @@ try:
         messages=[{"role": "user", "content": "hello"}],
         max_tokens=256,
     )
-except LLMTBGBlockedError:
+except RHEONICBlockedError:
     print("Blocked by protect preflight")`;
 
   return (
@@ -132,7 +132,7 @@ except LLMTBGBlockedError:
             <section id="problem">
               <h2>What problem it solves</h2>
               <p>
-                LLMTokenBurnGuard helps teams prevent runaway LLM spend and unstable traffic by combining provider-aware
+                Rheonic helps teams prevent runaway LLM spend and unstable traffic by combining provider-aware
                 telemetry with preflight protect decisions. You can monitor request/token rates in real time, open
                 incidents on anomalies, and enforce caps before costly calls are sent to providers.
               </p>
@@ -141,9 +141,9 @@ except LLMTBGBlockedError:
             <section id="install">
               <h2>Install</h2>
               <p>Node SDK</p>
-              <CopyableCodeBlock code={`npm install llmtokenburnguard-node`} language="bash" />
+              <CopyableCodeBlock code={`npm install rheonic-node`} language="bash" />
               <p>Python SDK</p>
-              <CopyableCodeBlock code={`pip install llmtokenburnguard`} language="bash" />
+              <CopyableCodeBlock code={`pip install rheonic`} language="bash" />
             </section>
 
             <section id="ingest">
@@ -165,8 +165,8 @@ except LLMTBGBlockedError:
             <section id="env">
               <h2>Required env vars</h2>
               <CopyableCodeBlock
-                code={`LLMTBG_BACKEND_URL=http://localhost:8000
-LLMTBG_INGEST_KEY=<your_ingest_key>`}
+                code={`RHEONIC_BACKEND_URL=http://localhost:8000
+RHEONIC_INGEST_KEY=<your_ingest_key>`}
                 language="bash"
               />
             </section>

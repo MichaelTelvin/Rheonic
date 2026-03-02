@@ -1,5 +1,5 @@
 # Unit tests for SDK event builder.
-from llmtokenburnguard.event_builder import build_event
+from rheonic.event_builder import build_event
 
 
 def test_build_event_schema_excludes_project_id() -> None:

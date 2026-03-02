@@ -6,7 +6,7 @@ import secrets
 def normalize_ingest_key(plaintext: str) -> str:
     # Normalize copied ingest key values (quotes, whitespace, optional env-style prefix).
     value = (plaintext or "").strip().strip('"').strip("'")
-    if value.startswith("LLMTBG_INGEST_KEY="):
+    if value.startswith("RHEONIC_INGEST_KEY="):
         value = value.split("=", 1)[1].strip().strip('"').strip("'")
     return value.strip()
 

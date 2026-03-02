@@ -1,7 +1,7 @@
 # Unit tests for SDK async client queue behavior.
 from typing import Any
 
-from llmtokenburnguard.client import Client
+from rheonic.client import Client
 
 
 class FakeHttpClient:

@@ -10,10 +10,10 @@ from app.infrastructure.jobs.webhook_job import send_project_webhook
 
 
 class RQWebhookDispatcher(WebhookDispatcher):
-    # Enqueues webhook delivery jobs onto the llmtbg RQ queue.
+    # Enqueues webhook delivery jobs onto the rheonic RQ queue.
 
     def __init__(self, redis_url: str) -> None:
-        self._queue = Queue("llmtbg", connection=Redis.from_url(redis_url))
+        self._queue = Queue("rheonic", connection=Redis.from_url(redis_url))
 
     def enqueue(
         self,

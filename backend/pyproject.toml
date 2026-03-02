@@ -1,7 +1,7 @@
 [project]
-name = "llmtokenburnguard-backend"
+name = "rheonic-backend"
 version = "0.1.0"
-description = "Backend service for LLMTokenBurnGuard"
+description = "Backend service for Rheonic"
 requires-python = ">=3.11"
 dependencies = [
   "alembic>=1.13.0",

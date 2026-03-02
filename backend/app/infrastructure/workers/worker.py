@@ -37,11 +37,11 @@ def main() -> None:
 
     with conn:
         worker = Worker(
-            queues=["llmtbg"],
+            queues=["rheonic"],
             connection=conn,
             exception_handlers=[_job_exception_handler],
         )
-        logger.info("RQ worker started", extra={"queues": ["llmtbg"]})
+        logger.info("RQ worker started", extra={"queues": ["rheonic"]})
         worker.work()
 
 

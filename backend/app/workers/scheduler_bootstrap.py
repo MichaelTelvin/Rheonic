@@ -64,16 +64,16 @@ def main() -> None:
     """Connect to Redis and bootstrap recurring scheduler jobs."""
     settings = Settings()
     redis_conn = Redis.from_url(settings.redis_url)
-    scheduler = Scheduler(queue_name="llmtbg", connection=redis_conn)
+    scheduler = Scheduler(queue_name="rheonic", connection=redis_conn)
 
     jobs = [
         RecurringJob(
-            job_id="llmtbg_auto_close_incidents",
+            job_id="rheonic_auto_close_incidents",
             func_path="app.infrastructure.jobs.auto_close_incidents_job.auto_close_incidents",
             interval_seconds=max(int(settings.auto_close_run_interval_seconds), 1),
         ),
         RecurringJob(
-            job_id="llmtbg_purge_old_events",
+            job_id="rheonic_purge_old_events",
             func_path="app.infrastructure.jobs.purge_events_job.purge_old_events",
             interval_seconds=app_config.purge_interval_seconds,
         ),

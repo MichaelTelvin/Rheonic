@@ -52,7 +52,7 @@ export class Client {
   private isClosed = false;
 
   public constructor(config: ClientConfig) {
-    this.baseUrl = config.baseUrl ?? process.env.LLMTBG_BASE_URL ?? sdkNodeConfig.defaultBaseUrl;
+    this.baseUrl = config.baseUrl ?? process.env.RHEONIC_BASE_URL ?? sdkNodeConfig.defaultBaseUrl;
     this.ingestKey = config.ingestKey;
     this.environment = config.environment ?? sdkNodeConfig.defaultEnvironment;
     this.protectEnabled = config.protectEnabled ?? false;
@@ -62,7 +62,7 @@ export class Client {
     this.requestTimeoutMs = config.requestTimeoutMs ?? sdkNodeConfig.defaultRequestTimeoutMs;
     const initialFailMode = config.protectFailMode ?? sdkNodeConfig.defaultProtectFailMode;
     const initialProtectTimeoutMs = config.protectDecisionTimeoutMs ?? sdkNodeConfig.defaultProtectDecisionTimeoutMs;
-    const envDebug = process.env.LLMTBG_DEBUG === "1" || process.env.LLMTBG_DEBUG === "true";
+    const envDebug = process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true";
     this.debug = config.debug ?? envDebug;
     this.protectEngine = new ProtectEngine({
       baseUrl: this.baseUrl,
@@ -264,7 +264,7 @@ export class Client {
     if (!this.debug) {
       return;
     }
-    console.debug(`[llmtbg] ${message}`);
+    console.debug(`[rheonic] ${message}`);
   }
 }
 

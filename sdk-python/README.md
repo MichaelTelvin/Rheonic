@@ -1,6 +1,6 @@
-# LLMTokenBurnGuard Python SDK
+# Rheonic Python SDK
 
-This SDK runs inside your app process and sends telemetry events to this LLMTokenBurnGuard service.
+This SDK runs inside your app process and sends telemetry events to this Rheonic service.
 
 ## Install
 
@@ -12,21 +12,21 @@ pip install -e .
 ## Configuration
 
 - Required: `ingest_key`
-- Optional: `base_url` (defaults to `LLMTBG_BASE_URL` env var, else `http://localhost:8000`)
+- Optional: `base_url` (defaults to `RHEONIC_BASE_URL` env var, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
 - Optional: `protect_enabled` (default `False`; when `True`, SDK calls `POST /api/v1/protect/decision` preflight)
-- Demo env var: `LLMTBG_INGEST_KEY`
+- Demo env var: `RHEONIC_INGEST_KEY`
 
-Provider/model validation: SDK wrappers fail fast with `LLMTBGValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
+Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
 
 ## Integration Path 1: Manual Capture (generic)
 
 ```python
 import os
 
-from llmtokenburnguard import build_event, capture_event, create_client
+from rheonic import build_event, capture_event, create_client
 
-create_client(ingest_key=os.environ["LLMTBG_INGEST_KEY"])
+create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"])
 
 capture_event(
     build_event(
@@ -44,9 +44,9 @@ capture_event(
 import os
 
 from openai import OpenAI
-from llmtokenburnguard import create_client, instrument_openai
+from rheonic import create_client, instrument_openai
 
-burnguard = create_client(ingest_key=os.environ["LLMTBG_INGEST_KEY"], protect_enabled=True)
+burnguard = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"], protect_enabled=True)
 openai_client = instrument_openai(
     OpenAI(api_key="..."),
     client=burnguard,
@@ -62,9 +62,9 @@ import os
 from anthropic import Anthropic
 import google.generativeai as genai
 
-from llmtokenburnguard import create_client
+from rheonic import create_client
 
-client = create_client(ingest_key=os.environ["LLMTBG_INGEST_KEY"], protect_enabled=True)
+client = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"], protect_enabled=True)
 
 anthropic_client = client.instrument_anthropic(Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]))
 anthropic_client.messages.create(
@@ -81,7 +81,7 @@ google_model.generate_content("Hello Google model")
 ## Verify it works
 
 ```bash
-export LLMTBG_INGEST_KEY="<copy from Keys modal>"
+export RHEONIC_INGEST_KEY="<copy from Keys modal>"
 python demo.py
 ```
 
@@ -90,14 +90,14 @@ The demo sends one event, flushes, prints stats, and exits.
 Backend-down smoke test (must exit cleanly and show failures):
 
 ```bash
-LLMTBG_BASE_URL=http://127.0.0.1:59999 python demo.py
+RHEONIC_BASE_URL=http://127.0.0.1:59999 python demo.py
 ```
 
 ## Check dashboard metrics
 
 After running `python demo.py` with backend/frontend up:
 - create/select project in dashboard
-- create key in Keys modal, copy it once, and export `LLMTBG_INGEST_KEY`
+- create key in Keys modal, copy it once, and export `RHEONIC_INGEST_KEY`
 - open the dashboard (default `http://localhost:5173`)
 - confirm metrics changed after ingest
 
@@ -108,17 +108,17 @@ Runs a local protect preflight + provider-stub call flow against:
 - provider stub: `http://localhost:8099`
 
 ```bash
-export LLMTBG_INGEST_KEY="<copy from Keys modal>"
-export LLMTBG_SCENARIO=allow   # allow | warn | block
+export RHEONIC_INGEST_KEY="<copy from Keys modal>"
+export RHEONIC_SCENARIO=allow   # allow | warn | block
 python demo_protect.py
 ```
 
 Optional overrides:
-- `LLMTBG_BACKEND_URL`
-- `LLMTBG_PROVIDER_URL`
-- `LLMTBG_MAX_TOKENS`
-- `LLMTBG_MODEL`
-- `LLMTBG_ENVIRONMENT`
+- `RHEONIC_BACKEND_URL`
+- `RHEONIC_PROVIDER_URL`
+- `RHEONIC_MAX_TOKENS`
+- `RHEONIC_MODEL`
+- `RHEONIC_ENVIRONMENT`
 
 Manual mode check:
 - Observe (`protect_enabled=False`): only `POST /api/v1/events`

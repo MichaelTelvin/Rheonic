@@ -81,8 +81,8 @@ def test_send_project_webhook_sets_signature_and_success_status(tmp_path, monkey
 
     headers = captured["headers"]
     assert isinstance(headers, dict)
-    assert headers["X-LLMTBG-Event-Type"] == "incident.high"
-    assert headers["X-LLMTBG-Signature"].startswith("sha256=")
+    assert headers["X-RHEONIC-Event-Type"] == "incident.high"
+    assert headers["X-RHEONIC-Signature"].startswith("sha256=")
 
     with session_factory.create_session() as session:
         project = session.query(ProjectRecord).filter(ProjectRecord.id == "p1").first()
@@ -132,8 +132,8 @@ def test_send_project_webhook_force_send_uses_override_when_disabled(tmp_path, m
     assert captured["url"] == "https://draft.test/hook"
     headers = captured["headers"]
     assert isinstance(headers, dict)
-    assert headers["X-LLMTBG-Event-Type"] == "webhook.test"
-    assert headers["X-LLMTBG-Signature"].startswith("sha256=")
+    assert headers["X-RHEONIC-Event-Type"] == "webhook.test"
+    assert headers["X-RHEONIC-Signature"].startswith("sha256=")
 
 
 def test_send_project_webhook_rejects_unsafe_host_and_records_failure(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:

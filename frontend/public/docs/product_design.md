@@ -1,4 +1,4 @@
-# LLMTokenBurnGuard — Product Design (v1)
+# Rheonic — Product Design (v1)
 
 This document describes product direction and positioning. For exact implemented runtime behavior and API semantics, use `protect-mode-spec.md`, `thresholds-map.md`, and `spec.md`.
 

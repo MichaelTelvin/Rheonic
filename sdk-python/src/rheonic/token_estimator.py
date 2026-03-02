@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from llmtokenburnguard.config import sdk_config
+from rheonic.config import sdk_config
 
 try:
     import tiktoken  # type: ignore[import-not-found]

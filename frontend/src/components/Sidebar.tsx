@@ -19,7 +19,7 @@ export function Sidebar({ userEmail, onSignOut }: SidebarProps): JSX.Element {
   return (
     <aside className="sidebar" aria-label="Primary navigation">
       <div className="sidebar-top">
-        <p className="sidebar-brand">LLMTokenBurnGuard</p>
+        <p className="sidebar-brand">Rheonic</p>
         <div className="sidebar-brand-divider" aria-hidden="true" />
         <nav className="sidebar-nav">
           {navItems.map((item) => (

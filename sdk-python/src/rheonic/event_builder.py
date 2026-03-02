@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from llmtokenburnguard.logger import get_logger
+from rheonic.logger import get_logger
 
 logger = get_logger(__name__)
 

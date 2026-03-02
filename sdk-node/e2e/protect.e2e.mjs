@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 
-import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, LLMTBGBlockedError } from "../dist/index.js";
+import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, RHEONICBlockedError } from "../dist/index.js";
 
-const backendBaseUrl = process.env.LLMTBG_E2E_BACKEND_URL ?? "http://backend_test:8000";
-const providerStubUrl = process.env.LLMTBG_E2E_PROVIDER_URL ?? "http://provider_stub_test:8099";
+const backendBaseUrl = process.env.RHEONIC_E2E_BACKEND_URL ?? "http://backend_test:8000";
+const providerStubUrl = process.env.RHEONIC_E2E_PROVIDER_URL ?? "http://provider_stub_test:8099";
 
 async function api(path, options = {}) {
   const mergedHeaders = {
@@ -148,7 +148,7 @@ async function main() {
       messages: [{ role: "user", content: "Predictive warning near cap check for node e2e." }],
     });
   } catch (error) {
-    blocked = error instanceof LLMTBGBlockedError;
+    blocked = error instanceof RHEONICBlockedError;
   }
   assert.equal(blocked, false);
   assert.equal((await providerCount()) - initialProviderCalls, 4);

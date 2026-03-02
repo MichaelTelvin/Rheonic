@@ -6,18 +6,18 @@ from typing import Any
 
 import pytest
 
-from llmtokenburnguard.client import Client
-from llmtokenburnguard.protect_engine import LLMTBGBlockedError, LLMTBGValidationError
-from llmtokenburnguard.providers.openai_adapter import instrument_openai, _set_token_estimator_for_tests
-from llmtokenburnguard.providers.anthropic_adapter import (
+from rheonic.client import Client
+from rheonic.protect_engine import RHEONICBlockedError, RHEONICValidationError
+from rheonic.providers.openai_adapter import instrument_openai, _set_token_estimator_for_tests
+from rheonic.providers.anthropic_adapter import (
     instrument_anthropic,
     _set_token_estimator_for_tests as _set_anthropic_token_estimator_for_tests,
 )
-from llmtokenburnguard.providers.google_adapter import (
+from rheonic.providers.google_adapter import (
     instrument_google,
     _set_token_estimator_for_tests as _set_google_token_estimator_for_tests,
 )
-from llmtokenburnguard.provider_model_validation import validate_provider_model
+from rheonic.provider_model_validation import validate_provider_model
 
 
 class FakeResponse:
@@ -209,7 +209,7 @@ def test_preflight_block_prevents_provider_call() -> None:
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
-    with pytest.raises(LLMTBGBlockedError):
+    with pytest.raises(RHEONICBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
     assert calls == []
     client.close()
@@ -236,9 +236,9 @@ def test_blocked_until_short_circuits_subsequent_decision_calls_locally() -> Non
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
-    with pytest.raises(LLMTBGBlockedError):
+    with pytest.raises(RHEONICBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
-    with pytest.raises(LLMTBGBlockedError):
+    with pytest.raises(RHEONICBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
     decision_calls = [url for url in transport.calls if url.endswith("/api/v1/protect/decision")]
     assert len(decision_calls) == 1
@@ -268,13 +268,13 @@ def test_parallel_calls_during_active_cooldown_block_locally_without_backend_dec
     instrument_openai(openai_client, client=client)
 
     # Prime cooldown from backend once.
-    with pytest.raises(LLMTBGBlockedError):
+    with pytest.raises(RHEONICBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
     decision_calls_before = len([url for url in transport.calls if url.endswith("/api/v1/protect/decision")])
     assert decision_calls_before == 1
 
     def _invoke() -> None:
-        with pytest.raises(LLMTBGBlockedError):
+        with pytest.raises(RHEONICBlockedError):
             openai_client.chat.completions.create(model="gpt-4o-mini")
 
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -431,7 +431,7 @@ def test_preflight_timeout_fail_closed_blocks_provider_call() -> None:
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
-    with pytest.raises(LLMTBGBlockedError):
+    with pytest.raises(RHEONICBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
     assert calls == []
     _wait_for_timeout_reports(transport, expected=1)
@@ -470,7 +470,7 @@ def test_preflight_500_fail_closed_blocks_provider_call() -> None:
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
-    with pytest.raises(LLMTBGBlockedError):
+    with pytest.raises(RHEONICBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
     assert calls == []
     client.close()
@@ -505,7 +505,7 @@ def test_preflight_invalid_json_fail_closed_blocks_provider_call() -> None:
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
-    with pytest.raises(LLMTBGBlockedError):
+    with pytest.raises(RHEONICBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
     assert calls == []
     client.close()
@@ -560,7 +560,7 @@ def test_anthropic_block_path_prevents_provider_call() -> None:
     anthropic_client, calls = _make_anthropic_stub()
     instrument_anthropic(anthropic_client, client=client)
 
-    with pytest.raises(LLMTBGBlockedError):
+    with pytest.raises(RHEONICBlockedError):
         anthropic_client.messages.create(
             model="claude-3-5-sonnet",
             max_tokens=128,
@@ -646,7 +646,7 @@ def test_google_block_path_prevents_provider_call() -> None:
     google_model, calls = _make_google_stub()
     instrument_google(google_model, client=client)
 
-    with pytest.raises(LLMTBGBlockedError):
+    with pytest.raises(RHEONICBlockedError):
         google_model.generate_content("hello")
     assert calls == []
     client.close()
@@ -769,7 +769,7 @@ def test_provider_model_validation_rejects_anthropic_call_when_model_missing() -
     anthropic_client, calls = _make_anthropic_stub()
     instrument_anthropic(anthropic_client, client=client)
 
-    with pytest.raises(LLMTBGValidationError):
+    with pytest.raises(RHEONICValidationError):
         anthropic_client.messages.create(
             max_tokens=64,
             messages=[{"role": "user", "content": "hello"}],
@@ -791,7 +791,7 @@ def test_provider_model_validation_rejects_openai_call_when_model_missing() -> N
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
-    with pytest.raises(LLMTBGValidationError):
+    with pytest.raises(RHEONICValidationError):
         openai_client.chat.completions.create(messages=[{"role": "user", "content": "hello"}], max_tokens=64)
     assert calls == []
     assert transport.decision_payloads == []
@@ -811,7 +811,7 @@ def test_provider_model_validation_rejects_google_call_when_model_missing() -> N
     google_model.model_name = ""
     instrument_google(google_model, client=client)
 
-    with pytest.raises(LLMTBGValidationError):
+    with pytest.raises(RHEONICValidationError):
         google_model.generate_content("hello")
     assert calls == []
     assert transport.decision_payloads == []
@@ -819,10 +819,10 @@ def test_provider_model_validation_rejects_google_call_when_model_missing() -> N
 
 
 def test_provider_model_validation_rejects_missing_provider() -> None:
-    with pytest.raises(LLMTBGValidationError):
+    with pytest.raises(RHEONICValidationError):
         validate_provider_model("", "any-model")
 
 
 def test_provider_model_validation_rejects_unknown_provider() -> None:
-    with pytest.raises(LLMTBGValidationError):
+    with pytest.raises(RHEONICValidationError):
         validate_provider_model("cohere", "command-r")
