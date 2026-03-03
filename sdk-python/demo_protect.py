@@ -287,7 +287,6 @@ def main() -> None:
     client = Client(
         ingest_key=ingest_key,
         base_url=BACKEND_BASE_URL,
-        protect_enabled=True,
         environment=env,
         flush_interval_s=60.0,
         protect_decision_timeout_ms=decision_timeout_ms,

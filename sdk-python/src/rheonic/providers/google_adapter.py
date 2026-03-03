@@ -44,9 +44,7 @@ def instrument_google(
             requested_model = _extract_requested_model(google_model, args, kwargs)
             validate_provider_model("google", requested_model)
             request_payload = _extract_request_payload(requested_model, args, kwargs)
-            estimated_input_tokens: int | None = None
-            if resolved_client.should_preflight_decision():
-                estimated_input_tokens = _estimate_input_tokens(request_payload)
+            estimated_input_tokens = _estimate_input_tokens(request_payload)
             protect_decision = _preflight(
                 sdk_client=resolved_client,
                 requested_model=requested_model,
@@ -96,9 +94,7 @@ def instrument_google(
         requested_model = _extract_requested_model(google_model, args, kwargs)
         validate_provider_model("google", requested_model)
         request_payload = _extract_request_payload(requested_model, args, kwargs)
-        estimated_input_tokens: int | None = None
-        if resolved_client.should_preflight_decision():
-            estimated_input_tokens = _estimate_input_tokens(request_payload)
+        estimated_input_tokens = _estimate_input_tokens(request_payload)
         protect_decision = _preflight(
             sdk_client=resolved_client,
             requested_model=requested_model,
@@ -152,8 +148,6 @@ def _preflight(
     environment: str | None,
     feature: str | None,
 ) -> dict[str, object]:
-    if not sdk_client.should_preflight_decision():
-        return {"decision": "allow", "reason": "protect_disabled"}
     return sdk_client.preflight_protect_decision(
         {
             "provider": "google",

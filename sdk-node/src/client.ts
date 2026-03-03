@@ -21,7 +21,6 @@ export interface ClientConfig {
   baseUrl?: string;
   ingestKey: string;
   environment?: string;
-  protectEnabled?: boolean;
   flushIntervalMs?: number;
   maxQueueSize?: number;
   overflowPolicy?: OverflowPolicy;
@@ -35,7 +34,6 @@ export class Client {
   public readonly baseUrl: string;
   public readonly ingestKey: string;
   public readonly environment: string;
-  public readonly protectEnabled: boolean;
 
   private readonly flushIntervalMs: number;
   private readonly maxQueueSize: number;
@@ -55,7 +53,6 @@ export class Client {
     this.baseUrl = config.baseUrl ?? process.env.RHEONIC_BASE_URL ?? sdkNodeConfig.defaultBaseUrl;
     this.ingestKey = config.ingestKey;
     this.environment = config.environment ?? sdkNodeConfig.defaultEnvironment;
-    this.protectEnabled = config.protectEnabled ?? false;
     this.flushIntervalMs = config.flushIntervalMs ?? sdkNodeConfig.defaultFlushIntervalMs;
     this.maxQueueSize = config.maxQueueSize ?? sdkNodeConfig.defaultMaxQueueSize;
     this.overflowPolicy = config.overflowPolicy ?? "drop_oldest";
@@ -136,15 +133,7 @@ export class Client {
   }
 
   public async evaluateProtectDecision(context: ProtectContext): Promise<ProtectEvaluation> {
-    // Observe mode bypasses backend decision preflight entirely.
-    if (!this.protectEnabled) {
-      return { decision: "allow", reason: "protect_disabled" };
-    }
     return this.protectEngine.evaluate(context);
-  }
-
-  public shouldPreflightDecision(): boolean {
-    return this.protectEnabled;
   }
 
   public instrumentOpenAI<T extends Record<string, any>>(

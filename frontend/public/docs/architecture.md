@@ -26,9 +26,10 @@
 6. Auto-close resolves stale open incidents by inactivity cooldown.
 
 ## Protect decision pipeline
-1. Observe mode: SDK skips preflight; telemetry only.
-2. Protect mode preflight reads `(project, provider)` counters and caps.
-3. Decision order:
+1. SDK always calls preflight before provider call.
+2. Observe mode returns allow-only behavior (telemetry only).
+3. Protect mode preflight reads `(project, provider)` counters and caps.
+4. Decision order:
 - cooldown active -> `block`
 - token/request cap breach -> `block`
 - warn-only signals -> `warn`

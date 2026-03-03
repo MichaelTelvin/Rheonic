@@ -90,7 +90,6 @@ def run() -> None:
     client = create_client(
         ingest_key=auth.ingest_key,
         base_url=BACKEND_BASE_URL,
-        protect_enabled=True,
         flush_interval_s=60.0,
     )
 

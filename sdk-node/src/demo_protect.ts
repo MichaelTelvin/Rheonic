@@ -206,7 +206,6 @@ async function main() {
   const client = createClient({
     baseUrl: backendBaseUrl,
     ingestKey,
-    protectEnabled: true,
     environment: env,
     debug: process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true",
     flushIntervalMs: 60_000,

@@ -1,4 +1,4 @@
-name: rheonic
+name: rheonic_prod
 
 services:
   postgres:

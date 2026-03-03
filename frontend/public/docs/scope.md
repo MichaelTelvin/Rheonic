@@ -37,7 +37,7 @@ Protect mode
 - Decision endpoint (`POST /api/v1/protect/decision`)
 - Provider-scoped decision inputs/state (counters + cooldown + deterministic warn signals)
 - Decision ordering: cooldown -> hard caps (block) -> warn signals (`near_cap`/`retry_storm`/`loop_suspect`/`token_explosion`) -> allow
-- SDK-gated preflight (observe skips decision), token estimation in protect mode only
+- Always-on SDK preflight (decision endpoint called in observe/protect), with server-side mode deciding enforceability
 - Fail-open / fail-closed handling for decision timeout/error
 - Protect metrics and health endpoints (project totals with optional provider filter)
 

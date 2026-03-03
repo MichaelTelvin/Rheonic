@@ -179,7 +179,6 @@ def main() -> None:
         client = create_client(
             base_url=os.getenv("RHEONIC_BASE_URL"),
             ingest_key=ingest_key,
-            protect_enabled=False,
             environment=environment,
             debug=os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"},
         )

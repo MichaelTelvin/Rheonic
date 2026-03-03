@@ -174,7 +174,6 @@ async function runDemo(): Promise<void> {
 
   const client: Client = createClient({
     ingestKey,
-    protectEnabled: false,
     environment,
     debug: process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true",
   });

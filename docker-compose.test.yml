@@ -39,6 +39,8 @@ services:
         condition: service_healthy
       redis_test:
         condition: service_healthy
+      db_init_test:
+        condition: service_completed_successfully
     command: >
       sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000"
     healthcheck:
@@ -46,6 +48,22 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+
+  db_init_test:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://rheonic:rheonic@postgres_test:5432/rheonic_test
+      REDIS_URL: redis://redis_test:6379/0
+      APP_ENV: test
+      JWT_SECRET: test-secret
+      CORS_ORIGINS: http://localhost:5173
+    depends_on:
+      postgres_test:
+        condition: service_healthy
+      redis_test:
+        condition: service_healthy
+    command: >
+      sh -c "python -m app.infrastructure.db.migrate && echo 'db_init_test complete'"
 
   provider_stub_test:
     image: python:3.12-alpine

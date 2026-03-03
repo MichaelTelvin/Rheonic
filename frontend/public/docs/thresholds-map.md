@@ -66,8 +66,8 @@ This map reflects the deterministic anomaly model now used by ingest and protect
   - `closed`: block if decision unavailable
 
 ## Observe Mode Rules
-- No preflight call.
-- No token estimation for preflight.
+- Preflight decision call still runs before provider call.
+- SDK may include token estimate when available.
 - Never returns warn/block action to SDK.
 - Ingest still logs incidents with dominance applied per event:
   - `cap_breach` dominates all

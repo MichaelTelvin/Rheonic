@@ -1,9 +1,9 @@
-name: rheonic
+name: rheonic_local
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: rheonic_postgres
+    container_name: rheonic-postgres
     env_file:
       - .env
     environment:
@@ -22,7 +22,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: rheonic_redis
+    container_name: rheonic-redis
     env_file:
       - .env
     ports:
@@ -38,7 +38,7 @@ services:
 
   backend:
     build: ./backend
-    container_name: rheonic_backend
+    container_name: rheonic-backend
     env_file:
       - .env
     environment:
@@ -63,7 +63,7 @@ services:
 
   worker:
     build: ./backend
-    container_name: rheonic_worker
+    container_name: rheonic-worker
     env_file:
       - .env
     environment:
@@ -84,7 +84,7 @@ services:
 
   scheduler:
     build: ./backend
-    container_name: rheonic_scheduler
+    container_name: rheonic-scheduler
     env_file:
       - .env
     environment:
@@ -106,7 +106,7 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: rheonic_frontend
+    container_name: rheonic-frontend
     env_file:
       - .env
     environment:
@@ -123,7 +123,7 @@ services:
 
   db_init:
     build: ./backend
-    container_name: rheonic_db_init
+    container_name: rheonic-db-init
     env_file:
       - .env
     environment:
@@ -145,6 +145,7 @@ services:
 
   sdk_node:
     image: node:20-alpine
+    container_name: rheonic-sdk-node
     working_dir: /app
     volumes:
       - ./sdk-node:/app
@@ -155,6 +156,7 @@ services:
 
   sdk_python:
     image: python:3.12-alpine
+    container_name: rheonic-sdk-python
     working_dir: /app
     volumes:
       - ./sdk-python:/app
@@ -164,6 +166,7 @@ services:
 
   frontend_test:
     image: node:20-alpine
+    container_name: rheonic-frontend-test
     working_dir: /app
     volumes:
       - ./frontend:/app
@@ -175,6 +178,7 @@ services:
 
   provider_stub:
     image: python:3.12-alpine
+    container_name: rheonic-provider-stub
     working_dir: /app
     volumes:
       - ./tests/e2e:/app/tests/e2e

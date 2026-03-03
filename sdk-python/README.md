@@ -14,7 +14,6 @@ pip install -e .
 - Required: `ingest_key`
 - Optional: `base_url` (defaults to `RHEONIC_BASE_URL` env var, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
-- Optional: `protect_enabled` (default `False`; when `True`, SDK calls `POST /api/v1/protect/decision` preflight)
 - Demo env var: `RHEONIC_INGEST_KEY`
 
 Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
@@ -46,7 +45,7 @@ import os
 from openai import OpenAI
 from rheonic import create_client, instrument_openai
 
-burnguard = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"], protect_enabled=True)
+burnguard = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"])
 openai_client = instrument_openai(
     OpenAI(api_key="..."),
     client=burnguard,
@@ -64,7 +63,7 @@ import google.generativeai as genai
 
 from rheonic import create_client
 
-client = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"], protect_enabled=True)
+client = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"])
 
 anthropic_client = client.instrument_anthropic(Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]))
 anthropic_client.messages.create(
@@ -120,6 +119,8 @@ Optional overrides:
 - `RHEONIC_MODEL`
 - `RHEONIC_ENVIRONMENT`
 
-Manual mode check:
-- Observe (`protect_enabled=False`): only `POST /api/v1/events`
-- Protect (`protect_enabled=True`): `POST /api/v1/protect/decision` then `POST /api/v1/events`
+Runtime call path:
+- SDK instrumentation calls `POST /api/v1/protect/decision` then `POST /api/v1/events`.
+- Project mode in dashboard controls decision behavior:
+  - Observe: allow only.
+  - Protect: allow/warn/block with cooldown.

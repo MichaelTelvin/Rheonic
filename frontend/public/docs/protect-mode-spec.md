@@ -13,8 +13,9 @@ Dashboard endpoints keep project totals and can optionally filter by provider.
 
 ## Modes
 ### Observe
-- SDK does not call `/api/v1/protect/decision`.
-- SDK does not run preflight token estimation.
+- SDK calls `/api/v1/protect/decision` before provider call.
+- SDK may send preflight token estimate when available.
+- Backend observe mode returns allow-only behavior (no runtime enforcement).
 - Provider call proceeds.
 - Ingest still records incidents.
 - No webhook events are dispatched from runtime detection/decision paths.

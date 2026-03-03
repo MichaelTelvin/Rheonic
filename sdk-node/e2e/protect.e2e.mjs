@@ -66,7 +66,6 @@ async function main() {
   const client = createClient({
     baseUrl: backendBaseUrl,
     ingestKey: createdKey.key,
-    protectEnabled: true,
     flushIntervalMs: 60000,
   });
   const openai = {

@@ -71,7 +71,7 @@ describe("App", () => {
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Guardrails and visibility for runaway token burn." })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Control your agent traffic before it controls your bill." })).toBeDefined();
     expect(screen.getAllByRole("link", { name: "Quickstart" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Sign in" }).length).toBeGreaterThan(0);
   });

@@ -14,7 +14,6 @@ npm install
 - Required: `ingestKey`
 - Optional: `baseUrl` (defaults to `RHEONIC_BASE_URL` env var, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
-- Optional: `protectEnabled` (default `false`; when `true`, SDK calls `POST /api/v1/protect/decision` preflight)
 - Demo env var: `RHEONIC_INGEST_KEY`
 
 Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
@@ -42,7 +41,7 @@ await captureEvent(
 import OpenAI from "openai";
 import { createClient, instrumentOpenAI } from "./src/index";
 
-const burnguard = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY!, protectEnabled: true });
+const burnguard = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
 const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
   client: burnguard,
   endpoint: "/chat/completions",
@@ -57,7 +56,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "./src/index";
 
-const client = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY!, protectEnabled: true });
+const client = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
 
 const anthropic = client.instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }));
 await anthropic.messages.create({
@@ -94,6 +93,8 @@ Before running the demo:
 
 Then check dashboard metrics for the selected project.
 
-Manual mode check:
-- Observe (`protectEnabled: false`): only `POST /api/v1/events`
-- Protect (`protectEnabled: true`): `POST /api/v1/protect/decision` then `POST /api/v1/events`
+Runtime call path:
+- SDK instrumentation calls `POST /api/v1/protect/decision` then `POST /api/v1/events`.
+- Project mode in dashboard controls decision behavior:
+  - Observe: allow only.
+  - Protect: allow/warn/block with cooldown.

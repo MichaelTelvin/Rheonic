@@ -12,7 +12,7 @@ style: {
   fill: "#f4f6fb"
 }
 
-sdk_mode: "SDK Mode Check\nObserve or Protect" {
+sdk_call: "SDK wrapper call\nalways runs preflight decision" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -22,7 +22,7 @@ sdk_mode: "SDK Mode Check\nObserve or Protect" {
   }
 }
 
-observe: "Observe path\nno preflight decision call" {
+mode_gate: "Backend project mode\nObserve or Protect" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -152,10 +152,11 @@ metrics: "Protect metrics\nproject totals aggregate across providers\noptional p
   }
 }
 
-sdk_mode -> observe: "Observe"
-sdk_mode -> preflight: "Protect"
+sdk_call -> preflight
+preflight -> mode_gate
+mode_gate -> observe: "Observe"
+mode_gate -> inputs: "Protect"
 observe -> provider
-preflight -> inputs
 inputs -> caps
 inputs -> ingest_note
 caps -> block: "block"
@@ -168,3 +169,12 @@ provider -> ingest
 decision_webhooks -> metrics
 ingest -> incident_pipeline
 ingest -> metrics
+observe: "Observe mode result\nallow only\nno decision webhooks" {
+  style: {
+    fill: "#e8eef9"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 13
+  }
+}

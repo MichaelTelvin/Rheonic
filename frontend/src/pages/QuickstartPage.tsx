@@ -63,7 +63,6 @@ export function QuickstartPage(): JSX.Element {
 const client = createClient({
   baseUrl: process.env.RHEONIC_BACKEND_URL,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
-  protectEnabled: false,
 });
 
 await client.captureEvent(
@@ -80,7 +79,6 @@ from rheonic import create_client, build_event
 client = create_client(
     base_url=os.environ["RHEONIC_BACKEND_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
-    protect_enabled=False,
 )
 
 client.capture_event(
@@ -103,7 +101,6 @@ import { createClient, instrumentOpenAI, RHEONICBlockedError } from "rheonic-nod
 const burnguard = createClient({
   baseUrl: process.env.RHEONIC_BACKEND_URL,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
-  protectEnabled: true,
 });
 
 const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
@@ -130,7 +127,6 @@ from rheonic import create_client, instrument_openai, RHEONICBlockedError
 burnguard = create_client(
     base_url=os.environ["RHEONIC_BACKEND_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
-    protect_enabled=True,
 )
 openai_client = instrument_openai(
     OpenAI(api_key=os.environ["OPENAI_API_KEY"]),

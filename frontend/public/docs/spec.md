@@ -51,7 +51,7 @@ No severity levels are used in runtime logic.
 - `PUT /api/v1/projects/{project_id}/protect`
 
 Fields:
-- `protect_enabled`
+- `protect_enabled` (project mode flag in backend settings; not an SDK wrapper config flag)
 - `protect_fail_mode` (`open` | `closed`)
 - `apply_clamp`
 - `protect_max_req_per_min`
@@ -74,7 +74,7 @@ Protect decision response fields include:
   - `recommended_max_output_tokens`
   - `applied` (backend recommendation payload; SDK may apply clamp before provider call when enabled)
 
-Observe mode is telemetry-only: SDK skips preflight by default.
+Observe mode is telemetry-only for enforcement: SDK still calls preflight, and backend mode returns allow (no warn/block enforcement).
 
 ## Webhook API
 - `GET /api/v1/projects/{project_id}/webhook`

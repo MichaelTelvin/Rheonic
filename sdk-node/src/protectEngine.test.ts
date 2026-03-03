@@ -54,7 +54,7 @@ function makeGoogleStub() {
   return { googleModel, calls };
 }
 
-test("observe mode skips decision endpoint and still calls provider", async () => {
+test("preflight decision endpoint is always called before provider request", async () => {
   const originalFetch = globalThis.fetch;
   let decisionCalls = 0;
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -63,7 +63,7 @@ test("observe mode skips decision endpoint and still calls provider", async () =
       return {
         ok: true,
         status: 200,
-        json: async () => ({ decision: "block", reason: "tok_limit" }),
+        json: async () => ({ decision: "allow", reason: "ok" }),
       } as Response;
     }
     if (url.endsWith("/api/v1/events")) {
@@ -73,27 +73,36 @@ test("observe mode skips decision endpoint and still calls provider", async () =
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", protectEnabled: false, flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini" });
     await client.flush();
     assert.equal(calls.length, 1);
-    assert.equal(decisionCalls, 0);
+    assert.equal(decisionCalls, 1);
     client.close();
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("observe mode skips token estimation", async () => {
+test("token estimation is evaluated before protect decision request", async () => {
   const originalFetch = globalThis.fetch;
   let estimatorCalls = 0;
   __setInputTokenEstimatorForTests(() => {
     estimatorCalls += 1;
     return 111;
   });
-  globalThis.fetch = (async (url: string) => {
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      const parsed = init?.body ? (JSON.parse(String(init.body)) as { input_tokens_estimate?: unknown }) : {};
+      assert.equal(parsed.input_tokens_estimate, 111);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ decision: "allow", reason: "ok" }),
+      } as Response;
+    }
     if (url.endsWith("/api/v1/events")) {
       return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
     }
@@ -101,7 +110,7 @@ test("observe mode skips token estimation", async () => {
   }) as typeof fetch;
 
   try {
-    const client = createClient({ ingestKey: "k1", protectEnabled: false, flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({
@@ -110,7 +119,7 @@ test("observe mode skips token estimation", async () => {
     });
     await client.flush();
     assert.equal(calls.length, 1);
-    assert.equal(estimatorCalls, 0);
+    assert.equal(estimatorCalls, 1);
     client.close();
   } finally {
     __setInputTokenEstimatorForTests(null);
@@ -133,7 +142,7 @@ test("decision block prevents provider call", async () => {
     }) as Response) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
@@ -167,7 +176,7 @@ test("blocked_until short-circuits subsequent decision calls locally", async () 
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
@@ -202,7 +211,7 @@ test("parallel calls during active cooldown block locally without backend decisi
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
 
@@ -238,7 +247,7 @@ test("near_cap warn allows provider call", async () => {
     }) as Response) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini", max_tokens: 2048 });
@@ -275,7 +284,7 @@ test("decision warn allows provider call and tags telemetry", async () => {
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini", max_tokens: 256 });
@@ -315,7 +324,7 @@ test("messages request includes estimated input_tokens_estimate in protect paylo
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({
@@ -356,7 +365,7 @@ test("messages request sends default-on input_tokens_estimate without overrides"
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({
@@ -399,7 +408,7 @@ test("token estimation failure omits input_tokens_estimate from protect payload"
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({
@@ -440,7 +449,7 @@ test("request with no messages or prompt omits input_tokens_estimate", async () 
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({
@@ -474,7 +483,6 @@ test("decision timeout fail-open allows provider call", async () => {
 
   try {
     const client = createClient({
-      protectEnabled: true,
       ingestKey: "k1",
       environment: "dev",
       flushIntervalMs: 30_000,
@@ -512,7 +520,6 @@ test("decision timeout fail-closed blocks provider call", async () => {
 
   try {
     const client = createClient({
-      protectEnabled: true,
       ingestKey: "k1",
       environment: "staging",
       flushIntervalMs: 30_000,
@@ -542,7 +549,7 @@ test("decision 500 fail-open allows provider call", async () => {
     }) as Response) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini" });
@@ -563,7 +570,7 @@ test("decision 500 fail-closed blocks provider call", async () => {
     }) as Response) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
@@ -586,7 +593,7 @@ test("invalid JSON fail-open allows provider call", async () => {
     }) as unknown as Response) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini" });
@@ -609,7 +616,7 @@ test("invalid JSON fail-closed blocks provider call", async () => {
     }) as unknown as Response) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
@@ -641,7 +648,7 @@ test("anthropic allow path calls provider and emits telemetry", async () => {
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { anthropic, calls } = makeAnthropicStub();
     instrumentAnthropic(anthropic, { client });
     await anthropic.messages.create({
@@ -669,7 +676,7 @@ test("anthropic block path prevents provider call", async () => {
     }) as Response) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { anthropic, calls } = makeAnthropicStub();
     instrumentAnthropic(anthropic, { client });
     await assert.rejects(
@@ -702,7 +709,7 @@ test("anthropic includes input_tokens_estimate in decision payload", async () =>
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { anthropic } = makeAnthropicStub();
     instrumentAnthropic(anthropic, { client });
     await anthropic.messages.create({
@@ -740,7 +747,7 @@ test("google allow path calls provider and emits telemetry", async () => {
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { googleModel, calls } = makeGoogleStub();
     instrumentGoogle(googleModel, { client });
     await googleModel.generateContent("hello from google");
@@ -764,7 +771,7 @@ test("google block path prevents provider call", async () => {
     }) as Response) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { googleModel, calls } = makeGoogleStub();
     instrumentGoogle(googleModel, { client });
     await assert.rejects(() => googleModel.generateContent("hello"), RHEONICBlockedError);
@@ -794,7 +801,7 @@ test("google includes input_tokens_estimate in decision payload", async () => {
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { googleModel } = makeGoogleStub();
     instrumentGoogle(googleModel, { client });
     await googleModel.generateContent("hello world");
@@ -808,7 +815,7 @@ test("google includes input_tokens_estimate in decision payload", async () => {
 });
 
 test("provider/model validation accepts openai gpt model", async () => {
-  const client = createClient({ protectEnabled: false, ingestKey: "k1", flushIntervalMs: 30_000 });
+  const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
   const { openai, calls } = makeOpenAIStub();
   instrumentOpenAI(openai, { client });
   await openai.chat.completions.create({ model: "gpt-4o-mini" });
@@ -817,7 +824,7 @@ test("provider/model validation accepts openai gpt model", async () => {
 });
 
 test("provider/model validation accepts anthropic claude model", async () => {
-  const client = createClient({ protectEnabled: false, ingestKey: "k1", flushIntervalMs: 30_000 });
+  const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
   const { anthropic, calls } = makeAnthropicStub();
   instrumentAnthropic(anthropic, { client });
   await anthropic.messages.create({
@@ -830,7 +837,7 @@ test("provider/model validation accepts anthropic claude model", async () => {
 });
 
 test("provider/model validation accepts google model", async () => {
-  const client = createClient({ protectEnabled: false, ingestKey: "k1", flushIntervalMs: 30_000 });
+  const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
   const { googleModel, calls } = makeGoogleStub();
   instrumentGoogle(googleModel, { client });
   await googleModel.generateContent("hello");
@@ -839,7 +846,7 @@ test("provider/model validation accepts google model", async () => {
 });
 
 test("provider/model validation does not enforce naming prefixes", async () => {
-  const client = createClient({ protectEnabled: false, ingestKey: "k1", flushIntervalMs: 30_000 });
+  const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
   const { anthropic, calls: anthropicCalls } = makeAnthropicStub();
   instrumentAnthropic(anthropic, { client });
   await anthropic.messages.create({
@@ -869,7 +876,7 @@ test("provider/model validation rejects anthropic call when model is missing", a
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { anthropic, calls } = makeAnthropicStub();
     instrumentAnthropic(anthropic, { client });
     await assert.rejects(
@@ -899,7 +906,7 @@ test("provider/model validation rejects openai call when model is missing", asyn
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(
@@ -929,7 +936,7 @@ test("provider/model validation rejects google call when model is missing", asyn
   }) as typeof fetch;
 
   try {
-    const client = createClient({ protectEnabled: true, ingestKey: "k1", flushIntervalMs: 30_000 });
+    const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { googleModel, calls } = makeGoogleStub();
     (googleModel as { model?: string; modelName?: string }).model = "";
     (googleModel as { model?: string; modelName?: string }).modelName = "";

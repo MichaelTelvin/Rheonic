@@ -127,18 +127,17 @@ def _make_google_stub() -> tuple[Any, list[tuple[tuple[Any, ...], dict[str, Any]
     return _GoogleModel(), calls
 
 
-def test_observe_mode_skips_decision_endpoint_and_allows_provider_call() -> None:
+def test_preflight_decision_endpoint_is_called_before_provider_request() -> None:
     transport = FakeHttpClient(  # type: ignore[arg-type]
         {
-            "decision": "block",
-            "reason": "tok_limit",
+            "decision": "allow",
+            "reason": "ok",
             "fail_mode": "open",
             "protect_decision_timeout_ms": 100,
         }
     )
     client = Client(
         ingest_key="p1",
-        protect_enabled=False,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -148,12 +147,12 @@ def test_observe_mode_skips_decision_endpoint_and_allows_provider_call() -> None
 
     openai_client.chat.completions.create(model="gpt-4o-mini")
     decision_calls = [url for url in transport.calls if url.endswith("/api/v1/protect/decision")]
-    assert len(decision_calls) == 0
+    assert len(decision_calls) == 1
     assert len(calls) == 1
     client.close()
 
 
-def test_observe_mode_skips_token_estimation() -> None:
+def test_token_estimation_is_evaluated_before_protect_decision_request() -> None:
     transport = FakeHttpClient(  # type: ignore[arg-type]
         {
             "decision": "allow",
@@ -171,7 +170,6 @@ def test_observe_mode_skips_token_estimation() -> None:
     _set_token_estimator_for_tests(_counting_estimator)
     client = Client(
         ingest_key="p1",
-        protect_enabled=False,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -184,9 +182,9 @@ def test_observe_mode_skips_token_estimation() -> None:
         messages=[{"role": "user", "content": "hello"}],
     )
     decision_calls = [url for url in transport.calls if url.endswith("/api/v1/protect/decision")]
-    assert len(decision_calls) == 0
+    assert len(decision_calls) == 1
     assert len(calls) == 1
-    assert estimator_calls["count"] == 0
+    assert estimator_calls["count"] == 1
     _set_token_estimator_for_tests(None)
     client.close()
 
@@ -194,7 +192,6 @@ def test_observe_mode_skips_token_estimation() -> None:
 def test_preflight_block_prevents_provider_call() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient(  # type: ignore[arg-type]
@@ -228,7 +225,6 @@ def test_blocked_until_short_circuits_subsequent_decision_calls_locally() -> Non
     )
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -259,7 +255,6 @@ def test_parallel_calls_during_active_cooldown_block_locally_without_backend_dec
     )
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -291,7 +286,6 @@ def test_parallel_calls_during_active_cooldown_block_locally_without_backend_dec
 def test_preflight_predictive_near_cap_warn_allows_provider_call() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient(  # type: ignore[arg-type]
@@ -322,7 +316,6 @@ def test_preflight_warn_allows_provider_call_and_tags_telemetry() -> None:
     )
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -352,7 +345,6 @@ def test_messages_request_includes_input_tokens_estimate() -> None:
     _set_token_estimator_for_tests(lambda _payload: 222)
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -379,7 +371,6 @@ def test_token_estimation_failure_omits_input_tokens_estimate() -> None:
     _set_token_estimator_for_tests(lambda _payload: None)
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -398,7 +389,6 @@ def test_preflight_timeout_fail_open_allows_provider_call() -> None:
     transport = FakeHttpClient(TimeoutError("timeout"))  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         environment="dev",
         flush_interval_s=30.0,
@@ -421,7 +411,6 @@ def test_preflight_timeout_fail_closed_blocks_provider_call() -> None:
     transport = FakeHttpClient(TimeoutError("timeout"))  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         environment="staging",
         flush_interval_s=30.0,
@@ -444,7 +433,6 @@ def test_preflight_timeout_fail_closed_blocks_provider_call() -> None:
 def test_preflight_500_fail_open_allows_provider_call() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="open",
@@ -461,7 +449,6 @@ def test_preflight_500_fail_open_allows_provider_call() -> None:
 def test_preflight_500_fail_closed_blocks_provider_call() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="closed",
@@ -479,7 +466,6 @@ def test_preflight_500_fail_closed_blocks_provider_call() -> None:
 def test_preflight_invalid_json_fail_open_allows_provider_call() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="open",
@@ -496,7 +482,6 @@ def test_preflight_invalid_json_fail_open_allows_provider_call() -> None:
 def test_preflight_invalid_json_fail_closed_blocks_provider_call() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="closed",
@@ -522,7 +507,6 @@ def test_anthropic_allow_path_calls_provider_and_emits_telemetry() -> None:
     )
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -545,7 +529,6 @@ def test_anthropic_allow_path_calls_provider_and_emits_telemetry() -> None:
 def test_anthropic_block_path_prevents_provider_call() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient(  # type: ignore[arg-type]
@@ -582,7 +565,6 @@ def test_anthropic_includes_input_tokens_estimate() -> None:
     _set_anthropic_token_estimator_for_tests(lambda _payload: 444)
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -612,7 +594,6 @@ def test_google_allow_path_calls_provider_and_emits_telemetry() -> None:
     )
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -631,7 +612,6 @@ def test_google_allow_path_calls_provider_and_emits_telemetry() -> None:
 def test_google_block_path_prevents_provider_call() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient(  # type: ignore[arg-type]
@@ -664,7 +644,6 @@ def test_google_includes_input_tokens_estimate() -> None:
     _set_google_token_estimator_for_tests(lambda _payload: 555)
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -682,7 +661,6 @@ def test_google_includes_input_tokens_estimate() -> None:
 def test_provider_model_validation_accepts_openai_gpt_model() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=False,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient({"decision": "allow"}),  # type: ignore[arg-type]
@@ -698,7 +676,6 @@ def test_provider_model_validation_accepts_openai_gpt_model() -> None:
 def test_provider_model_validation_accepts_anthropic_claude_model() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=False,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient({"decision": "allow"}),  # type: ignore[arg-type]
@@ -718,7 +695,6 @@ def test_provider_model_validation_accepts_anthropic_claude_model() -> None:
 def test_provider_model_validation_accepts_google_model() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=False,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient({"decision": "allow"}),  # type: ignore[arg-type]
@@ -734,7 +710,6 @@ def test_provider_model_validation_accepts_google_model() -> None:
 def test_provider_model_validation_does_not_enforce_prefixes() -> None:
     client = Client(
         ingest_key="p1",
-        protect_enabled=False,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=FakeHttpClient({"decision": "allow"}),  # type: ignore[arg-type]
@@ -761,7 +736,6 @@ def test_provider_model_validation_rejects_anthropic_call_when_model_missing() -
     transport = FakeHttpClient({"decision": "allow"})  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -783,7 +757,6 @@ def test_provider_model_validation_rejects_openai_call_when_model_missing() -> N
     transport = FakeHttpClient({"decision": "allow"})  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,
@@ -802,7 +775,6 @@ def test_provider_model_validation_rejects_google_call_when_model_missing() -> N
     transport = FakeHttpClient({"decision": "allow"})  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
-        protect_enabled=True,
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         http_client=transport,

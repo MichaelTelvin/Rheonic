@@ -8,7 +8,8 @@ All API paths remain under `/api/v1/...`.
 3. Expected:
 - Events ingest succeeds.
 - Realtime counters move.
-- No preflight decision call.
+- Preflight decision call still occurs before provider call.
+- Decision result remains allow-only in observe mode.
 - Incidents may be logged by deterministic detectors; no protect warn/block action is returned to SDK.
 - No runtime detector/decision webhook should be sent in observe mode.
 
