@@ -18,6 +18,8 @@ import { NotFound } from "./pages/NotFound";
 import { Projects } from "./pages/Projects";
 import { Protect } from "./pages/Protect";
 import { QuickstartPage } from "./pages/QuickstartPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
+import { TermsPage } from "./pages/TermsPage";
 
 interface AuthenticatedAppLayoutProps {
   userEmail: string | null;
@@ -100,6 +102,8 @@ export function App(): JSX.Element {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/quickstart" element={<QuickstartPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       <Route path="/docs" element={<Navigate to="/app/docs" replace />} />
       <Route
         path="/login"

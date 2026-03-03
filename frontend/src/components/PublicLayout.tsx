@@ -10,6 +10,8 @@ interface PublicLayoutProps extends PropsWithChildren {
   showQuickstartLink?: boolean;
   showHomeLink?: boolean;
   showDocsLink?: boolean;
+  docsLinkLabel?: string;
+  showBetaBadge?: boolean;
 }
 
 export function PublicLayout({
@@ -19,12 +21,16 @@ export function PublicLayout({
   showQuickstartLink = true,
   showHomeLink = false,
   showDocsLink = true,
+  docsLinkLabel = "Docs (dashboard)",
+  showBetaBadge = false,
   children,
 }: PublicLayoutProps): JSX.Element {
   const token = getAuthItem(frontendConfig.authTokenStorageKey);
   const docsHref = token ? "/docs" : "/login";
   const [scrolled, setScrolled] = useState(false);
   const isV2Surface = shellClassName?.includes("public-shell-marketing") || shellClassName?.includes("quickstart-v2-shell");
+  const isLandingFooter = shellClassName?.includes("public-shell-marketing");
+  const isQuickstartFooter = shellClassName?.includes("quickstart-v2-shell");
 
   useEffect(() => {
     if (!isV2Surface) {
@@ -45,12 +51,13 @@ export function PublicLayout({
       <div className={`public-shell${shellClassName ? ` ${shellClassName}` : ""}`}>
         <header className={`public-nav public-nav-sticky${scrolled ? " is-scrolled" : ""}`}>
           <Link className="public-brand" to="/">
-            Rheonic
+            <span className="public-brand-word">Rheonic</span>
+            {showBetaBadge ? <span className="public-beta-badge">Beta</span> : null}
           </Link>
           <nav className="public-nav-links">
             {showHomeLink ? <Link to="/">Home</Link> : null}
             {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
-            {showDocsLink ? <Link to={docsHref}>Docs (dashboard)</Link> : null}
+            {showDocsLink ? <Link to={docsHref}>{docsLinkLabel}</Link> : null}
             <Link className="public-login-link" to={navAuthHref}>
               {navAuthLabel}
             </Link>
@@ -59,14 +66,60 @@ export function PublicLayout({
 
         {children}
 
-        <footer className="public-footer">
-          <div className="public-footer-links">
-            {showHomeLink ? <Link to="/">Home</Link> : null}
-            {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
-            {showDocsLink ? <Link to={docsHref}>Docs (dashboard)</Link> : null}
-            <Link to="/login">Sign in</Link>
-          </div>
-          <p>© {new Date().getFullYear()} Rheonic</p>
+        <footer className={`public-footer${isLandingFooter ? " public-footer-landing-legal" : ""}${isQuickstartFooter ? " public-footer-quickstart-legal" : ""}`}>
+          {isLandingFooter ? (
+            <>
+              <div className="public-footer-links">
+                <Link to="/quickstart">Quickstart</Link>
+                <span aria-hidden="true" className="public-footer-dot">
+                  ·
+                </span>
+                <Link to="/login">Sign in</Link>
+                <span aria-hidden="true" className="public-footer-dot">
+                  ·
+                </span>
+                <Link to="/privacy">Privacy</Link>
+                <span aria-hidden="true" className="public-footer-dot">
+                  ·
+                </span>
+                <Link to="/terms">Terms</Link>
+              </div>
+              <p>© 2026 Rheonic</p>
+            </>
+          ) : isQuickstartFooter ? (
+            <>
+              <div className="public-footer-links">
+                <Link to="/">Home</Link>
+                <span aria-hidden="true" className="public-footer-dot">
+                  ·
+                </span>
+                <Link to={docsHref}>{docsLinkLabel}</Link>
+                <span aria-hidden="true" className="public-footer-dot">
+                  ·
+                </span>
+                <Link to="/privacy">Privacy</Link>
+                <span aria-hidden="true" className="public-footer-dot">
+                  ·
+                </span>
+                <Link to="/terms">Terms</Link>
+                <span aria-hidden="true" className="public-footer-dot">
+                  ·
+                </span>
+                <Link to="/login">Sign in</Link>
+              </div>
+              <p>© 2026 Rheonic</p>
+            </>
+          ) : (
+            <>
+              <div className="public-footer-links">
+                {showHomeLink ? <Link to="/">Home</Link> : null}
+                {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
+                {showDocsLink ? <Link to={docsHref}>{docsLinkLabel}</Link> : null}
+                <Link to="/login">Sign in</Link>
+              </div>
+              <p>© {new Date().getFullYear()} Rheonic</p>
+            </>
+          )}
         </footer>
       </div>
     </main>

@@ -158,6 +158,8 @@ except RHEONICBlockedError:
       showHomeLink
       showQuickstartLink={false}
       showDocsLink
+      docsLinkLabel="Docs"
+      showBetaBadge
     >
       <section className="quickstart-page quickstart-v2">
         <div className="quickstart-docs-layout">
@@ -228,7 +230,7 @@ RHEONIC_BACKEND_URL=http://localhost:8000`}
               <p className="quickstart-v2-next-copy">Verify events are flowing in observe mode, then move to protect mode.</p>
               <div className="quickstart-next-row">
                 <Link className="landing-link-button modal-primary" to="/login">
-                  Start testing
+                  Start beta testing
                 </Link>
                 <Link className="landing-link-button" to="/docs">
                   Open dashboard docs

@@ -35,6 +35,7 @@ export function LandingPage(): JSX.Element {
       navAuthLabel="Sign in"
       shellClassName="public-shell-marketing"
       showDocsLink={false}
+      showBetaBadge
     >
       <section className="landing-marketing landing-v2" ref={rootRef}>
         <section className="landing-v2-hero reveal-on-scroll">
@@ -44,9 +45,10 @@ export function LandingPage(): JSX.Element {
               Monitor model behavior per provider, detect anomalies early, and enforce preflight guardrails before
               expensive calls are sent.
             </p>
+            <small className="landing-v2-hero-beta">Beta: actively testing. Expect changes.</small>
             <div className="landing-v2-hero-cta">
               <Link className="landing-link-button modal-primary" to="/login">
-                Start testing
+                Start beta testing
               </Link>
               <Link className="landing-link-button" to="/quickstart">
                 View quickstart
@@ -329,7 +331,7 @@ export function LandingPage(): JSX.Element {
         <section className="landing-v2-final-cta reveal-on-scroll">
           <h2>Add guardrails before your next agent experiment.</h2>
           <Link className="landing-link-button modal-primary" to="/login">
-            Start testing
+            Start beta testing
           </Link>
         </section>
       </section>
