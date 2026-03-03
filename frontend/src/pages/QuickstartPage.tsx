@@ -113,7 +113,7 @@ const rheonic = createClient({
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
-const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
+const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY! }), {
   client: rheonic,
   endpoint: "/chat/completions",
   feature: "assistant",
@@ -281,7 +281,7 @@ OPENAI_API_KEY=<provider_key>`}
               <div className="quickstart-step-head">
                 {stepIcon}
                 <h2>
-                  Advanced: custom event capture (manual) <span className="quickstart-advanced-pill">Advanced</span>
+                  Optional: custom event capture <span className="quickstart-advanced-pill">Advanced</span>
                 </h2>
               </div>
               <p className="quickstart-step-intro-spacious">Use this only if you can&apos;t instrument a provider SDK or need custom events.</p>

@@ -1,37 +1,28 @@
 import { Link } from "react-router-dom";
 
-import { Card } from "../components/Card";
-
 interface NotFoundProps {
   inApp?: boolean;
 }
 
 export function NotFound({ inApp = false }: NotFoundProps): JSX.Element {
-  if (inApp) {
-    return (
-      <main className="dashboard">
-        <Card>
-          <h1 className="page-title">Page not found</h1>
-          <p className="page-subtitle">The page you&apos;re looking for doesn&apos;t exist.</p>
-          <Link className="auth-button auth-button-primary" to="/app">
-            Go to dashboard
-          </Link>
-        </Card>
-      </main>
-    );
-  }
-
   return (
-    <div className="auth-page">
-      <Card className="auth-card">
-        <h1 className="auth-title">Page not found</h1>
-        <p className="auth-subtitle">The page you&apos;re looking for doesn&apos;t exist.</p>
-        <div className="auth-actions">
-          <Link className="auth-button auth-button-primary" to="/app">
+    <main className={`notfound-page${inApp ? " notfound-page-in-app" : ""}`}>
+      <div className="notfound-bg-code" aria-hidden="true">
+        404
+      </div>
+      <div className="notfound-glow" aria-hidden="true" />
+      <section className="notfound-content">
+        <h1>Page not found</h1>
+        <p>The page you&apos;re looking for doesn&apos;t exist or has been moved.</p>
+        <div className="notfound-actions">
+          <Link className="landing-link-button modal-primary" to="/app">
             Go to dashboard
           </Link>
         </div>
-      </Card>
-    </div>
+        <Link className="notfound-home-link" to="/">
+          Go to home
+        </Link>
+      </section>
+    </main>
   );
 }
