@@ -8,7 +8,10 @@ export function AppHeader({ userEmail = null, onSignOut }: AppHeaderProps): JSX.
     <header className="app-header">
       <div className="app-header-inner">
         <div className="brand-cluster">
-          <p className="subtle top-brand">Rheonic</p>
+          <p className="top-brand">
+            <span className="dashboard-brand-word">Rheonic</span>
+            <span className="dashboard-beta-badge">Beta</span>
+          </p>
         </div>
         <div className="app-header-right">
           {userEmail ? (

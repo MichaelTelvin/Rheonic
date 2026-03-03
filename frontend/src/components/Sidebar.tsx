@@ -19,7 +19,10 @@ export function Sidebar({ userEmail, onSignOut }: SidebarProps): JSX.Element {
   return (
     <aside className="sidebar" aria-label="Primary navigation">
       <div className="sidebar-top">
-        <p className="sidebar-brand">Rheonic</p>
+        <p className="sidebar-brand">
+          <span className="dashboard-brand-word">Rheonic</span>
+          <span className="dashboard-beta-badge">BETA</span>
+        </p>
         <div className="sidebar-brand-divider" aria-hidden="true" />
         <nav className="sidebar-nav">
           {navItems.map((item) => (
