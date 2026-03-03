@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
   ApiError,
@@ -6,6 +7,7 @@ import {
   fetchMetrics,
   fetchProjectProviders,
   fetchProtectMetrics,
+  listKeys,
   type IncidentItem,
   type RealtimeMetrics,
 } from "../api/client";
@@ -27,8 +29,11 @@ function normalizeProviderValue(provider: string): string {
   return provider.trim().toLowerCase();
 }
 
+type SetupStage = "checking" | "no_project" | "no_selection" | "no_ingest_key" | "no_events" | "complete";
+
 export function Dashboard(): JSX.Element {
-  const { projectId } = useProjectContext();
+  const { loadingProjects, projects, projectId } = useProjectContext();
+  const navigate = useNavigate();
 
   const [metrics, setMetrics] = useState<RealtimeMetrics | null>(null);
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
@@ -50,6 +55,35 @@ export function Dashboard(): JSX.Element {
   const providerRequestSeq = useRef<number>(0);
   const metricsRequestSeq = useRef<number>(0);
   const seriesByScopeRef = useRef<Record<string, { requests: number[]; tokens: number[] }>>({});
+  const [hasIngestKey, setHasIngestKey] = useState<boolean>(false);
+  const [hasEvents, setHasEvents] = useState<boolean>(false);
+  const [setupStatusResolved, setSetupStatusResolved] = useState<boolean>(false);
+  const [setupBannerDismissed, setSetupBannerDismissed] = useState<boolean>(false);
+
+  const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
+  const setupStage = useMemo<SetupStage>(() => {
+    if (loadingProjects) {
+      return "checking";
+    }
+    if (projects.length === 0) {
+      return "no_project";
+    }
+    if (!projectId) {
+      return "no_selection";
+    }
+    if (!setupStatusResolved) {
+      return "checking";
+    }
+    if (!hasIngestKey) {
+      return "no_ingest_key";
+    }
+    if (!hasEvents) {
+      return "no_events";
+    }
+    return "complete";
+  }, [hasEvents, hasIngestKey, loadingProjects, projectId, projects.length, setupStatusResolved]);
+  const isSetupComplete = setupStage === "complete";
+  const showSetupBanner = !loadingProjects && setupStage !== "complete" && !setupBannerDismissed;
 
   const incidentSummary = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -70,7 +104,126 @@ export function Dashboard(): JSX.Element {
     setProtectDecisionStats(null);
     setProviders([]);
     setSelectedProvider("all");
+    setHasIngestKey(false);
+    setHasEvents(false);
+    setSetupStatusResolved(false);
   }, [projectId]);
+
+  useEffect(() => {
+    const dismissed = window.localStorage.getItem(setupDismissStorageKey) === "1";
+    setSetupBannerDismissed(dismissed);
+  }, [setupDismissStorageKey]);
+
+  useEffect(() => {
+    if (setupStage !== "complete") {
+      return;
+    }
+    window.localStorage.removeItem(setupDismissStorageKey);
+    setSetupBannerDismissed(false);
+  }, [setupDismissStorageKey, setupStage]);
+
+  useEffect(() => {
+    if (loadingProjects) {
+      return;
+    }
+    if (!projectId) {
+      setHasIngestKey(false);
+      setHasEvents(false);
+      setSetupStatusResolved(true);
+      return;
+    }
+
+    let cancelled = false;
+    const loadSetupSignals = async (): Promise<void> => {
+      try {
+        const [keys, projectProviders] = await Promise.all([listKeys(projectId), fetchProjectProviders(projectId)]);
+        if (cancelled) {
+          return;
+        }
+        setHasIngestKey(keys.some((key) => key.status === "active"));
+        setHasEvents(projectProviders.length > 0);
+      } catch {
+        if (cancelled) {
+          return;
+        }
+        setHasIngestKey(false);
+        setHasEvents(false);
+      } finally {
+        if (!cancelled) {
+          setSetupStatusResolved(true);
+        }
+      }
+    };
+
+    void loadSetupSignals();
+    const interval = window.setInterval(() => {
+      void loadSetupSignals();
+    }, 5_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [loadingProjects, projectId]);
+
+  const dismissSetupBanner = useCallback((): void => {
+    window.localStorage.setItem(setupDismissStorageKey, "1");
+    setSetupBannerDismissed(true);
+  }, [setupDismissStorageKey]);
+
+  const setupBannerContent = useMemo<{
+    title: string;
+    text: string;
+    primaryLabel?: string;
+    primaryTo?: string;
+    secondaryLabel?: string;
+    secondaryTo?: string;
+  }>(() => {
+    if (setupStage === "no_project") {
+      return {
+        title: "Setup required",
+        text: "Create your first project to generate an ingest key and start receiving telemetry.",
+        primaryLabel: "Go to Projects",
+        primaryTo: "/app/projects",
+        secondaryLabel: "Open Quickstart",
+        secondaryTo: "/quickstart",
+      };
+    }
+    if (setupStage === "no_selection") {
+      return {
+        title: "Setup required",
+        text: "Select a project to view metrics. Then create an ingest key and instrument your provider.",
+        primaryLabel: "Open Projects",
+        primaryTo: "/app/projects",
+        secondaryLabel: "Open Quickstart",
+        secondaryTo: "/quickstart",
+      };
+    }
+    if (setupStage === "no_ingest_key") {
+      return {
+        title: "Setup required",
+        text: "Create an ingest key to start receiving telemetry and preflight decisions.",
+        primaryLabel: "Open Keys",
+        primaryTo: "/app/keys",
+        secondaryLabel: "Open Quickstart",
+        secondaryTo: "/quickstart",
+      };
+    }
+    if (setupStage === "no_events") {
+      return {
+        title: "Setup required",
+        text: "Waiting for first event. Run one instrumented provider call to verify integration.",
+        primaryLabel: "Open Quickstart",
+        primaryTo: "/quickstart",
+      };
+    }
+    return {
+      title: "Setup required",
+      text: "Checking setup status for this project.",
+      secondaryLabel: "Open Quickstart",
+      secondaryTo: "/quickstart",
+    };
+  }, [setupStage]);
 
   const refreshProviders = useCallback(async (): Promise<void> => {
     if (!projectId) {
@@ -299,11 +452,36 @@ export function Dashboard(): JSX.Element {
         </section>
 
         {globalBanner ? <section className="banner">{globalBanner}</section> : null}
+        {showSetupBanner ? (
+          <section className="setup-banner" aria-live="polite">
+            <div className="setup-banner-copy">
+              <div className="setup-banner-title">{setupBannerContent.title}</div>
+              <div className="setup-banner-text">{setupBannerContent.text}</div>
+            </div>
+            <div className="setup-banner-actions">
+              {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
+                <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
+                  {setupBannerContent.primaryLabel}
+                </button>
+              ) : null}
+              {setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo ? (
+                <button type="button" className="modal-button" onClick={() => navigate(setupBannerContent.secondaryTo)}>
+                  {setupBannerContent.secondaryLabel}
+                </button>
+              ) : null}
+              <button type="button" className="modal-button" onClick={dismissSetupBanner}>
+                Dismiss
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         {!projectId ? (
-          <section className="empty">
-            <p>Select a project to see realtime metrics.</p>
-          </section>
+          showSetupBanner ? null : (
+            <section className="empty">
+              <p>Select a project to see realtime metrics.</p>
+            </section>
+          )
         ) : (
           <>
             <section className="dashboard-controls-main">

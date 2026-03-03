@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => {
     fetchIncidents: vi.fn(),
     fetchProjectProviders: vi.fn(),
     fetchProtectMetrics: vi.fn(),
+    listKeys: vi.fn(),
     resolveIncident: vi.fn(),
     useProjectContext: vi.fn(),
   };
@@ -28,6 +29,7 @@ vi.mock("../api/client", () => {
     fetchIncidents: (...args: unknown[]) => mocks.fetchIncidents(...args),
     fetchProjectProviders: (...args: unknown[]) => mocks.fetchProjectProviders(...args),
     fetchProtectMetrics: (...args: unknown[]) => mocks.fetchProtectMetrics(...args),
+    listKeys: (...args: unknown[]) => mocks.listKeys(...args),
     resolveIncident: (...args: unknown[]) => mocks.resolveIncident(...args),
   };
 });
@@ -46,10 +48,12 @@ describe("Dashboard", () => {
     mocks.fetchIncidents.mockReset();
     mocks.fetchProjectProviders.mockReset();
     mocks.fetchProtectMetrics.mockReset();
+    mocks.listKeys.mockReset();
     mocks.resolveIncident.mockReset();
     mocks.useProjectContext.mockReset();
 
     mocks.useProjectContext.mockReturnValue({
+      loadingProjects: false,
       projectId: "p1",
       projects: [{ id: "p1", name: "Demo", created_at: new Date().toISOString() }],
     });
@@ -65,16 +69,18 @@ describe("Dashboard", () => {
       decision_latency_p95_60m_ms: null,
       last: null,
     });
+    mocks.listKeys.mockResolvedValue([{ id: "k1", name: "Key", status: "active" }]);
   });
 
-  it("shows empty state when no project is selected", async () => {
-    mocks.useProjectContext.mockReturnValue({ projectId: null, projects: [] });
+  it("shows setup banner when no project is selected", async () => {
+    mocks.useProjectContext.mockReturnValue({ loadingProjects: false, projectId: null, projects: [] });
     render(
       <MemoryRouter>
         <Dashboard />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("Select a project to see realtime metrics.")).toBeDefined();
+    expect(await screen.findByText("Setup required")).toBeDefined();
+    expect(screen.getByText("Create your first project to generate an ingest key and start receiving telemetry.")).toBeDefined();
   });
 
   it("loads metrics and incidents for selected project", async () => {
@@ -110,6 +116,7 @@ describe("Dashboard", () => {
 
   it("resets provider filter to All when project changes", async () => {
     const context = {
+      loadingProjects: false,
       projectId: "p1",
       projects: [{ id: "p1", name: "Demo", created_at: new Date().toISOString() }],
     };

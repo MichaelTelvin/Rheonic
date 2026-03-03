@@ -15,7 +15,25 @@ export function Projects(): JSX.Element {
   const [newProjectName, setNewProjectName] = useState<string>("");
   const [creatingProject, setCreatingProject] = useState<boolean>(false);
   const [createProjectError, setCreateProjectError] = useState<string | null>(null);
+  const [copiedBackendUrl, setCopiedBackendUrl] = useState<boolean>(false);
   const shortId = (value: string): string => (value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value);
+  const backendBaseUrl = frontendConfig.apiBaseUrl.trim();
+  const hasBackendBaseUrl = backendBaseUrl.length > 0;
+
+  const onCopyBackendUrl = async (): Promise<void> => {
+    if (!hasBackendBaseUrl || !navigator.clipboard) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(backendBaseUrl);
+      setCopiedBackendUrl(true);
+      window.setTimeout(() => {
+        setCopiedBackendUrl(false);
+      }, 1200);
+    } catch {
+      setCopiedBackendUrl(false);
+    }
+  };
 
   const validateProjectName = (value: string): string | null => {
     if (!value) {
@@ -63,32 +81,60 @@ export function Projects(): JSX.Element {
           <p className="page-subtitle">View and create projects</p>
         </section>
 
-        <Card className="form-card card--form">
-          <h2 className="section-title">Create project</h2>
-          <FormColumn testId="projects-form-column">
-            <div className="form-field">
-              <label htmlFor="project-name-input">Project name</label>
-              <input
-                id="project-name-input"
-                className="text-input"
-                value={newProjectName}
-                onChange={(event) => setNewProjectName(event.target.value)}
-                placeholder="e.g. Prod"
-              />
+        <section className="projects-top-grid">
+          <Card className="form-card card--form projects-create-card">
+            <h2 className="section-title">Create project</h2>
+            <FormColumn testId="projects-form-column">
+              <div className="form-field">
+                <label htmlFor="project-name-input">Project name</label>
+                <input
+                  id="project-name-input"
+                  className="text-input"
+                  value={newProjectName}
+                  onChange={(event) => setNewProjectName(event.target.value)}
+                  placeholder="e.g. Prod"
+                />
+              </div>
+              <p className="form-error-slot">{createProjectError ?? "\u00A0"}</p>
+              <div className="modal-actions form-actions">
+                <button
+                  type="button"
+                  className="modal-button modal-primary action-btn"
+                  onClick={() => void onCreateProject()}
+                  disabled={creatingProject}
+                >
+                  {creatingProject ? "Creating..." : "Create project"}
+                </button>
+              </div>
+            </FormColumn>
+          </Card>
+
+          <Card className="form-card projects-integration-card">
+            <h2 className="section-title">Integration</h2>
+            <div className="projects-integration-body">
+              <div className="form-field projects-integration-field">
+                <label htmlFor="projects-backend-url">Backend base URL</label>
+                <input
+                  id="projects-backend-url"
+                  className="text-input mono projects-integration-input"
+                  readOnly
+                  value={hasBackendBaseUrl ? backendBaseUrl : "Not configured"}
+                  aria-label="Backend base URL"
+                />
+              </div>
+              <div className="modal-actions form-actions projects-integration-actions">
+                <button
+                  type="button"
+                  className="modal-button modal-primary action-btn"
+                  onClick={() => void onCopyBackendUrl()}
+                  disabled={!hasBackendBaseUrl}
+                >
+                  {copiedBackendUrl ? "Copied" : "Copy"}
+                </button>
+              </div>
             </div>
-            <p className="form-error-slot">{createProjectError ?? "\u00A0"}</p>
-            <div className="modal-actions form-actions">
-              <button
-                type="button"
-                className="modal-button modal-primary action-btn"
-                onClick={() => void onCreateProject()}
-                disabled={creatingProject}
-              >
-                {creatingProject ? "Creating..." : "Create project"}
-              </button>
-            </div>
-          </FormColumn>
-        </Card>
+          </Card>
+        </section>
 
         <Card className="card--table">
           <h2 className="section-title">Project list</h2>
