@@ -8,8 +8,18 @@ type Runtime = "node" | "python";
 
 export function QuickstartPage(): JSX.Element {
   const [runtime, setRuntime] = useState<Runtime>("node");
-  const [activeSection, setActiveSection] = useState("problem");
-  const sectionIds = ["problem", "install", "ingest", "protect", "env", "next"] as const;
+  const [activeSection, setActiveSection] = useState("project");
+  const sectionIds = [
+    "project",
+    "install",
+    "env",
+    "instrument",
+    "verify",
+    "limits",
+    "protect",
+    "advanced",
+    "next",
+  ] as const;
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") {
@@ -61,7 +71,7 @@ export function QuickstartPage(): JSX.Element {
         ? `import { createClient, buildEvent } from "rheonic-node";
 
 const client = createClient({
-  baseUrl: process.env.RHEONIC_BACKEND_URL,
+  baseUrl: process.env.RHEONIC_BACKEND_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
@@ -98,13 +108,13 @@ client.capture_event(
         ? `import OpenAI from "openai";
 import { createClient, instrumentOpenAI, RHEONICBlockedError } from "rheonic-node";
 
-const burnguard = createClient({
-  baseUrl: process.env.RHEONIC_BACKEND_URL,
+const rheonic = createClient({
+  baseUrl: process.env.RHEONIC_BACKEND_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
 const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
-  client: burnguard,
+  client: rheonic,
   endpoint: "/chat/completions",
   feature: "assistant",
 });
@@ -124,13 +134,13 @@ try {
 from openai import OpenAI
 from rheonic import create_client, instrument_openai, RHEONICBlockedError
 
-burnguard = create_client(
+rheonic = create_client(
     base_url=os.environ["RHEONIC_BACKEND_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
 )
 openai_client = instrument_openai(
     OpenAI(api_key=os.environ["OPENAI_API_KEY"]),
-    client=burnguard,
+    client=rheonic,
     endpoint="/chat/completions",
     feature="assistant",
 )
@@ -144,6 +154,13 @@ try:
 except RHEONICBlockedError:
     print("Blocked by protect preflight")`,
     [runtime],
+  );
+  const stepIcon = (
+    <span className="quickstart-step-icon" aria-hidden="true">
+      <svg viewBox="0 0 20 20" fill="none">
+        <path d="M10 4.8v9.2M6.7 10.9 10 14.6l3.3-3.7" />
+      </svg>
+    </span>
   );
 
   return (
@@ -162,19 +179,29 @@ except RHEONICBlockedError:
           <article className="quickstart-docs-content">
             <h1>Quickstart</h1>
             <p className="quickstart-v2-lede">
-              Instrument provider traffic first, then enable protect mode once thresholds are calibrated.
+              Follow these steps to start in Observe mode,
+              <br />
+              verify traffic, then enable Protect once caps are configured.
             </p>
 
-            <section id="problem">
-              <h2>What this gives you</h2>
+            <section id="project" className="quickstart-step-card">
+              <div className="quickstart-step-head">
+                {stepIcon}
+                <h2>Create a project</h2>
+              </div>
+              <p className="quickstart-step-path">Dashboard → Projects → Create project → Keys → Create key</p>
               <p>
-                Rheonic adds a control layer between agent calls and model providers so runaway traffic is visible and
-                enforceable before spend spikes.
+                You&apos;ll use this key to authenticate telemetry and preflight requests.
+                <br />
+                Copy the backend base URL shown in your project dashboard.
               </p>
             </section>
 
-            <section id="install">
-              <h2>Install</h2>
+            <section id="install" className="quickstart-step-card">
+              <div className="quickstart-step-head">
+                {stepIcon}
+                <h2>Install SDK</h2>
+              </div>
               <div className="runtime-tabs">
                 <button type="button" className={runtime === "node" ? "is-active" : ""} onClick={() => setRuntime("node")}>
                   Node
@@ -186,21 +213,32 @@ except RHEONICBlockedError:
               <CodeBlock code={install} language="bash" />
             </section>
 
-            <section id="ingest">
-              <h2>Capture telemetry</h2>
-              <div className="runtime-tabs">
-                <button type="button" className={runtime === "node" ? "is-active" : ""} onClick={() => setRuntime("node")}>
-                  Node
-                </button>
-                <button type="button" className={runtime === "python" ? "is-active" : ""} onClick={() => setRuntime("python")}>
-                  Python
-                </button>
+            <section id="env" className="quickstart-step-card">
+              <div className="quickstart-step-head">
+                {stepIcon}
+                <h2>Set environment variables</h2>
               </div>
-              <CodeBlock code={ingest} language={runtime === "node" ? "ts" : "python"} />
+              <CodeBlock
+                code={`RHEONIC_INGEST_KEY=<your_project_ingest_key>
+RHEONIC_BACKEND_URL=<value_shown_in_dashboard>
+OPENAI_API_KEY=<provider_key>`}
+                language="bash"
+              />
+              <p className="quickstart-step-muted">
+                Provider API keys are used only by the provider SDK. Rheonic does not access or store them.
+              </p>
             </section>
 
-            <section id="protect">
-              <h2>Enable protect wrapper</h2>
+            <section id="instrument" className="quickstart-step-card">
+              <div className="quickstart-step-head">
+                {stepIcon}
+                <h2>Instrument provider calls</h2>
+              </div>
+              <p>Wrap your provider SDK once.</p>
+              <div className="quickstart-step-callout">
+                <p>Telemetry is captured automatically after each provider call.</p>
+                <p>Enforcement follows Project mode in the dashboard (Observe / Protect).</p>
+              </div>
               <div className="runtime-tabs">
                 <button type="button" className={runtime === "node" ? "is-active" : ""} onClick={() => setRuntime("node")}>
                   Node
@@ -212,25 +250,69 @@ except RHEONICBlockedError:
               <CodeBlock code={protect} language={runtime === "node" ? "ts" : "python"} />
             </section>
 
-            <section id="env">
-              <h2>Required env vars</h2>
-              <CodeBlock
-                code={`RHEONIC_INGEST_KEY=<your_project_ingest_key>
-RHEONIC_BACKEND_URL=http://localhost:8000`}
-                language="bash"
-              />
+            <section id="verify" className="quickstart-step-card">
+              <div className="quickstart-step-head">
+                {stepIcon}
+                <h2>Verify in Observe mode</h2>
+              </div>
+              <p>Make one provider call. Open the dashboard and confirm traffic appears.</p>
+              <p className="quickstart-step-muted">Dashboard path: Dashboard → Metrics or Incidents</p>
             </section>
 
-            <section id="next" className="quickstart-next-links">
-              <h2>Next step</h2>
-              <p className="quickstart-v2-next-copy">Verify events are flowing in observe mode, then move to protect mode.</p>
-              <div className="quickstart-next-row">
-                <Link className="landing-link-button modal-primary" to="/login">
-                  Start beta testing
-                </Link>
-                <Link className="landing-link-button" to="/docs">
-                  Open dashboard docs
-                </Link>
+            <section id="limits" className="quickstart-step-card">
+              <div className="quickstart-step-head">
+                {stepIcon}
+                <h2>Set request and token limits</h2>
+              </div>
+              <p>In Project Settings, configure request and token limits per provider.</p>
+              <p className="quickstart-step-muted">Dashboard path: Dashboard → Project Settings → Limits</p>
+            </section>
+
+            <section id="protect" className="quickstart-step-card">
+              <div className="quickstart-step-head">
+                {stepIcon}
+                <h2>Enable Protect mode</h2>
+              </div>
+              <p>Switch Project mode from Observe to Protect to activate enforcement.</p>
+              <p className="quickstart-step-muted">Dashboard path: Dashboard → Project Settings → Mode</p>
+            </section>
+
+            <section id="advanced" className="quickstart-step-card quickstart-step-card--advanced">
+              <div className="quickstart-step-head">
+                {stepIcon}
+                <h2>
+                  Advanced: custom event capture (manual) <span className="quickstart-advanced-pill">Advanced</span>
+                </h2>
+              </div>
+              <p className="quickstart-step-intro-spacious">Use this only if you can&apos;t instrument a provider SDK or need custom events.</p>
+              <div className="runtime-tabs">
+                <button type="button" className={runtime === "node" ? "is-active" : ""} onClick={() => setRuntime("node")}>
+                  Node
+                </button>
+                <button type="button" className={runtime === "python" ? "is-active" : ""} onClick={() => setRuntime("python")}>
+                  Python
+                </button>
+              </div>
+              <CodeBlock code={ingest} language={runtime === "node" ? "ts" : "python"} />
+            </section>
+
+            <section id="next" className="quickstart-step-card quickstart-next-links">
+              <div className="quickstart-step-head">
+                {stepIcon}
+                <h2>Next step</h2>
+              </div>
+              <p className="quickstart-v2-next-copy">
+                Create a project, generate an ingest key, and run your first instrumented call.
+              </p>
+              <div className="quickstart-actions-row">
+                <div className="quickstart-next-row">
+                  <Link className="landing-link-button modal-primary" to="/login">
+                    Open dashboard setup
+                  </Link>
+                  <Link className="landing-link-button" to="/docs">
+                    Open dashboard docs
+                  </Link>
+                </div>
               </div>
             </section>
           </article>
@@ -238,35 +320,56 @@ RHEONIC_BACKEND_URL=http://localhost:8000`}
           <aside className="quickstart-toc-panel">
             <h3>On this page</h3>
             <a
-              href="#problem"
-              className={activeSection === "problem" ? "is-active" : ""}
-              onClick={(event) => onTocClick(event, "problem")}
+              href="#project"
+              className={activeSection === "project" ? "is-active" : ""}
+              onClick={(event) => onTocClick(event, "project")}
             >
-              What this gives you
+              Create a project
             </a>
             <a
               href="#install"
               className={activeSection === "install" ? "is-active" : ""}
               onClick={(event) => onTocClick(event, "install")}
             >
-              Install
+              Install SDK
+            </a>
+            <a href="#env" className={activeSection === "env" ? "is-active" : ""} onClick={(event) => onTocClick(event, "env")}>
+              Set environment variables
             </a>
             <a
-              href="#ingest"
-              className={activeSection === "ingest" ? "is-active" : ""}
-              onClick={(event) => onTocClick(event, "ingest")}
+              href="#instrument"
+              className={activeSection === "instrument" ? "is-active" : ""}
+              onClick={(event) => onTocClick(event, "instrument")}
             >
-              Capture telemetry
+              Instrument provider calls
+            </a>
+            <a
+              href="#verify"
+              className={activeSection === "verify" ? "is-active" : ""}
+              onClick={(event) => onTocClick(event, "verify")}
+            >
+              Verify in Observe mode
+            </a>
+            <a
+              href="#limits"
+              className={activeSection === "limits" ? "is-active" : ""}
+              onClick={(event) => onTocClick(event, "limits")}
+            >
+              Set request and token limits
             </a>
             <a
               href="#protect"
               className={activeSection === "protect" ? "is-active" : ""}
               onClick={(event) => onTocClick(event, "protect")}
             >
-              Enable protect wrapper
+              Enable Protect mode
             </a>
-            <a href="#env" className={activeSection === "env" ? "is-active" : ""} onClick={(event) => onTocClick(event, "env")}>
-              Required env vars
+            <a
+              href="#advanced"
+              className={activeSection === "advanced" ? "is-active" : ""}
+              onClick={(event) => onTocClick(event, "advanced")}
+            >
+              Advanced custom capture
             </a>
             <a href="#next" className={activeSection === "next" ? "is-active" : ""} onClick={(event) => onTocClick(event, "next")}>
               Next step
