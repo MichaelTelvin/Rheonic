@@ -1,27 +1,24 @@
 # Test safety guardrails to prevent accidental dev data mutation.
 from __future__ import annotations
 
-import os
 from urllib.parse import urlparse
 
 import pytest
 
+from app.config import Settings
+
 
 @pytest.fixture(scope="session", autouse=True)
 def enforce_test_isolation_contract() -> None:
-    app_env = os.getenv("APP_ENV", "")
-    database_url = os.getenv("DATABASE_URL", "")
-    redis_url = os.getenv("REDIS_URL", "")
+    settings = Settings()
+    app_env = settings.app_env
+    database_url = settings.database_url
+    redis_url = settings.redis_url
 
     if app_env != "test":
         raise RuntimeError(
             "Backend tests require APP_ENV=test. Refusing to run outside test isolation."
         )
-
-    if not database_url:
-        raise RuntimeError("Backend tests require DATABASE_URL to be set.")
-    if not redis_url:
-        raise RuntimeError("Backend tests require REDIS_URL to be set.")
 
     db = urlparse(database_url)
     db_name = db.path.lstrip("/").split("?")[0]

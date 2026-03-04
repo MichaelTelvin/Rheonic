@@ -1,9 +1,8 @@
-import os
-
 from redis import Redis
 from rq.job import Job
 from rq.utils import import_attribute
 
+from app.config import Settings
 from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
 from app.infrastructure.jobs.webhook_job import send_project_webhook
 
@@ -33,7 +32,7 @@ def test_webhook_dispatcher_enqueues_importable_job_callable() -> None:
     resolved = import_attribute(f"{capture.func.__module__}.{capture.func.__name__}")
     assert resolved is send_project_webhook
 
-    redis_url = os.getenv("REDIS_URL", "redis://redis_test:6379/0")
+    redis_url = Settings().redis_url
     job = Job.create(
         func=capture.func,
         kwargs={

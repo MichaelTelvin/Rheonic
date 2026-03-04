@@ -1,9 +1,9 @@
-import os
 import traceback
 
 from redis import Redis
 from rq import Worker, Queue
 
+from app.config import Settings
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -30,7 +30,7 @@ def _job_exception_handler(job, exc_type, exc_value, tb) -> bool:
 
 
 def main() -> None:
-    redis_url = os.getenv("REDIS_URL")
+    redis_url = Settings().redis_url
     if not redis_url:
         raise ValueError("REDIS_URL is not set")
     conn = Redis.from_url(redis_url)

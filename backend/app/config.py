@@ -1,6 +1,7 @@
 # Application configuration objects.
 from dataclasses import dataclass
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,10 +57,38 @@ class Settings(BaseSettings):
     app_name: str = "Rheonic API"
     api_prefix: str = "/api"
     app_env: str = "dev"
+    log_level: str = "INFO"
+
+    # Database settings.
+    postgres_db: str = "rheonic"
+    postgres_user: str = "rheonic"
+    postgres_password: str = "change-me"
+    postgres_host: str = "postgres"
+    postgres_port: int = 5432
     jwt_secret: str = ""
     jwt_alg: str = "HS256"
     jwt_expires_min: int = 60
     jwt_refresh_expires_min: int = 10080
+    rheonic_auth_token: str = ""
+
+    # Redis settings.
+    redis_host: str = "redis"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: str = ""
+
+    # Provider/demo settings.
+    rheonic_provider_url: str = "http://localhost:8099"
+    rheonic_provider: str = "openai"
+    rheonic_model: str = "gpt-4o-mini"
+    rheonic_environment: str = "dev"
+    rheonic_scenario: str = "allow"
+    rheonic_demo_case: str = "steady"
+    rheonic_base_url: str = "http://localhost:8000"
+    rheonic_backend_url: str = "http://localhost:8000"
+    rheonic_ingest_key: str = ""
+    rheonic_project_id: str = ""
+
     cors_origins: str = ""
     database_url: str = ""
     redis_url: str = ""
@@ -80,4 +109,15 @@ class Settings(BaseSettings):
     webhook_allow_private_hosts: bool = False
     webhook_secret_encryption_key: str = ""
 
-    # TODO: Add env-driven database, Redis, auth, and provider settings.
+    @model_validator(mode="after")
+    def _apply_url_defaults(self) -> "Settings":
+        # Build connection URLs from component env vars when explicit URLs are not provided.
+        if not (self.database_url or "").strip():
+            self.database_url = (
+                f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+                f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            )
+        if not (self.redis_url or "").strip():
+            redis_auth = f":{self.redis_password}@" if self.redis_password else ""
+            self.redis_url = f"redis://{redis_auth}{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        return self

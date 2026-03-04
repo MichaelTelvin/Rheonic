@@ -1,8 +1,8 @@
 # Redis client scaffolding.
-import os
 
 from redis import Redis
 
+from app.config import Settings
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -14,7 +14,7 @@ class RedisClient:
     def __init__(self, redis_url: str | None = None) -> None:
         # Create a Redis client wrapper.
         try:
-            resolved_redis_url = redis_url or os.getenv("REDIS_URL")
+            resolved_redis_url = redis_url or Settings().redis_url
             if not resolved_redis_url:
                 raise ValueError("REDIS_URL is not set")
             self._redis = Redis.from_url(resolved_redis_url)
