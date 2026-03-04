@@ -5,9 +5,11 @@ import { CodeBlock } from "../components/CodeBlock";
 import { PublicLayout } from "../components/PublicLayout";
 
 type Runtime = "node" | "python";
+type Provider = "openai" | "anthropic" | "google";
 
 export function QuickstartPage(): JSX.Element {
   const [runtime, setRuntime] = useState<Runtime>("node");
+  const [provider, setProvider] = useState<Provider>("openai");
   const [activeSection, setActiveSection] = useState("project");
   const sectionIds = [
     "project",
@@ -65,6 +67,16 @@ export function QuickstartPage(): JSX.Element {
     [runtime],
   );
 
+  const selectedModel = useMemo(() => {
+    if (provider === "anthropic") {
+      return "claude-3-5-sonnet-latest";
+    }
+    if (provider === "google") {
+      return "gemini-1.5-pro";
+    }
+    return "gpt-4o-mini";
+  }, [provider]);
+
   const ingest = useMemo(
     () =>
       runtime === "node"
@@ -77,9 +89,9 @@ const client = createClient({
 
 await client.captureEvent(
   buildEvent({
-    provider: "openai",
-    model: "gpt-4o-mini",
-    request: { endpoint: "/chat/completions", feature: "assistant" },
+    provider: "${provider}",
+    model: "${selectedModel}",
+    request: { endpoint: "${provider === "google" ? "/models/generateContent" : "/chat/completions"}", feature: "assistant" },
     response: { total_tokens: 64, latency_ms: 120, http_status: 200 },
   }),
 );`
@@ -93,19 +105,19 @@ client = create_client(
 
 client.capture_event(
     build_event(
-        provider="openai",
-        model="gpt-4o-mini",
-        request={"endpoint": "/chat/completions", "feature": "assistant"},
+        provider="${provider}",
+        model="${selectedModel}",
+        request={"endpoint": "${provider === "google" ? "/models/generateContent" : "/chat/completions"}", "feature": "assistant"},
         response={"total_tokens": 64, "latency_ms": 120, "http_status": 200},
     )
 )`,
-    [runtime],
+    [runtime, provider, selectedModel],
   );
 
   const protect = useMemo(
-    () =>
-      runtime === "node"
-        ? `import OpenAI from "openai";
+    () => {
+      if (runtime === "node" && provider === "openai") {
+        return `import OpenAI from "openai";
 import { createClient, instrumentOpenAI, RHEONICBlockedError } from "rheonic-node";
 
 const rheonic = createClient({
@@ -129,8 +141,91 @@ try {
   if (error instanceof RHEONICBlockedError) {
     console.log("Blocked by protect preflight");
   }
-}`
-        : `import os
+}`;
+      }
+      if (runtime === "node" && provider === "anthropic") {
+        return `import Anthropic from "@anthropic-ai/sdk";
+import { createClient, RHEONICBlockedError } from "rheonic-node";
+
+const rheonic = createClient({
+  baseUrl: process.env.RHEONIC_BACKEND_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
+
+const anthropic = rheonic.instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }));
+
+try {
+  await anthropic.messages.create({
+    model: "claude-3-5-sonnet-latest",
+    max_tokens: 256,
+    messages: [{ role: "user", content: "hello" }],
+  });
+} catch (error) {
+  if (error instanceof RHEONICBlockedError) {
+    console.log("Blocked by protect preflight");
+  }
+}`;
+      }
+      if (runtime === "node" && provider === "google") {
+        return `import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createClient, RHEONICBlockedError } from "rheonic-node";
+
+const rheonic = createClient({
+  baseUrl: process.env.RHEONIC_BACKEND_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
+
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+const model = rheonic.instrumentGoogle(genAI.getGenerativeModel({ model: "gemini-1.5-pro" }));
+
+try {
+  await model.generateContent("hello");
+} catch (error) {
+  if (error instanceof RHEONICBlockedError) {
+    console.log("Blocked by protect preflight");
+  }
+}`;
+      }
+      if (provider === "anthropic") {
+        return `import os
+from anthropic import Anthropic
+from rheonic import create_client, RHEONICBlockedError
+
+rheonic = create_client(
+    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
+)
+anthropic_client = rheonic.instrument_anthropic(
+    Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+)
+
+try:
+    anthropic_client.messages.create(
+        model="claude-3-5-sonnet-latest",
+        max_tokens=256,
+        messages=[{"role": "user", "content": "hello"}],
+    )
+except RHEONICBlockedError:
+    print("Blocked by protect preflight")`;
+      }
+      if (provider === "google") {
+        return `import os
+import google.generativeai as genai
+from rheonic import create_client, RHEONICBlockedError
+
+rheonic = create_client(
+    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
+)
+genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+google_model = rheonic.instrument_google(genai.GenerativeModel("gemini-1.5-pro"))
+
+try:
+    google_model.generate_content("hello")
+except RHEONICBlockedError:
+    print("Blocked by protect preflight")`;
+      }
+      return `import os
 from openai import OpenAI
 from rheonic import create_client, instrument_openai, RHEONICBlockedError
 
@@ -152,8 +247,9 @@ try:
         max_tokens=256,
     )
 except RHEONICBlockedError:
-    print("Blocked by protect preflight")`,
-    [runtime],
+    print("Blocked by protect preflight")`;
+    },
+    [runtime, provider],
   );
   const stepIcon = (
     <span className="quickstart-step-icon" aria-hidden="true">
@@ -202,7 +298,7 @@ except RHEONICBlockedError:
                 {stepIcon}
                 <h2>Install SDK</h2>
               </div>
-              <div className="runtime-tabs">
+              <div className="runtime-tabs quickstart-bookmark-tabs">
                 <button type="button" className={runtime === "node" ? "is-active" : ""} onClick={() => setRuntime("node")}>
                   Node
                 </button>
@@ -247,7 +343,20 @@ OPENAI_API_KEY=<provider_key>`}
                   Python
                 </button>
               </div>
-              <CodeBlock code={protect} language={runtime === "node" ? "ts" : "python"} />
+              <div className="quickstart-code-stack quickstart-code-stack--instrument">
+                <div className="runtime-tabs quickstart-provider-tabs">
+                  <button type="button" className={provider === "openai" ? "is-active" : ""} onClick={() => setProvider("openai")}>
+                    OpenAI
+                  </button>
+                  <button type="button" className={provider === "anthropic" ? "is-active" : ""} onClick={() => setProvider("anthropic")}>
+                    Anthropic
+                  </button>
+                  <button type="button" className={provider === "google" ? "is-active" : ""} onClick={() => setProvider("google")}>
+                    Google
+                  </button>
+                </div>
+                <CodeBlock code={protect} language={runtime === "node" ? "ts" : "python"} />
+              </div>
             </section>
 
             <section id="verify" className="quickstart-step-card">
@@ -293,7 +402,20 @@ OPENAI_API_KEY=<provider_key>`}
                   Python
                 </button>
               </div>
-              <CodeBlock code={ingest} language={runtime === "node" ? "ts" : "python"} />
+              <div className="quickstart-code-stack quickstart-code-stack--advanced">
+                <div className="runtime-tabs quickstart-provider-tabs">
+                  <button type="button" className={provider === "openai" ? "is-active" : ""} onClick={() => setProvider("openai")}>
+                    OpenAI
+                  </button>
+                  <button type="button" className={provider === "anthropic" ? "is-active" : ""} onClick={() => setProvider("anthropic")}>
+                    Anthropic
+                  </button>
+                  <button type="button" className={provider === "google" ? "is-active" : ""} onClick={() => setProvider("google")}>
+                    Google
+                  </button>
+                </div>
+                <CodeBlock code={ingest} language={runtime === "node" ? "ts" : "python"} />
+              </div>
             </section>
 
             <section id="next" className="quickstart-step-card quickstart-next-links">

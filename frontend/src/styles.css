@@ -5165,14 +5165,73 @@ html {
   background: rgba(15, 23, 42, 0.4);
 }
 
+.quickstart-v2 .quickstart-code-stack {
+  margin-top: 8px;
+}
+
+.quickstart-v2 .quickstart-provider-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 0 2px;
+  border: 0;
+  background: transparent;
+}
+
+.quickstart-v2 .quickstart-provider-tabs button {
+  border: 1px solid rgba(167, 185, 217, 0.3);
+  border-bottom-color: rgba(167, 185, 217, 0.2);
+  border-radius: 12px 12px 0 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(218, 230, 251, 0.82);
+  padding: 8px 14px 7px;
+  transform: translateY(1px);
+}
+
+.quickstart-v2 .quickstart-provider-tabs button:hover {
+  color: #f0f6ff;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.quickstart-v2 .quickstart-provider-tabs button.is-active {
+  border-color: rgba(188, 204, 234, 0.36);
+  border-bottom-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.14);
+  color: #f2f7ff;
+}
+
+.quickstart-v2 .quickstart-code-stack .public-code-block {
+  margin-top: 0;
+}
+
+.quickstart-v2 .quickstart-code-stack--instrument .public-code-block pre {
+  border-top-left-radius: 0;
+  margin-top: 0;
+  height: 560px;
+  overflow: hidden;
+}
+
+.quickstart-v2 .quickstart-code-stack--advanced .public-code-block pre {
+  border-top-left-radius: 0;
+  margin-top: 0;
+  height: 360px;
+  overflow: hidden;
+}
+
 .quickstart-v2 .runtime-tabs button {
   color: rgba(206, 219, 244, 0.82);
 }
 
-.quickstart-v2 .runtime-tabs button.is-active {
+.quickstart-v2 .runtime-tabs:not(.quickstart-provider-tabs) button.is-active {
   border-color: rgba(129, 140, 248, 0.42);
   background: rgba(99, 102, 241, 0.22);
   color: #edf3ff;
+}
+
+.quickstart-v2 #install .runtime-tabs {
+  margin-top: 8px;
+  margin-bottom: 6px;
 }
 
 .quickstart-v2 .public-code-block pre {
