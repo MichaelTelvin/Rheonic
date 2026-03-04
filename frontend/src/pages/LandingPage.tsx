@@ -3,6 +3,7 @@ import { Activity, Gauge, ShieldCheck, Workflow, Wrench, Layers, Signal, Databas
 import { Link } from "react-router-dom";
 
 import { PublicLayout } from "../components/PublicLayout";
+import { Seo } from "../components/Seo";
 
 export function LandingPage(): JSX.Element {
   const rootRef = useRef<HTMLElement | null>(null);
@@ -37,6 +38,21 @@ export function LandingPage(): JSX.Element {
       showDocsLink={false}
       showBetaBadge
     >
+      <Seo
+        title="Rheonic | LLM Guardrails and Cost Control"
+        description="Rheonic helps teams monitor model traffic, detect anomalies, and enforce preflight guardrails before expensive provider calls are sent."
+        path="/"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: "Rheonic",
+          applicationCategory: "DeveloperApplication",
+          operatingSystem: "Web",
+          description:
+            "Monitor model behavior per provider, detect anomalies, and enforce preflight guardrails for agent traffic.",
+          url: window.location.origin,
+        }}
+      />
       <section className="landing-marketing landing-v2" ref={rootRef}>
         <section className="landing-v2-hero reveal-on-scroll">
           <div className="landing-v2-hero-copy">

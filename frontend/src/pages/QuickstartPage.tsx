@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { CodeBlock } from "../components/CodeBlock";
 import { PublicLayout } from "../components/PublicLayout";
+import { Seo } from "../components/Seo";
 
 type Runtime = "node" | "python";
 type Provider = "openai" | "anthropic" | "google";
@@ -270,6 +271,20 @@ except RHEONICBlockedError:
       docsLinkLabel="Docs"
       showBetaBadge
     >
+      <Seo
+        title="Rheonic Quickstart | Integrate OpenAI, Anthropic, and Google"
+        description="Set up Rheonic in minutes with Node or Python. Instrument provider calls, capture custom events, and enable protect-mode guardrails."
+        path="/quickstart"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "TechArticle",
+          headline: "Rheonic Quickstart",
+          description:
+            "Guide for integrating Rheonic with OpenAI, Anthropic, and Google providers using Node or Python.",
+          about: ["LLM observability", "LLM guardrails", "API integration"],
+          mainEntityOfPage: `${window.location.origin}/quickstart`,
+        }}
+      />
       <section className="quickstart-page quickstart-v2">
         <div className="quickstart-docs-layout">
           <article className="quickstart-docs-content">
