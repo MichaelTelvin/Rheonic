@@ -96,3 +96,8 @@ class ProjectRepository(ABC):
     def list_project_providers(self, project_id: str) -> list[str]:
         # Return distinct providers recorded for a project.
         raise NotImplementedError
+
+    @abstractmethod
+    def delete_project(self, project_id: str) -> bool:
+        # Delete one project and associated scoped records.
+        raise NotImplementedError

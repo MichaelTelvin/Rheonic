@@ -132,3 +132,10 @@ class ProjectService:
             at=at or datetime.now(timezone.utc),
             error=error,
         )
+
+    def delete_project(self, project_id: str, user_id: str) -> None:
+        # Delete an owned project and its scoped records.
+        self.ensure_project_owned_by_user(project_id=project_id, user_id=user_id)
+        deleted = self._project_repository.delete_project(project_id=project_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="project not found")

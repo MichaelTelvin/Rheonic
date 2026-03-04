@@ -329,6 +329,12 @@ export async function createProject(name: string): Promise<ProjectItem> {
   });
 }
 
+export async function deleteProject(projectId: string): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/v1/projects/${encodeURIComponent(projectId)}`, {
+    method: "DELETE",
+  });
+}
+
 export async function listKeys(projectId: string): Promise<IngestKeyItem[]> {
   return request<IngestKeyItem[]>(`/api/v1/projects/${encodeURIComponent(projectId)}/keys`);
 }

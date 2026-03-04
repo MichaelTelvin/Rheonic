@@ -16,7 +16,6 @@ export function Projects(): JSX.Element {
   const [newProjectName, setNewProjectName] = useState<string>("");
   const [creatingProject, setCreatingProject] = useState<boolean>(false);
   const [createProjectError, setCreateProjectError] = useState<string | null>(null);
-  const [copiedBackendUrl, setCopiedBackendUrl] = useState<boolean>(false);
   const shortId = (value: string): string => (value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value);
   const backendBaseUrl = frontendConfig.rheonicBackendUrl.trim();
   const hasBackendBaseUrl = backendBaseUrl.length > 0;
@@ -27,12 +26,9 @@ export function Projects(): JSX.Element {
     }
     try {
       await navigator.clipboard.writeText(backendBaseUrl);
-      setCopiedBackendUrl(true);
-      window.setTimeout(() => {
-        setCopiedBackendUrl(false);
-      }, 1200);
+      showAppToast("URL copied");
     } catch {
-      setCopiedBackendUrl(false);
+      showAppToast("Action failed. Try again");
     }
   };
 
@@ -132,7 +128,7 @@ export function Projects(): JSX.Element {
                   onClick={() => void onCopyBackendUrl()}
                   disabled={!hasBackendBaseUrl}
                 >
-                  {copiedBackendUrl ? "Copied" : "Copy"}
+                  Copy
                 </button>
               </div>
             </div>
@@ -148,26 +144,27 @@ export function Projects(): JSX.Element {
                 <span>Name</span>
                 <span>ID</span>
                 <span>Created</span>
-                <span className="table-actions-header">Selection</span>
+                <span className="table-actions-header">Status</span>
               </div>
               {projects.map((project) => (
-                <div className="project-table-row" key={project.id}>
+                <button
+                  type="button"
+                  className={`project-table-row project-table-row-button${project.id === projectId ? " is-selected" : ""}`}
+                  key={project.id}
+                  onClick={() => setProjectId(project.id)}
+                  aria-pressed={project.id === projectId}
+                >
                   <span className="key-name">{project.name}</span>
                   <span className="subtle mono" title={project.id}>
                     {shortId(project.id)}
                   </span>
                   <span className="subtle">{formatRelative(project.created_at)}</span>
                   <span className="table-actions-cell">
-                    <button
-                      type="button"
-                      className="modal-button action-btn"
-                      disabled={project.id === projectId}
-                      onClick={() => setProjectId(project.id)}
-                    >
-                      {project.id === projectId ? "Selected" : "Select"}
-                    </button>
+                    <span className={`project-selection-label${project.id === projectId ? " is-selected" : ""}`}>
+                      {project.id === projectId ? "Selected" : "Click to select"}
+                    </span>
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           ) : null}

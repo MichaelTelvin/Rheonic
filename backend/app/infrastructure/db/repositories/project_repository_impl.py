@@ -8,7 +8,7 @@ from app.application.interfaces.project_repository import ProjectRepository
 from app.config import Settings
 from app.domain.models.project import Project
 from app.infrastructure.db.base import DatabaseSessionFactory
-from app.infrastructure.db.models import ProjectModelRecord, ProjectRecord
+from app.infrastructure.db.models import EventRecord, IncidentRecord, IngestKeyRecord, ProjectModelRecord, ProjectRecord
 from app.logger import get_logger
 from app.security.webhook_secrets import decrypt_webhook_secret, encrypt_webhook_secret
 
@@ -248,6 +248,24 @@ class ProjectRepositoryImpl(ProjectRepository):
             return [str(provider) for (provider,) in rows if provider]
         except Exception:
             logger.exception("Failed listing project providers", extra={"project_id": project_id})
+            raise
+
+    def delete_project(self, project_id: str) -> bool:
+        # Delete one project and associated scoped rows.
+        try:
+            with self._session_factory.create_session() as session:
+                record = session.query(ProjectRecord).filter(ProjectRecord.id == project_id).first()
+                if record is None:
+                    return False
+                session.query(EventRecord).filter(EventRecord.project_id == project_id).delete(synchronize_session=False)
+                session.query(IncidentRecord).filter(IncidentRecord.project_id == project_id).delete(synchronize_session=False)
+                session.query(IngestKeyRecord).filter(IngestKeyRecord.project_id == project_id).delete(synchronize_session=False)
+                session.query(ProjectModelRecord).filter(ProjectModelRecord.project_id == project_id).delete(synchronize_session=False)
+                session.delete(record)
+                session.commit()
+                return True
+        except Exception:
+            logger.exception("Failed deleting project", extra={"project_id": project_id})
             raise
 
 

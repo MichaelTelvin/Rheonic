@@ -1,18 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { fetchProjectProtect, updateProjectProtect, type ProjectProtectSettings } from "../api/client";
+import {
+  deleteProject,
+  fetchProjectProtect,
+  updateProjectProtect,
+  type ProjectProtectSettings,
+} from "../api/client";
+import { showAppToast } from "../components/AppToastHost";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
 import { InfoTooltip } from "../components/InfoTooltip";
 import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
-import { showAppToast } from "../components/AppToastHost";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { getProtectReadiness, type ProtectReadiness } from "./protectReadiness";
 
 export function Protect(): JSX.Element {
-  const { projectId } = useProjectContext();
+  const { projectId, projects, setProjectId, reloadProjects } = useProjectContext();
+
   const navigateTo = (path: string): void => {
     if (window.location.pathname === path) {
       return;
@@ -36,9 +42,17 @@ export function Protect(): JSX.Element {
   const [muteFor24h, setMuteFor24h] = useState<boolean>(false);
   const [pendingWarningsCount, setPendingWarningsCount] = useState<number | null>(null);
   const [showPostEnableToast, setShowPostEnableToast] = useState<boolean>(false);
+
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [deletingProject, setDeletingProject] = useState<boolean>(false);
+
   const failModeDisabled = !protectEnabledInput;
   const sanitizeDigits = (value: string): string => value.replace(/\D+/g, "");
   const mutedStorageKey = projectId ? `rheonic:protectConfirmMuted:${projectId}` : null;
+
+  const currentProject = useMemo(() => projects.find((item) => item.id === projectId) ?? null, [projects, projectId]);
+  const currentProjectName = currentProject?.name ?? projectId ?? "";
+
   const applyInputsFromSettings = (settings: ProjectProtectSettings): void => {
     setProtectEnabledInput(Boolean(settings.protect_enabled));
     setProtectMaxReqInput(
@@ -158,6 +172,7 @@ export function Protect(): JSX.Element {
     setMuteFor24h(false);
     setPendingWarningsCount(null);
     setShowPostEnableToast(false);
+    setShowDeleteModal(false);
   }, [projectId]);
 
   const onSaveProtectSettings = async (): Promise<void> => {
@@ -182,6 +197,7 @@ export function Protect(): JSX.Element {
       const protect_max_tok_per_min = parseOptionalInt(protectMaxTokInput);
       setSavingProtect(true);
       setProtectError(null);
+
       const updated = await updateProjectProtect(projectId, {
         protect_enabled: protectEnabledInput,
         protect_fail_mode: protectFailModeInput,
@@ -191,8 +207,10 @@ export function Protect(): JSX.Element {
         protect_decision_timeout_ms:
           protectSettings?.protect_decision_timeout_ms ?? frontendConfig.protectDefaultDecisionTimeoutMs,
       });
+
       setProtectSettings(updated);
       applyInputsFromSettings(updated);
+
       const isProtectEnabled = Boolean(updated.protect_enabled);
       if (!wasProtectEnabled && isProtectEnabled) {
         showAppToast("Protect enabled");
@@ -201,17 +219,18 @@ export function Protect(): JSX.Element {
       } else {
         showAppToast("Saved");
       }
-      const transitionedToProtect = !Boolean(protectSettings?.protect_enabled) && Boolean(updated.protect_enabled);
+
+      const transitionedToProtect = !wasProtectEnabled && isProtectEnabled;
       if (transitionedToProtect) {
         let unresolvedWarnings = pendingWarningsCount;
         if (unresolvedWarnings === null) {
           try {
             const latestReadiness = await getProtectReadiness(projectId);
-            unresolvedWarnings = Number(
-              [latestReadiness.limitsConfigured, latestReadiness.notificationsConfigured, latestReadiness.trafficDetected].filter(
-                (value) => !value,
-              ).length,
-            );
+            unresolvedWarnings = [
+              latestReadiness.limitsConfigured,
+              latestReadiness.notificationsConfigured,
+              latestReadiness.trafficDetected,
+            ].filter((value) => !value).length;
           } catch {
             unresolvedWarnings = 0;
           }
@@ -220,6 +239,7 @@ export function Protect(): JSX.Element {
       } else {
         setShowPostEnableToast(false);
       }
+
       setPendingWarningsCount(null);
       window.dispatchEvent(
         new CustomEvent("rheonic:protect-mode-updated", {
@@ -301,6 +321,7 @@ export function Protect(): JSX.Element {
       setPendingWarningsCount(null);
       return;
     }
+
     setLoadingReadiness(true);
     setReadinessError(null);
     try {
@@ -352,6 +373,31 @@ export function Protect(): JSX.Element {
       return;
     }
     navigateTo("/quickstart");
+  };
+
+  const onDeleteProject = async (): Promise<void> => {
+    if (!projectId) {
+      return;
+    }
+    setDeletingProject(true);
+    try {
+      const currentIndex = projects.findIndex((item) => item.id === projectId);
+      await deleteProject(projectId);
+      const items = await reloadProjects();
+      if (items.length > 0) {
+        const nextIndex = currentIndex >= 0 ? Math.min(currentIndex, items.length - 1) : 0;
+        setProjectId(items[nextIndex].id);
+      } else {
+        setProjectId(null);
+        navigateTo("/app/projects");
+      }
+      setShowDeleteModal(false);
+      showAppToast("Project deleted");
+    } catch {
+      showAppToast("Action failed. Try again");
+    } finally {
+      setDeletingProject(false);
+    }
   };
 
   return (
@@ -472,6 +518,7 @@ export function Protect(): JSX.Element {
               </fieldset>
             </FormColumn>
           </div>
+
           <p className="form-error-slot">{protectError ?? "\u00A0"}</p>
           {showPostEnableToast ? (
             <div className="protect-soft-warning-toast" role="status" aria-live="polite">
@@ -489,6 +536,31 @@ export function Protect(): JSX.Element {
               disabled={savingProtect || !projectId}
             >
               {savingProtect ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </Card>
+
+        <Card className="form-card card--form danger-zone-card">
+          <h2 className="section-title">Delete project</h2>
+          <p className="danger-zone-description">Delete this project and all associated data.</p>
+          <p className="danger-zone-description">This action permanently deletes:</p>
+          <ul className="danger-zone-list">
+            <li>telemetry events</li>
+            <li>incidents</li>
+            <li>API keys</li>
+            <li>limits configuration</li>
+            <li>webhook settings</li>
+          </ul>
+          <div className="modal-actions form-actions">
+            <button
+              type="button"
+              className="modal-button action-btn danger-zone-delete-button"
+              onClick={() => {
+                setShowDeleteModal(true);
+              }}
+              disabled={!projectId}
+            >
+              Delete
             </button>
           </div>
         </Card>
@@ -555,6 +627,41 @@ export function Protect(): JSX.Element {
             </div>
           </div>
         ) : null}
+
+        {showDeleteModal ? (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-project-title">
+            <div className="modal modal-delete-project">
+              <h2 id="delete-project-title" className="section-title">
+                Delete project "{currentProjectName}"
+              </h2>
+              <div className="delete-project-modal-copy">
+                <p className="subtle">Are you sure you want to delete the project and all associated data?</p>
+                <p className="subtle">This action is irreversible.</p>
+              </div>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="modal-button"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                  }}
+                  disabled={deletingProject}
+                >
+                  cancel
+                </button>
+                <button
+                  type="button"
+                  className="modal-button danger-zone-delete-button"
+                  onClick={() => void onDeleteProject()}
+                  disabled={deletingProject}
+                >
+                  {deletingProject ? "Deleting..." : "delete project"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <UnsavedChangesToast
           open={showUnsavedPrompt}
           busy={savingProtect}

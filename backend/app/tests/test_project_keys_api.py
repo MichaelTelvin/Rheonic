@@ -8,7 +8,7 @@ from app.application.services.project_service import ProjectService
 from app.dependencies import get_current_user, get_ingest_event_service, get_ingest_key_service, get_project_service
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
-from app.infrastructure.db.models import Base, IngestKeyRecord, ProjectModelRecord
+from app.infrastructure.db.models import Base, EventRecord, IncidentRecord, IngestKeyRecord, ProjectModelRecord, ProjectRecord
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.main import app
@@ -220,4 +220,165 @@ def test_project_providers_endpoint_returns_empty_list_when_none_seen(tmp_path) 
     response = client.get(f"/api/v1/projects/{project_id}/providers")
     assert response.status_code == 200
     assert response.json() == {"providers": []}
+    _cleanup_overrides()
+
+
+def test_project_delete_cascades_all_scoped_data_and_keeps_other_projects(tmp_path) -> None:
+    # Deleting one project should remove all scoped rows and keep sibling project data intact.
+    client, session_factory, _ = _make_client(tmp_path)
+    target = client.post("/api/v1/projects", json={"name": "Delete Target"}).json()
+    survivor = client.post("/api/v1/projects", json={"name": "Delete Survivor"}).json()
+    target_id = target["id"]
+    survivor_id = survivor["id"]
+    now = datetime.now(timezone.utc)
+
+    # Create API keys for both projects so ingest-key artifacts exist.
+    target_key = client.post(f"/api/v1/projects/{target_id}/keys", json={"name": "target-key"})
+    survivor_key = client.post(f"/api/v1/projects/{survivor_id}/keys", json={"name": "survivor-key"})
+    assert target_key.status_code == 200
+    assert survivor_key.status_code == 200
+
+    # Persist protect and webhook settings so project config artifacts are present.
+    protect_target = client.put(
+        f"/api/v1/projects/{target_id}/protect",
+        json={
+            "protect_enabled": True,
+            "protect_fail_mode": "closed",
+            "apply_clamp": True,
+            "protect_max_req_per_min": 120,
+            "protect_max_tok_per_min": 48000,
+            "protect_decision_timeout_ms": 150,
+        },
+    )
+    protect_survivor = client.put(
+        f"/api/v1/projects/{survivor_id}/protect",
+        json={
+            "protect_enabled": False,
+            "protect_fail_mode": "open",
+            "apply_clamp": False,
+            "protect_max_req_per_min": 25,
+            "protect_max_tok_per_min": 5000,
+            "protect_decision_timeout_ms": 100,
+        },
+    )
+    webhook_target = client.put(
+        f"/api/v1/projects/{target_id}/webhook",
+        json={
+            "enabled": True,
+            "email_enabled": True,
+            "url": "https://example.com/webhook-target",
+            "secret": "target-secret",
+        },
+    )
+    webhook_survivor = client.put(
+        f"/api/v1/projects/{survivor_id}/webhook",
+        json={
+            "enabled": True,
+            "email_enabled": False,
+            "url": "https://example.com/webhook-survivor",
+            "secret": "survivor-secret",
+        },
+    )
+    assert protect_target.status_code == 200
+    assert protect_survivor.status_code == 200
+    assert webhook_target.status_code == 200
+    assert webhook_survivor.status_code == 200
+
+    # Add telemetry/incidents/provider-model rows for both projects.
+    with session_factory.create_session() as session:
+        session.add_all(
+            [
+                EventRecord(
+                    id="evt-target",
+                    ts=now,
+                    project_id=target_id,
+                    provider="openai",
+                    model="gpt-4o-mini",
+                    environment="dev",
+                    input_tokens=12,
+                    output_tokens=24,
+                    total_tokens=36,
+                    status="ok",
+                ),
+                EventRecord(
+                    id="evt-survivor",
+                    ts=now,
+                    project_id=survivor_id,
+                    provider="openai",
+                    model="gpt-4o-mini",
+                    environment="prod",
+                    input_tokens=8,
+                    output_tokens=16,
+                    total_tokens=24,
+                    status="ok",
+                ),
+                IncidentRecord(
+                    id="inc-target",
+                    project_id=target_id,
+                    provider="openai",
+                    type="near_cap",
+                    status="open",
+                    fingerprint="fp-target",
+                    evidence={"detail": "target"},
+                    created_at=now,
+                    last_seen_at=now,
+                ),
+                IncidentRecord(
+                    id="inc-survivor",
+                    project_id=survivor_id,
+                    provider="openai",
+                    type="near_cap",
+                    status="open",
+                    fingerprint="fp-survivor",
+                    evidence={"detail": "survivor"},
+                    created_at=now,
+                    last_seen_at=now,
+                ),
+                ProjectModelRecord(
+                    id="pm-target",
+                    project_id=target_id,
+                    provider="openai",
+                    model="gpt-4o-mini",
+                    first_seen_at=now,
+                ),
+                ProjectModelRecord(
+                    id="pm-survivor",
+                    project_id=survivor_id,
+                    provider="openai",
+                    model="gpt-4o-mini",
+                    first_seen_at=now,
+                ),
+            ]
+        )
+        session.commit()
+
+    deleted = client.delete(f"/api/v1/projects/{target_id}")
+    assert deleted.status_code == 200
+    assert deleted.json() == {"status": "deleted"}
+
+    listed = client.get("/api/v1/projects")
+    assert listed.status_code == 200
+    assert all(item["id"] != target_id for item in listed.json())
+    assert any(item["id"] == survivor_id for item in listed.json())
+
+    with session_factory.create_session() as session:
+        assert session.query(ProjectRecord).filter(ProjectRecord.id == target_id).count() == 0
+        assert session.query(EventRecord).filter(EventRecord.project_id == target_id).count() == 0
+        assert session.query(IncidentRecord).filter(IncidentRecord.project_id == target_id).count() == 0
+        assert session.query(IngestKeyRecord).filter(IngestKeyRecord.project_id == target_id).count() == 0
+        assert session.query(ProjectModelRecord).filter(ProjectModelRecord.project_id == target_id).count() == 0
+
+        # Ensure sibling project data still exists.
+        assert session.query(ProjectRecord).filter(ProjectRecord.id == survivor_id).count() == 1
+        assert session.query(EventRecord).filter(EventRecord.project_id == survivor_id).count() == 1
+        assert session.query(IncidentRecord).filter(IncidentRecord.project_id == survivor_id).count() == 1
+        assert session.query(IngestKeyRecord).filter(IngestKeyRecord.project_id == survivor_id).count() == 1
+        assert session.query(ProjectModelRecord).filter(ProjectModelRecord.project_id == survivor_id).count() == 1
+
+    deleted_project_protect = client.get(f"/api/v1/projects/{target_id}/protect")
+    deleted_project_webhook = client.get(f"/api/v1/projects/{target_id}/webhook")
+    deleted_project_keys = client.get(f"/api/v1/projects/{target_id}/keys")
+    assert deleted_project_protect.status_code == 404
+    assert deleted_project_webhook.status_code == 404
+    assert deleted_project_keys.status_code == 404
     _cleanup_overrides()

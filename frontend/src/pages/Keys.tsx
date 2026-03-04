@@ -22,6 +22,7 @@ export function Keys(): JSX.Element {
   const [processingKeyId, setProcessingKeyId] = useState<string | null>(null);
   const [latestPlaintextKey, setLatestPlaintextKey] = useState<CreateKeyResponse | null>(null);
   const [copiedAction, setCopiedAction] = useState<string | null>(null);
+  const activeKeys = keys.filter((key) => key.status === "active");
 
   const validateKeyLabel = (value: string): string | null => {
     if (!value) {
@@ -241,8 +242,8 @@ export function Keys(): JSX.Element {
                 <span className="subtle">Created</span>
                 <span className="subtle key-actions-col table-actions-header">Actions</span>
               </div>
-              {keys.length === 0 ? <p className="subtle">No keys yet.</p> : null}
-              {keys.map((key) => (
+              {activeKeys.length === 0 ? <p className="subtle">No keys yet.</p> : null}
+              {activeKeys.map((key) => (
                 <div className="key-row key-row-data" key={key.id}>
                   <span className="key-name">{key.name}</span>
                   <span className={`badge ${key.status === "active" ? "low" : "high"}`}>{key.status}</span>
@@ -250,28 +251,24 @@ export function Keys(): JSX.Element {
                   <span className="subtle" title={key.created_at}>
                     {formatRelative(key.created_at)}
                   </span>
-                  {key.status === "active" ? (
-                    <div className="key-actions">
-                      <button
-                        type="button"
-                        className="modal-button key-action-btn action-btn"
-                        onClick={() => void onRotateKey(key.id)}
-                        disabled={processingKeyId === key.id}
-                      >
-                        Rotate
-                      </button>
-                      <button
-                        type="button"
-                        className="modal-button key-action-btn action-btn key-action-danger"
-                        onClick={() => void onRevokeKey(key.id)}
-                        disabled={processingKeyId === key.id}
-                      >
-                        Revoke
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="subtle key-actions-col">-</span>
-                  )}
+                  <div className="key-actions">
+                    <button
+                      type="button"
+                      className="modal-button key-action-btn action-btn"
+                      onClick={() => void onRotateKey(key.id)}
+                      disabled={processingKeyId === key.id}
+                    >
+                      Rotate
+                    </button>
+                    <button
+                      type="button"
+                      className="modal-button key-action-btn action-btn key-action-danger"
+                      onClick={() => void onRevokeKey(key.id)}
+                      disabled={processingKeyId === key.id}
+                    >
+                      Revoke
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

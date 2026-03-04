@@ -30,6 +30,11 @@ class ProjectProvidersOut(BaseModel):
     providers: list[str]
 
 
+class DeleteProjectOut(BaseModel):
+    # API response model for project deletion.
+    status: str
+
+
 @router.get("", response_model=list[ProjectOut])
 def list_projects(
     service: ProjectService = Depends(get_project_service),
@@ -86,3 +91,20 @@ def list_project_providers(
     except Exception:
         logger.exception("List project providers endpoint failed", extra={"project_id": project_id})
         raise HTTPException(status_code=500, detail="Failed to list project providers")
+
+
+@router.delete("/{project_id}", response_model=DeleteProjectOut)
+def delete_project(
+    project_id: str,
+    service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+) -> DeleteProjectOut:
+    # Delete one owned project and scoped records.
+    try:
+        service.delete_project(project_id=project_id, user_id=current_user.id)
+        return DeleteProjectOut(status="deleted")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Delete project endpoint failed", extra={"project_id": project_id})
+        raise HTTPException(status_code=500, detail="Failed to delete project")

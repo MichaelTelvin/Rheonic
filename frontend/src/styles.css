@@ -2214,6 +2214,15 @@ pre {
   overflow: auto;
 }
 
+.delete-project-modal-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.delete-project-modal-copy .subtle {
+  margin: 0;
+}
+
 .modal-keys {
   width: min(760px, 100%);
 }
@@ -2960,6 +2969,34 @@ pre {
   background: rgba(15, 23, 42, 0.3);
 }
 
+.project-table-row-button {
+  width: 100%;
+  border: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.project-table-row-button:hover {
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.project-table-row-button.is-selected {
+  background: rgba(167, 139, 250, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.28);
+}
+
+.project-selection-label {
+  color: rgba(229, 231, 235, 0.66);
+  font-size: 0.84rem;
+}
+
+.project-selection-label.is-selected {
+  color: rgba(221, 214, 254, 0.96);
+  font-weight: 600;
+}
+
 .table-actions-header,
 .table-actions-cell {
   justify-self: end;
@@ -3217,6 +3254,56 @@ pre {
 
 .protect-soft-warning-toast .modal-button {
   white-space: nowrap;
+}
+
+.danger-zone-card {
+  margin-top: 48px;
+  border-color: rgba(255, 90, 90, 0.35);
+  background: rgba(255, 80, 80, 0.04);
+}
+
+.danger-zone-card > * + * {
+  margin-top: 12px;
+}
+
+.danger-zone-card .section-title {
+  color: rgba(255, 155, 155, 0.92);
+}
+
+.danger-zone-description {
+  margin: 0;
+  color: rgba(254, 226, 226, 0.84);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.danger-zone-description:last-of-type {
+  margin-bottom: 10px;
+}
+
+.danger-zone-list {
+  margin: 0;
+  padding-left: 20px;
+  color: rgba(254, 226, 226, 0.9);
+  display: grid;
+  gap: 8px;
+  line-height: 1.45;
+  font-size: 0.88rem;
+}
+
+.danger-zone-card .form-actions {
+  margin-top: 18px;
+}
+
+.danger-zone-delete-button {
+  border-color: rgba(255, 80, 80, 0.5);
+  color: #ff9b9b;
+  background: rgba(255, 80, 80, 0.15);
+}
+
+.danger-zone-delete-button:hover:enabled {
+  border-color: rgba(255, 80, 80, 0.64);
+  background: rgba(255, 80, 80, 0.25);
 }
 
 .alerts-grid.is-disabled {
@@ -3627,6 +3714,10 @@ pre {
   .project-table-row {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .project-table-row-button {
+    padding: 10px 12px;
   }
 
   .projects-top-grid {
