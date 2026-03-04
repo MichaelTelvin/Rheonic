@@ -3540,6 +3540,48 @@ pre {
     width: 100%;
     border-right: 0;
     border-bottom: 1px solid var(--border);
+    padding: 8px 12px 10px;
+    gap: 10px;
+  }
+
+  .sidebar-brand {
+    min-height: 42px;
+  }
+
+  .sidebar-brand-divider,
+  .sidebar-footer-divider {
+    margin: 0 2px 10px;
+  }
+
+  .sidebar-top {
+    display: grid;
+    gap: 8px;
+  }
+
+  .sidebar-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .sidebar-link {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .sidebar-bottom {
+    padding-top: 10px;
+    padding-bottom: 8px;
+  }
+
+  .sidebar-user-row {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .sidebar-user-email {
+    max-width: 100%;
   }
 
   .app-main {
@@ -3558,9 +3600,22 @@ pre {
     padding-top: 0;
   }
 
+  .app-routes .dashboard {
+    padding: 20px 20px 28px;
+  }
+
+  .current-project-bar-inner {
+    padding: 0 20px;
+  }
+
   .current-project-select-row {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
+  }
+
+  .current-project-select-row select {
+    max-width: 100%;
   }
 
   .mode-indicator-group {
@@ -3594,6 +3649,118 @@ pre {
 
   .diagram-open-link {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 860px) {
+  .dashboard-controls-main .toolbar {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .dashboard-controls-main .toolbar label {
+    margin-bottom: 2px;
+  }
+
+  .dashboard-controls-main .toolbar select,
+  .dashboard-controls-main select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .incidents-toolbar {
+    width: 100%;
+    gap: 14px;
+  }
+
+  .incidents-filter-field {
+    width: 100%;
+  }
+
+  .incidents-filter-field select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .projects-create-card .form-column,
+  .projects-integration-body,
+  .projects-integration-field,
+  .projects-integration-input {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .app-routes .dashboard {
+    padding: 16px 14px 24px;
+  }
+
+  .current-project-bar {
+    padding: 10px 0;
+  }
+
+  .current-project-bar-inner {
+    padding: 0 14px;
+  }
+
+  .setup-banner {
+    margin: 12px 0 18px;
+    padding: 10px 12px 10px 14px;
+  }
+
+  .form-card,
+  .card--form,
+  .card--table,
+  .card--content {
+    max-width: 100%;
+  }
+
+  .key-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .key-row-header {
+    display: none;
+  }
+
+  .key-row-data {
+    padding: 10px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: rgba(15, 23, 42, 0.38);
+  }
+
+  .key-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .key-actions .action-btn {
+    min-width: 0;
+    flex: 1 1 120px;
+  }
+
+  .project-table-head {
+    display: none;
+  }
+
+  .project-table-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .table-actions-cell {
+    justify-self: start;
+  }
+
+  .doc-card {
+    min-height: 0;
+    padding: 16px;
   }
 }
 
