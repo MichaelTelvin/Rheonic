@@ -57,6 +57,7 @@ class ProjectRepository(ABC):
         self,
         project_id: str,
         webhook_enabled: bool,
+        email_enabled: bool,
         webhook_url: str | None,
         webhook_secret: str | None,
     ) -> Project | None:

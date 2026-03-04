@@ -143,6 +143,7 @@ class ProjectRepositoryImpl(ProjectRepository):
         self,
         project_id: str,
         webhook_enabled: bool,
+        email_enabled: bool,
         webhook_url: str | None,
         webhook_secret: str | None,
     ) -> Project | None:
@@ -153,6 +154,7 @@ class ProjectRepositoryImpl(ProjectRepository):
                 if record is None:
                     return None
                 record.webhook_enabled = webhook_enabled
+                record.email_enabled = email_enabled
                 record.webhook_url = webhook_url
                 record.webhook_secret = (
                     encrypt_webhook_secret(webhook_secret, settings=self._settings) if webhook_secret is not None else None
@@ -264,6 +266,7 @@ def _to_domain(record: ProjectRecord, settings: Settings | None = None) -> Proje
         protect_max_tok_per_min=getattr(record, "protect_max_tok_per_min", None),
         protect_decision_timeout_ms=int(getattr(record, "protect_decision_timeout_ms", 100) or 100),
         webhook_enabled=bool(getattr(record, "webhook_enabled", False)),
+        email_enabled=bool(getattr(record, "email_enabled", False)),
         webhook_url=getattr(record, "webhook_url", None),
         webhook_secret=decrypt_webhook_secret(getattr(record, "webhook_secret", None), settings=resolved_settings),
         webhook_last_status=getattr(record, "webhook_last_status", None),

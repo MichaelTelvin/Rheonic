@@ -1,14 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { fetchProjectProtect, updateProjectProtect, type ProjectProtectSettings } from "../api/client";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
 import { InfoTooltip } from "../components/InfoTooltip";
+import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
+import { getProtectReadiness, type ProtectReadiness } from "./protectReadiness";
 
 export function Protect(): JSX.Element {
   const { projectId } = useProjectContext();
+  const navigateTo = (path: string): void => {
+    if (window.location.pathname === path) {
+      return;
+    }
+    window.history.pushState({}, "", path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
 
   const [protectSettings, setProtectSettings] = useState<ProjectProtectSettings | null>(null);
   const [savingProtect, setSavingProtect] = useState<boolean>(false);
@@ -18,8 +28,96 @@ export function Protect(): JSX.Element {
   const [protectMaxTokInput, setProtectMaxTokInput] = useState<string>("");
   const [protectFailModeInput, setProtectFailModeInput] = useState<"open" | "closed">("open");
   const [applyClampInput, setApplyClampInput] = useState<boolean>(false);
+  const [showEnableModal, setShowEnableModal] = useState<boolean>(false);
+  const [loadingReadiness, setLoadingReadiness] = useState<boolean>(false);
+  const [readinessError, setReadinessError] = useState<string | null>(null);
+  const [readiness, setReadiness] = useState<ProtectReadiness | null>(null);
+  const [muteFor24h, setMuteFor24h] = useState<boolean>(false);
+  const [pendingWarningsCount, setPendingWarningsCount] = useState<number | null>(null);
+  const [showPostEnableToast, setShowPostEnableToast] = useState<boolean>(false);
   const failModeDisabled = !protectEnabledInput;
   const sanitizeDigits = (value: string): string => value.replace(/\D+/g, "");
+  const mutedStorageKey = projectId ? `rheonic:protectConfirmMuted:${projectId}` : null;
+  const applyInputsFromSettings = (settings: ProjectProtectSettings): void => {
+    setProtectEnabledInput(Boolean(settings.protect_enabled));
+    setProtectMaxReqInput(
+      settings.protect_max_req_per_min === null || settings.protect_max_req_per_min === undefined
+        ? ""
+        : String(settings.protect_max_req_per_min),
+    );
+    setProtectMaxTokInput(
+      settings.protect_max_tok_per_min === null || settings.protect_max_tok_per_min === undefined
+        ? ""
+        : String(settings.protect_max_tok_per_min),
+    );
+    setProtectFailModeInput(settings.protect_fail_mode === "closed" ? "closed" : "open");
+    setApplyClampInput(Boolean(settings.apply_clamp));
+  };
+
+  const readinessItems = useMemo(
+    () => [
+      {
+        id: "limits",
+        label: "Request/token limits",
+        ready: Boolean(readiness?.limitsConfigured),
+        readyText: "Set",
+        warnText: "Not set",
+        actionLabel: "Open settings",
+      },
+      {
+        id: "notifications",
+        label: "Notifications",
+        ready: Boolean(readiness?.notificationsConfigured),
+        readyText: "Configured",
+        warnText: "Set up Email or Webhook alerts before enabling Protect.",
+        actionLabel: "Open notifications",
+      },
+      {
+        id: "traffic",
+        label: "Traffic detected",
+        ready: Boolean(readiness?.trafficDetected),
+        readyText: "Events received",
+        warnText: "No events received yet",
+        actionLabel: "Open Quickstart",
+      },
+    ],
+    [readiness],
+  );
+
+  const warningsCount = readinessItems.filter((item) => !item.ready).length;
+
+  const refreshProtectReadiness = async (): Promise<void> => {
+    if (!projectId) {
+      return;
+    }
+    try {
+      setLoadingReadiness(true);
+      setReadinessError(null);
+      const nextReadiness = await getProtectReadiness(projectId);
+      setReadiness(nextReadiness);
+    } catch (error) {
+      setReadiness(null);
+      setReadinessError(error instanceof Error ? error.message : "Failed to validate readiness.");
+    } finally {
+      setLoadingReadiness(false);
+    }
+  };
+
+  const isProtectConfirmMuted = (): boolean => {
+    if (!mutedStorageKey) {
+      return false;
+    }
+    const raw = window.localStorage.getItem(mutedStorageKey);
+    if (!raw) {
+      return false;
+    }
+    const expiresAt = Number(raw);
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      window.localStorage.removeItem(mutedStorageKey);
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => {
     if (!projectId) {
@@ -36,19 +134,7 @@ export function Protect(): JSX.Element {
           return;
         }
         setProtectSettings(settings);
-        setProtectEnabledInput(Boolean(settings.protect_enabled));
-        setProtectMaxReqInput(
-          settings.protect_max_req_per_min === null || settings.protect_max_req_per_min === undefined
-            ? ""
-            : String(settings.protect_max_req_per_min),
-        );
-        setProtectMaxTokInput(
-          settings.protect_max_tok_per_min === null || settings.protect_max_tok_per_min === undefined
-            ? ""
-            : String(settings.protect_max_tok_per_min),
-        );
-        setProtectFailModeInput(settings.protect_fail_mode === "closed" ? "closed" : "open");
-        setApplyClampInput(Boolean(settings.apply_clamp));
+        applyInputsFromSettings(settings);
         setProtectError(null);
       } catch (error) {
         if (!cancelled) {
@@ -62,6 +148,15 @@ export function Protect(): JSX.Element {
     return () => {
       cancelled = true;
     };
+  }, [projectId]);
+
+  useEffect(() => {
+    setShowEnableModal(false);
+    setReadiness(null);
+    setReadinessError(null);
+    setMuteFor24h(false);
+    setPendingWarningsCount(null);
+    setShowPostEnableToast(false);
   }, [projectId]);
 
   const onSaveProtectSettings = async (): Promise<void> => {
@@ -95,8 +190,27 @@ export function Protect(): JSX.Element {
           protectSettings?.protect_decision_timeout_ms ?? frontendConfig.protectDefaultDecisionTimeoutMs,
       });
       setProtectSettings(updated);
-      setProtectEnabledInput(Boolean(updated.protect_enabled));
-      setApplyClampInput(Boolean(updated.apply_clamp));
+      applyInputsFromSettings(updated);
+      const transitionedToProtect = !Boolean(protectSettings?.protect_enabled) && Boolean(updated.protect_enabled);
+      if (transitionedToProtect) {
+        let unresolvedWarnings = pendingWarningsCount;
+        if (unresolvedWarnings === null) {
+          try {
+            const latestReadiness = await getProtectReadiness(projectId);
+            unresolvedWarnings = Number(
+              [latestReadiness.limitsConfigured, latestReadiness.notificationsConfigured, latestReadiness.trafficDetected].filter(
+                (value) => !value,
+              ).length,
+            );
+          } catch {
+            unresolvedWarnings = 0;
+          }
+        }
+        setShowPostEnableToast((unresolvedWarnings ?? 0) > 0);
+      } else {
+        setShowPostEnableToast(false);
+      }
+      setPendingWarningsCount(null);
       window.dispatchEvent(
         new CustomEvent("rheonic:protect-mode-updated", {
           detail: { projectId, protect_enabled: Boolean(updated.protect_enabled) },
@@ -109,6 +223,49 @@ export function Protect(): JSX.Element {
     }
   };
 
+  const hasUnsavedChanges = useMemo(() => {
+    if (!protectSettings) {
+      return false;
+    }
+    const savedReq = protectSettings.protect_max_req_per_min == null ? "" : String(protectSettings.protect_max_req_per_min);
+    const savedTok = protectSettings.protect_max_tok_per_min == null ? "" : String(protectSettings.protect_max_tok_per_min);
+    const savedFailMode = protectSettings.protect_fail_mode === "closed" ? "closed" : "open";
+    return (
+      protectEnabledInput !== Boolean(protectSettings.protect_enabled)
+      || protectMaxReqInput.trim() !== savedReq
+      || protectMaxTokInput.trim() !== savedTok
+      || protectFailModeInput !== savedFailMode
+      || applyClampInput !== Boolean(protectSettings.apply_clamp)
+    );
+  }, [
+    protectSettings,
+    protectEnabledInput,
+    protectMaxReqInput,
+    protectMaxTokInput,
+    protectFailModeInput,
+    applyClampInput,
+  ]);
+
+  const discardUnsavedChanges = (): void => {
+    if (!protectSettings) {
+      return;
+    }
+    applyInputsFromSettings(protectSettings);
+    setProtectError(null);
+    setPendingWarningsCount(null);
+    setShowEnableModal(false);
+  };
+
+  const {
+    showPrompt: showUnsavedPrompt,
+    onSaveAndContinue,
+    onDiscardAndContinue,
+  } = useUnsavedChangesGuard({
+    isDirty: hasUnsavedChanges,
+    onSave: onSaveProtectSettings,
+    onDiscard: discardUnsavedChanges,
+  });
+
   if (!projectId) {
     return (
       <main className="dashboard">
@@ -119,6 +276,72 @@ export function Protect(): JSX.Element {
       </main>
     );
   }
+
+  const onProtectModeChange = async (nextMode: "observe" | "protect"): Promise<void> => {
+    if (nextMode === "observe") {
+      setProtectEnabledInput(false);
+      return;
+    }
+    if (protectEnabledInput) {
+      return;
+    }
+    if (isProtectConfirmMuted()) {
+      setProtectEnabledInput(true);
+      setPendingWarningsCount(null);
+      return;
+    }
+    setLoadingReadiness(true);
+    setReadinessError(null);
+    try {
+      const nextReadiness = await getProtectReadiness(projectId);
+      setReadiness(nextReadiness);
+      const allChecksPassed =
+        Boolean(nextReadiness.limitsConfigured)
+        && Boolean(nextReadiness.notificationsConfigured)
+        && Boolean(nextReadiness.trafficDetected);
+      if (allChecksPassed) {
+        setPendingWarningsCount(0);
+        setProtectEnabledInput(true);
+        setShowEnableModal(false);
+        return;
+      }
+      setShowEnableModal(true);
+      setMuteFor24h(false);
+    } catch (error) {
+      setReadiness(null);
+      setReadinessError(error instanceof Error ? error.message : "Failed to validate readiness.");
+      setShowEnableModal(true);
+      setMuteFor24h(false);
+    } finally {
+      setLoadingReadiness(false);
+    }
+  };
+
+  const onEnableProtectAnyway = (): void => {
+    if (muteFor24h && mutedStorageKey) {
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+      window.localStorage.setItem(mutedStorageKey, String(expiresAt));
+    }
+    setPendingWarningsCount(warningsCount);
+    setProtectEnabledInput(true);
+    setShowEnableModal(false);
+  };
+
+  const onChecklistAction = (itemId: string): void => {
+    setShowEnableModal(false);
+    if (itemId === "limits") {
+      const node = document.getElementById("protect-max-req");
+      if (node instanceof HTMLInputElement) {
+        node.focus();
+      }
+      return;
+    }
+    if (itemId === "notifications") {
+      navigateTo("/app/alerts");
+      return;
+    }
+    navigateTo("/quickstart");
+  };
 
   return (
     <main className="dashboard">
@@ -138,7 +361,7 @@ export function Protect(): JSX.Element {
                   id="protect-mode-select"
                   value={protectEnabledInput ? "protect" : "observe"}
                   onChange={(event) => {
-                    setProtectEnabledInput(event.target.value === "protect");
+                    void onProtectModeChange(event.target.value === "protect" ? "protect" : "observe");
                     event.currentTarget.blur();
                   }}
                   title="Observe = telemetry only, Protect = preflight decisions enforced."
@@ -239,6 +462,14 @@ export function Protect(): JSX.Element {
             </FormColumn>
           </div>
           <p className="form-error-slot">{protectError ?? "\u00A0"}</p>
+          {showPostEnableToast ? (
+            <div className="protect-soft-warning-toast" role="status" aria-live="polite">
+              <span>Protect enabled — some settings need attention.</span>
+              <button type="button" className="modal-button" onClick={() => navigateTo("/app/settings")}>
+                Open settings
+              </button>
+            </div>
+          ) : null}
           <div className="modal-actions form-actions">
             <button
               type="button"
@@ -250,6 +481,75 @@ export function Protect(): JSX.Element {
             </button>
           </div>
         </Card>
+
+        {showEnableModal ? (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="protect-enable-title">
+            <div className="modal protect-enable-modal">
+              <h2 id="protect-enable-title" className="section-title">
+                Enable Protect mode?
+              </h2>
+              <p className="subtle">
+                We&apos;ll start making preflight decisions before provider calls. Review these items first.
+              </p>
+              {loadingReadiness ? <p className="subtle">Checking readiness...</p> : null}
+              {readinessError ? <p className="form-error-slot">{readinessError}</p> : null}
+              {!loadingReadiness && !readinessError ? (
+                <div className="protect-readiness-list">
+                  {readinessItems.map((item) => (
+                    <div key={item.id} className={`protect-readiness-row ${item.ready ? "is-ready" : "is-warning"}`}>
+                      <div className="protect-readiness-copy">
+                        <p className="protect-readiness-title">
+                          <span className="protect-readiness-icon" aria-hidden="true">
+                            {item.ready ? "✅" : "⚠️"}
+                          </span>
+                          <span>{item.label}</span>
+                        </p>
+                        <p className="subtle">{item.ready ? item.readyText : item.warnText}</p>
+                      </div>
+                      {!item.ready ? (
+                        <button
+                          type="button"
+                          className="modal-button protect-readiness-action"
+                          onClick={() => onChecklistAction(item.id)}
+                        >
+                          {item.actionLabel}
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <label className="protect-readiness-mute">
+                <input type="checkbox" checked={muteFor24h} onChange={(event) => setMuteFor24h(event.target.checked)} />
+                <span>Don&apos;t show again for this project for 24h</span>
+              </label>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="modal-button"
+                  onClick={() => {
+                    setProtectEnabledInput(false);
+                    setShowEnableModal(false);
+                  }}
+                >
+                  Back to Observe
+                </button>
+                <button type="button" className="modal-button modal-primary" onClick={onEnableProtectAnyway}>
+                  Enable Protect
+                </button>
+                <button type="button" className="modal-button" onClick={() => void refreshProtectReadiness()}>
+                  Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        <UnsavedChangesToast
+          open={showUnsavedPrompt}
+          busy={savingProtect}
+          onSave={() => void onSaveAndContinue()}
+          onDiscard={onDiscardAndContinue}
+        />
       </div>
     </main>
   );

@@ -197,10 +197,11 @@ class FakeProjectRepository:
         self,
         project_id: str,
         webhook_enabled: bool,
+        email_enabled: bool,
         webhook_url: str | None,
         webhook_secret: str | None,
     ) -> Project | None:
-        _ = (project_id, webhook_enabled, webhook_url, webhook_secret)
+        _ = (project_id, webhook_enabled, email_enabled, webhook_url, webhook_secret)
         return self.project
 
     def update_project_webhook_delivery_status(

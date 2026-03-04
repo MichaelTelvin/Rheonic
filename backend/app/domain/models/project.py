@@ -17,6 +17,7 @@ class Project:
     protect_max_tok_per_min: int | None = None
     protect_decision_timeout_ms: int = 100
     webhook_enabled: bool = False
+    email_enabled: bool = False
     webhook_url: str | None = None
     webhook_secret: str | None = None
     webhook_last_status: str | None = None

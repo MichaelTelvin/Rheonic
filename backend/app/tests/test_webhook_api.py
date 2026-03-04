@@ -158,7 +158,7 @@ def test_project_webhook_rejects_private_hosts(tmp_path) -> None:
     _cleanup_overrides()
 
 
-def test_project_webhook_test_requires_protect_mode(tmp_path) -> None:
+def test_project_webhook_test_is_available_in_observe_mode(tmp_path) -> None:
     client, dispatcher = _make_client(tmp_path)
     project_id = client.post("/api/v1/projects", json={"name": "Webhook Test Override"}).json()["id"]
 
@@ -173,8 +173,8 @@ def test_project_webhook_test_requires_protect_mode(tmp_path) -> None:
         f"/api/v1/projects/{project_id}/webhook/test",
         json={"url": "https://draft.test/hook", "secret": "draft-secret"},
     )
-    assert test_response.status_code == 409
-    assert len(dispatcher.calls) == 0
+    assert test_response.status_code == 202
+    assert len(dispatcher.calls) == 1
 
     _cleanup_overrides()
 

@@ -19,6 +19,7 @@ router = APIRouter()
 class ProjectWebhookOut(BaseModel):
     # Project webhook settings response payload.
     enabled: bool
+    email_enabled: bool
     url: str | None
     has_secret: bool
     last_status: str | None
@@ -29,6 +30,7 @@ class ProjectWebhookOut(BaseModel):
 class ProjectWebhookIn(BaseModel):
     # Project webhook settings update payload.
     enabled: bool
+    email_enabled: bool = False
     url: AnyHttpUrl | None = None
     secret: str | None = None
 
@@ -66,6 +68,7 @@ def get_project_webhook(
         project = project_service.get_project_webhook_settings(project_id=project_id, user_id=current_user.id)
         return ProjectWebhookOut(
             enabled=project.webhook_enabled,
+            email_enabled=project.email_enabled,
             url=project.webhook_url,
             has_secret=bool(project.webhook_secret),
             last_status=project.webhook_last_status,
@@ -98,11 +101,13 @@ def update_project_webhook(
             project_id=project_id,
             user_id=current_user.id,
             webhook_enabled=payload.enabled,
+            email_enabled=payload.email_enabled,
             webhook_url=normalized_url,
             webhook_secret=payload.secret,
         )
         return ProjectWebhookOut(
             enabled=updated.webhook_enabled,
+            email_enabled=updated.email_enabled,
             url=updated.webhook_url,
             has_secret=bool(updated.webhook_secret),
             last_status=updated.webhook_last_status,
@@ -128,8 +133,6 @@ def test_project_webhook(
     # Enqueue a webhook test payload for an owned project.
     try:
         project = project_service.get_project_webhook_settings(project_id=project_id, user_id=current_user.id)
-        if not bool(project.protect_enabled):
-            raise HTTPException(status_code=409, detail="webhook test is available only in protect mode")
         override_url = normalize_webhook_url(str(payload.url) if payload and payload.url is not None else None)
         target_url = override_url or project.webhook_url
         if not target_url:

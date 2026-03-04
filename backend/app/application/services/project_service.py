@@ -101,6 +101,7 @@ class ProjectService:
         project_id: str,
         user_id: str,
         webhook_enabled: bool,
+        email_enabled: bool,
         webhook_url: str | None,
         webhook_secret: str | None,
     ) -> Project:
@@ -109,6 +110,7 @@ class ProjectService:
         updated = self._project_repository.update_project_webhook_settings(
             project_id=project_id,
             webhook_enabled=webhook_enabled,
+            email_enabled=email_enabled,
             webhook_url=webhook_url,
             webhook_secret=webhook_secret,
         )

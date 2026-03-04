@@ -1684,6 +1684,32 @@ select {
   margin-top: 12px;
 }
 
+.alerts-helper {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.alerts-destination {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.alerts-destination-label {
+  color: var(--muted);
+}
+
+.alerts-destination-email {
+  color: var(--text);
+}
+
+.alerts-pending-status {
+  margin: -4px 0 0;
+  color: rgba(209, 213, 219, 0.9);
+  font-size: 0.84rem;
+}
+
 .form-field label.alerts-toggle-row {
   display: inline-flex;
   width: fit-content;
@@ -1709,6 +1735,12 @@ select {
   line-height: 1.35;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.alerts-test-note {
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .alerts-success {
@@ -2689,6 +2721,38 @@ pre {
   gap: 30px;
 }
 
+.alerts-page-stack {
+  gap: 24px;
+}
+
+.alerts-cards-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.alerts-card {
+  max-width: none;
+  height: 100%;
+}
+
+.alerts-cards-row .alerts-card .section-title {
+  margin-bottom: 8px;
+}
+
+.alerts-cards-row .alerts-card .alerts-helper {
+  margin-bottom: 14px;
+}
+
+.alerts-webhook-input {
+  width: 100%;
+}
+
+.alerts-webhook-field {
+  width: min(100%, 340px);
+}
+
 .page-stack .section-title {
   margin-bottom: 8px;
 }
@@ -3035,6 +3099,79 @@ pre {
   line-height: 1;
 }
 
+.protect-enable-modal {
+  width: min(680px, 100%);
+}
+
+.protect-readiness-list {
+  display: grid;
+  gap: 10px;
+}
+
+.protect-readiness-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.45);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.protect-readiness-row.is-warning {
+  border-color: rgba(251, 191, 36, 0.32);
+  background: rgba(217, 119, 6, 0.1);
+}
+
+.protect-readiness-title {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.protect-readiness-icon {
+  line-height: 1;
+}
+
+.protect-readiness-copy .subtle {
+  margin-top: 4px;
+}
+
+.protect-readiness-action {
+  flex-shrink: 0;
+  min-width: 160px;
+  width: 160px;
+  text-align: center;
+}
+
+.protect-readiness-mute {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.protect-soft-warning-toast {
+  margin: 0 0 12px;
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  border-radius: 10px;
+  background: rgba(217, 119, 6, 0.12);
+  color: #fde68a;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.protect-soft-warning-toast .modal-button {
+  white-space: nowrap;
+}
+
 .alerts-grid.is-disabled {
   opacity: 0.6;
 }
@@ -3043,6 +3180,11 @@ pre {
   .protect-settings-grid {
     grid-template-columns: 1fr;
     gap: 14px;
+  }
+
+  .protect-readiness-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -3288,7 +3430,64 @@ pre {
   color: rgba(253, 164, 175, 0.92);
 }
 
+.alerts-error-slot {
+  min-height: 16px;
+  margin-top: -6px;
+}
+
+.unsaved-changes-toast {
+  position: fixed;
+  right: 24px;
+  top: 74px;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.72);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  color: rgba(229, 231, 235, 0.95);
+  animation: unsaved-toast-slide-in 180ms ease-out;
+}
+
+.unsaved-changes-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+@keyframes unsaved-toast-slide-in {
+  from {
+    transform: translateX(18px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unsaved-changes-toast {
+    animation: none;
+  }
+}
+
 @media (max-width: 980px) {
+  .unsaved-changes-toast {
+    left: 12px;
+    right: 12px;
+    top: 64px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .alerts-cards-row {
+    grid-template-columns: 1fr;
+  }
+
   .sidebar {
     position: static;
     width: 100%;

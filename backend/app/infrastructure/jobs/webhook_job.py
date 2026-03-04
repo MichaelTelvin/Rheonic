@@ -44,7 +44,7 @@ def send_project_webhook(
     if project is None:
         return
 
-    if not force_send and (not project.webhook_enabled or not project.webhook_url):
+    if not force_send and (not project.protect_enabled or not project.webhook_enabled or not project.webhook_url):
         return
 
     target_url = override_url or project.webhook_url
