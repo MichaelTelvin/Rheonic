@@ -1,5 +1,6 @@
 import { useEffect, useState, type MouseEvent as ReactMouseEvent, type PropsWithChildren } from "react";
 import { Link } from "react-router-dom";
+import { fetchPublicConfig } from "../api/client";
 import { getAuthItem, removeAuthItem } from "../authStorage";
 import { frontendConfig } from "../config";
 
@@ -31,6 +32,7 @@ export function PublicLayout({
   const authHref = isSignedIn ? "/" : navAuthHref;
   const authLabel = isSignedIn ? "Sign out" : navAuthLabel;
   const [scrolled, setScrolled] = useState(false);
+  const [publicContactEmail, setPublicContactEmail] = useState<string>(frontendConfig.publicContactEmail || "feedback@example.com");
   const isV2Surface = shellClassName?.includes("public-shell-marketing") || shellClassName?.includes("quickstart-v2-shell");
   const isLandingFooter = shellClassName?.includes("public-shell-marketing");
   const isQuickstartFooter = shellClassName?.includes("quickstart-v2-shell");
@@ -48,6 +50,26 @@ export function PublicLayout({
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [isV2Surface]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPublicConfig = async (): Promise<void> => {
+      try {
+        const config = await fetchPublicConfig();
+        if (!cancelled && (config.public_contact_email || "").trim()) {
+          setPublicContactEmail(config.public_contact_email.trim());
+        }
+      } catch {
+        if (!cancelled) {
+          setPublicContactEmail(frontendConfig.publicContactEmail || "feedback@example.com");
+        }
+      }
+    };
+    void loadPublicConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSignOut = (event: ReactMouseEvent<HTMLAnchorElement>): void => {
     if (!isSignedIn) {
@@ -100,6 +122,12 @@ export function PublicLayout({
                 </span>
                 <Link to="/terms">Terms</Link>
               </div>
+              <p className="public-footer-contact">
+                Questions or feedback:{" "}
+                <span className="public-footer-contact-email">
+                  {publicContactEmail}
+                </span>
+              </p>
               <p>© 2026 Rheonic</p>
             </>
           ) : isQuickstartFooter ? (

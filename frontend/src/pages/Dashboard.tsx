@@ -688,6 +688,7 @@ export function Dashboard(): JSX.Element {
             </section>
           </>
         )}
+        <p className="dashboard-beta-note">Rheonic is in beta — your feedback shapes the product!</p>
       </div>
     </main>
   );

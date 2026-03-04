@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { setUnauthorizedHandler, type AuthUser, type LoginResponse } from "./api/client";
 import { getAuthItem, removeAuthItem, setAuthItem } from "./authStorage";
 import { CurrentProjectBar } from "./components/CurrentProjectBar";
+import { FeedbackModal } from "./components/FeedbackModal";
 import { Sidebar } from "./components/Sidebar";
 import { AppToastHost } from "./components/AppToastHost";
 import { frontendConfig } from "./config";
@@ -28,6 +29,8 @@ interface AuthenticatedAppLayoutProps {
 }
 
 function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayoutProps): JSX.Element {
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState<boolean>(false);
+
   useEffect(() => {
     const onPointerDown = (event: PointerEvent): void => {
       const target = event.target as HTMLElement | null;
@@ -60,7 +63,7 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
 
   return (
     <div className="app-shell">
-      <Sidebar userEmail={userEmail} onSignOut={onSignOut} />
+      <Sidebar userEmail={userEmail} onSignOut={onSignOut} onSendFeedback={() => setFeedbackModalOpen(true)} />
       <div className="app-main app-main-content">
         <CurrentProjectBar />
         <div className="app-routes">
@@ -77,6 +80,7 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
         </div>
       </div>
       <AppToastHost />
+      <FeedbackModal open={feedbackModalOpen} onClose={() => setFeedbackModalOpen(false)} />
     </div>
   );
 }

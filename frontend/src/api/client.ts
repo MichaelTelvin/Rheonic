@@ -115,6 +115,20 @@ export interface LoginResponse {
   user: AuthUser;
 }
 
+export interface FeedbackInput {
+  message: string;
+  email?: string | null;
+  project_id?: string | null;
+  page?: string | null;
+  mode?: string | null;
+  timestamp?: string | null;
+  app_version?: string | null;
+}
+
+export interface PublicConfigResponse {
+  public_contact_email: string;
+}
+
 export class ApiError extends Error {
   status: number;
   code?: string;
@@ -358,4 +372,15 @@ export async function rotateKey(keyId: string): Promise<CreateKeyResponse> {
     method: "POST",
     body: JSON.stringify({}),
   });
+}
+
+export async function sendFeedback(payload: FeedbackInput): Promise<{ status: string }> {
+  return request<{ status: string }>("/api/v1/feedback", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchPublicConfig(): Promise<PublicConfigResponse> {
+  return request<PublicConfigResponse>("/api/v1/public-config");
 }

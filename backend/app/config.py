@@ -108,6 +108,14 @@ class Settings(BaseSettings):
     protect_block_cooldown_seconds: int = 60
     webhook_allow_private_hosts: bool = False
     webhook_secret_encryption_key: str = ""
+    public_contact_email: str = "owldevlab@gmail.com"
+    feedback_report_email: str = "owldevlab@gmail.com"
+    smtp_host: str = "localhost"
+    smtp_port: int = 25
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = False
+    smtp_use_ssl: bool = False
 
     @model_validator(mode="after")
     def _apply_url_defaults(self) -> "Settings":

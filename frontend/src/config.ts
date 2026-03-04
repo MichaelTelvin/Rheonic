@@ -1,6 +1,8 @@
 export const frontendConfig = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000",
   rheonicBackendUrl: import.meta.env.VITE_RHEONIC_BACKEND_URL ?? import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000",
+  publicContactEmail: import.meta.env.VITE_PUBLIC_CONTACT_EMAIL ?? "feedback@example.com",
+  appVersion: import.meta.env.VITE_APP_VERSION ?? "",
   dashboardSelectedProjectStorageKey: "selected_project_id",
   authTokenStorageKey: "rheonic_token",
   authRefreshTokenStorageKey: "rheonic_refresh_token",

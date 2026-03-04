@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 interface SidebarProps {
   userEmail: string | null;
   onSignOut: () => void;
+  onSendFeedback: () => void;
 }
 
 const navItems = [
@@ -15,7 +16,7 @@ const navItems = [
   { to: "/app/docs", label: "Docs" },
 ];
 
-export function Sidebar({ userEmail, onSignOut }: SidebarProps): JSX.Element {
+export function Sidebar({ userEmail, onSignOut, onSendFeedback }: SidebarProps): JSX.Element {
   return (
     <aside className="sidebar" aria-label="Primary navigation">
       <div className="sidebar-top">
@@ -38,6 +39,9 @@ export function Sidebar({ userEmail, onSignOut }: SidebarProps): JSX.Element {
         </nav>
       </div>
       <div className="sidebar-bottom">
+        <button type="button" className="sidebar-feedback-button" onClick={onSendFeedback}>
+          Send feedback
+        </button>
         <div className="sidebar-footer-divider" aria-hidden="true" />
         <div className="sidebar-user-row">
           <p className="sidebar-user-email" title={userEmail ?? "Unknown user"}>

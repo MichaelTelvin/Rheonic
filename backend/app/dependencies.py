@@ -20,6 +20,7 @@ from app.infrastructure.db.repositories.incident_repository_impl import Incident
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
 from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
+from app.infrastructure.notifications.feedback_mailer import FeedbackMailer
 from app.infrastructure.redis.redis_client import RedisClient
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.infrastructure.redis.rolling_window import RollingWindow
@@ -97,6 +98,16 @@ def get_webhook_dispatcher() -> RQWebhookDispatcher:
         return RQWebhookDispatcher(redis_url=get_settings().redis_url)
     except Exception:
         logger.exception("Failed to initialize webhook dispatcher")
+        raise
+
+
+@lru_cache
+def get_feedback_mailer() -> FeedbackMailer:
+    # Provide feedback mail sender.
+    try:
+        return FeedbackMailer(settings=get_settings())
+    except Exception:
+        logger.exception("Failed to initialize feedback mailer")
         raise
 
 
