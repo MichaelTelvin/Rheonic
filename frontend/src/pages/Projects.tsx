@@ -3,6 +3,7 @@ import { useState } from "react";
 import { createProject } from "../api/client";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
+import { showAppToast } from "../components/AppToastHost";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
 import { formatRelative } from "./dashboardUtils";
@@ -66,8 +67,10 @@ export function Projects(): JSX.Element {
       const found = items.find((item) => item.id === created.id);
       setProjectId(found ? found.id : created.id);
       setNewProjectName("");
+      showAppToast("Project created");
     } catch (error) {
       setCreateProjectError(error instanceof Error ? error.message : "Failed to create project");
+      showAppToast("Action failed. Try again");
     } finally {
       setCreatingProject(false);
     }

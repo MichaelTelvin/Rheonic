@@ -6,6 +6,7 @@ import {
   fetchIncidents,
   fetchMetrics,
   fetchProjectProviders,
+  fetchProjectWebhook,
   fetchProtectMetrics,
   listKeys,
   type IncidentItem,
@@ -27,6 +28,17 @@ function formatProviderLabel(provider: string): string {
 
 function normalizeProviderValue(provider: string): string {
   return provider.trim().toLowerCase();
+}
+
+function formatAlertAttemptTime(iso: string | null): string {
+  if (!iso) {
+    return "--";
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
 type SetupStage = "checking" | "no_project" | "no_selection" | "no_ingest_key" | "no_events" | "complete";
@@ -59,6 +71,17 @@ export function Dashboard(): JSX.Element {
   const [hasEvents, setHasEvents] = useState<boolean>(false);
   const [setupStatusResolved, setSetupStatusResolved] = useState<boolean>(false);
   const [setupBannerDismissed, setSetupBannerDismissed] = useState<boolean>(false);
+  const [webhookIssue, setWebhookIssue] = useState<{ count: number; lastAt: string | null } | null>(null);
+  const webhookIssueRef = useRef<{ active: boolean; count: number; lastAt: string | null; lastFailureSeenAt: string | null }>({
+    active: false,
+    count: 0,
+    lastAt: null,
+    lastFailureSeenAt: null,
+  });
+  const webhookTestMarkerKey = useMemo<string | null>(
+    () => (projectId ? `rheonic:webhookTestAt:${projectId}` : null),
+    [projectId],
+  );
 
   const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
   const setupStage = useMemo<SetupStage>(() => {
@@ -107,6 +130,8 @@ export function Dashboard(): JSX.Element {
     setHasIngestKey(false);
     setHasEvents(false);
     setSetupStatusResolved(false);
+    setWebhookIssue(null);
+    webhookIssueRef.current = { active: false, count: 0, lastAt: null, lastFailureSeenAt: null };
   }, [projectId]);
 
   useEffect(() => {
@@ -417,6 +442,74 @@ export function Dashboard(): JSX.Element {
     };
   }, [projectId, selectedProvider]);
 
+  useEffect(() => {
+    if (!projectId) {
+      setWebhookIssue(null);
+      webhookIssueRef.current = { active: false, count: 0, lastAt: null, lastFailureSeenAt: null };
+      return;
+    }
+
+    let cancelled = false;
+    const loadWebhookIssue = async (): Promise<void> => {
+      try {
+        const settings = await fetchProjectWebhook(projectId);
+        if (cancelled) {
+          return;
+        }
+        if (!settings.enabled) {
+          webhookIssueRef.current = { active: false, count: 0, lastAt: null, lastFailureSeenAt: null };
+          setWebhookIssue(null);
+          return;
+        }
+        const markerRaw = webhookTestMarkerKey ? window.localStorage.getItem(webhookTestMarkerKey) : null;
+        const markerAt = markerRaw ? Number(markerRaw) : NaN;
+        const lastAtMs = settings.last_at ? new Date(settings.last_at).getTime() : NaN;
+        const isLikelyTestDelivery =
+          Number.isFinite(markerAt)
+          && Number.isFinite(lastAtMs)
+          && Math.abs(lastAtMs - markerAt) <= 120_000;
+
+        const current = webhookIssueRef.current;
+        if (settings.last_status === "failed" && !isLikelyTestDelivery) {
+          const nextCount =
+            current.active && settings.last_at && current.lastFailureSeenAt !== settings.last_at ? current.count + 1 : current.active ? current.count : 1;
+          webhookIssueRef.current = {
+            active: true,
+            count: nextCount,
+            lastAt: settings.last_at ?? current.lastAt,
+            lastFailureSeenAt: settings.last_at ?? current.lastFailureSeenAt,
+          };
+          setWebhookIssue({ count: webhookIssueRef.current.count, lastAt: webhookIssueRef.current.lastAt });
+          return;
+        }
+        if (settings.last_status === "success" && !isLikelyTestDelivery) {
+          webhookIssueRef.current = { active: false, count: 0, lastAt: null, lastFailureSeenAt: null };
+          setWebhookIssue(null);
+          return;
+        }
+        if (current.active) {
+          setWebhookIssue({ count: current.count, lastAt: current.lastAt });
+          return;
+        }
+        setWebhookIssue(null);
+      } catch {
+        if (!cancelled) {
+          setWebhookIssue(null);
+        }
+      }
+    };
+
+    void loadWebhookIssue();
+    const interval = window.setInterval(() => {
+      void loadWebhookIssue();
+    }, 15_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [projectId]);
+
   const renderMetric = (value: number | null | undefined): string => (value === null || value === undefined ? "—" : String(value));
   const isApiConnected = Boolean(
     lastMetricsSuccessAt && !metricsFetchFailed && Date.now() - new Date(lastMetricsSuccessAt).getTime() <= 10_000,
@@ -474,6 +567,21 @@ export function Dashboard(): JSX.Element {
               </button>
             </div>
           </section>
+        ) : null}
+
+        {projectId && webhookIssue ? (
+          <Card className="dashboard-alert-card">
+            <h2 className="card-title">Webhook delivery issues</h2>
+            <p className="subtle">
+              {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
+              {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
+            </p>
+            <div className="modal-actions form-actions">
+              <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
+                Open Alerts
+              </button>
+            </div>
+          </Card>
         ) : null}
 
         {!projectId ? (

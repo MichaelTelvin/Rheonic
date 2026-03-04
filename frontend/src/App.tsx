@@ -5,6 +5,7 @@ import { setUnauthorizedHandler, type AuthUser, type LoginResponse } from "./api
 import { getAuthItem, removeAuthItem, setAuthItem } from "./authStorage";
 import { CurrentProjectBar } from "./components/CurrentProjectBar";
 import { Sidebar } from "./components/Sidebar";
+import { AppToastHost } from "./components/AppToastHost";
 import { frontendConfig } from "./config";
 import { ProjectProvider } from "./context/ProjectContext";
 import { Architecture } from "./pages/Architecture";
@@ -75,6 +76,7 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
           </Routes>
         </div>
       </div>
+      <AppToastHost />
     </div>
   );
 }

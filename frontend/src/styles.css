@@ -1985,6 +1985,26 @@ select {
   box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.18) inset;
 }
 
+.dashboard-alert-card {
+  border: 1px solid rgba(255, 180, 80, 0.35);
+  background: rgba(255, 180, 80, 0.06);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.dashboard-alert-card::before {
+  content: none;
+}
+
+.dashboard-alert-card .card-title {
+  color: inherit;
+}
+
+.dashboard-alert-card .subtle {
+  color: inherit;
+}
+
 .section-title {
   margin: 0 0 10px;
   font-size: 1.25rem;
@@ -2747,10 +2767,37 @@ pre {
 
 .alerts-webhook-input {
   width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .alerts-webhook-field {
   width: min(100%, 340px);
+}
+
+.alerts-webhook-input:focus {
+  text-overflow: clip;
+}
+
+.alerts-label-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alerts-inline-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(148, 163, 184, 0.4);
+  border-top-color: rgba(229, 231, 235, 0.95);
+  animation: alerts-spin 700ms linear infinite;
+}
+
+@keyframes alerts-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .page-stack .section-title {

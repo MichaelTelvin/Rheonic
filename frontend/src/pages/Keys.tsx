@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createKey, listKeys, revokeKey, rotateKey, type CreateKeyResponse, type IngestKeyItem } from "../api/client";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
+import { showAppToast } from "../components/AppToastHost";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
 import { formatRelative } from "./dashboardUtils";
@@ -100,41 +101,41 @@ export function Keys(): JSX.Element {
       setLatestPlaintextKey(created);
       setNewKeyName("");
       await reloadKeys();
+      showAppToast("Key created");
     } catch (error) {
       setKeysError(error instanceof Error ? error.message : "Failed to create key.");
+      showAppToast("Action failed. Try again");
     } finally {
       setCreatingKey(false);
     }
   };
 
   const onRevokeKey = async (keyId: string): Promise<void> => {
-    if (!window.confirm("Revoke this key? It will stop working immediately.")) {
-      return;
-    }
     setProcessingKeyId(keyId);
     setKeysError(null);
     try {
       await revokeKey(keyId);
       await reloadKeys();
+      showAppToast("Key revoked");
     } catch (error) {
       setKeysError(error instanceof Error ? error.message : "Failed to revoke key.");
+      showAppToast("Action failed. Try again");
     } finally {
       setProcessingKeyId(null);
     }
   };
 
   const onRotateKey = async (keyId: string): Promise<void> => {
-    if (!window.confirm("Rotate this key? A new key will be created and shown once.")) {
-      return;
-    }
     setProcessingKeyId(keyId);
     setKeysError(null);
     try {
       const rotated = await rotateKey(keyId);
       setLatestPlaintextKey(rotated);
       await reloadKeys();
+      showAppToast("Key refreshed");
     } catch (error) {
       setKeysError(error instanceof Error ? error.message : "Failed to rotate key.");
+      showAppToast("Action failed. Try again");
     } finally {
       setProcessingKeyId(null);
     }

@@ -5,6 +5,7 @@ import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
 import { InfoTooltip } from "../components/InfoTooltip";
 import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
+import { showAppToast } from "../components/AppToastHost";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
@@ -176,6 +177,7 @@ export function Protect(): JSX.Element {
     };
 
     try {
+      const wasProtectEnabled = Boolean(protectSettings?.protect_enabled);
       const protect_max_req_per_min = parseOptionalInt(protectMaxReqInput);
       const protect_max_tok_per_min = parseOptionalInt(protectMaxTokInput);
       setSavingProtect(true);
@@ -191,6 +193,14 @@ export function Protect(): JSX.Element {
       });
       setProtectSettings(updated);
       applyInputsFromSettings(updated);
+      const isProtectEnabled = Boolean(updated.protect_enabled);
+      if (!wasProtectEnabled && isProtectEnabled) {
+        showAppToast("Protect enabled");
+      } else if (wasProtectEnabled && !isProtectEnabled) {
+        showAppToast("Protect disabled");
+      } else {
+        showAppToast("Saved");
+      }
       const transitionedToProtect = !Boolean(protectSettings?.protect_enabled) && Boolean(updated.protect_enabled);
       if (transitionedToProtect) {
         let unresolvedWarnings = pendingWarningsCount;
@@ -218,6 +228,7 @@ export function Protect(): JSX.Element {
       );
     } catch (error) {
       setProtectError(error instanceof Error ? error.message : "Failed to save protect settings.");
+      showAppToast("Action failed. Try again");
     } finally {
       setSavingProtect(false);
     }

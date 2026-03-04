@@ -12,14 +12,10 @@ import { getAuthItem } from "../authStorage";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
 import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
+import { showAppToast } from "../components/AppToastHost";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
-
-type TestStatus = {
-  kind: "idle" | "sending" | "success" | "failed";
-  message: string;
-};
 
 function formatDateTime(iso: string | null): string {
   if (!iso) {
@@ -32,8 +28,16 @@ function formatDateTime(iso: string | null): string {
   return value.toLocaleString();
 }
 
+function statusUpdated(previous: ProjectWebhookSettings | null, next: ProjectWebhookSettings): boolean {
+  if (!previous) {
+    return Boolean(next.last_status || next.last_at);
+  }
+  return next.last_status !== previous.last_status || next.last_at !== previous.last_at;
+}
+
 export function Alerts(): JSX.Element {
   const { projectId } = useProjectContext();
+  const webhookTestMarkerKey = projectId ? `rheonic:webhookTestAt:${projectId}` : null;
 
   const [webhookSettings, setWebhookSettings] = useState<ProjectWebhookSettings | null>(null);
   const [webhookEnabledInput, setWebhookEnabledInput] = useState<boolean>(false);
@@ -43,7 +47,6 @@ export function Alerts(): JSX.Element {
   const [webhookSaving, setWebhookSaving] = useState<boolean>(false);
   const [webhookTesting, setWebhookTesting] = useState<boolean>(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
-  const [testStatus, setTestStatus] = useState<TestStatus>({ kind: "idle", message: "" });
   const [protectEnabled, setProtectEnabled] = useState<boolean>(false);
   const accountEmail = useMemo(() => {
     const raw = getAuthItem(frontendConfig.authUserStorageKey);
@@ -121,7 +124,7 @@ export function Alerts(): JSX.Element {
       && !webhookSaving,
     [projectId, webhookEnabledInput, webhookUrlInput, webhookTesting, webhookSaving],
   );
-  const controlsDisabled = !projectId || webhookSaving || webhookTesting;
+  const controlsDisabled = !projectId || webhookSaving;
   const hasUnsavedChanges = useMemo(() => {
     if (!webhookSettings) {
       return false;
@@ -145,10 +148,9 @@ export function Alerts(): JSX.Element {
     setWebhookUrlInput(webhookSettings.url ?? "");
     setWebhookSecretInput("");
     setWebhookError(null);
-    setTestStatus({ kind: "idle", message: "" });
   };
 
-  const saveWebhookSettings = async (): Promise<void> => {
+  const saveWebhookSettings = async (emitToast = true): Promise<void> => {
     if (!projectId) {
       return;
     }
@@ -162,8 +164,14 @@ export function Alerts(): JSX.Element {
         secret: webhookSecretInput.trim() || null,
       });
       await reloadWebhookSettings();
+      if (emitToast) {
+        showAppToast("Saved");
+      }
     } catch (error) {
       setWebhookError(error instanceof Error ? error.message : "Failed to save webhook settings.");
+      if (emitToast) {
+        showAppToast("Action failed. Try again");
+      }
       throw error;
     } finally {
       setWebhookSaving(false);
@@ -171,8 +179,7 @@ export function Alerts(): JSX.Element {
   };
 
   const onSaveWebhookSettings = async (): Promise<void> => {
-    setTestStatus({ kind: "idle", message: "" });
-    await saveWebhookSettings();
+    await saveWebhookSettings(true);
   };
 
   const {
@@ -189,25 +196,38 @@ export function Alerts(): JSX.Element {
     if (!projectId) {
       return;
     }
-    setTestStatus({ kind: "sending", message: "Saving settings..." });
     setWebhookTesting(true);
     setWebhookError(null);
     try {
-      await saveWebhookSettings();
-      setTestStatus({ kind: "sending", message: "Sending test..." });
+      if (webhookTestMarkerKey) {
+        window.localStorage.setItem(webhookTestMarkerKey, String(Date.now()));
+      }
+      const baseline = webhookSettings;
+      await saveWebhookSettings(false);
       await testProjectWebhook(projectId);
-      setTestStatus({ kind: "success", message: "Success (queued)." });
-      window.setTimeout(() => {
-        void reloadWebhookSettings(true);
-      }, 700);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        setTestStatus({
-          kind: "failed",
-          message: `Failed (HTTP ${error.status}).`,
+      let latest: ProjectWebhookSettings | null = null;
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, 700);
         });
+        latest = await fetchProjectWebhook(projectId);
+        if (statusUpdated(baseline, latest)) {
+          break;
+        }
+      }
+      if (latest) {
+        setWebhookSettings(latest);
+      }
+      if (latest?.last_status === "success") {
+        showAppToast("Webhook test succeeded");
       } else {
-        setTestStatus({ kind: "failed", message: "Failed." });
+        showAppToast("Webhook test failed");
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status) {
+        showAppToast(`Webhook test failed (HTTP ${error.status})`);
+      } else {
+        showAppToast("Webhook test failed");
       }
       setWebhookError(error instanceof Error ? error.message : "Failed to queue webhook test.");
     } finally {
@@ -304,7 +324,10 @@ export function Alerts(): JSX.Element {
                 ) : null}
                 <div className="form-field alerts-url alerts-webhook-field">
                   <label htmlFor="webhook-url" title="HTTPS endpoint that receives RHEONIC webhook events.">
-                    Webhook URL
+                    <span className="alerts-label-inline">
+                      <span>Webhook URL</span>
+                      {webhookTesting ? <span className="alerts-inline-spinner" aria-label="Testing webhook" /> : null}
+                    </span>
                   </label>
                   <input
                     id="webhook-url"
@@ -313,7 +336,8 @@ export function Alerts(): JSX.Element {
                     placeholder="https://..."
                     value={webhookUrlInput}
                     onChange={(event) => setWebhookUrlInput(event.target.value)}
-                    disabled={controlsDisabled}
+                    disabled={controlsDisabled || webhookTesting}
+                    title={webhookUrlInput || undefined}
                   />
                 </div>
                 <div className="form-field alerts-webhook-field">
@@ -327,7 +351,7 @@ export function Alerts(): JSX.Element {
                     placeholder={webhookSettings?.has_secret ? "•••••••• (leave blank to keep)" : "optional"}
                     value={webhookSecretInput}
                     onChange={(event) => setWebhookSecretInput(event.target.value)}
-                    disabled={controlsDisabled}
+                    disabled={controlsDisabled || webhookTesting}
                   />
                 </div>
                 <p className="form-error-slot alerts-error-slot">{webhookError ?? "\u00A0"}</p>
@@ -358,13 +382,6 @@ export function Alerts(): JSX.Element {
                     {webhookSaving ? "Saving..." : "Save"}
                   </button>
                 </div>
-                {testStatus.kind !== "idle" ? (
-                  <p
-                    className={`alerts-test-status ${testStatus.kind === "failed" ? "failed" : testStatus.kind === "success" ? "success" : ""}`}
-                  >
-                    {testStatus.message}
-                  </p>
-                ) : null}
               </div>
             </FormColumn>
           </Card>
