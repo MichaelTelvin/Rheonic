@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.application.services.transport_service import TransportService
+from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base, TransportOutboxRecord
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
@@ -81,3 +81,32 @@ def test_transport_service_enqueue_writes_expected_outbox_fields(tmp_path) -> No
         assert row.payload["severity"] == "low"
         assert row.payload["provider"] == "openai"
         assert row.payload["environment"] == "prod"
+
+
+def test_build_transport_dedupe_key_is_stable_for_same_payload_semantics() -> None:
+    first = build_transport_dedupe_key(
+        project_id="p1",
+        kind="email",
+        event_type="feedback.submitted",
+        payload={"b": 2, "a": 1},
+        destination="ops@example.com",
+        seed="u1",
+    )
+    second = build_transport_dedupe_key(
+        project_id="p1",
+        kind="email",
+        event_type="feedback.submitted",
+        payload={"a": 1, "b": 2},
+        destination="ops@example.com",
+        seed="u1",
+    )
+    different = build_transport_dedupe_key(
+        project_id="p1",
+        kind="email",
+        event_type="feedback.submitted",
+        payload={"a": 1, "b": 2},
+        destination="ops@example.com",
+        seed="u2",
+    )
+    assert first == second
+    assert first != different

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.application.email_templates.base_layout import render_base_email
+
 
 def render_feedback_submitted(payload: dict[str, object]) -> dict[str, str]:
     message = str(payload.get("message") or "").strip()
@@ -13,31 +15,19 @@ def render_feedback_submitted(payload: dict[str, object]) -> dict[str, str]:
     app_version = str(payload.get("app_version") or "").strip() or "-"
 
     subject = "Rheonic beta feedback"
-    text = "\n".join(
-        [
-            "Rheonic beta feedback",
-            "",
-            f"message: {message}",
-            f"email: {email}",
-            f"user_id: {user_id}",
-            f"user_email: {user_email}",
-            f"project_id: {project_id}",
-            f"page: {page}",
-            f"mode: {mode}",
-            f"timestamp: {timestamp}",
-            f"app_version: {app_version}",
-        ]
+    rendered = render_base_email(
+        title="Rheonic beta feedback",
+        subtitle="New feedback submission received.",
+        fields=[
+            ("message", message),
+            ("email", email),
+            ("user_id", user_id),
+            ("user_email", user_email),
+            ("project_id", project_id),
+            ("page", page),
+            ("mode", mode),
+            ("timestamp", timestamp),
+            ("app_version", app_version),
+        ],
     )
-    html = (
-        "<h3>Rheonic beta feedback</h3>"
-        f"<p><strong>message:</strong> {message}</p>"
-        f"<p><strong>email:</strong> {email}</p>"
-        f"<p><strong>user_id:</strong> {user_id}</p>"
-        f"<p><strong>user_email:</strong> {user_email}</p>"
-        f"<p><strong>project_id:</strong> {project_id}</p>"
-        f"<p><strong>page:</strong> {page}</p>"
-        f"<p><strong>mode:</strong> {mode}</p>"
-        f"<p><strong>timestamp:</strong> {timestamp}</p>"
-        f"<p><strong>app_version:</strong> {app_version}</p>"
-    )
-    return {"subject": subject, "html": html, "text": text}
+    return {"subject": subject, "html": rendered["html"], "text": rendered["text"]}
