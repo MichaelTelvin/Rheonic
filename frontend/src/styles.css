@@ -1771,13 +1771,13 @@ select {
 }
 
 .card-title {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: 1.02rem;
   font-weight: 600;
 }
 
 .metric-value {
-  margin: 8px 0 10px;
+  margin: 12px 0 10px;
   font-size: 2.2rem;
   line-height: 1.05;
   font-weight: 800;
@@ -2461,9 +2461,50 @@ pre {
   width: min(420px, 100%);
 }
 
-.sparkline {
+.pulse-meter {
+  --meter-glow-rgb: 56, 189, 248;
+  --meter-glow-strong: 0.1;
+  --meter-glow-mid: 0.045;
+  --meter-glow-low: 0.015;
   margin-top: 8px;
-  max-width: 220px;
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+  height: 64px;
+  width: min(78%, 340px);
+  min-width: 220px;
+  overflow: hidden;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pulse-meter::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 2px;
+  height: 44px;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    72% 120% at 50% 100%,
+    rgba(var(--meter-glow-rgb), var(--meter-glow-strong)) 0%,
+    rgba(var(--meter-glow-rgb), var(--meter-glow-mid)) 34%,
+    rgba(var(--meter-glow-rgb), var(--meter-glow-low)) 56%,
+    rgba(var(--meter-glow-rgb), 0) 100%
+  );
+  filter: blur(2px);
+}
+
+.pulse-meter canvas {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: block;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 22%, #000 78%, transparent 100%);
 }
 
 @media (max-width: 780px) {
@@ -2663,11 +2704,21 @@ pre {
   border-radius: 10px;
   padding: 10px 12px;
   text-align: left;
-  color: rgba(224, 242, 254, 0.86);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: rgba(125, 211, 252, 0.62);
   background: rgba(125, 211, 252, 0.07);
   cursor: pointer;
   font-size: 0.95rem;
   box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.12) inset, 0 0 8px rgba(125, 211, 252, 0.13);
+}
+
+.sidebar-feedback-arrow {
+  color: rgba(125, 211, 252, 0.62);
+  font-size: 1.32rem;
+  line-height: 1;
 }
 
 .sidebar-feedback-button:hover {

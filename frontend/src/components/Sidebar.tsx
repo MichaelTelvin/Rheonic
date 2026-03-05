@@ -40,7 +40,10 @@ export function Sidebar({ userEmail, onSignOut, onSendFeedback }: SidebarProps):
       </div>
       <div className="sidebar-bottom">
         <button type="button" className="sidebar-feedback-button" onClick={onSendFeedback}>
-          Send feedback
+          <span>Send feedback</span>
+          <span className="sidebar-feedback-arrow" aria-hidden="true">
+            →
+          </span>
         </button>
         <div className="sidebar-footer-divider" aria-hidden="true" />
         <div className="sidebar-user-row">

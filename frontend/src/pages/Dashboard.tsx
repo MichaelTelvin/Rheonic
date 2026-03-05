@@ -13,7 +13,7 @@ import {
   type RealtimeMetrics,
 } from "../api/client";
 import { Card } from "../components/Card";
-import { Sparkline } from "../components/Sparkline";
+import { PulseMeter } from "../components/pulseMeter";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
 import { formatNumber, formatTime } from "./dashboardUtils";
@@ -625,20 +625,22 @@ export function Dashboard(): JSX.Element {
               <Card>
                 <h2 className="card-title">Requests (60s)</h2>
                 <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.requests_60s ?? 0)}</p>
-                <div className="meta-row">
-                  <span className="metric-subtitle">Last 60 seconds</span>
-                </div>
-                <Sparkline values={requestsSeries} stroke="var(--req)" />
+                <PulseMeter
+                  values={requestsSeries}
+                  color="var(--req)"
+                  mode="requests"
+                />
                 <p className={`metric-card-warning ${metricsWarning ? "visible" : ""}`}>{metricsWarning ?? ""}</p>
               </Card>
 
               <Card>
                 <h2 className="card-title">Tokens (60s)</h2>
                 <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.tokens_60s ?? 0)}</p>
-                <div className="meta-row">
-                  <span className="metric-subtitle">Last 60 seconds</span>
-                </div>
-                <Sparkline values={tokensSeries} stroke="var(--accent)" />
+                <PulseMeter
+                  values={tokensSeries}
+                  color="var(--accent)"
+                  mode="tokens"
+                />
                 <p className={`metric-card-warning ${metricsWarning ? "visible" : ""}`}>{metricsWarning ?? ""}</p>
               </Card>
 
