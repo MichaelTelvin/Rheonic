@@ -102,7 +102,17 @@ block: "block\nRHEONICBlockedError\nprovider call prevented" {
   }
 }
 
-decision_webhooks: "Protect webhooks\nwarn -> decision.warn\nblock -> incident.block" {
+transport_outbox: "Transport outbox\nappend delivery row\nkind=webhook|email\ndedupe key enforced" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 13
+  }
+}
+
+transport_worker: "RQ transport worker\nclaim pending row\ndeliver webhook/email\nretry/backoff\nupdate outbox status" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
@@ -142,7 +152,7 @@ incident_pipeline: "Incident pipeline source\nCounters -> Detector(s) -> Inciden
   }
 }
 
-metrics: "Protect metrics\nproject totals aggregate across providers\noptional provider filter" {
+metrics: "Protect metrics\nproject totals aggregate across providers\noptional provider filter\n+ delivery failures from outbox" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
@@ -162,11 +172,12 @@ inputs -> ingest_note
 caps -> block: "block"
 caps -> warn_signals: "no block"
 warn_signals -> allow_warn: "warn / allow"
-warn_signals -> decision_webhooks: "warn"
-block -> decision_webhooks: "block"
+warn_signals -> transport_outbox: "warn -> decision.warn"
+block -> transport_outbox: "block -> incident.block"
 allow_warn -> provider
 provider -> ingest
-decision_webhooks -> metrics
+transport_outbox -> transport_worker
+transport_worker -> metrics
 ingest -> incident_pipeline
 ingest -> metrics
 observe: "Observe mode result\nallow only\nno decision webhooks" {

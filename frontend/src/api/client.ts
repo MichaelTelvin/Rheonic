@@ -26,6 +26,11 @@ export interface ProtectHealthMetrics {
   timeouts_60m: number;
 }
 
+export interface DeliveryFailures {
+  count: number;
+  last_attempt_at: string | null;
+}
+
 export interface IncidentItem {
   id: string;
   type: string;
@@ -273,6 +278,15 @@ export async function fetchProtectMetrics(projectId: string, provider?: string):
 export async function fetchProtectHealth(projectId: string, provider?: string): Promise<ProtectHealthMetrics> {
   const providerQuery = provider ? `&provider=${encodeURIComponent(provider)}` : "";
   return request<ProtectHealthMetrics>(`/api/v1/metrics/protect/health?project_id=${encodeURIComponent(projectId)}${providerQuery}`);
+}
+
+export async function fetchDeliveryFailures(
+  projectId: string,
+  kind: "webhook" | "email" = "webhook",
+): Promise<DeliveryFailures> {
+  return request<DeliveryFailures>(
+    `/api/v1/metrics/delivery-failures?project_id=${encodeURIComponent(projectId)}&kind=${encodeURIComponent(kind)}`,
+  );
 }
 
 export async function fetchProjectProtect(projectId: string): Promise<ProjectProtectSettings> {

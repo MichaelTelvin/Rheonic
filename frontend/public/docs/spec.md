@@ -30,6 +30,7 @@ All routes are under `/api/v1/...`.
 - `GET /api/v1/metrics/realtime?project_id=...&provider?`
 - `GET /api/v1/metrics/protect?project_id=...&provider?`
 - `GET /api/v1/metrics/protect/health?project_id=...&provider?`
+- `GET /api/v1/metrics/delivery-failures?project_id=...&kind=webhook|email`
 
 Provider filter is optional. No schema change when filter is used.
 
@@ -81,6 +82,11 @@ Observe mode is telemetry-only for enforcement: SDK still calls preflight, and b
 - `PUT /api/v1/projects/{project_id}/webhook`
 - `POST /api/v1/projects/{project_id}/webhook/test`
 
+Webhook delivery model:
+- Enqueue-only on API/runtime path via `TransportService`.
+- Async delivery in RQ worker from `transport_outbox`.
+- Source of truth for delivery failures is outbox status (`failed`/`dead`), not project summary fields.
+
 Webhook event types:
 - `decision.warn` (protect mode only)
 - `incident.warn` (protect mode only; ingest non-breach opens)
@@ -88,3 +94,8 @@ Webhook event types:
 - `incident.resolved` (protect mode only)
 - `policy_gap.detected` (protect mode only)
 - `webhook.test` (mode independent)
+
+## Feedback API
+- `POST /api/v1/feedback`
+- Behavior: validates payload, enqueues `kind=email` + `event_type=feedback.submitted`, returns `202`.
+- No SMTP path; email delivery is processed asynchronously by transport worker.

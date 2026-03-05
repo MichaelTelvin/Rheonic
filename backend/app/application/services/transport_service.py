@@ -1,0 +1,92 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from datetime import datetime, timezone
+from typing import Callable, Literal
+
+from app.application.interfaces.transport_outbox_repository import TransportOutboxRepository
+from app.config import app_config
+
+
+class TransportService:
+    def __init__(
+        self,
+        *,
+        outbox_repository: TransportOutboxRepository,
+        enqueue_job: Callable[[str], None],
+        now_provider: Callable[[], datetime] | None = None,
+    ) -> None:
+        self._outbox_repository = outbox_repository
+        self._enqueue_job = enqueue_job
+        self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
+
+    def enqueue(
+        self,
+        *,
+        project_id: str,
+        kind: Literal["webhook", "email"],
+        event_type: str,
+        payload: dict,
+        dedupe_key: str,
+        destination: str | None = None,
+        subject: str | None = None,
+        template: str | None = None,
+        severity: str | None = None,
+        provider: str | None = None,
+        environment: str | None = None,
+    ) -> str:
+        if not dedupe_key or not dedupe_key.strip():
+            raise ValueError("dedupe_key is required")
+        now = self._now_provider()
+        normalized_payload = dict(payload)
+        if severity is not None:
+            normalized_payload.setdefault("severity", severity)
+        if provider is not None:
+            normalized_payload.setdefault("provider", provider)
+        if environment is not None:
+            normalized_payload.setdefault("environment", environment)
+
+        max_attempts = _max_attempts(kind)
+        outbox, created = self._outbox_repository.create_or_get_deduped(
+            project_id=project_id,
+            kind=kind,
+            event_type=event_type,
+            destination=destination,
+            subject=subject,
+            template=template,
+            payload=normalized_payload,
+            dedupe_key=dedupe_key.strip(),
+            max_attempts=max_attempts,
+            now=now,
+        )
+        if created:
+            self._enqueue_job(outbox.id)
+        return outbox.id
+
+
+def build_transport_dedupe_key(
+    *,
+    project_id: str,
+    kind: Literal["webhook", "email"],
+    event_type: str,
+    payload: dict[str, object],
+    destination: str | None = None,
+    seed: str | None = None,
+) -> str:
+    source = {
+        "project_id": project_id,
+        "kind": kind,
+        "event_type": event_type,
+        "destination": destination,
+        "payload": payload,
+        "seed": seed,
+    }
+    encoded = json.dumps(source, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _max_attempts(kind: Literal["webhook", "email"]) -> int:
+    if kind == "webhook":
+        return max(int(app_config.webhook_retry_max_attempts), 1)
+    return max(int(app_config.email_retry_max_attempts), 1)

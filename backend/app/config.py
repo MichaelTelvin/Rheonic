@@ -28,8 +28,6 @@ class AppConfig:
     protect_action_counter_ttl_seconds: int = 3600
     webhook_retry_max_attempts: int = 3
     webhook_retry_intervals_seconds: tuple[int, int, int] = (5, 20, 60)
-    webhook_result_ttl_seconds: int = 3600
-    webhook_failure_ttl_seconds: int = 86400
     webhook_timeout_connect_seconds: float = 2.0
     webhook_timeout_read_seconds: float = 5.0
     webhook_timeout_write_seconds: float = 5.0
@@ -37,6 +35,8 @@ class AppConfig:
     webhook_max_error_chars: int = 240
     webhook_secret_prefix: str = "enc:v1:"
     webhook_secret_default_fallback_key: str = "rheonic-webhook-secret-default"
+    email_retry_max_attempts: int = 1
+    email_retry_intervals_seconds: tuple[int, ...] = ()
     scheduler_default_result_ttl_seconds: int = 3600
     scheduler_default_failure_ttl_seconds: int = 86400
     purge_interval_seconds: int = 24 * 60 * 60
@@ -108,14 +108,9 @@ class Settings(BaseSettings):
     protect_block_cooldown_seconds: int = 60
     webhook_allow_private_hosts: bool = False
     webhook_secret_encryption_key: str = ""
+    email_provider_enabled: bool = False
     public_contact_email: str = "owldevlab@gmail.com"
     feedback_report_email: str = "owldevlab@gmail.com"
-    smtp_host: str = "localhost"
-    smtp_port: int = 25
-    smtp_username: str = ""
-    smtp_password: str = ""
-    smtp_use_tls: bool = False
-    smtp_use_ssl: bool = False
 
     @model_validator(mode="after")
     def _apply_url_defaults(self) -> "Settings":

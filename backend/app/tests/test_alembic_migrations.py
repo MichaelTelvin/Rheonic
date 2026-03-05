@@ -45,6 +45,7 @@ def test_alembic_upgrade_head_creates_current_schema_on_fresh_database() -> None
                 "incidents",
                 "project_models",
                 "ingest_keys",
+                "transport_outbox",
                 "alembic_version",
             }.issubset(table_names)
 

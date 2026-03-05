@@ -118,21 +118,6 @@ class ProjectService:
             raise HTTPException(status_code=404, detail="project not found")
         return updated
 
-    def update_project_webhook_delivery_status(
-        self,
-        project_id: str,
-        status: str,
-        error: str | None,
-        at: datetime | None = None,
-    ) -> Project | None:
-        # Persist latest webhook delivery status fields.
-        return self._project_repository.update_project_webhook_delivery_status(
-            project_id=project_id,
-            status=status,
-            at=at or datetime.now(timezone.utc),
-            error=error,
-        )
-
     def delete_project(self, project_id: str, user_id: str) -> None:
         # Delete an owned project and its scoped records.
         self.ensure_project_owned_by_user(project_id=project_id, user_id=user_id)

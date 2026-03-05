@@ -17,13 +17,14 @@
 4. Pass signals to `IncidentManager`:
 - create/open incident when no recent matching open fingerprint
 - otherwise update existing incident (count, last_seen, evidence)
-5. Webhook hooks:
+5. Enqueue transport events in shared outbox (`transport_outbox`):
 - protect mode decision warns -> `decision.warn`
 - protect mode ingest non-breach incident opens -> `incident.warn`
 - protect mode decision blocks -> `incident.block`
 - protect mode resolution events -> `incident.resolved`
 - protect mode policy-gap first-seen tuple -> `policy_gap.detected`
-6. Auto-close resolves stale open incidents by inactivity cooldown.
+6. RQ transport worker delivers pending outbox rows (`kind=webhook|email`) with retry/backoff and terminal status (`delivered|failed|dead`).
+7. Auto-close resolves stale open incidents by inactivity cooldown.
 
 ## Protect decision pipeline
 1. SDK always calls preflight before provider call.
@@ -43,6 +44,13 @@
 ## Dashboard metrics behavior
 - Endpoints return project totals by default.
 - Optional provider filter narrows to a single provider.
+- Delivery failures come from `transport_outbox` terminal rows via `GET /api/v1/metrics/delivery-failures`.
+
+## Transport hub behavior
+- Shared enqueue API: `TransportService.enqueue(...)` with mandatory `dedupe_key`.
+- Webhook and feedback email use the same outbox + RQ worker path.
+- Webhook signing, URL safety checks, and HTTP timeout policy are applied in worker delivery.
+- Feedback email endpoint is async (`POST /api/v1/feedback` returns `202`) and enqueues `event_type=feedback.submitted`.
 
 ## Frontend model
 - Dashboard: compact monitoring cards + provider filter.

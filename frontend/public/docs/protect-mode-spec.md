@@ -89,6 +89,10 @@ For a single ingested event, incident emission follows this dominance:
   - `policy_gap.detected` once per first-seen `(project, provider, model)`
 - Mode independent:
   - `webhook.test` from `/api/v1/projects/{project_id}/webhook/test`
+- Delivery path:
+  - runtime/API enqueues to shared `transport_outbox` with dedupe key
+  - RQ transport worker sends webhook HTTP requests asynchronously
+  - retries/backoff and terminal failure state are tracked in outbox rows
 
 ## Metrics
 - Realtime: `GET /api/v1/metrics/realtime?project_id=...&provider?`

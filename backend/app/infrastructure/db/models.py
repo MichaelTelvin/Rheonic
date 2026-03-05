@@ -86,9 +86,6 @@ class ProjectRecord(Base):
     email_enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
     webhook_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     webhook_secret: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    webhook_last_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    webhook_last_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    webhook_last_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -138,6 +135,36 @@ class IngestKeyRecord(Base):
         server_default=func.now(),
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TransportOutboxRecord(Base):
+    # Persistence record for shared transport outbox deliveries.
+    __tablename__ = "transport_outbox"
+    __table_args__ = (
+        UniqueConstraint("project_id", "kind", "dedupe_key", name="uq_transport_outbox_project_kind_dedupe"),
+        Index("ix_transport_outbox_project_kind_status", "project_id", "kind", "status"),
+        Index("ix_transport_outbox_status_next_attempt_at", "status", "next_attempt_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    destination: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    template: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", server_default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class PricingRecord:

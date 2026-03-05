@@ -1,45 +1,36 @@
-from redis import Redis
-from rq.job import Job
-from rq.utils import import_attribute
+from datetime import datetime, timezone
 
-from app.config import Settings
-from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
-from app.infrastructure.jobs.webhook_job import send_project_webhook
+from app.infrastructure.alerts import rq_webhook_dispatcher
+from app.infrastructure.db.base import DatabaseSessionFactory
+from app.infrastructure.db.models import Base, TransportOutboxRecord
 
 
-class _CaptureQueue:
-    def __init__(self) -> None:
-        self.func = None
-        self.kwargs = None
+def test_webhook_dispatcher_enqueues_outbox_row_and_dispatch_job(tmp_path, monkeypatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/rq_webhook_dispatcher_test.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
 
-    def enqueue(self, func, **kwargs):
-        self.func = func
-        self.kwargs = kwargs
-        return None
+    monkeypatch.setattr(rq_webhook_dispatcher, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    captured_outbox_ids: list[str] = []
+    monkeypatch.setattr(rq_webhook_dispatcher, "enqueue_outbox_delivery", lambda outbox_id: captured_outbox_ids.append(outbox_id))
 
-
-def test_webhook_dispatcher_enqueues_importable_job_callable() -> None:
-    dispatcher = RQWebhookDispatcher(redis_url="redis://localhost:6379/15")
-    capture = _CaptureQueue()
-    dispatcher._queue = capture  # type: ignore[assignment]
-
-    dispatcher.enqueue(project_id="p1", payload={"event": "webhook.test"}, event_type="webhook.test")
-
-    assert capture.func is send_project_webhook
-    assert capture.kwargs is not None
-    assert capture.kwargs["kwargs"]["project_id"] == "p1"
-
-    resolved = import_attribute(f"{capture.func.__module__}.{capture.func.__name__}")
-    assert resolved is send_project_webhook
-
-    redis_url = Settings().redis_url
-    job = Job.create(
-        func=capture.func,
-        kwargs={
-            "project_id": "p1",
-            "payload": {"event": "webhook.test"},
-            "event_type": "webhook.test",
-        },
-        connection=Redis.from_url(redis_url),
+    dispatcher = rq_webhook_dispatcher.RQWebhookDispatcher(redis_url="redis://localhost:6379/15")
+    dispatcher.enqueue(
+        project_id="p1",
+        payload={"event": "webhook.test", "sent_at": datetime.now(timezone.utc).isoformat()},
+        event_type="webhook.test",
+        override_url="https://example.test/hook",
+        force_send=True,
     )
-    assert job.func is send_project_webhook
+
+    with session_factory.create_session() as session:
+        rows = session.query(TransportOutboxRecord).all()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.project_id == "p1"
+        assert row.kind == "webhook"
+        assert row.event_type == "webhook.test"
+        assert row.destination == "https://example.test/hook"
+
+    assert len(captured_outbox_ids) == 1
+    assert captured_outbox_ids[0] == rows[0].id

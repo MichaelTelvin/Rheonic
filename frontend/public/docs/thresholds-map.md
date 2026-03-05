@@ -85,6 +85,23 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - Mode independent:
   - `webhook.test`
 
+## Transport Delivery and Retries
+- Shared outbox: `transport_outbox` stores webhook/email deliveries and status transitions.
+- Webhook retry knobs:
+  - `webhook_retry_max_attempts`
+  - `webhook_retry_intervals_seconds`
+  - `webhook_timeout_connect_seconds`
+  - `webhook_timeout_read_seconds`
+  - `webhook_timeout_write_seconds`
+  - `webhook_timeout_pool_seconds`
+- Email retry knobs:
+  - `email_retry_max_attempts`
+  - `email_retry_intervals_seconds`
+  - `email_provider_enabled`
+- Failure observability:
+  - dashboard delivery failures are derived from outbox rows with status `failed` or `dead`
+  - `last_error_code` and `last_error_message` are persisted per outbox delivery
+
 ## Tuning Checklist
 ### Too many warnings
 1. Increase `retry_storm_count` or reduce `retry_storm_window_seconds`.

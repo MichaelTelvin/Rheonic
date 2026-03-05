@@ -167,30 +167,6 @@ class ProjectRepositoryImpl(ProjectRepository):
             logger.exception("Failed updating project webhook settings", extra={"project_id": project_id})
             raise
 
-    def update_project_webhook_delivery_status(
-        self,
-        project_id: str,
-        status: str,
-        at: datetime,
-        error: str | None,
-    ) -> Project | None:
-        # Update and return project webhook delivery status fields.
-        try:
-            with self._session_factory.create_session() as session:
-                record = session.query(ProjectRecord).filter(ProjectRecord.id == project_id).first()
-                if record is None:
-                    return None
-                record.webhook_last_status = status
-                record.webhook_last_at = at
-                record.webhook_last_error = error
-                session.add(record)
-                session.commit()
-                session.refresh(record)
-            return _to_domain(record, settings=self._settings)
-        except Exception:
-            logger.exception("Failed updating project webhook delivery status", extra={"project_id": project_id})
-            raise
-
     def record_project_model_first_seen(
         self,
         *,
@@ -287,7 +263,4 @@ def _to_domain(record: ProjectRecord, settings: Settings | None = None) -> Proje
         email_enabled=bool(getattr(record, "email_enabled", False)),
         webhook_url=getattr(record, "webhook_url", None),
         webhook_secret=decrypt_webhook_secret(getattr(record, "webhook_secret", None), settings=resolved_settings),
-        webhook_last_status=getattr(record, "webhook_last_status", None),
-        webhook_last_at=getattr(record, "webhook_last_at", None),
-        webhook_last_error=getattr(record, "webhook_last_error", None),
     )

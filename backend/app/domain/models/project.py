@@ -20,6 +20,3 @@ class Project:
     email_enabled: bool = False
     webhook_url: str | None = None
     webhook_secret: str | None = None
-    webhook_last_status: str | None = None
-    webhook_last_at: datetime | None = None
-    webhook_last_error: str | None = None

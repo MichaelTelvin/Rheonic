@@ -1,6 +1,9 @@
 # Application service for metrics aggregation.
+from typing import Literal
+
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.project_repository import ProjectRepository
+from app.application.interfaces.transport_outbox_repository import TransportOutboxRepository
 from app.application.provider_scope import scoped_project_provider_id
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.logger import get_logger
@@ -16,11 +19,13 @@ class MetricsService:
         realtime_counters: RealtimeCounterStore,
         protect_action_store: ProtectActionStore,
         project_repository: ProjectRepository,
+        transport_outbox_repository: TransportOutboxRepository | None = None,
     ) -> None:
         # Initialize service dependencies.
         self._realtime_counters = realtime_counters
         self._protect_action_store = protect_action_store
         self._project_repository = project_repository
+        self._transport_outbox_repository = transport_outbox_repository
 
     def get_realtime(self, project_id: str, provider: str | None = None) -> dict[str, int]:
         # Return realtime request/token counters aggregated across project providers.
@@ -119,3 +124,19 @@ class MetricsService:
             return providers
         # Fallback keeps protect counters visible for projects with preflight traffic before first ingest event.
         return ["openai", "anthropic", "google", "unknown"]
+
+    def get_delivery_failures(self, *, project_id: str, kind: Literal["webhook", "email"] = "webhook") -> dict[str, object]:
+        if self._transport_outbox_repository is None:
+            return {"count": 0, "last_attempt_at": None}
+        count = self._transport_outbox_repository.count_failed_or_dead_by_project_kind(
+            project_id=project_id,
+            kind=kind,
+        )
+        latest = self._transport_outbox_repository.get_latest_terminal_by_project_kind(
+            project_id=project_id,
+            kind=kind,
+        )
+        last_attempt_at = None
+        if latest is not None and latest.status in {"failed", "dead"}:
+            last_attempt_at = (latest.delivered_at or latest.updated_at).isoformat()
+        return {"count": int(count), "last_attempt_at": last_attempt_at}

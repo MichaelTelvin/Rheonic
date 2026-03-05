@@ -65,17 +65,6 @@ class ProjectRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update_project_webhook_delivery_status(
-        self,
-        project_id: str,
-        status: str,
-        at: datetime,
-        error: str | None,
-    ) -> Project | None:
-        # Update and return latest webhook delivery status fields.
-        raise NotImplementedError
-
-    @abstractmethod
     def record_project_model_first_seen(
         self,
         *,

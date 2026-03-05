@@ -52,7 +52,17 @@ incident_manager: "IncidentManager\nopen / update\n(project+provider+incident_ty
   }
 }
 
-webhooks: "Webhook hooks\nprotect mode only:\ndecision.warn / incident.warn / incident.block\nincident.resolved / policy_gap.detected\n(webhook.test is mode-independent)" {
+transport_outbox: "Transport outbox\nappend delivery row\nkind=webhook|email\nstatus=pending/sending/delivered/failed/dead" {
+  style: {
+    fill: "#e4edf8"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 14
+    font-size: 11
+  }
+}
+
+transport_worker: "RQ transport worker\nclaim pending row\ndeliver webhook/email\nretry/backoff\nupdate terminal status" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
@@ -82,7 +92,7 @@ resolved: "Resolved incidents\n(manual or auto)" {
   }
 }
 
-dashboard: "Dashboard metrics\nproject totals aggregate across providers\noptional provider filter" {
+dashboard: "Dashboard metrics\nproject totals aggregate across providers\noptional provider filter\n+ delivery failures from outbox" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
@@ -95,7 +105,10 @@ dashboard: "Dashboard metrics\nproject totals aggregate across providers\noption
 ingest -> counters
 counters -> detectors
 detectors -> incident_manager
-incident_manager -> webhooks
+incident_manager -> transport_outbox
+transport_outbox -> transport_worker
+transport_worker -> dashboard
 incident_manager -> autoclose
 autoclose -> resolved
+resolved -> transport_outbox: "incident.resolved"
 resolved -> dashboard

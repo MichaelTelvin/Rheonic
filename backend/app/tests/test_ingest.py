@@ -204,16 +204,6 @@ class FakeProjectRepository:
         _ = (project_id, webhook_enabled, email_enabled, webhook_url, webhook_secret)
         return self.project
 
-    def update_project_webhook_delivery_status(
-        self,
-        project_id: str,
-        status: str,
-        at: datetime,
-        error: str | None,
-    ) -> Project | None:
-        _ = (project_id, status, at, error)
-        return self.project
-
     def count_project_models(self, project_id: str) -> int:
         _ = project_id
         return len(self.seen)

@@ -3,11 +3,12 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from app.application.services.project_service import ProjectService
-from app.dependencies import get_current_user, get_project_service, get_webhook_dispatcher
+from app.dependencies import get_current_user, get_project_service, get_transport_outbox_repository, get_webhook_dispatcher
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base, ProjectRecord
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
+from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.main import app
 
 
@@ -41,6 +42,7 @@ def _make_client(tmp_path, current_user: User | None = None) -> tuple[TestClient
 
     app.dependency_overrides[get_project_service] = lambda: service
     app.dependency_overrides[get_webhook_dispatcher] = lambda: dispatcher
+    app.dependency_overrides[get_transport_outbox_repository] = lambda: TransportOutboxRepositoryImpl(session_factory=session_factory)
     app.dependency_overrides[get_current_user] = lambda: current_user or User(
         id="u1",
         email="u1@example.com",
@@ -193,6 +195,7 @@ def test_project_webhook_secret_is_not_stored_plaintext(tmp_path) -> None:
     )
     app.dependency_overrides[get_project_service] = lambda: service
     app.dependency_overrides[get_webhook_dispatcher] = lambda: dispatcher
+    app.dependency_overrides[get_transport_outbox_repository] = lambda: TransportOutboxRepositoryImpl(session_factory=session_factory)
     app.dependency_overrides[get_current_user] = lambda: current_user
     client = TestClient(app)
 

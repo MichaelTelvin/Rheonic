@@ -11,6 +11,7 @@ from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.metrics_service import MetricsService
 from app.application.services.protect_service import ProtectService
 from app.application.services.project_service import ProjectService
+from app.application.services.transport_service import TransportService
 from app.config import Settings
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
@@ -18,9 +19,10 @@ from app.infrastructure.db.repositories.event_repository_impl import EventReposi
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
+from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
 from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
-from app.infrastructure.notifications.feedback_mailer import FeedbackMailer
+from app.infrastructure.jobs.transport_job import enqueue_outbox_delivery
 from app.infrastructure.redis.redis_client import RedisClient
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.infrastructure.redis.rolling_window import RollingWindow
@@ -102,13 +104,21 @@ def get_webhook_dispatcher() -> RQWebhookDispatcher:
 
 
 @lru_cache
-def get_feedback_mailer() -> FeedbackMailer:
-    # Provide feedback mail sender.
+def get_transport_service() -> TransportService:
+    # Provide shared transport enqueue service.
     try:
-        return FeedbackMailer(settings=get_settings())
+        return TransportService(
+            outbox_repository=TransportOutboxRepositoryImpl(session_factory=get_db_session_factory()),
+            enqueue_job=enqueue_outbox_delivery,
+        )
     except Exception:
-        logger.exception("Failed to initialize feedback mailer")
+        logger.exception("Failed to initialize transport service")
         raise
+
+
+def get_transport_outbox_repository() -> TransportOutboxRepositoryImpl:
+    # Provide transport outbox repository.
+    return TransportOutboxRepositoryImpl(session_factory=get_db_session_factory())
 
 
 def get_ingest_event_service() -> IngestEventService:
@@ -142,6 +152,7 @@ def get_metrics_service() -> MetricsService:
             realtime_counters=get_rolling_window(),
             protect_action_store=get_protect_action_store(),
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
+            transport_outbox_repository=TransportOutboxRepositoryImpl(session_factory=get_db_session_factory()),
         )
         logger.debug("Metrics service provided")
         return service

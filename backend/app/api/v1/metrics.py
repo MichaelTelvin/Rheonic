@@ -1,4 +1,6 @@
 # Metrics endpoints.
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
@@ -28,6 +30,11 @@ class ProtectHealthOut(BaseModel):
     p50_ms: int | None
     p95_ms: int | None
     timeouts_60m: int
+
+
+class DeliveryFailuresOut(BaseModel):
+    count: int
+    last_attempt_at: str | None
 
 
 @router.get("/realtime")
@@ -101,3 +108,26 @@ def get_protect_health(
     except Exception:
         logger.exception("Failed to fetch protect health", extra={"project_id": project_id})
         raise HTTPException(status_code=500, detail="Failed to fetch protect health")
+
+
+@router.get("/delivery-failures", response_model=DeliveryFailuresOut)
+def get_delivery_failures(
+    project_id: str = Query(..., min_length=1),
+    kind: str = Query("webhook", pattern="^(webhook|email)$"),
+    service: MetricsService = Depends(get_metrics_service),
+    project_service: ProjectService = Depends(get_project_service),
+    current_user: User = Depends(get_current_user),
+) -> DeliveryFailuresOut:
+    try:
+        project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
+        resolved_kind: Literal["webhook", "email"] = "email" if kind == "email" else "webhook"
+        payload = service.get_delivery_failures(project_id=project_id, kind=resolved_kind)
+        return DeliveryFailuresOut(
+            count=int(payload.get("count", 0) or 0),
+            last_attempt_at=str(payload.get("last_attempt_at")) if payload.get("last_attempt_at") else None,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to fetch delivery failures", extra={"project_id": project_id, "kind": kind})
+        raise HTTPException(status_code=500, detail="Failed to fetch delivery failures")

@@ -1,0 +1,83 @@
+from datetime import datetime, timezone
+
+from app.application.services.transport_service import TransportService
+from app.infrastructure.db.base import DatabaseSessionFactory
+from app.infrastructure.db.models import Base, TransportOutboxRecord
+from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
+
+
+def test_transport_service_dedupe_key_prevents_duplicates(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_service_dedupe.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    enqueued: list[str] = []
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: enqueued.append(outbox_id),
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+
+    first = service.enqueue(
+        project_id="p1",
+        kind="webhook",
+        event_type="incident.warn",
+        payload={"body": {"event": "incident.warn"}},
+        dedupe_key="dedupe-1",
+    )
+    second = service.enqueue(
+        project_id="p1",
+        kind="webhook",
+        event_type="incident.warn",
+        payload={"body": {"event": "incident.warn"}},
+        dedupe_key="dedupe-1",
+    )
+
+    assert first == second
+    assert enqueued == [first]
+
+    with session_factory.create_session() as session:
+        assert session.query(TransportOutboxRecord).count() == 1
+
+
+def test_transport_service_enqueue_writes_expected_outbox_fields(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_service_fields.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: None,
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+
+    outbox_id = service.enqueue(
+        project_id="p2",
+        kind="email",
+        event_type="feedback.submitted",
+        payload={"message": "hello"},
+        dedupe_key="email-dedupe-1",
+        destination="ops@example.com",
+        subject="Subject",
+        template="feedback_submitted",
+        severity="low",
+        provider="openai",
+        environment="prod",
+    )
+
+    with session_factory.create_session() as session:
+        row = session.query(TransportOutboxRecord).filter(TransportOutboxRecord.id == outbox_id).first()
+        assert row is not None
+        assert row.project_id == "p2"
+        assert row.kind == "email"
+        assert row.event_type == "feedback.submitted"
+        assert row.destination == "ops@example.com"
+        assert row.subject == "Subject"
+        assert row.template == "feedback_submitted"
+        assert row.status == "pending"
+        assert row.attempts == 0
+        assert row.max_attempts == 1
+        assert row.payload["message"] == "hello"
+        assert row.payload["severity"] == "low"
+        assert row.payload["provider"] == "openai"
+        assert row.payload["environment"] == "prod"

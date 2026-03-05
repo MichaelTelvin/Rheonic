@@ -3,26 +3,30 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
+from app.application.services.transport_service import TransportService
 from app.config import Settings
-from app.dependencies import get_current_user, get_feedback_mailer, get_settings
+from app.dependencies import get_current_user, get_settings, get_transport_service
 from app.domain.models.user import User
+from app.infrastructure.db.base import DatabaseSessionFactory
+from app.infrastructure.db.models import Base, TransportOutboxRecord
+from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.main import app
 
 
-class FakeFeedbackMailer:
-    # Test double for feedback email sender.
-
-    def __init__(self) -> None:
-        self.sent: list[tuple[str, str]] = []
-
-    def send(self, *, subject: str, body: str) -> None:
-        self.sent.append((subject, body))
+def _make_transport_service(db_url: str) -> TransportService:
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    return TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: None,
+    )
 
 
-def test_feedback_endpoint_sends_email_payload() -> None:
-    # Valid payload should be accepted and forwarded to mailer.
-    fake_mailer = FakeFeedbackMailer()
-    app.dependency_overrides[get_feedback_mailer] = lambda: fake_mailer
+def test_feedback_endpoint_enqueues_outbox_email_and_returns_202(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/feedback_api_test.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    app.dependency_overrides[get_transport_service] = lambda: _make_transport_service(db_url)
     app.dependency_overrides[get_current_user] = lambda: User(
         id="u1",
         email="user@example.com",
@@ -44,22 +48,29 @@ def test_feedback_endpoint_sends_email_payload() -> None:
         },
     )
 
-    assert response.status_code == 200
-    assert response.json() == {"status": "sent"}
-    assert len(fake_mailer.sent) == 1
-    subject, body = fake_mailer.sent[0]
-    assert subject == "Rheonic beta feedback"
-    assert "project_id: p1" in body
-    assert "mode: protect" in body
-    assert "The alerts setup was confusing." in body
+    assert response.status_code == 202
+    assert response.json() == {"status": "queued"}
+
+    with session_factory.create_session() as session:
+        rows = session.query(TransportOutboxRecord).all()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.kind == "email"
+        assert row.event_type == "feedback.submitted"
+        assert row.template == "feedback_submitted"
+        assert row.status == "pending"
+        assert row.payload["message"] == "The alerts setup was confusing."
+        assert row.payload["user_email"] == "user@example.com"
 
     app.dependency_overrides.clear()
 
 
-def test_feedback_endpoint_rejects_empty_message() -> None:
-    # Empty message should return validation error.
-    fake_mailer = FakeFeedbackMailer()
-    app.dependency_overrides[get_feedback_mailer] = lambda: fake_mailer
+def test_feedback_endpoint_rejects_empty_message(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/feedback_api_empty_test.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    app.dependency_overrides[get_transport_service] = lambda: _make_transport_service(db_url)
     app.dependency_overrides[get_current_user] = lambda: User(
         id="u1",
         email="user@example.com",
@@ -74,7 +85,8 @@ def test_feedback_endpoint_rejects_empty_message() -> None:
     )
 
     assert response.status_code == 400
-    assert len(fake_mailer.sent) == 0
+    with session_factory.create_session() as session:
+        assert session.query(TransportOutboxRecord).count() == 0
     app.dependency_overrides.clear()
 
 

@@ -4,9 +4,16 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import AnyHttpUrl, BaseModel, field_validator
 
+from app.application.interfaces.transport_outbox_repository import TransportOutboxRepository
 from app.application.services.project_service import ProjectService
 from app.config import Settings
-from app.dependencies import get_current_user, get_project_service, get_settings, get_webhook_dispatcher
+from app.dependencies import (
+    get_current_user,
+    get_project_service,
+    get_settings,
+    get_transport_outbox_repository,
+    get_webhook_dispatcher,
+)
 from app.domain.models.user import User
 from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
 from app.logger import get_logger
@@ -61,6 +68,7 @@ class ProjectWebhookTestIn(BaseModel):
 def get_project_webhook(
     project_id: str,
     project_service: ProjectService = Depends(get_project_service),
+    transport_outbox_repository: TransportOutboxRepository = Depends(get_transport_outbox_repository),
     current_user: User = Depends(get_current_user),
 ) -> ProjectWebhookOut:
     # Return webhook configuration for an owned project.
@@ -71,9 +79,9 @@ def get_project_webhook(
             email_enabled=project.email_enabled,
             url=project.webhook_url,
             has_secret=bool(project.webhook_secret),
-            last_status=project.webhook_last_status,
-            last_at=project.webhook_last_at,
-            last_error=project.webhook_last_error,
+            last_status=_last_status_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
+            last_at=_last_at_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
+            last_error=_last_error_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
         )
     except HTTPException:
         raise
@@ -87,6 +95,7 @@ def update_project_webhook(
     project_id: str,
     payload: ProjectWebhookIn,
     project_service: ProjectService = Depends(get_project_service),
+    transport_outbox_repository: TransportOutboxRepository = Depends(get_transport_outbox_repository),
     settings: Settings = Depends(get_settings),
     current_user: User = Depends(get_current_user),
 ) -> ProjectWebhookOut:
@@ -110,9 +119,9 @@ def update_project_webhook(
             email_enabled=updated.email_enabled,
             url=updated.webhook_url,
             has_secret=bool(updated.webhook_secret),
-            last_status=updated.webhook_last_status,
-            last_at=updated.webhook_last_at,
-            last_error=updated.webhook_last_error,
+            last_status=_last_status_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
+            last_at=_last_at_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
+            last_error=_last_error_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
         )
     except HTTPException:
         raise
@@ -156,3 +165,32 @@ def test_project_webhook(
     except Exception:
         logger.exception("Test project webhook failed", extra={"project_id": project_id})
         raise HTTPException(status_code=500, detail="Failed to enqueue webhook test")
+
+
+def _latest_terminal(project_id: str, outbox_repository: TransportOutboxRepository):
+    return outbox_repository.get_latest_terminal_by_project_kind(project_id=project_id, kind="webhook")
+
+
+def _last_status_from_outbox(*, project_id: str, outbox_repository: TransportOutboxRepository) -> str | None:
+    latest = _latest_terminal(project_id=project_id, outbox_repository=outbox_repository)
+    if latest is None:
+        return None
+    if latest.status == "delivered":
+        return "success"
+    if latest.status in {"failed", "dead"}:
+        return "failed"
+    return None
+
+
+def _last_at_from_outbox(*, project_id: str, outbox_repository: TransportOutboxRepository) -> datetime | None:
+    latest = _latest_terminal(project_id=project_id, outbox_repository=outbox_repository)
+    if latest is None:
+        return None
+    return latest.delivered_at or latest.updated_at
+
+
+def _last_error_from_outbox(*, project_id: str, outbox_repository: TransportOutboxRepository) -> str | None:
+    latest = _latest_terminal(project_id=project_id, outbox_repository=outbox_repository)
+    if latest is None:
+        return None
+    return latest.last_error_message

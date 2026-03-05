@@ -3,10 +3,10 @@ import { useNavigate } from "react-router-dom";
 
 import {
   ApiError,
+  fetchDeliveryFailures,
   fetchIncidents,
   fetchMetrics,
   fetchProjectProviders,
-  fetchProjectWebhook,
   fetchProtectMetrics,
   listKeys,
   type IncidentItem,
@@ -72,16 +72,6 @@ export function Dashboard(): JSX.Element {
   const [setupStatusResolved, setSetupStatusResolved] = useState<boolean>(false);
   const [setupBannerDismissed, setSetupBannerDismissed] = useState<boolean>(false);
   const [webhookIssue, setWebhookIssue] = useState<{ count: number; lastAt: string | null } | null>(null);
-  const webhookIssueRef = useRef<{ active: boolean; count: number; lastAt: string | null; lastFailureSeenAt: string | null }>({
-    active: false,
-    count: 0,
-    lastAt: null,
-    lastFailureSeenAt: null,
-  });
-  const webhookTestMarkerKey = useMemo<string | null>(
-    () => (projectId ? `rheonic:webhookTestAt:${projectId}` : null),
-    [projectId],
-  );
 
   const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
   const setupStage = useMemo<SetupStage>(() => {
@@ -131,7 +121,6 @@ export function Dashboard(): JSX.Element {
     setHasEvents(false);
     setSetupStatusResolved(false);
     setWebhookIssue(null);
-    webhookIssueRef.current = { active: false, count: 0, lastAt: null, lastFailureSeenAt: null };
   }, [projectId]);
 
   useEffect(() => {
@@ -445,53 +434,17 @@ export function Dashboard(): JSX.Element {
   useEffect(() => {
     if (!projectId) {
       setWebhookIssue(null);
-      webhookIssueRef.current = { active: false, count: 0, lastAt: null, lastFailureSeenAt: null };
       return;
     }
 
     let cancelled = false;
     const loadWebhookIssue = async (): Promise<void> => {
       try {
-        const settings = await fetchProjectWebhook(projectId);
+        const issue = await fetchDeliveryFailures(projectId, "webhook");
         if (cancelled) {
           return;
         }
-        if (!settings.enabled) {
-          webhookIssueRef.current = { active: false, count: 0, lastAt: null, lastFailureSeenAt: null };
-          setWebhookIssue(null);
-          return;
-        }
-        const markerRaw = webhookTestMarkerKey ? window.localStorage.getItem(webhookTestMarkerKey) : null;
-        const markerAt = markerRaw ? Number(markerRaw) : NaN;
-        const lastAtMs = settings.last_at ? new Date(settings.last_at).getTime() : NaN;
-        const isLikelyTestDelivery =
-          Number.isFinite(markerAt)
-          && Number.isFinite(lastAtMs)
-          && Math.abs(lastAtMs - markerAt) <= 120_000;
-
-        const current = webhookIssueRef.current;
-        if (settings.last_status === "failed" && !isLikelyTestDelivery) {
-          const nextCount =
-            current.active && settings.last_at && current.lastFailureSeenAt !== settings.last_at ? current.count + 1 : current.active ? current.count : 1;
-          webhookIssueRef.current = {
-            active: true,
-            count: nextCount,
-            lastAt: settings.last_at ?? current.lastAt,
-            lastFailureSeenAt: settings.last_at ?? current.lastFailureSeenAt,
-          };
-          setWebhookIssue({ count: webhookIssueRef.current.count, lastAt: webhookIssueRef.current.lastAt });
-          return;
-        }
-        if (settings.last_status === "success" && !isLikelyTestDelivery) {
-          webhookIssueRef.current = { active: false, count: 0, lastAt: null, lastFailureSeenAt: null };
-          setWebhookIssue(null);
-          return;
-        }
-        if (current.active) {
-          setWebhookIssue({ count: current.count, lastAt: current.lastAt });
-          return;
-        }
-        setWebhookIssue(null);
+        setWebhookIssue(issue.count > 0 ? { count: issue.count, lastAt: issue.last_attempt_at } : null);
       } catch {
         if (!cancelled) {
           setWebhookIssue(null);

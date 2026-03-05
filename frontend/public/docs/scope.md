@@ -43,14 +43,20 @@ Protect mode
 
 Alerts (webhook)
 - Project webhook config + test API
-- Webhook dispatch on:
+- Unified transport hub (shared outbox + RQ worker) for webhook + email delivery
+- Webhook dispatch events:
 - protect decision warns (`decision.warn`)
 - warn incident opens in protect mode (`incident.warn`, non-breach ingest signals after ingest dominance suppression)
 - protect decision blocks (`incident.block`)
 - incident resolved in protect mode (manual/auto)
 - policy-gap first-seen tuples in protect mode (`policy_gap.detected`)
 - webhook test (`webhook.test`, mode-independent)
-- Delivery status tracking
+- Delivery failures sourced from `transport_outbox` (`failed` / `dead`) via metrics endpoint
+
+Feedback email
+- `POST /api/v1/feedback` is enqueue-only (`202` response)
+- Email jobs are processed asynchronously by transport worker
+- Current email provider implementation is intentionally unconfigured/stubbed and records deterministic failure code `email_provider_not_configured`
 
 Frontend/docs
 - Control Center layout with auth-gated routes
@@ -73,16 +79,16 @@ Operational readiness
 - Dashboard/incident UX polished for MVP operator workflows
 - Baseline alerting runbook for webhook failures (status visibility and retry behavior)
 - Smoke-test scripts/demos for launch validation scenarios implemented (allow, near-cap warn, cap-breach block, retry storm, loop suspect, token explosion, lifecycle)
+- Built a production landing page for public launch funnel
 
 ========================================
 V1 Next Phase (Active)
 ========================================
 
 Productization and deployment
-- Integrate Stripe for billing and subscription lifecycle required for launch
 - Package and deploy backend/frontend to production infrastructure (with environment and secrets management)
 - Publish SDK packages to npm and PyPI for external consumption
-- Build and deploy a production landing page for public launch funnel
+- Integrate Stripe for billing and subscription lifecycle required for launch
 - Finalize release/versioning workflow and launch runbook (rollback + health checks)
 
 ========================================
@@ -90,9 +96,6 @@ Planned in V2
 ========================================
 
 Detectors and intelligence
-- Retry storm detector heuristics (stub scaffold exists)
-- Loop suspect detector heuristics (stub scaffold exists)
-- Token explosion detector heuristics (stub scaffold exists)
 - Additional anomaly families and detector-specific tuning presets
 
 Providers and policy actions
@@ -108,11 +111,6 @@ Cost and reconciliation
 Aggregation and analytics
 - Durable rollups and longer-term aggregation views
 - Advanced protect/incident trend analytics
-
-Alerts and channels
-- Additional outbound channels (Slack, email, PagerDuty, etc.)
-- Channel routing and per-project delivery policies
-- Expanded delivery/failure observability
 
 Multitenancy evolution
 - Org/workspace RBAC multitenancy (roles, workspace scoping, delegated access)
