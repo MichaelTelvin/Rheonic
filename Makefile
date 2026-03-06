@@ -1,4 +1,4 @@
-.PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e up-deps up-dev down-dev up-test down-test backend frontend sdk-node sdk-python e2e diagrams diagrams-check
+.PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e up-deps up-dev down-dev up-test down-test up-staging down-staging up-prod down-prod smoke-staging backend frontend sdk-node sdk-python e2e diagrams diagrams-check
 
 up-deps:
 	@docker compose up -d postgres redis
@@ -14,6 +14,21 @@ up-test:
 
 down-test:
 	@docker compose -p rheonic_test -f docker-compose.test.yml down -v
+
+up-staging:
+	@docker compose -f docker-compose.staging.yml up -d --build
+
+down-staging:
+	@docker compose -f docker-compose.staging.yml down
+
+up-prod:
+	@docker compose -f docker-compose.prod.yml up -d --build
+
+down-prod:
+	@docker compose -f docker-compose.prod.yml down
+
+smoke-staging:
+	@bash -lc "set -euo pipefail; docker compose -f docker-compose.staging.yml ps; curl -fsS \"http://localhost:$${BACKEND_PORT:-8000}/health\" >/dev/null; curl -fsS \"http://localhost:$${BACKEND_PORT:-8000}/ready\" >/dev/null; docker compose -f docker-compose.staging.yml logs --tail=80 backend worker scheduler"
 
 ifneq ($(filter backend frontend sdk-node sdk-python test-backend test-frontend test-sdk-node test-sdk-python,$(MAKECMDGOALS)),)
 test:

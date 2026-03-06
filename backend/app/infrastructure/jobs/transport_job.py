@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 
 def enqueue_outbox_delivery(outbox_id: str) -> None:
     settings = Settings()
-    queue = Queue("rheonic", connection=Redis.from_url(settings.redis_url))
+    queue = Queue(settings.rq_queue_name, connection=Redis.from_url(settings.redis_url))
     queue.enqueue(process_outbox_delivery, kwargs={"outbox_id": outbox_id})
 
 
@@ -58,7 +58,7 @@ def process_outbox_delivery(outbox_id: str) -> None:
             dead=dead,
         )
         if not dead and next_attempt_at is not None:
-            queue = Queue("rheonic", connection=Redis.from_url(settings.redis_url))
+            queue = Queue(settings.rq_queue_name, connection=Redis.from_url(settings.redis_url))
             queue.enqueue_in(timedelta(seconds=delay_seconds), process_outbox_delivery, kwargs={"outbox_id": outbox.id})
 
 

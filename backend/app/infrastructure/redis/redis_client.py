@@ -142,3 +142,11 @@ class RedisClient:
         except Exception:
             logger.exception("Redis DELETE failed", extra={"key": key})
             raise
+
+    def ping(self) -> bool:
+        # Verify connectivity to Redis.
+        try:
+            return bool(self._redis.ping())
+        except Exception:
+            logger.exception("Redis PING failed")
+            raise

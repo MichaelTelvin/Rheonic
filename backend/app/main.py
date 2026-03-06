@@ -5,11 +5,12 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from sqlalchemy import text
 
 from app.api.error_responses import build_error_response, default_code_for_status
 from app.api.routers import api_router
 from app.config import Settings
-from app.dependencies import get_db_session_factory
+from app.dependencies import get_db_session_factory, get_redis_client
 from app.domain.models.project import Project
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.logger import configure_logging, get_logger
@@ -56,13 +57,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging()
     _settings = settings or Settings()
     app = FastAPI(title=_settings.app_name, lifespan=lifespan)
-    origins = [origin.strip() for origin in (_settings.cors_origins or "").split(",") if origin.strip()]
+    origins = _settings.cors_origin_list
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins or ["http://localhost:5173"],
+        allow_origins=origins or (["http://localhost:5173"] if _settings.app_env_normalized == "dev" else []),
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Project-Ingest-Key", "X-Idempotency-Key"],
     )
 
     @app.middleware("http")
@@ -100,17 +101,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # all the routes go here
     @app.get("/health")
     def health() -> dict[str, str]:
-        # Return a basic health response.
+        # Liveness endpoint for process-level checks.
+        return {"status": "ok"}
+
+    @app.get("/ready")
+    def ready() -> dict[str, str]:
+        # Readiness endpoint verifies DB and Redis dependencies.
         try:
-            logger.debug("Health endpoint called")
-            return {"status": "ok"}
-        except Exception:
-            logger.exception("Health endpoint failed")
-            raise
+            with get_db_session_factory().create_session() as session:
+                session.execute(text("SELECT 1"))
+            if not get_redis_client().ping():
+                raise RuntimeError("redis ping failed")
+            return {"status": "ready"}
+        except Exception as exc:
+            logger.exception("Readiness check failed")
+            raise HTTPException(status_code=503, detail=f"not ready: {exc}") from exc
 
     # register routers
     app.include_router(api_router, prefix=_settings.api_prefix)
-    logger.info("FastAPI app initialized", extra={"api_prefix": _settings.api_prefix})
+    logger.info(
+        "FastAPI app initialized",
+        extra={"api_prefix": _settings.api_prefix, "app_env": _settings.app_env_normalized},
+    )
     return app
 
 

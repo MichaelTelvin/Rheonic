@@ -1,70 +1,36 @@
 # Rheonic
 
-Runtime safety layer for LLM applications.
+Rheonic is a runtime safety layer for LLM applications with:
+- FastAPI backend
+- PostgreSQL + Redis
+- RQ worker + scheduler
+- React/Vite frontend
+- unified outbox-based transport hub for webhook + email delivery
 
-Rheonic detects runaway usage patterns (retry storms, loops, spend spikes) 
-and optionally applies guardrail policies (model downgrade, token caps, rate limiting, cooldown, cache)
-across OpenAI, Anthropic, and Google models.
-
----
-
-## ✨ Core Features
-
-### Observe Mode (default)
-- Real-time burn velocity tracking
-- Retry storm detection
-- Loop detection
-- Token explosion detection
-- Incident-first dashboard
-- Slack/Webhook alerts
-- Per-feature / per-endpoint / per-tenant attribution
-
-### Protect Mode (opt-in)
-- Model downgrade (fallback chains)
-- Output token cap
-- Local rate limiting
-- Cooldown soft-block
-- Cached fallback responses
-- Deterministic, logged decisions
-
----
-
-## 🏗 Architecture
-
-- Backend: FastAPI
-- Database: PostgreSQL
-- Realtime counters: Redis
-- Worker: RQ
-- Frontend: React + Vite + TypeScript
-- SDKs: Python (v1), Node (v1.1)
-
----
-
-## 🔐 Privacy
-
-By default:
-- No raw prompts stored
-- Only token counts, metadata, and prompt hashes
-- Strict mode available (no prompt hash)
-
----
-
-## 🚀 Development
-
-Run locally with Docker:
-
+## Local development
+1. Copy env template:
+```bash
+cp .env.local.example .env
 ```
-docker-compose up --build
+2. Start local stack:
+```bash
+docker compose up -d --build
+```
+3. Verify:
+```bash
+curl -fsS http://localhost:8000/health
+curl -fsS http://localhost:8000/ready
 ```
 
-See /docs for:
-	•	product_design.md
-	•	architecture.md
-	•	spec.md
-	•	scope.md
+## Deployment docs
+- Audit: [`docs/deploy-readiness-audit.md`](docs/deploy-readiness-audit.md)
+- Staging: [`docs/deploy-staging.md`](docs/deploy-staging.md)
+- Production: [`docs/deploy-production.md`](docs/deploy-production.md)
+- Rollback: [`docs/rollback.md`](docs/rollback.md)
+- Operations: [`docs/operations.md`](docs/operations.md)
 
-⸻
+## Transport notifications
+- Notification catalog: [`NOTIFICATION_CATALOG.md`](NOTIFICATION_CATALOG.md)
 
-📜 License
-
-MIT License
+## License
+MIT

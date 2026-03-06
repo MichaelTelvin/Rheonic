@@ -111,6 +111,22 @@ class Settings(BaseSettings):
     email_provider_enabled: bool = False
     public_contact_email: str = "owldevlab@gmail.com"
     feedback_report_email: str = "owldevlab@gmail.com"
+    rq_queue_name: str = "rheonic"
+    rq_scheduler_interval_seconds: int = 15
+    trust_proxy_headers: bool = False
+    forwarded_allow_ips: str = "127.0.0.1"
+
+    @property
+    def app_env_normalized(self) -> str:
+        return (self.app_env or "dev").strip().lower()
+
+    @property
+    def is_production_like(self) -> bool:
+        return self.app_env_normalized in {"prod", "production", "staging"}
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in (self.cors_origins or "").split(",") if origin.strip()]
 
     @model_validator(mode="after")
     def _apply_url_defaults(self) -> "Settings":
@@ -123,4 +139,23 @@ class Settings(BaseSettings):
         if not (self.redis_url or "").strip():
             redis_auth = f":{self.redis_password}@" if self.redis_password else ""
             self.redis_url = f"redis://{redis_auth}{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        return self
+
+    @model_validator(mode="after")
+    def _validate_deploy_safety(self) -> "Settings":
+        # Enforce stricter requirements in staging/production-like environments.
+        allowed_envs = {"dev", "test", "staging", "prod", "production"}
+        if self.app_env_normalized not in allowed_envs:
+            raise ValueError(f"APP_ENV must be one of {sorted(allowed_envs)}")
+        if self.is_production_like:
+            jwt = (self.jwt_secret or "").strip()
+            if len(jwt) < 32:
+                raise ValueError("JWT_SECRET must be at least 32 characters in staging/production")
+            if not self.cors_origin_list:
+                raise ValueError("CORS_ORIGINS is required in staging/production")
+            lowered = ",".join(self.cors_origin_list).lower()
+            if "localhost" in lowered or "127.0.0.1" in lowered:
+                raise ValueError("CORS_ORIGINS must not contain localhost in staging/production")
+            if not (self.webhook_secret_encryption_key or "").strip():
+                raise ValueError("WEBHOOK_SECRET_ENCRYPTION_KEY is required in staging/production")
         return self

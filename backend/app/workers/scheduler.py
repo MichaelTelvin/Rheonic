@@ -13,8 +13,9 @@ logger = get_logger(__name__)
 def main() -> None:
     settings = Settings()
     connection = Redis.from_url(settings.redis_url)
-    scheduler = Scheduler(queue_name="rheonic", connection=connection, interval=15)
-    logger.info("RQ scheduler started", extra={"queue": "rheonic", "interval_seconds": 15})
+    interval_seconds = max(int(settings.rq_scheduler_interval_seconds), 1)
+    scheduler = Scheduler(queue_name=settings.rq_queue_name, connection=connection, interval=interval_seconds)
+    logger.info("RQ scheduler started", extra={"queue": settings.rq_queue_name, "interval_seconds": interval_seconds})
     scheduler.run()
 
 

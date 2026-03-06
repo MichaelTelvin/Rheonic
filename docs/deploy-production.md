@@ -1,0 +1,75 @@
+# Production Deployment
+
+## Prerequisites
+- VPS with Docker + Docker Compose plugin.
+- DNS configured for frontend and API domains.
+- Reverse proxy/TLS termination configured (Nginx or Caddy on host).
+- Secrets provisioned securely.
+
+## Domain/DNS assumptions
+- Frontend domain points to VPS.
+- API domain points to VPS and routes to backend service port.
+- `CORS_ORIGINS` contains only production frontend origin(s).
+
+## SSL assumptions
+- TLS is terminated by external reverse proxy.
+- Proxy forwards to:
+  - frontend container port `${FRONTEND_PORT}` (default 80 in production compose)
+  - backend container port `${BACKEND_PORT}` (default 8000)
+
+## Deployment order (exact)
+1. Prepare env:
+```bash
+cp .env.example .env
+```
+2. Configure `.env` for production:
+- `APP_ENV=prod` (or `production`)
+- strong `JWT_SECRET`
+- strong `WEBHOOK_SECRET_ENCRYPTION_KEY`
+- production `CORS_ORIGINS`
+- production `DATABASE_URL` and `REDIS_URL`
+- `VITE_API_BASE_URL` production API URL
+3. Deploy:
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml ps
+```
+
+## Migration order
+- `db_init` runs before API/worker/scheduler by compose dependency.
+- Verify migration completion:
+```bash
+docker compose -f docker-compose.prod.yml logs db_init
+```
+
+## Service restart order
+For controlled restart:
+1. `db_init` (if schema changes)
+2. `backend`
+3. `worker`
+4. `scheduler`
+5. `frontend`
+
+Example:
+```bash
+docker compose -f docker-compose.prod.yml up -d --build db_init
+docker compose -f docker-compose.prod.yml up -d --build backend worker scheduler frontend
+```
+
+## Smoke checklist
+- `GET /health` returns `ok`.
+- `GET /ready` returns `ready`.
+- frontend home/dashboard loads.
+- authenticated API call succeeds.
+- worker queue is active:
+```bash
+docker compose -f docker-compose.prod.yml exec redis redis-cli KEYS "rq:worker:*"
+```
+- scheduler running:
+```bash
+docker compose -f docker-compose.prod.yml logs scheduler | tail -n 50
+```
+- transport failures visible through metrics endpoint if induced.
+
+## Rollback
+- Follow [`docs/rollback.md`](rollback.md).

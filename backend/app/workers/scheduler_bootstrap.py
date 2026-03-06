@@ -64,7 +64,7 @@ def main() -> None:
     """Connect to Redis and bootstrap recurring scheduler jobs."""
     settings = Settings()
     redis_conn = Redis.from_url(settings.redis_url)
-    scheduler = Scheduler(queue_name="rheonic", connection=redis_conn)
+    scheduler = Scheduler(queue_name=settings.rq_queue_name, connection=redis_conn)
 
     jobs = [
         RecurringJob(
