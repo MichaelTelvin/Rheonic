@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { fetchPublicConfig } from "../api/client";
 import { getAuthItem, removeAuthItem } from "../authStorage";
 import { frontendConfig } from "../config";
+import { RheonicLogoMark } from "./RheonicLogoMark";
 
 interface PublicLayoutProps extends PropsWithChildren {
   navAuthHref: string;
@@ -87,6 +88,7 @@ export function PublicLayout({
       <div className={`public-shell${shellClassName ? ` ${shellClassName}` : ""}`}>
         <header className={`public-nav public-nav-sticky${scrolled ? " is-scrolled" : ""}`}>
           <Link className="public-brand" to="/">
+            <RheonicLogoMark className="brand-logo-icon" />
             <span className="public-brand-word">Rheonic</span>
             {showBetaBadge ? <span className="public-beta-badge">Beta</span> : null}
           </Link>

@@ -1,3 +1,5 @@
+import { RheonicLogoMark } from "./RheonicLogoMark";
+
 interface AppHeaderProps {
   userEmail?: string | null;
   onSignOut?: () => void;
@@ -9,6 +11,7 @@ export function AppHeader({ userEmail = null, onSignOut }: AppHeaderProps): JSX.
       <div className="app-header-inner">
         <div className="brand-cluster">
           <p className="top-brand">
+            <RheonicLogoMark className="brand-logo-icon" />
             <span className="dashboard-brand-word">Rheonic</span>
             <span className="dashboard-beta-badge">Beta</span>
           </p>

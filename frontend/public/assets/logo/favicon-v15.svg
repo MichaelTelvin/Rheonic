@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Rheonic favicon">
+  <defs>
+    <linearGradient id="rheonic-f15" x1="0" y1="0" x2="128" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="28%" stop-color="#8d84fc"/>
+      <stop offset="56%" stop-color="#7a7dff"/>
+      <stop offset="78%" stop-color="#79a3ff"/>
+      <stop offset="100%" stop-color="#7cc1ff"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(15 15) scale(0.76)">
+    <circle cx="16" cy="72" r="8" fill="url(#rheonic-f15)"/>
+    <path d="M 43 40 Q 36 40 36 47 L 36 89 L 43 100 L 50 89 L 50 47 Q 50 40 43 40 Z" fill="url(#rheonic-f15)"/>
+    <path d="M 67 22 Q 60 22 60 29 L 60 96 L 67 110 L 74 96 L 74 29 Q 74 22 67 22 Z" fill="url(#rheonic-f15)"/>
+    <path d="M 91 40 Q 84 40 84 47 L 84 89 L 91 100 L 98 89 L 98 47 Q 98 40 91 40 Z" fill="url(#rheonic-f15)"/>
+    <path d="M 114 54 Q 107 54 107 61 L 107 82 L 114 92 L 121 82 L 121 61 Q 121 54 114 54 Z" fill="url(#rheonic-f15)"/>
+  </g>
+</svg>

@@ -109,8 +109,8 @@ class Settings(BaseSettings):
     webhook_allow_private_hosts: bool = False
     webhook_secret_encryption_key: str = ""
     email_provider_enabled: bool = False
-    public_contact_email: str = "owldevlab@gmail.com"
-    feedback_report_email: str = "owldevlab@gmail.com"
+    public_contact_email: str = "founder@rheonic.dev"
+    feedback_report_email: str = "feedback@rheonic.dev"
     rq_queue_name: str = "rheonic"
     rq_scheduler_interval_seconds: int = 15
     trust_proxy_headers: bool = False
