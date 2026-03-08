@@ -8,21 +8,27 @@ interface RheonicLogoMarkProps {
 export function RheonicLogoMark({ className, title = "Rheonic logo" }: RheonicLogoMarkProps): JSX.Element {
   const gradientId = useId();
   return (
-    <svg className={className} viewBox="4 16 120 96" role="img" aria-label={title}>
+    <svg className={className} viewBox="0 0 256 256" role="img" aria-label={title}>
       <defs>
-        <linearGradient id={gradientId} x1="4" y1="0" x2="124" y2="0" gradientUnits="userSpaceOnUse">
+        <linearGradient id={gradientId} x1="44" y1="128" x2="212" y2="128" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#a78bfa" />
-          <stop offset="28%" stopColor="#8d84fc" />
-          <stop offset="56%" stopColor="#7a7dff" />
-          <stop offset="78%" stopColor="#79a3ff" />
+          <stop offset="45%" stopColor="#7a7dff" />
           <stop offset="100%" stopColor="#7cc1ff" />
         </linearGradient>
+        <filter id={`${gradientId}-glow`} x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="5" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
-      <circle cx="16" cy="72" r="8" fill={`url(#${gradientId})`} />
-      <path d="M 43 40 Q 36 40 36 47 L 36 89 L 43 100 L 50 89 L 50 47 Q 50 40 43 40 Z" fill={`url(#${gradientId})`} />
-      <path d="M 67 22 Q 60 22 60 29 L 60 96 L 67 110 L 74 96 L 74 29 Q 74 22 67 22 Z" fill={`url(#${gradientId})`} />
-      <path d="M 91 40 Q 84 40 84 47 L 84 89 L 91 100 L 98 89 L 98 47 Q 98 40 91 40 Z" fill={`url(#${gradientId})`} />
-      <path d="M 114 54 Q 107 54 107 61 L 107 82 L 114 92 L 121 82 L 121 61 Q 121 54 114 54 Z" fill={`url(#${gradientId})`} />
+      <rect x="39" y="39" width="178" height="178" rx="0" fill="none" stroke={`url(#${gradientId})`} strokeWidth="22" />
+      <g filter={`url(#${gradientId}-glow)`} fill="none" stroke={`url(#${gradientId})`} strokeWidth="12" strokeLinecap="round">
+        <path d="M 46 128 L 99 128" />
+        <path d="M 157 128 L 210 128" />
+        <circle cx="128" cy="128" r="31" />
+      </g>
     </svg>
   );
 }

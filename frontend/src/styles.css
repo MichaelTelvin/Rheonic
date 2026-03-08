@@ -1490,7 +1490,7 @@ body {
   margin: 0;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   letter-spacing: 0.02em;
   font-size: 0.86rem;
   font-weight: 700;
@@ -1498,12 +1498,11 @@ body {
 
 .brand-logo-icon {
   display: block;
-  height: 26px;
-  width: auto;
-  object-fit: contain;
+  height: 29px;
+  width: 29px;
   flex: 0 0 auto;
-  opacity: 0.88;
-  filter: saturate(0.86) brightness(0.94);
+  opacity: 0.8;
+  filter: saturate(0.78) brightness(0.92);
 }
 
 .dashboard-brand-word {
