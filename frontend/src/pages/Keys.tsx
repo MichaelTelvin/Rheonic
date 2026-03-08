@@ -146,6 +146,7 @@ export function Keys(): JSX.Element {
     try {
       await navigator.clipboard.writeText(value);
       setCopiedAction(actionId);
+      showAppToast("Copied to clipboard");
       window.setTimeout(() => {
         setCopiedAction((current) => (current === actionId ? null : current));
       }, 1200);
@@ -223,9 +224,6 @@ export function Keys(): JSX.Element {
                   Copy env var
                 </button>
               </div>
-              <p className={`copy-feedback ${copiedAction === "key" || copiedAction === "env" ? "visible" : ""}`}>
-                Copied to clipboard.
-              </p>
             </div>
           </Card>
         ) : null}
