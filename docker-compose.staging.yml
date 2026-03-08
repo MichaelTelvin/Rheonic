@@ -1,5 +1,11 @@
 name: rheonic_staging
 
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -16,6 +22,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    logging: *default-logging
     restart: unless-stopped
 
   redis:
@@ -28,6 +35,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    logging: *default-logging
     restart: unless-stopped
 
   db_init:
@@ -51,6 +59,7 @@ services:
         condition: service_healthy
     command: >
       sh -c "python -m app.infrastructure.db.migrate && echo 'db_init complete'"
+    logging: *default-logging
     restart: "no"
 
   backend:
@@ -85,6 +94,7 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+    logging: *default-logging
     restart: unless-stopped
 
   worker:
@@ -108,6 +118,12 @@ services:
         condition: service_completed_successfully
     command: >
       sh -c "rq worker --url \"$$REDIS_URL\" \"$${RQ_QUEUE_NAME:-rheonic}\""
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'rq worker' >/dev/null"]
+      interval: 15s
+      timeout: 3s
+      retries: 10
+    logging: *default-logging
     restart: unless-stopped
 
   scheduler:
@@ -133,6 +149,12 @@ services:
         condition: service_completed_successfully
     command: >
       sh -c "python -m app.workers.scheduler_bootstrap && python -m app.workers.scheduler"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'python -m app.workers.scheduler' >/dev/null"]
+      interval: 15s
+      timeout: 3s
+      retries: 10
+    logging: *default-logging
     restart: unless-stopped
 
   frontend:
@@ -154,6 +176,7 @@ services:
       interval: 15s
       timeout: 3s
       retries: 10
+    logging: *default-logging
     restart: unless-stopped
 
 volumes:

@@ -65,6 +65,10 @@ docker compose -f docker-compose.staging.yml ps worker scheduler
 curl -fsS "http://<staging-ip>:${BACKEND_PORT}/health"
 curl -fsS "http://<staging-ip>:${BACKEND_PORT}/ready"
 ```
+- services show healthy or running:
+```bash
+docker compose -f docker-compose.staging.yml ps
+```
 - Queue/worker visible:
 ```bash
 docker compose -f docker-compose.staging.yml exec redis redis-cli LLEN rq:queue:${RQ_QUEUE_NAME:-rheonic}
@@ -84,6 +88,7 @@ docker compose -f docker-compose.staging.yml logs -f worker
 docker compose -f docker-compose.staging.yml logs -f scheduler
 docker compose -f docker-compose.staging.yml logs -f frontend
 ```
+- container log rotation is enabled in the staging compose file to cap local Docker log growth.
 
 ## Protect latency checks
 - Protect decision latency is logged by the backend on every `/api/v1/protect/decision` call.

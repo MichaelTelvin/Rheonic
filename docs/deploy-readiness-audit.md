@@ -75,6 +75,7 @@
 - Reverse proxy + TLS termination strategy (Nginx/Caddy on VPS host) and certificate automation.
 - Final production domain and DNS cutover.
 - Email provider implementation behind current stub transport (currently deterministic fail-state by design when provider disabled/unimplemented).
+- External log aggregation remains a recommended production upgrade; current compose files now cap Docker log size locally, but logs are not yet shipped off-host.
 - Privacy/compliance review:
   - confirm data retention policy for events and incidents,
   - confirm customer-facing privacy language and subprocessors,
@@ -103,3 +104,5 @@
   - Mitigation: transport outbox captures failures (`email_provider_not_configured`); add real provider before relying on email delivery.
 - R3: Forward-fix migration policy.
   - Mitigation: no down migration in prod; rollback is image/code rollback plus corrective forward migration.
+- R4: Single-host Postgres/Redis for MVP production.
+  - Mitigation: acceptable early with persistent volumes and backups; move to managed or separate data services as load and criticality increase.

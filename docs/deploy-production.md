@@ -7,6 +7,15 @@
 - Secrets provisioned securely.
 - Privacy/compliance review completed for target customers and regions.
 
+## MVP production stance
+- For an early MVP, running backend, Postgres, and Redis on one VPS is acceptable if:
+  - volumes are persistent,
+  - backups are enabled,
+  - the host is monitored,
+  - secrets are managed outside git,
+  - recovery steps are documented.
+- Longer term, Postgres should move to a managed or separate database service before higher-volume production use.
+
 ## Secrets handling
 - The repo does not currently include a native Vault or cloud secret-manager integration.
 - Production secrets are expected to be injected by your platform or deployment pipeline into the environment consumed by `docker compose`.
@@ -68,6 +77,7 @@ docker compose -f docker-compose.prod.yml up -d --build backend worker scheduler
 - `GET /ready` returns `ready`.
 - frontend home/dashboard loads.
 - authenticated API call succeeds.
+- `docker compose -f docker-compose.prod.yml ps` shows `backend`, `worker`, `scheduler`, and `frontend` as healthy or running.
 - worker queue is active:
 ```bash
 docker compose -f docker-compose.prod.yml exec redis redis-cli KEYS "rq:worker:*"
@@ -78,6 +88,12 @@ docker compose -f docker-compose.prod.yml logs scheduler | tail -n 50
 ```
 - transport failures visible through metrics endpoint if induced.
 - email alerts are either intentionally disabled or backed by a real provider.
+
+## Recommended next production upgrades
+- external log aggregation so logs survive container replacement and host-level troubleshooting is easier,
+- managed or separate Postgres once load and customer reliance increase,
+- secret manager-backed deploys instead of host-managed `.env`,
+- backups and restore drills for Postgres and Redis persistence.
 
 ## Rollback
 - Follow [`docs/rollback.md`](rollback.md).
