@@ -60,6 +60,24 @@ async function main() {
     body: JSON.stringify({ name: "node-e2e" }),
   });
 
+  const preflightResponse = await fetch(`${backendBaseUrl}/api/v1/protect/decision`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Project-Ingest-Key": createdKey.key,
+    },
+    body: JSON.stringify({
+      provider: "openai",
+      model: "gpt-4o-mini",
+      environment: "dev",
+      feature: "node-e2e",
+      input_tokens_estimate: 12,
+      max_output_tokens: 32,
+    }),
+  });
+  assert.equal(preflightResponse.status, 200);
+  assert.ok(Number(preflightResponse.headers.get("X-Protect-Decision-Latency-Ms")) >= 0);
+
   await fetch(`${providerStubUrl}/reset`, { method: "POST" });
   const initialProviderCalls = await providerCount();
 

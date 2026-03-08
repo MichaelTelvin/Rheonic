@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TestRouter } from "./test/testRouter";
 
 const { mockSetUnauthorizedHandler, mockFetchProjects, mockFetchProjectProtect } = vi.hoisted(() => ({
   mockSetUnauthorizedHandler: vi.fn(),
@@ -67,20 +67,22 @@ describe("App", () => {
 
   it("renders landing on public root with CTA buttons", () => {
     render(
-      <MemoryRouter initialEntries={["/"]}>
+      <TestRouter initialEntries={["/"]}>
         <App />
-      </MemoryRouter>,
+      </TestRouter>,
     );
     expect(screen.getByRole("heading", { name: "Control your agent traffic before it controls your bill." })).toBeDefined();
     expect(screen.getAllByRole("link", { name: "Quickstart" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Sign in" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "Privacy" }).getAttribute("href")).toBe("/privacy");
+    expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
   });
 
   it("renders quickstart page on /quickstart", () => {
     render(
-      <MemoryRouter initialEntries={["/quickstart"]}>
+      <TestRouter initialEntries={["/quickstart"]}>
         <App />
-      </MemoryRouter>,
+      </TestRouter>,
     );
     expect(screen.getByRole("heading", { name: "Quickstart" })).toBeDefined();
     expect(screen.getByText(/npm install/i)).toBeDefined();
@@ -88,11 +90,31 @@ describe("App", () => {
     expect(screen.getByText(/pip install/i)).toBeDefined();
   });
 
+  it("renders privacy page on /privacy", () => {
+    render(
+      <TestRouter initialEntries={["/privacy"]}>
+        <App />
+      </TestRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "Privacy Policy" })).toBeDefined();
+    expect(screen.getByText(/We collect account, project, and usage data/i)).toBeDefined();
+  });
+
+  it("renders terms page on /terms", () => {
+    render(
+      <TestRouter initialEntries={["/terms"]}>
+        <App />
+      </TestRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "Terms of Use" })).toBeDefined();
+    expect(screen.getByText(/Rheonic is provided for business evaluation and operational monitoring/i)).toBeDefined();
+  });
+
   it("stores auth payload and renders dashboard after login success", async () => {
     render(
-      <MemoryRouter initialEntries={["/login"]}>
+      <TestRouter initialEntries={["/login"]}>
         <App />
-      </MemoryRouter>,
+      </TestRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Mock Login" }));
 
@@ -104,9 +126,9 @@ describe("App", () => {
 
   it("redirects unauthenticated user from /app to /login", async () => {
     render(
-      <MemoryRouter initialEntries={["/app"]}>
+      <TestRouter initialEntries={["/app"]}>
         <App />
-      </MemoryRouter>,
+      </TestRouter>,
     );
     expect(await screen.findByRole("button", { name: "Mock Login" })).toBeDefined();
   });
@@ -120,9 +142,9 @@ describe("App", () => {
     );
 
     render(
-      <MemoryRouter initialEntries={["/login"]}>
+      <TestRouter initialEntries={["/login"]}>
         <App />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(await screen.findByText("Dashboard Page")).toBeDefined();
@@ -137,9 +159,9 @@ describe("App", () => {
     );
 
     render(
-      <MemoryRouter initialEntries={["/incidents"]}>
+      <TestRouter initialEntries={["/incidents"]}>
         <App />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(await screen.findByText("Page not found")).toBeDefined();
@@ -154,9 +176,9 @@ describe("App", () => {
     );
 
     render(
-      <MemoryRouter initialEntries={["/app/unknown"]}>
+      <TestRouter initialEntries={["/app/unknown"]}>
         <App />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(await screen.findByText("Page not found")).toBeDefined();
@@ -171,12 +193,13 @@ describe("App", () => {
     );
 
     render(
-      <MemoryRouter initialEntries={["/app"]}>
+      <TestRouter initialEntries={["/app"]}>
         <App />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(await screen.findByText("Dashboard Page")).toBeDefined();
+    expect(screen.getByRole("link", { name: "Visit site" }).getAttribute("href")).toBe("/");
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
     await waitFor(() => {
@@ -187,9 +210,9 @@ describe("App", () => {
 
   it("registers and cleans unauthorized handler", () => {
     const { unmount } = render(
-      <MemoryRouter>
+      <TestRouter>
         <App />
-      </MemoryRouter>,
+      </TestRouter>,
     );
     expect(mockSetUnauthorizedHandler).toHaveBeenCalled();
     unmount();
@@ -205,9 +228,9 @@ describe("App", () => {
     );
 
     render(
-      <MemoryRouter initialEntries={["/app"]}>
+      <TestRouter initialEntries={["/app"]}>
         <App />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     expect(await screen.findByText("Dashboard Page")).toBeDefined();

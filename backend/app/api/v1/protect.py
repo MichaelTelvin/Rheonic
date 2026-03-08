@@ -1,7 +1,7 @@
 # Protect mode API endpoints.
 from time import perf_counter
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app.application.services.protect_service import ProtectDecisionContext, ProtectService
@@ -75,6 +75,7 @@ class DecisionTimeoutIn(BaseModel):
 @router.post("/protect/decision", response_model=ProtectDecisionOut)
 def protect_decision(
     payload: ProtectDecisionIn,
+    response: Response,
     service: ProtectService = Depends(get_protect_service),
     protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
@@ -98,6 +99,7 @@ def protect_decision(
         if decision is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
         latency_ms = int((perf_counter() - start) * 1000)
+        response.headers["X-Protect-Decision-Latency-Ms"] = str(latency_ms)
         if project_id:
             scoped_id = scoped_project_provider_id(project_id, payload.provider)
             protect_action_store.record(
@@ -110,6 +112,16 @@ def protect_decision(
                 latency_ms=latency_ms,
                 timed_out=False,
             )
+        logger.info(
+            "Protect decision evaluated",
+            extra={
+                "project_id": project_id,
+                "provider": payload.provider,
+                "decision": decision.decision,
+                "reason": decision.reason,
+                "latency_ms": latency_ms,
+            },
+        )
         return ProtectDecisionOut(
             decision=decision.decision,
             reason=decision.reason,

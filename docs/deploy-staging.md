@@ -20,6 +20,19 @@ cp .env.example .env
 - `FRONTEND_PORT`, `BACKEND_PORT`
 - optional: `RQ_QUEUE_NAME`, `RQ_SCHEDULER_INTERVAL_SECONDS`
 
+## Secrets handling
+- There is no built-in Vault, SSM, Doppler, or cloud secret-manager integration in this repo today.
+- Staging currently relies on environment-variable injection via the host `.env` file consumed by Docker Compose.
+- See [`docs/secrets-management.md`](/Users/mike/Projects/Rheonic/docs/secrets-management.md) for the recommended migration path away from host-managed `.env` files.
+- Treat `.env` as a host secret:
+  - do not commit it,
+  - keep file permissions restricted (for example `chmod 600 .env`),
+  - provision it from your server secret store or CI/CD secret injection if you have one outside the repo.
+- Minimum staging secrets:
+  - `POSTGRES_PASSWORD`
+  - `JWT_SECRET`
+  - `WEBHOOK_SECRET_ENCRYPTION_KEY`
+
 ## Exact deploy commands
 ```bash
 docker compose -f docker-compose.staging.yml up -d --build
@@ -59,6 +72,10 @@ docker compose -f docker-compose.staging.yml exec redis redis-cli KEYS "rq:worke
 ```
 - Email transport status (stub behavior expected unless real provider implemented):
   - check backend/worker logs for `email_provider_not_configured` on email jobs.
+- Compliance sanity check before external access:
+  - verify privacy/terms pages match actual data handling,
+  - verify event retention and deletion expectations for staging data,
+  - avoid using real customer data until compliance posture is finalized.
 
 ## Inspect logs
 ```bash
@@ -66,4 +83,11 @@ docker compose -f docker-compose.staging.yml logs -f backend
 docker compose -f docker-compose.staging.yml logs -f worker
 docker compose -f docker-compose.staging.yml logs -f scheduler
 docker compose -f docker-compose.staging.yml logs -f frontend
+```
+
+## Protect latency checks
+- Protect decision latency is logged by the backend on every `/api/v1/protect/decision` call.
+- SDK debug mode also logs token-estimation and preflight timing:
+```bash
+RHEONIC_DEBUG=1
 ```

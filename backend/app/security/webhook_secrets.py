@@ -2,27 +2,24 @@
 from __future__ import annotations
 
 import base64
-import hashlib
+from cryptography.fernet import Fernet, InvalidToken
 
 from app.config import Settings, app_config
+from app.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def _encryption_key_bytes(settings: Settings) -> bytes:
-    seed = settings.webhook_secret_encryption_key or settings.jwt_secret or app_config.webhook_secret_default_fallback_key
-    return hashlib.sha256(seed.encode("utf-8")).digest()
-
-
-def _xor_bytes(payload: bytes, key: bytes) -> bytes:
-    # Apply a deterministic XOR stream over payload bytes.
-    return bytes(byte ^ key[index % len(key)] for index, byte in enumerate(payload))
+    digest = bytes.fromhex(settings.webhook_secret_encryption_key_digest)
+    return base64.urlsafe_b64encode(digest)
 
 
 def encrypt_webhook_secret(secret: str, settings: Settings) -> str:
     # Encrypt webhook secret before persisting it.
     if not secret:
         return secret
-    encrypted = _xor_bytes(secret.encode("utf-8"), _encryption_key_bytes(settings))
-    token_text = base64.urlsafe_b64encode(encrypted).decode("utf-8")
+    token_text = Fernet(_encryption_key_bytes(settings)).encrypt(secret.encode("utf-8")).decode("utf-8")
     return f"{app_config.webhook_secret_prefix}{token_text}"
 
 
@@ -34,8 +31,11 @@ def decrypt_webhook_secret(secret: str | None, settings: Settings) -> str | None
         return secret
     token = secret[len(app_config.webhook_secret_prefix) :]
     try:
-        decoded = base64.urlsafe_b64decode(token.encode("utf-8"))
-        plaintext = _xor_bytes(decoded, _encryption_key_bytes(settings))
+        plaintext = Fernet(_encryption_key_bytes(settings)).decrypt(token.encode("utf-8"))
         return plaintext.decode("utf-8")
+    except InvalidToken:
+        logger.warning("Stored webhook secret could not be decrypted with the configured encryption key")
+        return None
     except Exception:
+        logger.exception("Webhook secret decryption failed unexpectedly")
         return None

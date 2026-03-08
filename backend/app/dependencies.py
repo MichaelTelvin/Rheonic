@@ -163,7 +163,6 @@ def get_metrics_service() -> MetricsService:
 
 def get_detect_incidents_service() -> DetectIncidentsService:
     # Provide an incident detection service instance.
-    # TODO: Inject detector and repository dependencies.
     try:
         service = DetectIncidentsService(
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),

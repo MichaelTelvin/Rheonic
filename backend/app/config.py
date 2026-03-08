@@ -1,5 +1,6 @@
 # Application configuration objects.
 from dataclasses import dataclass
+import hashlib
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -34,7 +35,6 @@ class AppConfig:
     webhook_timeout_pool_seconds: float = 5.0
     webhook_max_error_chars: int = 240
     webhook_secret_prefix: str = "enc:v1:"
-    webhook_secret_default_fallback_key: str = "rheonic-webhook-secret-default"
     email_retry_max_attempts: int = 1
     email_retry_intervals_seconds: tuple[int, ...] = ()
     scheduler_default_result_ttl_seconds: int = 3600
@@ -156,6 +156,14 @@ class Settings(BaseSettings):
             lowered = ",".join(self.cors_origin_list).lower()
             if "localhost" in lowered or "127.0.0.1" in lowered:
                 raise ValueError("CORS_ORIGINS must not contain localhost in staging/production")
-            if not (self.webhook_secret_encryption_key or "").strip():
-                raise ValueError("WEBHOOK_SECRET_ENCRYPTION_KEY is required in staging/production")
+            webhook_key = (self.webhook_secret_encryption_key or "").strip()
+            if len(webhook_key) < 32:
+                raise ValueError("WEBHOOK_SECRET_ENCRYPTION_KEY must be at least 32 characters in staging/production")
         return self
+
+    @property
+    def webhook_secret_encryption_key_digest(self) -> str:
+        seed = (self.webhook_secret_encryption_key or self.jwt_secret or "").strip()
+        if not seed:
+            raise ValueError("WEBHOOK_SECRET_ENCRYPTION_KEY or JWT_SECRET is required for webhook secret encryption")
+        return hashlib.sha256(seed.encode("utf-8")).hexdigest()

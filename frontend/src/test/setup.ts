@@ -50,6 +50,32 @@ Object.defineProperty(globalThis, "IntersectionObserver", {
   configurable: true,
 });
 
+const mockCanvasContext = {
+  clearRect: () => {},
+  setTransform: () => {},
+  save: () => {},
+  restore: () => {},
+  beginPath: () => {},
+  moveTo: () => {},
+  lineTo: () => {},
+  stroke: () => {},
+  fill: () => {},
+  closePath: () => {},
+  quadraticCurveTo: () => {},
+  setLineDash: () => {},
+  strokeStyle: "",
+  lineWidth: 1,
+  fillStyle: "",
+  shadowColor: "",
+  shadowBlur: 0,
+  globalAlpha: 1,
+};
+
+Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+  value: () => mockCanvasContext,
+  configurable: true,
+});
+
 afterEach(() => {
   cleanup();
   window.localStorage.clear();

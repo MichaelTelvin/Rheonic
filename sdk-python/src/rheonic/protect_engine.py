@@ -41,6 +41,7 @@ class ProtectEngine:
         fail_mode: str = sdk_config.default_protect_fail_mode,
         decision_timeout_ms: int = sdk_config.default_protect_decision_timeout_ms,
         http_client: object | None = None,
+        debug_logger: Any | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._ingest_key = ingest_key
@@ -53,6 +54,7 @@ class ProtectEngine:
             else sdk_config.default_protect_decision_timeout_ms
         )
         self._http_client = http_client
+        self._debug_logger = debug_logger
         self._cooldown_until_ms: int | None = None
         self._cooldown_reason: str | None = None
 
@@ -60,11 +62,17 @@ class ProtectEngine:
         # Return allow/warn/block decision from backend with fail-mode fallback.
         now_ms = int(time.time() * 1000)
         if self._cooldown_until_ms is not None and now_ms < self._cooldown_until_ms:
+            self._debug(
+                "Protect preflight blocked locally from cached cooldown",
+                provider=context.get("provider"),
+                decision="block",
+                reason=self._cooldown_reason or "cooldown_active",
+            )
             return {"decision": "block", "reason": self._cooldown_reason or "cooldown_active"}
 
         timeout_s = max(self._decision_timeout_ms, 1) / 1000.0
+        started_at = time.perf_counter()
         try:
-            
             response = self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision",
                 json=context,
@@ -76,23 +84,23 @@ class ProtectEngine:
             )
             status_code = int(getattr(response, "status_code", 0))
             if status_code < 200 or status_code >= 300:
+                self._debug(
+                    "Protect preflight returned non-success status",
+                    provider=context.get("provider"),
+                    status_code=status_code,
+                    latency_ms=int((time.perf_counter() - started_at) * 1000),
+                )
                 return self._fallback_decision()
-            
             payload = self._parse_json_payload(response)
-            
             decision = str(payload.get("decision") or "allow")
             reason = str(payload.get("reason") or "ok")
             fail_mode = str(payload.get("fail_mode") or self._fail_mode)
-            
             if fail_mode in {"open", "closed"}:
                 self._fail_mode = fail_mode
-            
             decision_timeout = payload.get("protect_decision_timeout_ms")
-            
             if isinstance(decision_timeout, int) and decision_timeout > 0:
                 self._decision_timeout_ms = decision_timeout
             blocked_until_ms = _parse_blocked_until_ms(payload.get("blocked_until"))
-            
             if blocked_until_ms is not None and blocked_until_ms > int(time.time() * 1000):
                 self._cooldown_until_ms = blocked_until_ms
                 self._cooldown_reason = "cooldown_active"
@@ -114,12 +122,34 @@ class ProtectEngine:
                         "recommended_max_output_tokens": recommended,
                         "applied": bool(applied) if isinstance(applied, bool) else False,
                     }
+            self._debug(
+                "Protect preflight completed",
+                provider=context.get("provider"),
+                decision=decision,
+                reason=reason,
+                latency_ms=int((time.perf_counter() - started_at) * 1000),
+                timeout_ms=self._decision_timeout_ms,
+            )
             return result
         except Exception:
+            latency_ms = int((time.perf_counter() - started_at) * 1000)
             if self._is_timeout_error():
                 provider = context.get("provider")
+                self._debug(
+                    "Protect preflight timed out",
+                    provider=provider,
+                    latency_ms=latency_ms,
+                    timeout_ms=self._decision_timeout_ms,
+                )
                 self._report_decision_timeout_fire_and_forget(
                     provider=str(provider) if isinstance(provider, str) else None,
+                )
+            else:
+                self._debug(
+                    "Protect preflight failed",
+                    provider=context.get("provider"),
+                    latency_ms=latency_ms,
+                    error_type=type(sys.exc_info()[1]).__name__ if sys.exc_info()[1] is not None else "unknown",
                 )
             return self._fallback_decision()
 
@@ -185,6 +215,15 @@ class ProtectEngine:
         import threading
 
         threading.Thread(target=_send, daemon=True).start()
+
+    def _debug(self, message: str, **extra: object) -> None:
+        if callable(self._debug_logger):
+            try:
+                self._debug_logger(message, **extra)
+                return
+            except Exception:
+                logger.exception("Protect engine debug logger failed")
+        logger.debug(message, extra=extra or None)
 
 
 def _parse_blocked_until_ms(value: object) -> int | None:

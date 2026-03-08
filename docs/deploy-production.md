@@ -5,6 +5,13 @@
 - DNS configured for frontend and API domains.
 - Reverse proxy/TLS termination configured (Nginx or Caddy on host).
 - Secrets provisioned securely.
+- Privacy/compliance review completed for target customers and regions.
+
+## Secrets handling
+- The repo does not currently include a native Vault or cloud secret-manager integration.
+- Production secrets are expected to be injected by your platform or deployment pipeline into the environment consumed by `docker compose`.
+- See [`docs/secrets-management.md`](/Users/mike/Projects/Rheonic/docs/secrets-management.md) for the recommended integration pattern for this repo.
+- Do not keep production `.env` files in the repo or on developer machines longer than necessary.
 
 ## Domain/DNS assumptions
 - Frontend domain points to VPS.
@@ -70,6 +77,7 @@ docker compose -f docker-compose.prod.yml exec redis redis-cli KEYS "rq:worker:*
 docker compose -f docker-compose.prod.yml logs scheduler | tail -n 50
 ```
 - transport failures visible through metrics endpoint if induced.
+- email alerts are either intentionally disabled or backed by a real provider.
 
 ## Rollback
 - Follow [`docs/rollback.md`](rollback.md).

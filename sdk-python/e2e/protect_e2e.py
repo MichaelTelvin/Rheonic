@@ -84,6 +84,22 @@ def _provider_count() -> int:
 
 def run() -> None:
     auth = _seed()
+    preflight_response = httpx.post(
+        f"{BACKEND_BASE_URL}/api/v1/protect/decision",
+        json={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "feature": "python-e2e",
+            "input_tokens_estimate": 12,
+            "max_output_tokens": 32,
+        },
+        headers={"X-Project-Ingest-Key": auth.ingest_key, "Content-Type": "application/json"},
+        timeout=5.0,
+    )
+    assert preflight_response.status_code == 200
+    assert int(preflight_response.headers.get("X-Protect-Decision-Latency-Ms", "0")) >= 0
+
     _provider_reset()
     initial_provider_calls = _provider_count()
 

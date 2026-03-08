@@ -35,11 +35,18 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
     const requestPayload = extractRequestPayload(args, requestedModel);
     let estimatedInputTokens: number | null = null;
 
+    const tokenEstimateStartedAt = Date.now();
     estimatedInputTokens = requestPayload
       ? (estimatorOverrideForTests
           ? estimatorOverrideForTests(requestPayload)
           : estimateInputTokensFromRequest(requestPayload))
       : null;
+    options.client.debugLog("Protect token estimation completed", {
+      provider: "google",
+      model: requestedModel,
+      latency_ms: Date.now() - tokenEstimateStartedAt,
+      estimated_input_tokens: estimatedInputTokens ?? undefined,
+    });
     const protectPayload: {
       provider: string;
       model: string | null;

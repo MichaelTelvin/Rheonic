@@ -32,11 +32,18 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
     const model = extractRequestedModel(args);
     validateProviderModel("openai", model);
     const requestPayload = extractRequestPayload(args);
+    const tokenEstimateStartedAt = Date.now();
     const estimatedInputTokens = requestPayload
       ? (estimatorOverrideForTests
           ? estimatorOverrideForTests(requestPayload)
           : estimateInputTokensFromRequest(requestPayload))
       : null;
+    options.client.debugLog("Protect token estimation completed", {
+      provider: "openai",
+      model,
+      latency_ms: Date.now() - tokenEstimateStartedAt,
+      estimated_input_tokens: estimatedInputTokens ?? undefined,
+    });
     const protectPayload: {
       provider: string;
       model: string | null;

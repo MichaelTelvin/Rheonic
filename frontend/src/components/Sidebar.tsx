@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { RheonicLogoMark } from "./RheonicLogoMark";
 
 interface SidebarProps {
@@ -21,11 +21,11 @@ export function Sidebar({ userEmail, onSignOut, onSendFeedback }: SidebarProps):
   return (
     <aside className="sidebar" aria-label="Primary navigation">
       <div className="sidebar-top">
-        <p className="sidebar-brand">
+        <Link className="sidebar-brand" to="/" aria-label="Go to Rheonic site">
           <RheonicLogoMark className="brand-logo-icon" />
           <span className="dashboard-brand-word">Rheonic</span>
           <span className="dashboard-beta-badge">BETA</span>
-        </p>
+        </Link>
         <div className="sidebar-brand-divider" aria-hidden="true" />
         <nav className="sidebar-nav">
           {navItems.map((item) => (
@@ -41,6 +41,9 @@ export function Sidebar({ userEmail, onSignOut, onSendFeedback }: SidebarProps):
         </nav>
       </div>
       <div className="sidebar-bottom">
+        <Link className="sidebar-site-link" to="/">
+          Visit site
+        </Link>
         <button type="button" className="sidebar-feedback-button" onClick={onSendFeedback}>
           <span>Send feedback</span>
           <span className="sidebar-feedback-arrow" aria-hidden="true">

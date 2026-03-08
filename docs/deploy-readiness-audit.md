@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 - Scope audited: backend, frontend, workers/scheduler, transport hub, migrations, compose/Docker, tests, docs.
-- Result: staging-ready after fixes in this pass; production-ready with two manual prerequisites (TLS reverse proxy and secret generation/rotation).
+- Result: staging-ready for internal validation after fixes in this pass; not fully production-ready until TLS, secret rotation, email delivery, and compliance decisions are completed.
 
 ## 2. What Was Found
 - Production safety gaps:
@@ -63,6 +63,7 @@
   - updated [`/.env.example`](/Users/mike/Projects/Rheonic/.env.example) for staging/prod-safe defaults
   - added [`/.env.local.example`](/Users/mike/Projects/Rheonic/.env.local.example)
   - updated [`.gitignore`](/Users/mike/Projects/Rheonic/.gitignore) to allow `.env.local.example`
+  - confirmed current staging/prod secret handling is environment-based only; no native Vault/secret-manager integration exists in-repo today
 - Tests added:
   - [`backend/app/tests/test_settings_validation.py`](/Users/mike/Projects/Rheonic/backend/app/tests/test_settings_validation.py)
   - [`backend/app/tests/test_health_readiness.py`](/Users/mike/Projects/Rheonic/backend/app/tests/test_health_readiness.py)
@@ -74,9 +75,13 @@
 - Reverse proxy + TLS termination strategy (Nginx/Caddy on VPS host) and certificate automation.
 - Final production domain and DNS cutover.
 - Email provider implementation behind current stub transport (currently deterministic fail-state by design when provider disabled/unimplemented).
+- Privacy/compliance review:
+  - confirm data retention policy for events and incidents,
+  - confirm customer-facing privacy language and subprocessors,
+  - decide whether GDPR-facing materials (privacy policy, DPA, deletion/export workflow) are required for target customers before production launch.
 
 ## 5. Staging Readiness Status
-- Status: **READY**
+- Status: **READY FOR INTERNAL STAGING**
 - Required before deploy:
   - create `.env` from `.env.example`
   - set real staging secrets and domains
@@ -87,6 +92,8 @@
 - Conditions:
   - reverse proxy + TLS in place
   - production secrets provisioned/rotated
+  - compliance/privacy review completed
+  - real email provider implemented if email alerts are expected to work
   - deployment and smoke checklist in `docs/deploy-production.md` completed
 
 ## 7. Risk Register

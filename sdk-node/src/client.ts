@@ -68,6 +68,7 @@ export class Client {
       fallbackRequestTimeoutMs: this.requestTimeoutMs,
       initialFailMode,
       initialDecisionTimeoutMs: initialProtectTimeoutMs,
+      debugLog: this.debugLog.bind(this),
     });
 
     this.timer = setInterval(() => {
@@ -249,11 +250,15 @@ export class Client {
     }
   }
 
-  private debugLog(message: string): void {
+  public debugLog(message: string, meta?: Record<string, unknown>): void {
     if (!this.debug) {
       return;
     }
-    console.debug(`[rheonic] ${message}`);
+    if (!meta || Object.keys(meta).length === 0) {
+      console.debug(`[rheonic] ${message}`);
+      return;
+    }
+    console.debug(`[rheonic] ${message} ${JSON.stringify(meta)}`);
   }
 }
 

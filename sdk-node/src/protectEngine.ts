@@ -48,6 +48,7 @@ export class ProtectEngine {
   private readonly ingestKey: string;
   private readonly environment: string;
   private readonly fallbackRequestTimeoutMs: number;
+  private readonly debugLog?: (message: string, meta?: Record<string, unknown>) => void;
   private failMode: ProtectFailMode;
   private decisionTimeoutMs: number;
   private cooldownUntilMs: number | null;
@@ -60,11 +61,13 @@ export class ProtectEngine {
     fallbackRequestTimeoutMs: number;
     initialFailMode: ProtectFailMode;
     initialDecisionTimeoutMs: number;
+    debugLog?: (message: string, meta?: Record<string, unknown>) => void;
   }) {
     this.baseUrl = params.baseUrl;
     this.ingestKey = params.ingestKey;
     this.environment = params.environment;
     this.fallbackRequestTimeoutMs = params.fallbackRequestTimeoutMs;
+    this.debugLog = params.debugLog;
     this.failMode = params.initialFailMode;
     this.decisionTimeoutMs = params.initialDecisionTimeoutMs;
     this.cooldownUntilMs = null;
@@ -74,11 +77,20 @@ export class ProtectEngine {
   public async evaluate(context: ProtectContext): Promise<ProtectEvaluation> {
     const nowMs = Date.now();
     if (this.cooldownUntilMs !== null && nowMs < this.cooldownUntilMs) {
+      this.debugLog?.("Protect preflight blocked locally from cached cooldown", {
+        provider: context.provider,
+        decision: "block",
+        reason: this.cooldownReason ?? "cooldown_active",
+      });
       return { decision: "block", reason: this.cooldownReason ?? "cooldown_active" };
     }
 
     const fetchFn = await resolveFetch();
     if (!fetchFn) {
+      this.debugLog?.("Protect preflight skipped because fetch is unavailable", {
+        provider: context.provider,
+        decision: this.failMode === "closed" ? "block" : "allow",
+      });
       return this.failMode === "closed"
         ? { decision: "block", reason: "decision_unavailable" }
         : { decision: "allow", reason: "decision_unavailable" };
@@ -88,6 +100,7 @@ export class ProtectEngine {
     const timeoutMs = this.decisionTimeoutMs > 0 ? this.decisionTimeoutMs : this.fallbackRequestTimeoutMs;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     timeout.unref?.();
+    const startedAt = Date.now();
 
     try {
       const response = await fetchFn(`${this.baseUrl}/api/v1/protect/decision`, {
@@ -102,6 +115,11 @@ export class ProtectEngine {
 
       clearTimeout(timeout);
       if (!response.ok) {
+        this.debugLog?.("Protect preflight returned non-success status", {
+          provider: context.provider,
+          status_code: response.status,
+          latency_ms: Date.now() - startedAt,
+        });
         return this.failMode === "closed"
           ? { decision: "block", reason: "decision_unavailable" }
           : { decision: "allow", reason: "decision_unavailable" };
@@ -127,6 +145,13 @@ export class ProtectEngine {
         this.cooldownUntilMs = null;
         this.cooldownReason = null;
       }
+      this.debugLog?.("Protect preflight completed", {
+        provider: context.provider,
+        decision,
+        reason,
+        latency_ms: Date.now() - startedAt,
+        timeout_ms: this.decisionTimeoutMs,
+      });
       return {
         decision,
         reason,
@@ -137,7 +162,18 @@ export class ProtectEngine {
     } catch (error) {
       clearTimeout(timeout);
       if (isAbortError(error)) {
+        this.debugLog?.("Protect preflight timed out", {
+          provider: context.provider,
+          latency_ms: Date.now() - startedAt,
+          timeout_ms: timeoutMs,
+        });
         void this.reportDecisionTimeout(fetchFn, context.provider);
+      } else {
+        this.debugLog?.("Protect preflight failed", {
+          provider: context.provider,
+          latency_ms: Date.now() - startedAt,
+          error_type: extractErrorType(error),
+        });
       }
       return this.failMode === "closed"
         ? { decision: "block", reason: "decision_unavailable" }
@@ -209,6 +245,16 @@ function parseFailMode(value: unknown): ProtectFailMode | null {
 
 function isAbortError(value: unknown): boolean {
   return typeof value === "object" && value !== null && "name" in value && (value as { name?: unknown }).name === "AbortError";
+}
+
+function extractErrorType(value: unknown): string {
+  if (value && typeof value === "object" && "name" in value) {
+    const maybeName = (value as { name?: unknown }).name;
+    if (typeof maybeName === "string" && maybeName.length > 0) {
+      return maybeName;
+    }
+  }
+  return "unknown";
 }
 
 async function resolveFetch(): Promise<typeof fetch | null> {

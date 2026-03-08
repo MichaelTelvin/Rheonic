@@ -1,6 +1,7 @@
 # FastAPI application entrypoint.
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,6 +68,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     @app.middleware("http")
+    async def request_context_middleware(request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid4())
+        request.state.request_id = request_id
+        logger.info(
+            "HTTP request started",
+            extra={"request_id": request_id, "method": request.method, "path": request.url.path},
+        )
+        response = await call_next(request)
+        response.headers.setdefault("X-Request-ID", request_id)
+        logger.info(
+            "HTTP request completed",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+            },
+        )
+        return response
+
+    @app.middleware("http")
     async def security_headers_middleware(request: Request, call_next):
         # Apply baseline browser hardening headers for API and frontend clients.
         response: Response = await call_next(request)
@@ -81,8 +103,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     @app.exception_handler(HTTPException)
-    async def http_exception_handler(_: Request, exc: HTTPException):
+    async def http_exception_handler(request: Request, exc: HTTPException):
         # Return standardized error payloads for known API failures.
+        logger.warning(
+            "HTTP exception raised",
+            extra={
+                "request_id": getattr(request.state, "request_id", None),
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": exc.status_code,
+            },
+        )
         if isinstance(exc.detail, dict) and "error" in exc.detail:
             payload = exc.detail["error"]
             code = str(payload.get("code") or default_code_for_status(exc.status_code))
@@ -92,9 +123,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return build_error_response(exc.status_code, default_code_for_status(exc.status_code), message)
 
     @app.exception_handler(Exception)
-    async def unhandled_exception_handler(_: Request, exc: Exception):
+    async def unhandled_exception_handler(request: Request, exc: Exception):
         # Hide unexpected exception internals from clients.
-        logger.exception("Unhandled application exception")
+        logger.exception(
+            "Unhandled application exception",
+            extra={
+                "request_id": getattr(request.state, "request_id", None),
+                "method": request.method,
+                "path": request.url.path,
+            },
+        )
         _ = exc
         return build_error_response(500, "internal_error", "Internal server error")
 

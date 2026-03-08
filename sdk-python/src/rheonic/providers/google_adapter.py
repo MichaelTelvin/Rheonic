@@ -44,7 +44,15 @@ def instrument_google(
             requested_model = _extract_requested_model(google_model, args, kwargs)
             validate_provider_model("google", requested_model)
             request_payload = _extract_request_payload(requested_model, args, kwargs)
+            token_estimate_started_at = perf_counter()
             estimated_input_tokens = _estimate_input_tokens(request_payload)
+            resolved_client.debug_log(
+                "Protect token estimation completed",
+                provider="google",
+                model=requested_model,
+                latency_ms=int((perf_counter() - token_estimate_started_at) * 1000),
+                estimated_input_tokens=estimated_input_tokens,
+            )
             protect_decision = _preflight(
                 sdk_client=resolved_client,
                 requested_model=requested_model,
@@ -94,7 +102,15 @@ def instrument_google(
         requested_model = _extract_requested_model(google_model, args, kwargs)
         validate_provider_model("google", requested_model)
         request_payload = _extract_request_payload(requested_model, args, kwargs)
+        token_estimate_started_at = perf_counter()
         estimated_input_tokens = _estimate_input_tokens(request_payload)
+        resolved_client.debug_log(
+            "Protect token estimation completed",
+            provider="google",
+            model=requested_model,
+            latency_ms=int((perf_counter() - token_estimate_started_at) * 1000),
+            estimated_input_tokens=estimated_input_tokens,
+        )
         protect_decision = _preflight(
             sdk_client=resolved_client,
             requested_model=requested_model,

@@ -45,7 +45,15 @@ def instrument_anthropic(
             request_payload = _extract_request_payload(args, kwargs)
             requested_model = _extract_requested_model(args, kwargs)
             validate_provider_model("anthropic", requested_model)
+            token_estimate_started_at = perf_counter()
             estimated_input_tokens = _estimate_input_tokens(request_payload)
+            resolved_client.debug_log(
+                "Protect token estimation completed",
+                provider="anthropic",
+                model=requested_model,
+                latency_ms=int((perf_counter() - token_estimate_started_at) * 1000),
+                estimated_input_tokens=estimated_input_tokens,
+            )
             protect_decision = _preflight(
                 sdk_client=resolved_client,
                 requested_model=requested_model,
@@ -95,7 +103,15 @@ def instrument_anthropic(
         request_payload = _extract_request_payload(args, kwargs)
         requested_model = _extract_requested_model(args, kwargs)
         validate_provider_model("anthropic", requested_model)
+        token_estimate_started_at = perf_counter()
         estimated_input_tokens = _estimate_input_tokens(request_payload)
+        resolved_client.debug_log(
+            "Protect token estimation completed",
+            provider="anthropic",
+            model=requested_model,
+            latency_ms=int((perf_counter() - token_estimate_started_at) * 1000),
+            estimated_input_tokens=estimated_input_tokens,
+        )
         protect_decision = _preflight(
             sdk_client=resolved_client,
             requested_model=requested_model,

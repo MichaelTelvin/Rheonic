@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TestRouter } from "../test/testRouter";
 
 const mocks = vi.hoisted(() => ({
   fetchIncidents: vi.fn(),
@@ -50,9 +50,9 @@ describe("Incidents page", () => {
 
   it("loads provider options and applies provider/type/status filters", async () => {
     render(
-      <MemoryRouter initialEntries={["/incidents?provider=openai"]}>
+      <TestRouter initialEntries={["/incidents?provider=openai"]}>
         <Incidents />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai", "open"));

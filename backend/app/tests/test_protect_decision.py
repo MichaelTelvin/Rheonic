@@ -102,11 +102,13 @@ class FakeRedisClient:
 class FakeEventRepository:
     def __init__(self) -> None:
         self.events: list[Event] = []
+        self.list_recent_calls = 0
 
     def add_recent(self, event: Event) -> None:
         self.events.append(event)
 
     def list_recent(self, project_id: str, limit: int = 100, provider: str | None = None) -> list[Event]:
+        self.list_recent_calls += 1
         rows = [event for event in self.events if event.project_id == project_id]
         if provider:
             rows = [event for event in rows if event.provider == provider]
@@ -147,6 +149,7 @@ def _make_client(
     *,
     cooldown_seconds: int = 60,
     webhook_dispatcher: FakeWebhookDispatcher | None = None,
+    event_repository: FakeEventRepository | None = None,
 ) -> tuple[TestClient, RollingWindow, FakeEventRepository]:
     db_url = f"sqlite:///{tmp_path}/protect_decision.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
@@ -160,7 +163,7 @@ def _make_client(
         ingest_key_repository=IngestKeyRepositoryImpl(session_factory=session_factory),
         project_repository=project_repository,
     )
-    event_repository = FakeEventRepository()
+    event_repository = event_repository or FakeEventRepository()
     protect_action_store = ProtectActionStore(redis_client=redis_client)  # type: ignore[arg-type]
     protect_service = ProtectService(
         ingest_key_service=ingest_key_service,
@@ -320,6 +323,29 @@ def test_near_cap_warns_when_predictive_reaches_warn_ratio(tmp_path) -> None:
     assert isinstance(decision["clamp"], dict)
     assert int(decision["clamp"]["recommended_max_output_tokens"]) > 0
     assert decision["clamp"]["applied"] is False
+    _cleanup_overrides()
+
+
+def test_near_cap_warn_short_circuits_recent_event_lookup(tmp_path) -> None:
+    event_repository = FakeEventRepository()
+    client, rolling_window, _ = _make_client(tmp_path, event_repository=event_repository)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Fast Path")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=150)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "input_tokens_estimate": 15,
+            "max_output_tokens": 64,
+        },
+    )
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "near_cap"
+    assert event_repository.list_recent_calls == 0
     _cleanup_overrides()
 
 

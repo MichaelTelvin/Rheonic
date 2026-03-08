@@ -36,11 +36,18 @@ export function instrumentAnthropic<T extends Record<string, any>>(
     validateProviderModel("anthropic", requestedModel);
     let estimatedInputTokens: number | null = null;
 
+    const tokenEstimateStartedAt = Date.now();
     estimatedInputTokens = requestPayload
       ? (estimatorOverrideForTests
           ? estimatorOverrideForTests(requestPayload)
           : estimateInputTokensFromRequest(requestPayload))
       : null;
+    options.client.debugLog("Protect token estimation completed", {
+      provider: "anthropic",
+      model: requestedModel,
+      latency_ms: Date.now() - tokenEstimateStartedAt,
+      estimated_input_tokens: estimatedInputTokens ?? undefined,
+    });
     const protectPayload: {
       provider: string;
       model: string | null;

@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from math import ceil
+from time import perf_counter
 from typing import Callable
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
@@ -17,6 +18,9 @@ from app.domain.detectors.registry import DetectorRegistry
 from app.domain.detectors.retry_storm_detector import RetryStormDetector
 from app.domain.detectors.token_explosion_detector import TokenExplosionDetector
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
+from app.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -64,14 +68,14 @@ class ProtectService:
         self._protect_block_cooldown_seconds = protect_block_cooldown_seconds
         self._webhook_dispatcher = webhook_dispatcher
         self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
-        self._warn_detector_registry = DetectorRegistry(
+        self._fast_warn_detector_registry = DetectorRegistry(detectors=[NearCapDetector()])
+        self._behavioral_warn_detector_registry = DetectorRegistry(
             detectors=[
-                NearCapDetector(),
                 RetryStormDetector(),
                 LoopSuspectDetector(),
-                TokenExplosionDetector(),
             ]
         )
+        self._deferred_warn_detector_registry = DetectorRegistry(detectors=[TokenExplosionDetector()])
 
     def evaluate_decision(
         self,
@@ -182,12 +186,94 @@ class ProtectService:
             input_estimate = max(ctx.input_tokens_estimate, 0)
             output_estimate = max(ctx.max_output_tokens, 0) if isinstance(ctx.max_output_tokens, int) else 0
             estimated_next_tokens = input_estimate + output_estimate
-        recent_limit = max(int(app_config.retry_storm_count), int(app_config.loop_count)) + 8
-        recent_events = (
-            self._event_repository.list_recent(project_id=project_id, limit=recent_limit, provider=provider)
-            if self._event_repository is not None
-            else []
+        detector_ctx = DetectionContext(
+            project_id=project_id,
+            provider=provider,
+            model=ctx.model,
+            environment=ctx.environment,
+            request_endpoint="/chat/completions",
+            request_feature=ctx.feature,
+            now=now,
+            current_requests_60s=requests_60s,
+            current_tokens_60s=tokens_60s,
+            req_cap=max_req,
+            tok_cap=max_tok,
+            protect_enabled=True,
+            estimated_next_tokens=estimated_next_tokens,
+            current_event=None,
+            recent_events=[],
+            warn_ratio=app_config.protect_near_cap_factor,
+            retry_storm_window_seconds=app_config.retry_storm_window_seconds,
+            retry_storm_count=app_config.retry_storm_count,
+            loop_window_seconds=app_config.loop_window_seconds,
+            loop_count=app_config.loop_count,
+            token_explosion_ratio=app_config.token_explosion_ratio,
+            token_explosion_abs=app_config.token_explosion_abs,
         )
+        warn_signals = self._fast_warn_detector_registry.detect(detector_ctx)
+        if warn_signals:
+            warn_signal = warn_signals[0]
+            reason = str(warn_signal.detector)
+            clamp = self._build_clamp(
+                reason=reason,
+                max_tok=max_tok,
+                current_tokens_60s=tokens_60s,
+                max_output_tokens=ctx.max_output_tokens,
+                estimated_next_tokens=estimated_next_tokens,
+            )
+            self._enqueue_warn_webhook(
+                project_id=project_id,
+                provider=provider,
+                reason=reason,
+                requests_60s=requests_60s,
+                tokens_60s=tokens_60s,
+                max_req=max_req,
+                max_tok=max_tok,
+                estimated_next_tokens=estimated_next_tokens,
+                apply_clamp_enabled=apply_clamp_enabled,
+                clamp=clamp,
+            )
+            return project_id, ProtectDecision(
+                decision="warn",
+                reason=reason,
+                fail_mode=fail_mode,
+                decision_timeout_ms=decision_timeout_ms,
+                retry_after_seconds=None,
+                blocked_until=None,
+                snapshot={
+                    "requests_60s": requests_60s,
+                    "tokens_60s": tokens_60s,
+                    "threshold_req_60s": max_req,
+                    "threshold_tok_60s": max_tok,
+                    "decision_timeout_ms": decision_timeout_ms,
+                    "predictive": {
+                        "enabled": bool(estimated_next_tokens is not None),
+                        "estimated_next_tokens": estimated_next_tokens,
+                        "would_exceed_tokens_cap": bool(
+                            max_tok is not None
+                            and estimated_next_tokens is not None
+                            and (tokens_60s + estimated_next_tokens >= max_tok)
+                        ),
+                    },
+                },
+                apply_clamp_enabled=apply_clamp_enabled,
+                clamp=clamp,
+            )
+
+        recent_events = []
+        if self._event_repository is not None:
+            recent_limit = max(int(app_config.retry_storm_count), int(app_config.loop_count)) + 8
+            recent_fetch_started_at = perf_counter()
+            recent_events = self._event_repository.list_recent(project_id=project_id, limit=recent_limit, provider=provider)
+            logger.debug(
+                "Loaded recent events for protect evaluation",
+                extra={
+                    "project_id": project_id,
+                    "provider": provider,
+                    "recent_events_count": len(recent_events),
+                    "recent_events_fetch_ms": int((perf_counter() - recent_fetch_started_at) * 1000),
+                },
+            )
         detector_ctx = DetectionContext(
             project_id=project_id,
             provider=provider,
@@ -212,7 +298,7 @@ class ProtectService:
             token_explosion_ratio=app_config.token_explosion_ratio,
             token_explosion_abs=app_config.token_explosion_abs,
         )
-        warn_signals = self._warn_detector_registry.detect(detector_ctx)
+        warn_signals = self._behavioral_warn_detector_registry.detect(detector_ctx)
         if warn_signals:
             warn_signal = warn_signals[0]
             reason = str(warn_signal.detector)
@@ -232,6 +318,82 @@ class ProtectService:
                 max_req=max_req,
                 max_tok=max_tok,
                 estimated_next_tokens=estimated_next_tokens,
+                apply_clamp_enabled=apply_clamp_enabled,
+                clamp=clamp,
+            )
+            return project_id, ProtectDecision(
+                decision="warn",
+                reason=reason,
+                fail_mode=fail_mode,
+                decision_timeout_ms=decision_timeout_ms,
+                retry_after_seconds=None,
+                blocked_until=None,
+                snapshot={
+                    "requests_60s": requests_60s,
+                    "tokens_60s": tokens_60s,
+                    "threshold_req_60s": max_req,
+                    "threshold_tok_60s": max_tok,
+                    "decision_timeout_ms": decision_timeout_ms,
+                    "predictive": {
+                        "enabled": bool(estimated_next_tokens is not None),
+                        "estimated_next_tokens": estimated_next_tokens,
+                        "would_exceed_tokens_cap": bool(
+                            max_tok is not None
+                            and estimated_next_tokens is not None
+                            and (tokens_60s + estimated_next_tokens >= max_tok)
+                        ),
+                    },
+                },
+                apply_clamp_enabled=apply_clamp_enabled,
+                clamp=clamp,
+            )
+
+        warn_signals = self._deferred_warn_detector_registry.detect(detector_ctx)
+        if warn_signals:
+            warn_signal = warn_signals[0]
+            reason = str(warn_signal.detector)
+            clamp = self._build_clamp(
+                reason=reason,
+                max_tok=max_tok,
+                current_tokens_60s=tokens_60s,
+                max_output_tokens=ctx.max_output_tokens,
+                estimated_next_tokens=estimated_next_tokens,
+            )
+            self._enqueue_warn_webhook(
+                project_id=project_id,
+                provider=provider,
+                reason=reason,
+                requests_60s=requests_60s,
+                tokens_60s=tokens_60s,
+                max_req=max_req,
+                max_tok=max_tok,
+                estimated_next_tokens=estimated_next_tokens,
+                apply_clamp_enabled=apply_clamp_enabled,
+                clamp=clamp,
+            )
+            return project_id, ProtectDecision(
+                decision="warn",
+                reason=reason,
+                fail_mode=fail_mode,
+                decision_timeout_ms=decision_timeout_ms,
+                retry_after_seconds=None,
+                blocked_until=None,
+                snapshot={
+                    "requests_60s": requests_60s,
+                    "tokens_60s": tokens_60s,
+                    "threshold_req_60s": max_req,
+                    "threshold_tok_60s": max_tok,
+                    "decision_timeout_ms": decision_timeout_ms,
+                    "predictive": {
+                        "enabled": bool(estimated_next_tokens is not None),
+                        "estimated_next_tokens": estimated_next_tokens,
+                        "would_exceed_tokens_cap": bool(
+                            max_tok is not None
+                            and estimated_next_tokens is not None
+                            and (tokens_60s + estimated_next_tokens >= max_tok)
+                        ),
+                    },
+                },
                 apply_clamp_enabled=apply_clamp_enabled,
                 clamp=clamp,
             )
@@ -378,7 +540,10 @@ class ProtectService:
             )
         except Exception:
             # Decision path must never fail because webhook dispatch fails.
-            pass
+            logger.exception(
+                "Failed to enqueue protect block webhook",
+                extra={"project_id": project_id, "provider": provider, "reason": reason},
+            )
 
     def _enqueue_warn_webhook(
         self,
@@ -419,7 +584,10 @@ class ProtectService:
             )
         except Exception:
             # Decision path must never fail because webhook dispatch fails.
-            pass
+            logger.exception(
+                "Failed to enqueue protect warn webhook",
+                extra={"project_id": project_id, "provider": provider, "reason": reason},
+            )
 
     def _build_clamp(
         self,

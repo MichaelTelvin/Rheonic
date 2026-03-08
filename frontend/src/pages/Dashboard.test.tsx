@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { TestRouter } from "../test/testRouter";
 
 const mocks = vi.hoisted(() => {
   class HoistedApiError extends Error {
@@ -75,9 +75,9 @@ describe("Dashboard", () => {
   it("shows setup banner when no project is selected", async () => {
     mocks.useProjectContext.mockReturnValue({ loadingProjects: false, projectId: null, projects: [] });
     render(
-      <MemoryRouter>
+      <TestRouter>
         <Dashboard />
-      </MemoryRouter>,
+      </TestRouter>,
     );
     expect(await screen.findByText("Setup required")).toBeDefined();
     expect(screen.getByText("Create your first project to generate an ingest key and start receiving telemetry.")).toBeDefined();
@@ -85,9 +85,9 @@ describe("Dashboard", () => {
 
   it("loads metrics and incidents for selected project", async () => {
     render(
-      <MemoryRouter>
+      <TestRouter>
         <Dashboard />
-      </MemoryRouter>,
+      </TestRouter>,
     );
     await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1", undefined));
     expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", undefined);
@@ -97,9 +97,9 @@ describe("Dashboard", () => {
 
   it("loads provider list and applies provider filter to metrics and incidents calls", async () => {
     render(
-      <MemoryRouter>
+      <TestRouter>
         <Dashboard />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     await waitFor(() => expect(mocks.fetchProjectProviders).toHaveBeenCalledWith("p1"));
@@ -122,9 +122,9 @@ describe("Dashboard", () => {
     };
     mocks.useProjectContext.mockImplementation(() => context);
     const { rerender } = render(
-      <MemoryRouter>
+      <TestRouter>
         <Dashboard />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     const providerSelect = await screen.findByLabelText("Provider");
@@ -138,9 +138,9 @@ describe("Dashboard", () => {
     ];
     mocks.fetchProjectProviders.mockResolvedValueOnce(["anthropic"]);
     rerender(
-      <MemoryRouter>
+      <TestRouter>
         <Dashboard />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p2", undefined));
@@ -150,9 +150,9 @@ describe("Dashboard", () => {
   it("shows forbidden warning when metrics request fails with 403", async () => {
     mocks.fetchMetrics.mockRejectedValue(new mocks.ApiError(403, "forbidden"));
     render(
-      <MemoryRouter>
+      <TestRouter>
         <Dashboard />
-      </MemoryRouter>,
+      </TestRouter>,
     );
     const metricWarnings = await screen.findAllByText("Metrics request was forbidden.");
     expect(metricWarnings).toHaveLength(2);
@@ -160,9 +160,9 @@ describe("Dashboard", () => {
 
   it("renders protect decision counters", async () => {
     render(
-      <MemoryRouter>
+      <TestRouter>
         <Dashboard />
-      </MemoryRouter>,
+      </TestRouter>,
     );
 
     const allowedLabel = await screen.findByText("Allowed");
@@ -194,9 +194,9 @@ describe("Dashboard", () => {
       },
     ]);
     render(
-      <MemoryRouter>
+      <TestRouter>
         <Dashboard />
-      </MemoryRouter>,
+      </TestRouter>,
     );
     await screen.findByText("Incidents");
     expect(screen.getByText("Near cap")).toBeDefined();
@@ -206,9 +206,9 @@ describe("Dashboard", () => {
 
   it("does not render dashboard config modal buttons", async () => {
     render(
-      <MemoryRouter>
+      <TestRouter>
         <Dashboard />
-      </MemoryRouter>,
+      </TestRouter>,
     );
     await screen.findByText("Requests (60s)");
 

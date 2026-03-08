@@ -131,6 +131,7 @@ class Client:
                 fail_mode=self.protect_fail_mode,
                 decision_timeout_ms=self.protect_decision_timeout_ms,
                 http_client=self._http_client,
+                debug_logger=self.debug_log,
             )
 
             self._worker = threading.Thread(target=self._run_flush_loop, daemon=True)
@@ -200,6 +201,12 @@ class Client:
                 "sent": self._sent,
                 "failed": self._failed,
             }
+
+    def debug_log(self, message: str, **extra: object) -> None:
+        # Emit SDK debug logs only when debug mode is enabled.
+        if not self._debug_enabled:
+            return
+        logger.debug(message, extra=extra or None)
 
     def preflight_protect_decision(self, context: dict[str, object]) -> dict[str, object]:
         # Evaluate protect decision for provider call preflight.
