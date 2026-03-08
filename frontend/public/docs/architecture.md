@@ -1,58 +1,45 @@
 # Rheonic Architecture
 
-## Runtime model
-- Scope: `(project_id, provider)` for counters, incidents, and protect decisions.
-- Event ingest: `POST /api/v1/events`.
-- Protect preflight: `POST /api/v1/protect/decision` (protect mode only).
+This page gives a product-level view of how Rheonic fits into your application. Use the flow charts for the full request path, then use the API reference when you need exact endpoints.
 
-## Ingest pipeline
-1. Persist event.
-2. Update rolling 60s counters (`requests_60s`, `tokens_60s`) for `(project, provider)`.
-3. Run deterministic detectors:
-- `near_cap`
-- `retry_storm`
-- `loop_suspect`
-- `token_explosion`
-- `cap_breach` logging from counters/caps
-4. Pass signals to `IncidentManager`:
-- create/open incident when no recent matching open fingerprint
-- otherwise update existing incident (count, last_seen, evidence)
-5. Enqueue transport events in shared outbox (`transport_outbox`):
-- protect mode decision warns -> `decision.warn`
-- protect mode ingest non-breach incident opens -> `incident.warn`
-- protect mode decision blocks -> `incident.block`
-- protect mode resolution events -> `incident.resolved`
-- protect mode policy-gap first-seen tuple -> `policy_gap.detected`
-6. RQ transport worker delivers pending outbox rows (`kind=webhook|email`) with retry/backoff and terminal status (`delivered|failed|dead`).
-7. Auto-close resolves stale open incidents by inactivity cooldown.
+## System Flow
+1. Your app sends an instrumented provider call or a manual telemetry event.
+2. The SDK can request a protect decision before the provider call.
+3. The provider call runs if the decision is `allow` or `warn`.
+4. Rheonic ingests the event and updates project metrics.
+5. Incident detectors evaluate the event and open or update incidents when needed.
+6. Dashboard views, alerts, and delivery metrics are updated from the resulting state.
 
-## Protect decision pipeline
-1. SDK always calls preflight before provider call.
-2. Observe mode returns allow-only behavior (telemetry only).
-3. Protect mode preflight reads `(project, provider)` counters and caps.
-4. Decision order:
-- cooldown active -> `block`
-- token/request cap breach -> `block`
-- warn-only signals -> `warn`
-- else -> `allow`
-4. Warn-only signals:
-- `near_cap` (predictive)
-- `retry_storm`
-- `loop_suspect`
-- `token_explosion`
+## Main Runtime Components
+- **SDKs**: capture telemetry and request protect decisions.
+- **Protect service**: evaluates request and token limits before provider execution.
+- **Ingest pipeline**: accepts events, normalizes token usage, and updates rolling counters.
+- **Incident engine**: turns detector output into incidents that can be reviewed and resolved.
+- **Transport worker**: delivers webhook and email notifications asynchronously.
+- **Dashboard**: shows metrics, incidents, protect outcomes, and delivery status for the selected project.
 
-## Dashboard metrics behavior
-- Endpoints return project totals by default.
-- Optional provider filter narrows to a single provider.
-- Delivery failures come from `transport_outbox` terminal rows via `GET /api/v1/metrics/delivery-failures`.
+## Scope Model
+- Projects are the top-level customer boundary in the product.
+- Within a project, counters, incidents, and protect decisions are separated by provider.
+- Dashboard metrics aggregate across providers by default and can be filtered down to one provider.
 
-## Transport hub behavior
-- Shared enqueue API: `TransportService.enqueue(...)` with mandatory `dedupe_key`.
-- Webhook and feedback email use the same outbox + RQ worker path.
-- Webhook signing, URL safety checks, and HTTP timeout policy are applied in worker delivery.
-- Feedback email endpoint is async (`POST /api/v1/feedback` returns `202`) and enqueues `event_type=feedback.submitted`.
+## Data Flow
+### Protect path
+- SDK calls `POST /api/v1/protect/decision`.
+- Rheonic evaluates current provider-scoped counters and protect settings.
+- The response tells the SDK to `allow`, `warn`, or `block`.
 
-## Frontend model
-- Dashboard: compact monitoring cards + provider filter.
-- Incidents page: provider/type/status filters and incident list.
-- Docs page/viewer: architecture diagrams + markdown docs.
+### Telemetry path
+- SDK or custom integration calls `POST /api/v1/events`.
+- Rheonic records the event and updates rolling request and token counters.
+- Incident detection runs against the event and current state.
+
+### Notification path
+- Protect or incident events are queued for delivery.
+- Webhook and email delivery happen asynchronously.
+- Delivery failures are exposed in dashboard metrics.
+
+## Flow Charts
+Use the chart viewer for visual references:
+- `Incident Flow` shows how ingest leads to counters, detectors, incidents, and notifications.
+- `Protect Flow` shows how preflight decisions are evaluated before provider execution.

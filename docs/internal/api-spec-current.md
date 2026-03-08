@@ -45,7 +45,7 @@ Incident types:
 - `loop_suspect`
 - `token_explosion`
 
-No severity levels are used in runtime logic.
+Severity levels are not part of runtime logic.
 
 ## Protect settings
 - `GET /api/v1/projects/{project_id}/protect`

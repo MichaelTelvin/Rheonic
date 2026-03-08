@@ -65,9 +65,9 @@ sdk-python: test-sdk-python
 e2e: test-e2e
 
 diagrams:
-	@docker run --rm -v "$$(pwd):/work" -w /work terrastruct/d2 frontend/public/docs/architecture/incident_flow.d2 frontend/public/docs/architecture/incident_flow.svg
-	@docker run --rm -v "$$(pwd):/work" -w /work terrastruct/d2 frontend/public/docs/architecture/protect_decision_flow.d2 frontend/public/docs/architecture/protect_decision_flow.svg
-	@python3 frontend/public/docs/architecture/normalize_diagram_svgs.py
+	@docker run --rm -v "$$(pwd):/work" -w /work terrastruct/d2 docs/architecture/incident_flow.d2 frontend/public/docs/architecture/incident_flow.svg
+	@docker run --rm -v "$$(pwd):/work" -w /work terrastruct/d2 docs/architecture/protect_decision_flow.d2 frontend/public/docs/architecture/protect_decision_flow.svg
+	@python3 docs/architecture/normalize_diagram_svgs.py
 
 diagrams-check:
 	@test -s frontend/public/docs/architecture/incident_flow.svg

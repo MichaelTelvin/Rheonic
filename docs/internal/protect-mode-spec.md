@@ -40,7 +40,7 @@ Dashboard endpoints keep project totals and can optionally filter by provider.
    - `token_explosion`
 5. Otherwise -> `allow` (`ok`)
 
-No severity/escalation dependency exists in protect decisions.
+Protect decisions do not depend on severity or escalation.
 
 ## Near-Cap Rule
 Protect preflight warns when either condition is met:
