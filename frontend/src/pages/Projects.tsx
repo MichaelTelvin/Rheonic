@@ -17,7 +17,7 @@ export function Projects(): JSX.Element {
   const [creatingProject, setCreatingProject] = useState<boolean>(false);
   const [createProjectError, setCreateProjectError] = useState<string | null>(null);
   const shortId = (value: string): string => (value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value);
-  const backendBaseUrl = frontendConfig.rheonicBackendUrl.trim();
+  const backendBaseUrl = frontendConfig.apiBaseUrl.trim();
   const hasBackendBaseUrl = backendBaseUrl.length > 0;
 
   const onCopyBackendUrl = async (): Promise<void> => {
