@@ -188,6 +188,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   margin: 0;
   font-size: 0.86rem;
   letter-spacing: 0.06em;
@@ -2651,6 +2652,7 @@ pre {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   text-decoration: none;
 }
 
@@ -3757,6 +3759,11 @@ pre {
 
   .sidebar-brand {
     min-height: 42px;
+  }
+
+  .brand-logo-icon {
+    width: 25px;
+    height: 25px;
   }
 
   .sidebar-brand-divider,
@@ -6446,6 +6453,29 @@ html {
 }
 
 @media (max-width: 480px) {
+  .public-brand,
+  .sidebar-brand {
+    gap: 6px;
+    font-size: 0.8rem;
+  }
+
+  .brand-logo-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .public-brand-word,
+  .dashboard-brand-word {
+    letter-spacing: 0.05em;
+  }
+
+  .public-beta-badge,
+  .dashboard-beta-badge {
+    min-height: 16px;
+    padding: 0 6px;
+    font-size: 0.56rem;
+  }
+
   .landing-v2-hero-copy h1 {
     font-size: clamp(1.9rem, 11vw, 2.3rem);
   }
@@ -6487,6 +6517,17 @@ html {
 }
 
 @media (max-width: 360px) {
+  .public-brand,
+  .sidebar-brand {
+    gap: 5px;
+    font-size: 0.76rem;
+  }
+
+  .brand-logo-icon {
+    width: 20px;
+    height: 20px;
+  }
+
   .public-shell.public-shell-marketing,
   .public-shell.quickstart-v2-shell {
     padding: 10px 8px 24px;
