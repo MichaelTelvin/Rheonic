@@ -13,6 +13,14 @@ except Exception:  # pragma: no cover - import availability depends on environme
 _ENCODER_CACHE: dict[str, Any] = {}
 
 
+def prewarm_token_estimator(model: str | None = None) -> None:
+    # Best-effort encoder warmup to avoid first-request tokenizer cold start.
+    try:
+        _get_encoder(model)
+    except Exception:
+        return
+
+
 def estimate_input_tokens(payload: dict[str, Any]) -> int | None:
     # Return a best-effort local token count for supported request shapes.
     text = _extract_text(payload)

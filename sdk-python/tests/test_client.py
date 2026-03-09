@@ -13,6 +13,10 @@ class FakeHttpClient:
     def post(self, url: str, json: dict[str, Any], headers: dict[str, str]) -> None:
         self.calls.append({"url": url, "json": json, "headers": headers})
 
+    def get(self, url: str, headers: dict[str, str] | None = None) -> Any:
+        self.calls.append({"url": url, "headers": headers or {}, "method": "GET"})
+        return type("Response", (), {"status_code": 200})()
+
     def close(self) -> None:
         return
 
@@ -27,6 +31,9 @@ class FlakyHttpClient:
         self.calls += 1
         if self.calls == 1:
             return type("Response", (), {"status_code": 503})()
+        return type("Response", (), {"status_code": 200})()
+
+    def get(self, url: str, headers: dict[str, str] | None = None) -> Any:
         return type("Response", (), {"status_code": 200})()
 
     def close(self) -> None:
@@ -93,3 +100,21 @@ def test_retry_runs_exactly_once_for_transient_failure() -> None:
     assert flaky_http.calls == 2
     assert stats["sent"] == 1
     assert stats["failed"] == 0
+
+
+def test_warm_connections_hits_health_endpoint() -> None:
+    fake_http = FakeHttpClient()
+    client = Client(
+        ingest_key="p1",
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        max_queue_size=10,
+        http_client=fake_http,  # type: ignore[arg-type]
+    )
+
+    client.warm_connections()
+    client.close()
+
+    get_calls = [call for call in fake_http.calls if call.get("method") == "GET"]
+    assert len(get_calls) == 1
+    assert get_calls[0]["url"] == "http://localhost:8000/health"

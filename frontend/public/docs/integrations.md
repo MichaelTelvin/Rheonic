@@ -19,6 +19,11 @@ Optional:
 - environment label such as `production` or `staging`,
 - provider API keys used by your own provider client.
 
+## Runtime Recommendation
+- Create one long-lived SDK client at app startup and reuse it across requests.
+- Do not create a new Rheonic client per provider call.
+- The SDK prewarms tokenizer state and the backend connection on startup so the first protected call is not penalized repeatedly.
+
 ## Manual Capture
 Use manual capture when you want to send telemetry without wrapping a provider SDK.
 

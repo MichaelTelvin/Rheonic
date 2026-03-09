@@ -1,5 +1,6 @@
 import { sdkNodeConfig } from "./config.js";
 import { randomUUID } from "node:crypto";
+import { requestJson } from "./httpTransport.js";
 
 export type ProtectDecision = "allow" | "warn" | "block";
 export type ProtectFailMode = "open" | "closed";
@@ -89,17 +90,6 @@ export class ProtectEngine {
       return { decision: "block", reason: this.cooldownReason ?? "cooldown_active" };
     }
 
-    const fetchFn = await resolveFetch();
-    if (!fetchFn) {
-      this.debugLog?.("Protect preflight skipped because fetch is unavailable", {
-        provider: context.provider,
-        decision: this.failMode === "closed" ? "block" : "allow",
-      });
-      return this.failMode === "closed"
-        ? { decision: "block", reason: "decision_unavailable" }
-        : { decision: "allow", reason: "decision_unavailable" };
-    }
-
     const controller = new AbortController();
     const timeoutMs = this.decisionTimeoutMs > 0 ? this.decisionTimeoutMs : this.fallbackRequestTimeoutMs;
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -108,7 +98,7 @@ export class ProtectEngine {
     const requestId = randomUUID();
 
     try {
-      const response = await fetchFn(`${this.baseUrl}/api/v1/protect/decision`, {
+      const response = await requestJson(`${this.baseUrl}/api/v1/protect/decision`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -173,7 +163,7 @@ export class ProtectEngine {
           latency_ms: Date.now() - startedAt,
           timeout_ms: timeoutMs,
         });
-        void this.reportDecisionTimeout(fetchFn, context.provider, requestId);
+        void this.reportDecisionTimeout(context.provider, requestId);
       } else {
         this.debugLog?.("Protect preflight failed", {
           provider: context.provider,
@@ -187,9 +177,9 @@ export class ProtectEngine {
     }
   }
 
-  private async reportDecisionTimeout(fetchFn: typeof fetch, provider: string | undefined, requestId: string): Promise<void> {
+  private async reportDecisionTimeout(provider: string | undefined, requestId: string): Promise<void> {
     try {
-      await fetchFn(`${this.baseUrl}/api/v1/protect/decision-timeout`, {
+      await requestJson(`${this.baseUrl}/api/v1/protect/decision-timeout`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -262,19 +252,6 @@ function extractErrorType(value: unknown): string {
     }
   }
   return "unknown";
-}
-
-async function resolveFetch(): Promise<typeof fetch | null> {
-  if (typeof globalThis.fetch === "function") {
-    return globalThis.fetch.bind(globalThis);
-  }
-
-  try {
-    const undici = (await import("undici" as string)) as { fetch: typeof fetch };
-    return undici.fetch as typeof fetch;
-  } catch {
-    return null;
-  }
 }
 
 export const defaultProtectTimeoutMs = sdkNodeConfig.internalProtectDecisionTimeoutMs;

@@ -18,14 +18,18 @@ npm install
 
 Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
 
+## Integration Recommendation
+
+Create one long-lived SDK client at app startup and reuse it for all provider calls. The SDK prewarms tokenizer state and the backend connection on client initialization, so reusing a single client avoids paying protect cold-start cost on every request.
+
 ## Integration Path 1: Manual Capture (generic)
 
 ```ts
 import { buildEvent, captureEvent, createClient } from "./src/index";
 
-createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
+const client = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
 
-await captureEvent(
+await client.captureEvent(
   buildEvent({
     provider: "openai",
     model: "gpt-4o-mini",
@@ -34,6 +38,8 @@ await captureEvent(
   }),
 );
 ```
+
+Initialize `client` once during app startup, then reuse that same instance for manual capture and provider instrumentation.
 
 ## Integration Path 2: OpenAI instrumentation (convenience wrapper)
 

@@ -17,6 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover
 from rheonic.logger import configure_logging, get_logger
 from rheonic.config import sdk_config
 from rheonic.protect_engine import ProtectEngine
+from rheonic.token_estimator import prewarm_token_estimator
 
 logger = get_logger(__name__)
 
@@ -41,6 +42,10 @@ class HttpTransport(Protocol):
         # Send one JSON request.
         ...
 
+    def get(self, url: str, headers: dict[str, str] | None = None) -> HttpResponse:
+        # Send one GET request.
+        ...
+
     def close(self) -> None:
         # Close transport resources.
         ...
@@ -58,6 +63,18 @@ class _UrllibTransport:
             data=bytes(json_lib.dumps(json), encoding="utf-8"),
             headers=headers,
             method="POST",
+        )
+        try:
+            with request.urlopen(payload, timeout=self._timeout_s) as response:
+                return _SimpleResponse(status_code=response.getcode())
+        except error.HTTPError as exc:
+            return _SimpleResponse(status_code=exc.code)
+
+    def get(self, url: str, headers: dict[str, str] | None = None) -> "_SimpleResponse":
+        payload = request.Request(
+            url=url,
+            headers=headers or {},
+            method="GET",
         )
         try:
             with request.urlopen(payload, timeout=self._timeout_s) as response:
@@ -95,8 +112,8 @@ class Client:
         # Initialize client queue, worker thread, and HTTP transport.
         try:
             env_debug = os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"}
-            self._debug_enabled = debug or env_debug
-            configure_logging(level="DEBUG" if self._debug_enabled else None)
+        self._debug_enabled = debug or env_debug
+        configure_logging(level="DEBUG" if self._debug_enabled else None)
 
             self.ingest_key = ingest_key
             resolved_base_url = base_url or os.getenv("RHEONIC_BASE_URL", sdk_config.default_base_url)
@@ -115,6 +132,13 @@ class Client:
             self._sent = 0
             self._failed = 0
 
+            # Warm default/model-specific tokenizer state before the first protected call.
+            prewarm_token_estimator()
+            prewarm_model = os.getenv("RHEONIC_MODEL", "").strip() or None
+            if prewarm_model is not None:
+                prewarm_token_estimator(prewarm_model)
+
+            managed_http_client = http_client is None
             if http_client is not None:
                 self._http_client = http_client
             elif httpx is not None:
@@ -134,6 +158,8 @@ class Client:
             self._worker = threading.Thread(target=self._run_flush_loop, daemon=True)
             self._is_closed = False
             self._worker.start()
+            if managed_http_client:
+                self.warm_connections()
             atexit.register(self.close)
             logger.info("SDK client initialized")
         except Exception:
@@ -218,6 +244,16 @@ class Client:
             if self.protect_fail_mode == "closed":
                 return {"decision": "block", "reason": "decision_unavailable"}
             return {"decision": "allow", "reason": "decision_unavailable"}
+
+    def warm_connections(self) -> None:
+        # Best-effort warmup of the shared backend HTTP connection.
+        try:
+            response = self._http_client.get(f"{self.base_url}/health")
+            status_code = int(getattr(response, "status_code", 0))
+            self.debug_log("SDK connection warmup completed", status_code=status_code)
+        except Exception:
+            self.debug_log("SDK connection warmup failed")
+            return
 
     def instrument_openai(
         self,

@@ -1,6 +1,8 @@
 import type { EventPayload } from "./eventBuilder.js";
 import { sdkNodeConfig } from "./config.js";
 import { ProtectEngine, type ProtectContext, type ProtectEvaluation, type ProtectFailMode } from "./protectEngine.js";
+import { requestJson } from "./httpTransport.js";
+import { prewarmTokenEstimator } from "./tokenEstimator.js";
 import { instrumentOpenAI as instrumentOpenAIProvider, type OpenAIInstrumentationOptions } from "./providers/openaiAdapter.js";
 import { instrumentAnthropic as instrumentAnthropicProvider, type AnthropicInstrumentationOptions } from "./providers/anthropicAdapter.js";
 import { instrumentGoogle as instrumentGoogleProvider, type GoogleInstrumentationOptions } from "./providers/googleAdapter.js";
@@ -47,6 +49,7 @@ export class Client {
   private sent = 0;
   private failed = 0;
   private isClosed = false;
+  private warmupPromise: Promise<void> | null = null;
 
   public constructor(config: ClientConfig) {
     this.baseUrl = config.baseUrl ?? process.env.RHEONIC_BASE_URL ?? sdkNodeConfig.defaultBaseUrl;
@@ -59,6 +62,14 @@ export class Client {
     const initialFailMode = config.protectFailMode ?? sdkNodeConfig.defaultProtectFailMode;
     const envDebug = process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true";
     this.debug = config.debug ?? envDebug;
+
+    // Warm default/model-specific tokenizer state before the first protected call.
+    prewarmTokenEstimator(null);
+    const prewarmModel = process.env.RHEONIC_MODEL?.trim();
+    if (prewarmModel) {
+      prewarmTokenEstimator(prewarmModel);
+    }
+
     this.protectEngine = new ProtectEngine({
       baseUrl: this.baseUrl,
       ingestKey: this.ingestKey,
@@ -67,6 +78,7 @@ export class Client {
       initialFailMode,
       debugLog: this.debugLog.bind(this),
     });
+    this.warmupPromise = this.warmConnections();
 
     this.timer = setInterval(() => {
       void this.flush();
@@ -131,7 +143,22 @@ export class Client {
   }
 
   public async evaluateProtectDecision(context: ProtectContext): Promise<ProtectEvaluation> {
+    if (this.warmupPromise) {
+      await this.warmupPromise;
+      this.warmupPromise = null;
+    }
     return this.protectEngine.evaluate(context);
+  }
+
+  public async warmConnections(): Promise<void> {
+    try {
+      const response = await requestJson(`${this.baseUrl}/health`, {
+        method: "GET",
+      });
+      this.debugLog("SDK connection warmup completed", { status_code: response.status });
+    } catch {
+      this.debugLog("SDK connection warmup failed");
+    }
   }
 
   public instrumentOpenAI<T extends Record<string, any>>(
@@ -214,16 +241,10 @@ export class Client {
   }
 
   private async sendEventOnce(event: EventPayload): Promise<{ ok: boolean; shouldRetry: boolean }> {
-    const fetchFn = await resolveFetch();
-    if (!fetchFn) {
-      this.debugLog("Fetch implementation unavailable; event dropped");
-      return { ok: false, shouldRetry: true };
-    }
-
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
     try {
-      const response = await fetchFn(`${this.baseUrl}/api/v1/events`, {
+      const response = await requestJson(`${this.baseUrl}/api/v1/events`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -256,19 +277,6 @@ export class Client {
       return;
     }
     console.debug(`[rheonic] ${message} ${JSON.stringify(meta)}`);
-  }
-}
-
-async function resolveFetch(): Promise<typeof fetch | null> {
-  if (typeof globalThis.fetch === "function") {
-    return globalThis.fetch.bind(globalThis);
-  }
-
-  try {
-    const undici = (await import("undici" as string)) as { fetch: typeof fetch };
-    return undici.fetch as typeof fetch;
-  } catch {
-    return null;
   }
 }
 

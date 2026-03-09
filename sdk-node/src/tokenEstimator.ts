@@ -3,6 +3,14 @@ import { sdkNodeConfig } from "./config.js";
 
 const encoderCache = new Map<string, Tiktoken>();
 
+export function prewarmTokenEstimator(model: string | null = null): void {
+  try {
+    getEncoder(model);
+  } catch {
+    return;
+  }
+}
+
 export function estimateInputTokensFromRequest(payload: unknown): number | null {
   if (!payload || typeof payload !== "object") {
     return null;

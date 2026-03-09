@@ -76,6 +76,8 @@ client.capture_event(
 )
 ```
 
+Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all capture/instrumentation calls. Rheonic prewarms tokenizer state and the backend connection when the client starts, so reusing that client avoids repeated protect cold-start latency.
+
 ## 5. Verify in the Dashboard
 After your first event:
 - `Dashboard` should show non-zero request and token activity.

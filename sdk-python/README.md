@@ -18,16 +18,20 @@ pip install -e .
 
 Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
 
+## Integration Recommendation
+
+Create one long-lived SDK client at app startup and reuse it for all provider calls. The SDK now prewarms tokenizer state and the backend connection on client initialization, so reusing a single client avoids first-call protect latency on every request.
+
 ## Integration Path 1: Manual Capture (generic)
 
 ```python
 import os
 
-from rheonic import build_event, capture_event, create_client
+from rheonic import build_event, create_client
 
-create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"])
+client = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"])
 
-capture_event(
+client.capture_event(
     build_event(
         provider="openai",
         model="gpt-4o-mini",
@@ -36,6 +40,8 @@ capture_event(
     )
 )
 ```
+
+Initialize `client` once during app startup, then reuse that same instance when you capture events or instrument provider SDKs.
 
 ## Integration Path 2: OpenAI instrumentation (convenience wrapper)
 
