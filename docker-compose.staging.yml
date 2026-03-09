@@ -119,7 +119,11 @@ services:
     command: >
       sh -c "rq worker --url \"$$REDIS_URL\" \"$${RQ_QUEUE_NAME:-rheonic}\""
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'rq worker' >/dev/null"]
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import pathlib,sys; sys.exit(0 if any('rq worker' in p.read_text(errors='ignore') for p in pathlib.Path('/proc').glob('[0-9]*/cmdline')) else 1)\"",
+        ]
       interval: 15s
       timeout: 3s
       retries: 10
@@ -150,7 +154,11 @@ services:
     command: >
       sh -c "python -m app.workers.scheduler_bootstrap && python -m app.workers.scheduler"
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'python -m app.workers.scheduler' >/dev/null"]
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import pathlib,sys; sys.exit(0 if any('python-mapp.workers.scheduler' in p.read_text(errors='ignore').replace(chr(0), '') for p in pathlib.Path('/proc').glob('[0-9]*/cmdline')) else 1)\"",
+        ]
       interval: 15s
       timeout: 3s
       retries: 10
