@@ -2,7 +2,8 @@
 
 ## Prerequisites
 - VPS with Docker + Docker Compose plugin.
-- Open ports for staging access (typically `80` and optionally `${BACKEND_PORT}` for direct API checks).
+- `staging.rheonic.dev` DNS record pointed at the VPS IP.
+- Open ports `80` and `443` to the internet.
 - Repo checked out on server.
 
 ## Environment file requirements
@@ -17,13 +18,15 @@ cp .env.staging.example .env
 - `CORS_ORIGINS` (staging frontend origin only; no localhost)
 - `DATABASE_URL`, `REDIS_URL`
 - `VITE_API_BASE_URL` (public staging API URL)
-- `FRONTEND_PORT`, `BACKEND_PORT`
 - optional: `RQ_QUEUE_NAME`, `RQ_SCHEDULER_INTERVAL_SECONDS`
 
-## Temporary IP-based staging
-- For first private VPS testing without a domain, use [`.env.staging.example`](/Users/mike/Projects/Rheonic/.env.staging.example).
-- Replace every `YOUR_VPS_IP` placeholder with your actual VPS IP.
-- This keeps your local [`.env`](/Users/mike/Projects/Rheonic/.env) as a dev-only file and avoids mixing localhost values into staging.
+## HTTPS staging shape
+- Staging uses `Caddy` on the VPS for TLS termination and reverse proxy.
+- Public entrypoint: `https://staging.rheonic.dev`
+- Caddy routes:
+  - `/api/*` -> backend service on internal Docker network
+  - everything else -> frontend service
+- Backend and frontend are not published directly to host ports in the staging stack.
 
 ## Secrets handling
 - There is no built-in Vault, SSM, Doppler, or cloud secret-manager integration in this repo today.
@@ -53,9 +56,9 @@ This assumes the repo on the VPS lives at `/root/rheonic`.
 If the repo is elsewhere, change the destination path.
 
 ## Access by IP
-- Frontend: `http://<staging-ip>:${FRONTEND_PORT}`
-- Backend health: `http://<staging-ip>:${BACKEND_PORT}/health`
-- Backend readiness: `http://<staging-ip>:${BACKEND_PORT}/ready`
+- App: `https://staging.rheonic.dev`
+- API health via Caddy: `https://staging.rheonic.dev/api/health` is not defined; use Docker exec/logs for backend verification or temporarily curl the backend container internally.
+- Backend direct host access is intentionally removed from the HTTPS staging shape.
 
 ## Run migrations
 - Migrations run automatically via `db_init`.
@@ -72,11 +75,12 @@ docker compose -f docker-compose.staging.yml ps worker scheduler
 ```
 
 ## Verification checklist
-- Landing page loads on staging frontend port.
-- API liveness and readiness:
+- Landing page loads on `https://staging.rheonic.dev`.
+- TLS certificate is issued successfully by Caddy.
+- Backend liveness and readiness from inside the backend container:
 ```bash
-curl -fsS "http://<staging-ip>:${BACKEND_PORT}/health"
-curl -fsS "http://<staging-ip>:${BACKEND_PORT}/ready"
+docker compose -f docker-compose.staging.yml exec backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health').read().decode())"
+docker compose -f docker-compose.staging.yml exec backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/ready').read().decode())"
 ```
 - services show healthy or running:
 ```bash
@@ -100,6 +104,7 @@ docker compose -f docker-compose.staging.yml logs -f backend
 docker compose -f docker-compose.staging.yml logs -f worker
 docker compose -f docker-compose.staging.yml logs -f scheduler
 docker compose -f docker-compose.staging.yml logs -f frontend
+docker compose -f docker-compose.staging.yml logs -f caddy
 ```
 - container log rotation is enabled in the staging compose file to cap local Docker log growth.
 
