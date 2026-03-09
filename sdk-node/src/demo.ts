@@ -19,7 +19,9 @@ function loadRheonicEnvFromDotenv(): void {
     const key = line.slice(0, index).trim();
     if (!key.startsWith("RHEONIC_")) continue;
     const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
-    process.env[key] = value;
+    if (!(key in process.env)) {
+      process.env[key] = value;
+    }
   }
 }
 
@@ -27,14 +29,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchRealtimeSnapshot(projectId: string, authToken: string, provider: string, phase: string): Promise<void> {
+async function fetchRealtimeSnapshot(
+  backendBaseUrl: string,
+  projectId: string,
+  authToken: string,
+  provider: string,
+  phase: string,
+): Promise<void> {
   if (!authToken || !projectId) {
     console.log(`[SNAPSHOT] ${phase}: (snapshot skipped: no auth token/project id)`);
     return;
   }
   const params = new URLSearchParams({ project_id: projectId });
   if (provider !== "all") params.set("provider", provider);
-  const response = await fetch(`http://localhost:8000/api/v1/metrics/realtime?${params.toString()}`, {
+  const response = await fetch(`${backendBaseUrl}/api/v1/metrics/realtime?${params.toString()}`, {
     headers: { Authorization: `Bearer ${authToken}` },
   });
   if (!response.ok) {
@@ -45,14 +53,19 @@ async function fetchRealtimeSnapshot(projectId: string, authToken: string, provi
   console.log(`[SNAPSHOT] ${phase}: req60=${payload.requests_60s} tok60=${payload.tokens_60s}`);
 }
 
-async function fetchIncidentSummary(projectId: string, authToken: string, provider: string): Promise<void> {
+async function fetchIncidentSummary(
+  backendBaseUrl: string,
+  projectId: string,
+  authToken: string,
+  provider: string,
+): Promise<void> {
   if (!authToken || !projectId) {
     console.log("[OBSERVE] incidents: (skipped: no auth token/project id)");
     return;
   }
   const params = new URLSearchParams({ project_id: projectId, status: "open" });
   if (provider !== "all") params.set("provider", provider);
-  const response = await fetch(`http://localhost:8000/api/v1/incidents?${params.toString()}`, {
+  const response = await fetch(`${backendBaseUrl}/api/v1/incidents?${params.toString()}`, {
     headers: { Authorization: `Bearer ${authToken}` },
   });
   if (!response.ok) {
@@ -72,9 +85,15 @@ async function fetchIncidentSummary(projectId: string, authToken: string, provid
   console.log(`[OBSERVE] incidents open=${incidents.length} types=${compact || "none"}`);
 }
 
-async function printPhase(phase: string, projectId: string, authToken: string, provider: string): Promise<void> {
-  await fetchRealtimeSnapshot(projectId, authToken, provider, phase);
-  await fetchIncidentSummary(projectId, authToken, provider);
+async function printPhase(
+  backendBaseUrl: string,
+  phase: string,
+  projectId: string,
+  authToken: string,
+  provider: string,
+): Promise<void> {
+  await fetchRealtimeSnapshot(backendBaseUrl, projectId, authToken, provider, phase);
+  await fetchIncidentSummary(backendBaseUrl, projectId, authToken, provider);
 }
 
 async function sendEvent(
@@ -127,6 +146,7 @@ function printUsageExamples(): void {
 
 async function runDemo(): Promise<void> {
   loadRheonicEnvFromDotenv();
+  const backendBaseUrl = (process.env.RHEONIC_BACKEND_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
   const ingestKey = process.env.RHEONIC_INGEST_KEY;
   if (!ingestKey) {
@@ -187,10 +207,8 @@ async function runDemo(): Promise<void> {
   const runSteady = async (): Promise<void> => {
     console.log("\n[STEP] Steady traffic / no anomaly");
     await sendEvent(client, provider, model, endpoint, 42, "steady-1");
-    await sleep(stepSleepMs);
-    await sendEvent(client, provider, model, endpoint, 42, "steady-2");
     await client.flush();
-    await printPhase("steady", projectId, authToken, provider);
+    await printPhase(backendBaseUrl, "steady", projectId, authToken, provider);
   };
 
   const runRetryStorm = async (): Promise<void> => {
@@ -204,7 +222,7 @@ async function runDemo(): Promise<void> {
       await sleep(stepSleepMs);
     }
     await client.flush();
-    await printPhase("retry_storm", projectId, authToken, provider);
+    await printPhase(backendBaseUrl, "retry_storm", projectId, authToken, provider);
   };
 
   const runNearCap = async (): Promise<void> => {
@@ -212,7 +230,7 @@ async function runDemo(): Promise<void> {
     console.log("[STEP] Requires project token/request cap configured in Settings page.");
     await sendEvent(client, provider, model, endpoint, nearCapTokens, "near-cap");
     await client.flush();
-    await printPhase("near_cap", projectId, authToken, provider);
+    await printPhase(backendBaseUrl, "near_cap", projectId, authToken, provider);
   };
 
   const runLoopSuspect = async (): Promise<void> => {
@@ -222,14 +240,14 @@ async function runDemo(): Promise<void> {
       await sleep(stepSleepMs);
     }
     await client.flush();
-    await printPhase("loop_suspect", projectId, authToken, provider);
+    await printPhase(backendBaseUrl, "loop_suspect", projectId, authToken, provider);
   };
 
   const runTokenExplosion = async (): Promise<void> => {
     console.log("\n[STEP] Token explosion");
     await sendEvent(client, provider, model, endpoint, tokenExplosionTokens, "token-explosion");
     await client.flush();
-    await printPhase("token_explosion", projectId, authToken, provider);
+    await printPhase(backendBaseUrl, "token_explosion", projectId, authToken, provider);
   };
 
   const runCapBreach = async (): Promise<void> => {
@@ -237,7 +255,7 @@ async function runDemo(): Promise<void> {
     console.log("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).");
     await sendEvent(client, provider, model, endpoint, capBreachTokens, "cap-breach");
     await client.flush();
-    await printPhase("cap_breach", projectId, authToken, provider);
+    await printPhase(backendBaseUrl, "cap_breach", projectId, authToken, provider);
   };
 
   const runReqCapBreach = async (): Promise<void> => {
@@ -251,7 +269,7 @@ async function runDemo(): Promise<void> {
       await sleep(stepSleepMs);
     }
     await client.flush();
-    await printPhase("req_cap_breach", projectId, authToken, provider);
+    await printPhase(backendBaseUrl, "req_cap_breach", projectId, authToken, provider);
   };
 
   if (demoCase === "all") {

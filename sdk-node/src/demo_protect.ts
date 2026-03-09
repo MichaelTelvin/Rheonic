@@ -19,7 +19,9 @@ function loadRheonicEnvFromDotenv(): void {
     const key = line.slice(0, index).trim();
     if (!key.startsWith("RHEONIC_")) continue;
     const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
-    process.env[key] = value;
+    if (!(key in process.env)) {
+      process.env[key] = value;
+    }
   }
 }
 

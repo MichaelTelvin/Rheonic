@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { setUnauthorizedHandler, type AuthUser, type LoginResponse } from "./api/client";
 import { getAuthItem, removeAuthItem, setAuthItem } from "./authStorage";
@@ -90,6 +90,16 @@ interface RequireAuthProps {
   children: JSX.Element;
 }
 
+function ScrollToTop(): null {
+  const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  return null;
+}
+
 function RequireAuth({ token, children }: RequireAuthProps): JSX.Element {
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -135,31 +145,34 @@ export function App(): JSX.Element {
   };
 
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/quickstart" element={<QuickstartPage />} />
-      <Route path="/privacy" element={<PrivacyPage />} />
-      <Route path="/terms" element={<TermsPage />} />
-      <Route path="/docs" element={<Navigate to="/app/docs" replace />} />
-      <Route
-        path="/login"
-        element={token ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />}
-      />
-      <Route
-        path="/signup"
-        element={token ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />}
-      />
-      <Route
-        path="/app/*"
-        element={
-          <RequireAuth token={token}>
-            <ProjectProvider>
-              <AuthenticatedAppLayout userEmail={user?.email ?? null} onSignOut={signOut} />
-            </ProjectProvider>
-          </RequireAuth>
-        }
-      />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/quickstart" element={<QuickstartPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/docs" element={<Navigate to="/app/docs" replace />} />
+        <Route
+          path="/login"
+          element={token ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />}
+        />
+        <Route
+          path="/signup"
+          element={token ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />}
+        />
+        <Route
+          path="/app/*"
+          element={
+            <RequireAuth token={token}>
+              <ProjectProvider>
+                <AuthenticatedAppLayout userEmail={user?.email ?? null} onSignOut={signOut} />
+              </ProjectProvider>
+            </RequireAuth>
+          }
+        />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 }

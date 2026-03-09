@@ -602,7 +602,7 @@ export function Dashboard(): JSX.Element {
                 <div className="protect-decisions-list">
                   <div className="protect-decisions-row">
                     <span className="protect-decisions-label">Near cap</span>
-                    <span className="protect-decisions-value">{incidentSummary.near_cap ?? 0}</span>
+                    <span className="protect-decisions-value warned">{incidentSummary.near_cap ?? 0}</span>
                   </div>
                   <div className="protect-decisions-row">
                     <span className="protect-decisions-label">Retry storm</span>

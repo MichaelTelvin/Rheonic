@@ -9,6 +9,10 @@ from typing import Any
 
 import httpx
 
+sdk_src = Path(__file__).resolve().parent / "src"
+if str(sdk_src) not in sys.path:
+    sys.path.insert(0, str(sdk_src))
+
 from rheonic.client import Client
 from rheonic.protect_engine import RHEONICBlockedError
 from rheonic.providers.anthropic_adapter import instrument_anthropic
@@ -28,7 +32,8 @@ def _load_rheonic_env_from_dotenv() -> None:
         key = key.strip()
         if not key.startswith("RHEONIC_"):
             continue
-        os.environ[key] = value.strip().strip('"').strip("'")
+        if key not in os.environ:
+            os.environ[key] = value.strip().strip('"').strip("'")
 
 
 _load_rheonic_env_from_dotenv()
@@ -71,14 +76,24 @@ class LoggingHttpClient:
 
 
 def _provider_reset() -> None:
-    httpx.post(f"{PROVIDER_STUB_URL}/reset", timeout=3.0).raise_for_status()
+    try:
+        httpx.post(f"{PROVIDER_STUB_URL}/reset", timeout=3.0).raise_for_status()
+    except Exception as exc:
+        raise RuntimeError(
+            f"Provider stub is unavailable at {PROVIDER_STUB_URL}. Start tests/e2e/provider_stub.py first."
+        ) from exc
 
 
 def _provider_count() -> int:
-    response = httpx.get(f"{PROVIDER_STUB_URL}/count", timeout=3.0)
-    response.raise_for_status()
-    payload = response.json()
-    return int(payload.get("count", 0)) if isinstance(payload, dict) else 0
+    try:
+        response = httpx.get(f"{PROVIDER_STUB_URL}/count", timeout=3.0)
+        response.raise_for_status()
+        payload = response.json()
+        return int(payload.get("count", 0)) if isinstance(payload, dict) else 0
+    except Exception as exc:
+        raise RuntimeError(
+            f"Provider stub is unavailable at {PROVIDER_STUB_URL}. Start tests/e2e/provider_stub.py first."
+        ) from exc
 
 
 def _provider_last_call() -> dict[str, Any] | None:
@@ -288,7 +303,7 @@ def main() -> None:
         ingest_key=ingest_key,
         base_url=BACKEND_BASE_URL,
         environment=env,
-        flush_interval_s=60.0,
+        flush_interval_s=0.25,
         protect_decision_timeout_ms=decision_timeout_ms,
         http_client=transport,
     )
@@ -303,134 +318,140 @@ def main() -> None:
     instrument_anthropic(anthropic, client=client, feature=decision_feature, environment=env)
     instrument_google(google, client=client, feature=decision_feature, environment=env)
 
-    _provider_reset()
-    before_calls = _provider_count()
+    try:
+        _provider_reset()
+        before_calls = _provider_count()
 
-    print(f"[DEMO] provider={provider} model={model} scenario={scenario}")
-    print(f"[DEMO] environment={env}")
-    print(f"[DEMO] protect_decision_timeout_ms={decision_timeout_ms}")
-    print(f"[DEMO] decision_feature={decision_feature}")
+        print(f"[DEMO] provider={provider} model={model} scenario={scenario}")
+        print(f"[DEMO] environment={env}")
+        print(f"[DEMO] protect_decision_timeout_ms={decision_timeout_ms}")
+        print(f"[DEMO] decision_feature={decision_feature}")
 
-    max_tokens = int(os.getenv("RHEONIC_MAX_TOKENS", "128"))
-    call_max_tokens = max_tokens
-    print(f"[DEMO] max_tokens(before call)={max_tokens}")
+        max_tokens = int(os.getenv("RHEONIC_MAX_TOKENS", "128"))
+        call_max_tokens = max_tokens
+        print(f"[DEMO] max_tokens(before call)={max_tokens}")
 
-    if scenario == "near_cap":
-        print("\n[STEP] Seed near-cap traffic then expect warn")
-        seed_tokens = int(os.getenv("RHEONIC_NEAR_CAP_SEED_TOKENS", "1600"))
-        _send_ingest_event(ingest_key, provider, model, total_tokens=seed_tokens, feature="near-cap-seed", environment=env)
-        time.sleep(pause_ms / 1000)
-    elif scenario == "cap_breach":
-        print("\n[STEP] Seed cap breach then expect block")
-        breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
-        _send_ingest_event(ingest_key, provider, model, total_tokens=breach_tokens, feature="cap-breach-seed", environment=env)
-        time.sleep(pause_ms / 1000)
-    elif scenario == "req_cap_breach":
-        print("\n[STEP] Seed req cap breach then expect block")
-        count = int(os.getenv("RHEONIC_REQ_CAP_BREACH_COUNT", "6"))
-        req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
-        for i in range(count):
-            _send_ingest_event(
-                ingest_key,
-                provider,
-                model,
-                total_tokens=req_tokens,
-                feature=f"req-cap-breach-{i+1}",
-                environment=env,
-            )
+        if scenario == "near_cap":
+            print("\n[STEP] Seed near-cap traffic then expect warn")
+            seed_tokens = int(os.getenv("RHEONIC_NEAR_CAP_SEED_TOKENS", "1600"))
+            _send_ingest_event(ingest_key, provider, model, total_tokens=seed_tokens, feature="near-cap-seed", environment=env)
             time.sleep(pause_ms / 1000)
-    elif scenario == "retry_storm":
-        print("\n[STEP] Seed retry storm then expect warn")
-        count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "6"))
-        for i in range(count):
-            _send_ingest_event(
-                ingest_key,
-                provider,
-                model,
-                total_tokens=50,
-                feature=f"retry-{i+1}",
-                environment=env,
-                status="error",
-                http_status=500,
-                error_type="provider_5xx",
-            )
+        elif scenario == "cap_breach":
+            print("\n[STEP] Seed cap breach then expect block")
+            breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
+            _send_ingest_event(ingest_key, provider, model, total_tokens=breach_tokens, feature="cap-breach-seed", environment=env)
             time.sleep(pause_ms / 1000)
-    elif scenario == "loop_suspect":
-        print("\n[STEP] Seed loop suspect then expect warn")
-        count = int(os.getenv("RHEONIC_LOOP_COUNT", "7"))
-        for _ in range(count):
-            _send_ingest_event(ingest_key, provider, model, total_tokens=60, feature="loop-fixed-signature", environment=env)
+        elif scenario == "req_cap_breach":
+            print("\n[STEP] Seed req cap breach then expect block")
+            count = int(os.getenv("RHEONIC_REQ_CAP_BREACH_COUNT", "6"))
+            req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
+            for i in range(count):
+                _send_ingest_event(
+                    ingest_key,
+                    provider,
+                    model,
+                    total_tokens=req_tokens,
+                    feature=f"req-cap-breach-{i+1}",
+                    environment=env,
+                )
+                time.sleep(pause_ms / 1000)
+        elif scenario == "retry_storm":
+            print("\n[STEP] Seed retry storm then expect warn")
+            count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "6"))
+            for i in range(count):
+                _send_ingest_event(
+                    ingest_key,
+                    provider,
+                    model,
+                    total_tokens=50,
+                    feature=f"retry-{i+1}",
+                    environment=env,
+                    status="error",
+                    http_status=500,
+                    error_type="provider_5xx",
+                )
+                time.sleep(pause_ms / 1000)
+        elif scenario == "loop_suspect":
+            print("\n[STEP] Seed loop suspect then expect warn")
+            count = int(os.getenv("RHEONIC_LOOP_COUNT", "7"))
+            for _ in range(count):
+                _send_ingest_event(ingest_key, provider, model, total_tokens=60, feature="loop-fixed-signature", environment=env)
+                time.sleep(pause_ms / 1000)
+        elif scenario == "token_explosion":
+            print("\n[STEP] Seed token explosion then expect warn")
+            huge = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "9000"))
+            _send_ingest_event(ingest_key, provider, model, total_tokens=huge, feature="token-explosion-seed", environment=env)
+            call_max_tokens = max(max_tokens, huge)
+            print(f"[STEP] token_explosion call max_tokens={call_max_tokens}")
             time.sleep(pause_ms / 1000)
-    elif scenario == "token_explosion":
-        print("\n[STEP] Seed token explosion then expect warn")
-        huge = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "9000"))
-        _send_ingest_event(ingest_key, provider, model, total_tokens=huge, feature="token-explosion-seed", environment=env)
-        call_max_tokens = max(max_tokens, huge)
-        print(f"[STEP] token_explosion call max_tokens={call_max_tokens}")
-        time.sleep(pause_ms / 1000)
-    elif scenario == "cooldown":
-        print("\n[STEP] Seed cap breach then verify cooldown blocks repeated call")
-        breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
-        _send_ingest_event(ingest_key, provider, model, total_tokens=breach_tokens, feature="cooldown-breach-seed", environment=env)
-        time.sleep(pause_ms / 1000)
+        elif scenario == "cooldown":
+            print("\n[STEP] Seed cap breach then verify cooldown blocks repeated call")
+            breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
+            _send_ingest_event(ingest_key, provider, model, total_tokens=breach_tokens, feature="cooldown-breach-seed", environment=env)
+            time.sleep(pause_ms / 1000)
 
-    if scenario == "cooldown":
-        first_blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
-        second_blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
-        blocked = first_blocked and second_blocked
-    else:
-        blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
-    client.flush()
-    after_calls = _provider_count()
-    provider_calls_delta = after_calls - before_calls
-    decision_payload = transport.last_decision_payload if isinstance(transport.last_decision_payload, dict) else {}
-    decision_reason = str(decision_payload.get("reason", ""))
-    decision_value = str(decision_payload.get("decision", "")).lower()
-    clamp = decision_payload.get("clamp")
-    clamp_payload = clamp if isinstance(clamp, dict) else {}
-    clamp_recommended = clamp_payload.get("recommended_max_output_tokens")
-    clamp_applied = clamp_payload.get("applied")
-    used_max_tokens = _extract_used_max_tokens(_provider_last_call())
-
-    print(f"[RESULT] blocked={blocked} provider_calls_delta={provider_calls_delta}")
-    if scenario == "near_cap":
-        print(f"[CLAMP] recommended={clamp_recommended} applied={clamp_applied} used_max_tokens={used_max_tokens}")
-    if project_id and auth_token:
-        _print_incidents(project_id, provider, auth_token)
-    else:
-        print("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID and RHEONIC_AUTH_TOKEN)")
-
-    if scenario == "allow":
-        _assert_line("allow passed", not blocked and provider_calls_delta >= 1 and decision_value == "allow")
-    elif scenario == "near_cap":
-        _assert_line("near_cap warn triggered", decision_value == "warn" and decision_reason == "near_cap" and not blocked)
-        clamp_is_recommended = isinstance(clamp_recommended, int) and clamp_recommended > 0
-        clamp_used = clamp_is_recommended and used_max_tokens == clamp_recommended and provider_calls_delta >= 1
-        if clamp_used:
-            _assert_line("clamp applied / clamp suggested", True)
+        if scenario == "cooldown":
+            first_blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
+            second_blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
+            blocked = first_blocked and second_blocked
         else:
-            _assert_line("clamp applied / clamp suggested", clamp_is_recommended)
-    elif scenario == "cap_breach":
-        _assert_line("cap breach blocked", blocked and provider_calls_delta == 0)
-    elif scenario == "req_cap_breach":
-        _assert_line("req_cap breach blocked", blocked and provider_calls_delta == 0)
-        _assert_line("req_cap breach triggered block", blocked and provider_calls_delta == 0)
-    elif scenario == "retry_storm":
-        _assert_line("retry_storm warn triggered", decision_value == "warn" and decision_reason == "retry_storm" and not blocked)
-    elif scenario == "loop_suspect":
-        _assert_line("loop_suspect warn triggered", decision_value == "warn" and decision_reason == "loop_suspect" and not blocked)
-    elif scenario == "token_explosion":
-        _assert_line(
-            "token_explosion warn triggered",
-            decision_value == "warn" and decision_reason in {"token_explosion", "near_cap"} and not blocked,
-        )
-    elif scenario == "cooldown":
-        _assert_line("cooldown active", blocked and provider_calls_delta == 0)
-        _assert_line("cooldown active - repeated call blocked", blocked and provider_calls_delta == 0)
+            blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
+        client.flush()
+        after_calls = _provider_count()
+        provider_calls_delta = after_calls - before_calls
+        decision_payload = transport.last_decision_payload if isinstance(transport.last_decision_payload, dict) else {}
+        decision_reason = str(decision_payload.get("reason", ""))
+        decision_value = str(decision_payload.get("decision", "")).lower()
+        clamp = decision_payload.get("clamp")
+        clamp_payload = clamp if isinstance(clamp, dict) else {}
+        clamp_recommended = clamp_payload.get("recommended_max_output_tokens")
+        clamp_applied = clamp_payload.get("applied")
+        used_max_tokens = _extract_used_max_tokens(_provider_last_call())
 
-    client.close()
-    transport.close()
+        print(f"[RESULT] blocked={blocked} provider_calls_delta={provider_calls_delta}")
+        if scenario == "near_cap":
+            print(f"[CLAMP] recommended={clamp_recommended} applied={clamp_applied} used_max_tokens={used_max_tokens}")
+        if project_id and auth_token:
+            _print_incidents(project_id, provider, auth_token)
+        else:
+            print("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID and RHEONIC_AUTH_TOKEN)")
+
+        if scenario == "allow":
+            _assert_line("allow passed", not blocked and provider_calls_delta >= 1 and decision_value == "allow")
+        elif scenario == "near_cap":
+            _assert_line("near_cap warn triggered", decision_value == "warn" and decision_reason == "near_cap" and not blocked)
+            clamp_is_recommended = isinstance(clamp_recommended, int) and clamp_recommended > 0
+            clamp_used = clamp_is_recommended and used_max_tokens == clamp_recommended and provider_calls_delta >= 1
+            if clamp_used:
+                _assert_line("clamp applied / clamp suggested", True)
+            else:
+                _assert_line("clamp applied / clamp suggested", clamp_is_recommended)
+        elif scenario == "cap_breach":
+            _assert_line("cap breach blocked", blocked and provider_calls_delta == 0)
+        elif scenario == "req_cap_breach":
+            _assert_line("req_cap breach blocked", blocked and provider_calls_delta == 0)
+            _assert_line("req_cap breach triggered block", blocked and provider_calls_delta == 0)
+        elif scenario == "retry_storm":
+            _assert_line("retry_storm warn triggered", decision_value == "warn" and decision_reason == "retry_storm" and not blocked)
+        elif scenario == "loop_suspect":
+            _assert_line("loop_suspect warn triggered", decision_value == "warn" and decision_reason == "loop_suspect" and not blocked)
+        elif scenario == "token_explosion":
+            _assert_line(
+                "token_explosion warn triggered",
+                decision_value == "warn" and decision_reason in {"token_explosion", "near_cap"} and not blocked,
+            )
+        elif scenario == "cooldown":
+            _assert_line("cooldown active", blocked and provider_calls_delta == 0)
+            _assert_line("cooldown active - repeated call blocked", blocked and provider_calls_delta == 0)
+
+    finally:
+        client.close()
+        transport.close()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n[DEMO] interrupted by user")
+        sys.exit(130)

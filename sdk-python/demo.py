@@ -25,7 +25,8 @@ def _load_rheonic_env_from_dotenv() -> None:
         key = key.strip()
         if not key.startswith("RHEONIC_"):
             continue
-        os.environ[key] = value.strip().strip('"').strip("'")
+        if key not in os.environ:
+            os.environ[key] = value.strip().strip('"').strip("'")
 
 
 def _send_event(
@@ -58,7 +59,7 @@ def _send_event(
     capture_event(event)
 
 
-def _print_realtime_snapshot(project_id: str, auth_token: str, provider: str, phase: str) -> None:
+def _print_realtime_snapshot(backend_base_url: str, project_id: str, auth_token: str, provider: str, phase: str) -> None:
     if not auth_token or not project_id:
         print(f"[SNAPSHOT] {phase}: (snapshot skipped: no auth token/project id)")
         return
@@ -67,7 +68,7 @@ def _print_realtime_snapshot(project_id: str, auth_token: str, provider: str, ph
         params["provider"] = provider
     try:
         response = httpx.get(
-            "http://localhost:8000/api/v1/metrics/realtime",
+            f"{backend_base_url}/api/v1/metrics/realtime",
             params=params,
             headers={"Authorization": f"Bearer {auth_token}"},
             timeout=5.0,
@@ -86,7 +87,7 @@ def _print_realtime_snapshot(project_id: str, auth_token: str, provider: str, ph
         print(f"[SNAPSHOT] {phase}: unavailable ({error})")
 
 
-def _print_incident_summary(project_id: str, auth_token: str, provider: str) -> None:
+def _print_incident_summary(backend_base_url: str, project_id: str, auth_token: str, provider: str) -> None:
     if not auth_token or not project_id:
         print("[OBSERVE] incidents: (skipped: no auth token/project id)")
         return
@@ -94,7 +95,7 @@ def _print_incident_summary(project_id: str, auth_token: str, provider: str) -> 
     if provider != "all":
         params["provider"] = provider
     response = httpx.get(
-        "http://localhost:8000/api/v1/incidents",
+        f"{backend_base_url}/api/v1/incidents",
         params=params,
         headers={"Authorization": f"Bearer {auth_token}"},
         timeout=5.0,
@@ -111,9 +112,9 @@ def _print_incident_summary(project_id: str, auth_token: str, provider: str) -> 
     print(f"[OBSERVE] incidents open={len(incidents)} types={compact}")
 
 
-def _print_phase(phase: str, project_id: str, auth_token: str, provider: str) -> None:
-    _print_realtime_snapshot(project_id, auth_token, provider, phase)
-    _print_incident_summary(project_id, auth_token, provider)
+def _print_phase(backend_base_url: str, phase: str, project_id: str, auth_token: str, provider: str) -> None:
+    _print_realtime_snapshot(backend_base_url, project_id, auth_token, provider, phase)
+    _print_incident_summary(backend_base_url, project_id, auth_token, provider)
 
 
 def _usage() -> None:
@@ -134,6 +135,7 @@ def _usage() -> None:
 
 def main() -> None:
     _load_rheonic_env_from_dotenv()
+    backend_base_url = os.getenv("RHEONIC_BACKEND_URL", "http://localhost:8000").rstrip("/")
 
     ingest_key = os.getenv("RHEONIC_INGEST_KEY")
     if not ingest_key:
@@ -197,17 +199,15 @@ def main() -> None:
         def run_steady() -> None:
             print("\n[STEP] Steady traffic / no anomaly")
             _send_event(provider, model, endpoint, 42, "steady-1", environment)
-            time.sleep(step_sleep_ms / 1000)
-            _send_event(provider, model, endpoint, 42, "steady-2", environment)
             client.flush()
-            _print_phase("steady", project_id, auth_token, provider)
+            _print_phase(backend_base_url, "steady", project_id, auth_token, provider)
 
         def run_near_cap() -> None:
             print("\n[STEP] Near-cap logging (observe)")
             print("[STEP] Requires project token/request cap configured in Settings page.")
             _send_event(provider, model, endpoint, near_cap_tokens, "near-cap", environment)
             client.flush()
-            _print_phase("near_cap", project_id, auth_token, provider)
+            _print_phase(backend_base_url, "near_cap", project_id, auth_token, provider)
 
         def run_retry_storm() -> None:
             print("\n[STEP] Retry storm")
@@ -225,7 +225,7 @@ def main() -> None:
                 )
                 time.sleep(step_sleep_ms / 1000)
             client.flush()
-            _print_phase("retry_storm", project_id, auth_token, provider)
+            _print_phase(backend_base_url, "retry_storm", project_id, auth_token, provider)
 
         def run_loop_suspect() -> None:
             print("\n[STEP] Loop suspect")
@@ -233,20 +233,20 @@ def main() -> None:
                 _send_event(provider, model, endpoint, 60, "loop-fixed-signature", environment)
                 time.sleep(step_sleep_ms / 1000)
             client.flush()
-            _print_phase("loop_suspect", project_id, auth_token, provider)
+            _print_phase(backend_base_url, "loop_suspect", project_id, auth_token, provider)
 
         def run_token_explosion() -> None:
             print("\n[STEP] Token explosion")
             _send_event(provider, model, endpoint, token_explosion_tokens, "token-explosion", environment)
             client.flush()
-            _print_phase("token_explosion", project_id, auth_token, provider)
+            _print_phase(backend_base_url, "token_explosion", project_id, auth_token, provider)
 
         def run_cap_breach() -> None:
             print("\n[STEP] Cap breach logging (observe)")
             print("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).")
             _send_event(provider, model, endpoint, cap_breach_tokens, "cap-breach", environment)
             client.flush()
-            _print_phase("cap_breach", project_id, auth_token, provider)
+            _print_phase(backend_base_url, "cap_breach", project_id, auth_token, provider)
 
         def run_req_cap_breach() -> None:
             print("\n[STEP] Request cap breach logging (observe)")
@@ -264,7 +264,7 @@ def main() -> None:
                 )
                 time.sleep(step_sleep_ms / 1000)
             client.flush()
-            _print_phase("req_cap_breach", project_id, auth_token, provider)
+            _print_phase(backend_base_url, "req_cap_breach", project_id, auth_token, provider)
 
         if demo_case == "all":
             run_steady()

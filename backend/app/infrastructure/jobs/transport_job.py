@@ -33,8 +33,20 @@ def process_outbox_delivery(outbox_id: str) -> None:
     repository = TransportOutboxRepositoryImpl(session_factory=DatabaseSessionFactory())
     outbox = repository.claim_for_send(outbox_id=outbox_id, now=now)
     if outbox is None:
+        logger.info("Outbox delivery skipped; row unavailable", extra={"outbox_id": outbox_id})
         return
 
+    logger.info(
+        "Outbox delivery claimed",
+        extra={
+            "outbox_id": outbox.id,
+            "kind": outbox.kind,
+            "event_type": outbox.event_type,
+            "project_id": outbox.project_id,
+            "attempts": int(outbox.attempts),
+            "max_attempts": int(outbox.max_attempts),
+        },
+    )
     try:
         if outbox.kind == "webhook":
             _deliver_webhook(outbox_id=outbox.id)
@@ -43,6 +55,15 @@ def process_outbox_delivery(outbox_id: str) -> None:
         else:
             raise RuntimeError(f"unsupported transport kind: {outbox.kind}")
         repository.mark_delivered(outbox_id=outbox.id, now=datetime.now(timezone.utc))
+        logger.info(
+            "Outbox delivery succeeded",
+            extra={
+                "outbox_id": outbox.id,
+                "kind": outbox.kind,
+                "event_type": outbox.event_type,
+                "project_id": outbox.project_id,
+            },
+        )
     except Exception as exc:
         attempts = max(int(outbox.attempts), 1)
         delay_seconds = _retry_delay_seconds(kind=outbox.kind, attempt_number=attempts)
@@ -57,9 +78,33 @@ def process_outbox_delivery(outbox_id: str) -> None:
             next_attempt_at=next_attempt_at,
             dead=dead,
         )
+        logger.warning(
+            "Outbox delivery failed",
+            extra={
+                "outbox_id": outbox.id,
+                "kind": outbox.kind,
+                "event_type": outbox.event_type,
+                "project_id": outbox.project_id,
+                "attempts": attempts,
+                "max_attempts": int(outbox.max_attempts),
+                "error_code": code,
+                "dead": dead,
+                "retry_delay_seconds": delay_seconds,
+            },
+        )
         if not dead and next_attempt_at is not None:
             queue = Queue(settings.rq_queue_name, connection=Redis.from_url(settings.redis_url))
             queue.enqueue_in(timedelta(seconds=delay_seconds), process_outbox_delivery, kwargs={"outbox_id": outbox.id})
+            logger.info(
+                "Outbox delivery retry scheduled",
+                extra={
+                    "outbox_id": outbox.id,
+                    "kind": outbox.kind,
+                    "event_type": outbox.event_type,
+                    "project_id": outbox.project_id,
+                    "retry_delay_seconds": delay_seconds,
+                },
+            )
 
 
 def _deliver_webhook(*, outbox_id: str) -> None:
