@@ -214,7 +214,6 @@ def get_protect_service() -> ProtectService:
             protect_action_store=get_protect_action_store(),
             protect_block_cooldown_seconds=get_settings().protect_block_cooldown_seconds,
             webhook_dispatcher=get_webhook_dispatcher(),
-            protect_decision_timeout_ms=get_settings().protect_decision_timeout_ms,
         )
     except Exception:
         logger.exception("Failed to construct protect service")

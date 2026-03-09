@@ -81,7 +81,6 @@ Protect decisions return:
 - `decision`
 - `reason`
 - `fail_mode`
-- `protect_decision_timeout_ms` (backend-managed)
 - `retry_after_seconds`
 - `blocked_until`
 - `snapshot`

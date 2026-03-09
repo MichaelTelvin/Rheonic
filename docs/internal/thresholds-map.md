@@ -60,7 +60,7 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - `loop_suspect`
 - `token_explosion`
 - `protect_block_cooldown_seconds`: cooldown after block.
-- `protect_decision_timeout_ms`: backend-managed preflight timeout budget.
+- `protect_decision_timeout_ms`: backend-only preflight timeout budget set from server config, not project/user settings.
 - `protect_fail_mode`:
   - `open`: allow if decision unavailable
   - `closed`: block if decision unavailable
