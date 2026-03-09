@@ -56,7 +56,6 @@ export interface ProjectProtectSettings {
   apply_clamp: boolean;
   protect_max_req_per_min: number | null;
   protect_max_tok_per_min: number | null;
-  protect_decision_timeout_ms: number;
 }
 
 export interface ProjectWebhookSettings {
@@ -87,7 +86,6 @@ export interface UpdateProjectProtectInput {
   apply_clamp: boolean;
   protect_max_req_per_min: number | null;
   protect_max_tok_per_min: number | null;
-  protect_decision_timeout_ms: number;
 }
 
 export interface IngestKeyItem {

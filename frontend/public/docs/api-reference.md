@@ -77,13 +77,11 @@ Protect settings include:
 - `protect_max_req_per_min`
 - `protect_max_tok_per_min`
 
-`protect_decision_timeout_ms` appears in API payloads, but it is not currently configurable from the dashboard UI.
-
 Protect decisions return:
 - `decision`
 - `reason`
 - `fail_mode`
-- `protect_decision_timeout_ms`
+- `protect_decision_timeout_ms` (backend-managed)
 - `retry_after_seconds`
 - `blocked_until`
 - `snapshot`

@@ -13,5 +13,4 @@ export const frontendConfig = {
   dashboardIncidentsPollMs: 5000,
   dashboardNameMaxLength: 80,
   dashboardNamePattern: "^[A-Za-z0-9 _.-]+$",
-  protectDefaultDecisionTimeoutMs: 100,
 } as const;

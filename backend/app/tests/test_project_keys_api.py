@@ -247,7 +247,6 @@ def test_project_delete_cascades_all_scoped_data_and_keeps_other_projects(tmp_pa
             "apply_clamp": True,
             "protect_max_req_per_min": 120,
             "protect_max_tok_per_min": 48000,
-            "protect_decision_timeout_ms": 150,
         },
     )
     protect_survivor = client.put(
@@ -258,7 +257,6 @@ def test_project_delete_cascades_all_scoped_data_and_keeps_other_projects(tmp_pa
             "apply_clamp": False,
             "protect_max_req_per_min": 25,
             "protect_max_tok_per_min": 5000,
-            "protect_decision_timeout_ms": 100,
         },
     )
     webhook_target = client.put(

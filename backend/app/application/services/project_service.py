@@ -75,7 +75,6 @@ class ProjectService:
         apply_clamp: bool,
         protect_max_req_per_min: int | None,
         protect_max_tok_per_min: int | None,
-        protect_decision_timeout_ms: int,
     ) -> Project:
         # Update protect settings for an owned project.
         self.ensure_project_owned_by_user(project_id=project_id, user_id=user_id)
@@ -86,7 +85,6 @@ class ProjectService:
             apply_clamp=apply_clamp,
             protect_max_req_per_min=protect_max_req_per_min,
             protect_max_tok_per_min=protect_max_tok_per_min,
-            protect_decision_timeout_ms=protect_decision_timeout_ms,
         )
         if updated is None:
             raise HTTPException(status_code=404, detail="project not found")

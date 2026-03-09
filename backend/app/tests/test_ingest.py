@@ -181,7 +181,6 @@ class FakeProjectRepository:
         apply_clamp: bool,
         protect_max_req_per_min: int | None,
         protect_max_tok_per_min: int | None,
-        protect_decision_timeout_ms: int,
     ) -> Project | None:
         if project_id != self.project.id:
             return None
@@ -190,7 +189,6 @@ class FakeProjectRepository:
         self.project.apply_clamp = apply_clamp
         self.project.protect_max_req_per_min = protect_max_req_per_min
         self.project.protect_max_tok_per_min = protect_max_tok_per_min
-        self.project.protect_decision_timeout_ms = protect_decision_timeout_ms
         return self.project
 
     def update_project_webhook_settings(

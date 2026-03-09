@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 @dataclass(frozen=True)
 class AppConfig:
     default_log_format: str = "%(asctime)s %(levelname)s %(name)s %(message)s"
+    default_protect_decision_timeout_ms: int = 250
     rolling_window_seconds: int = 60
     rolling_window_ms: int = rolling_window_seconds * 1000
     rolling_counter_ttl_seconds: int = 600
@@ -106,6 +107,7 @@ class Settings(BaseSettings):
     auto_close_run_interval_seconds: int = 60
     event_retention_days: int = 30
     protect_block_cooldown_seconds: int = 60
+    protect_decision_timeout_ms: int = app_config.default_protect_decision_timeout_ms
     webhook_allow_private_hosts: bool = False
     webhook_secret_encryption_key: str = ""
     email_provider_enabled: bool = False

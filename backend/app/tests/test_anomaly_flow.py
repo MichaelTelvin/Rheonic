@@ -59,7 +59,6 @@ def test_incidents_provider_filter_returns_scoped_rows() -> None:
             "protect_fail_mode": "open",
             "protect_max_req_per_min": 1000,
             "protect_max_tok_per_min": 100000,
-            "protect_decision_timeout_ms": 100,
         },
         headers=headers,
     )
@@ -111,7 +110,6 @@ def test_incident_dedup_updates_existing_row_count() -> None:
             "protect_fail_mode": "open",
             "protect_max_req_per_min": 1000,
             "protect_max_tok_per_min": 100000,
-            "protect_decision_timeout_ms": 100,
         },
         headers=headers,
     )
@@ -145,7 +143,6 @@ def test_retry_storm_ingest_returns_202_and_incident_is_listed() -> None:
             "protect_fail_mode": "open",
             "protect_max_req_per_min": 1000,
             "protect_max_tok_per_min": 100000,
-            "protect_decision_timeout_ms": 100,
         },
         headers=headers,
     )

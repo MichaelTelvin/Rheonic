@@ -487,8 +487,8 @@ test("decision timeout fail-open allows provider call", async () => {
       environment: "dev",
       flushIntervalMs: 30_000,
       protectFailMode: "open",
-      protectDecisionTimeoutMs: 5,
     });
+    ((client as unknown as { protectEngine?: { decisionTimeoutMs?: number } }).protectEngine ?? {}).decisionTimeoutMs = 5;
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini" });
@@ -524,8 +524,8 @@ test("decision timeout fail-closed blocks provider call", async () => {
       environment: "staging",
       flushIntervalMs: 30_000,
       protectFailMode: "closed",
-      protectDecisionTimeoutMs: 5,
     });
+    ((client as unknown as { protectEngine?: { decisionTimeoutMs?: number } }).protectEngine ?? {}).decisionTimeoutMs = 5;
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);

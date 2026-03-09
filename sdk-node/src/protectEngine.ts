@@ -60,7 +60,7 @@ export class ProtectEngine {
     environment: string;
     fallbackRequestTimeoutMs: number;
     initialFailMode: ProtectFailMode;
-    initialDecisionTimeoutMs: number;
+    initialDecisionTimeoutMs?: number;
     debugLog?: (message: string, meta?: Record<string, unknown>) => void;
   }) {
     this.baseUrl = params.baseUrl;
@@ -69,7 +69,10 @@ export class ProtectEngine {
     this.fallbackRequestTimeoutMs = params.fallbackRequestTimeoutMs;
     this.debugLog = params.debugLog;
     this.failMode = params.initialFailMode;
-    this.decisionTimeoutMs = params.initialDecisionTimeoutMs;
+    this.decisionTimeoutMs =
+      typeof params.initialDecisionTimeoutMs === "number" && Number.isFinite(params.initialDecisionTimeoutMs) && params.initialDecisionTimeoutMs > 0
+        ? Math.floor(params.initialDecisionTimeoutMs)
+        : sdkNodeConfig.internalProtectDecisionTimeoutMs;
     this.cooldownUntilMs = null;
     this.cooldownReason = null;
   }
@@ -270,4 +273,4 @@ async function resolveFetch(): Promise<typeof fetch | null> {
   }
 }
 
-export const defaultProtectTimeoutMs = sdkNodeConfig.defaultProtectDecisionTimeoutMs;
+export const defaultProtectTimeoutMs = sdkNodeConfig.internalProtectDecisionTimeoutMs;

@@ -26,7 +26,6 @@ export interface ClientConfig {
   overflowPolicy?: OverflowPolicy;
   requestTimeoutMs?: number;
   protectFailMode?: ProtectFailMode;
-  protectDecisionTimeoutMs?: number;
   debug?: boolean;
 }
 
@@ -58,7 +57,6 @@ export class Client {
     this.overflowPolicy = config.overflowPolicy ?? "drop_oldest";
     this.requestTimeoutMs = config.requestTimeoutMs ?? sdkNodeConfig.defaultRequestTimeoutMs;
     const initialFailMode = config.protectFailMode ?? sdkNodeConfig.defaultProtectFailMode;
-    const initialProtectTimeoutMs = config.protectDecisionTimeoutMs ?? sdkNodeConfig.defaultProtectDecisionTimeoutMs;
     const envDebug = process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true";
     this.debug = config.debug ?? envDebug;
     this.protectEngine = new ProtectEngine({
@@ -67,7 +65,6 @@ export class Client {
       environment: this.environment,
       fallbackRequestTimeoutMs: this.requestTimeoutMs,
       initialFailMode,
-      initialDecisionTimeoutMs: initialProtectTimeoutMs,
       debugLog: this.debugLog.bind(this),
     });
 

@@ -5,10 +5,11 @@ export const sdkNodeConfig = {
   defaultMaxQueueSize: 1000,
   defaultFlushTimeoutMs: 500,
   defaultRequestTimeoutMs: 1000,
-  defaultProtectDecisionTimeoutMs: 100,
   defaultProtectFailMode: "open",
+  internalProtectDecisionTimeoutMs: 250,
   retryDelayMinMs: 200,
   retryDelayMaxMs: 400,
   defaultTokenizerEncoding: "cl100k_base",
   maxInputTokenEstimate: 50_000,
+  supportedProviders: ["openai", "anthropic", "google"] as const,
 } as const;

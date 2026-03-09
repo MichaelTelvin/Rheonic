@@ -52,7 +52,6 @@ describe("Form column layout", () => {
       apply_clamp: false,
       protect_max_req_per_min: null,
       protect_max_tok_per_min: null,
-      protect_decision_timeout_ms: 100,
     });
   });
 
@@ -104,7 +103,6 @@ describe("Form column layout", () => {
       apply_clamp: false,
       protect_max_req_per_min: null,
       protect_max_tok_per_min: null,
-      protect_decision_timeout_ms: 100,
     });
     render(<Protect />);
     const toggleEnabled = await screen.findByRole("switch");

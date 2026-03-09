@@ -51,6 +51,7 @@ class LoggingHttpClient:
     def post(self, url: str, json: dict[str, Any], headers: dict[str, str], timeout: float | None = None) -> httpx.Response:
         payload = json
         if url.endswith("/api/v1/protect/decision"):
+            started_at = time.perf_counter()
             print("=== PROTECT DECISION REQUEST ===")
             print(json_lib.dumps(payload, indent=2, sort_keys=True))
         try:
@@ -67,7 +68,14 @@ class LoggingHttpClient:
             except Exception:
                 payload = {"status_code": response.status_code, "body": response.text}
             self.last_decision_payload = payload
+            header_latency_ms = response.headers.get("X-Protect-Decision-Latency-Ms")
+            round_trip_latency_ms = int((time.perf_counter() - started_at) * 1000)
             print("=== PROTECT DECISION RESPONSE ===")
+            if header_latency_ms is not None:
+                print(
+                    f"[LATENCY] protect_server_ms={header_latency_ms} "
+                    f"protect_round_trip_ms={round_trip_latency_ms}"
+                )
             print(json_lib.dumps(payload, indent=2, sort_keys=True))
         return response
 
@@ -294,7 +302,7 @@ def main() -> None:
     scenario = (os.getenv("RHEONIC_SCENARIO") or "allow").strip().lower()
     env = (os.getenv("RHEONIC_ENVIRONMENT") or "").strip() or f"protect-{int(time.time())}"
     pause_ms = int(os.getenv("RHEONIC_STEP_SLEEP_MS", "200"))
-    decision_timeout_ms = int(os.getenv("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", "100"))
+    decision_timeout_ms = int(os.getenv("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", "250"))
     project_id = os.getenv("RHEONIC_PROJECT_ID", "")
     auth_token = os.getenv("RHEONIC_AUTH_TOKEN", "")
 
@@ -304,9 +312,9 @@ def main() -> None:
         base_url=BACKEND_BASE_URL,
         environment=env,
         flush_interval_s=0.25,
-        protect_decision_timeout_ms=decision_timeout_ms,
         http_client=transport,
     )
+    client._protect_engine._decision_timeout_ms = decision_timeout_ms
 
     openai = _make_openai_stub()
     anthropic = _make_anthropic_stub()

@@ -39,7 +39,7 @@ class ProtectEngine:
         environment: str,
         request_timeout_s: float,
         fail_mode: str = sdk_config.default_protect_fail_mode,
-        decision_timeout_ms: int = sdk_config.default_protect_decision_timeout_ms,
+        decision_timeout_ms: int = sdk_config.internal_protect_decision_timeout_ms,
         http_client: object | None = None,
         debug_logger: Any | None = None,
     ) -> None:
@@ -51,7 +51,7 @@ class ProtectEngine:
         self._decision_timeout_ms = (
             int(decision_timeout_ms)
             if decision_timeout_ms > 0
-            else sdk_config.default_protect_decision_timeout_ms
+            else sdk_config.internal_protect_decision_timeout_ms
         )
         self._http_client = http_client
         self._debug_logger = debug_logger

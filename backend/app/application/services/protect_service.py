@@ -10,7 +10,7 @@ from app.application.interfaces.event_repository import EventRepository
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.ingest_key_service import IngestKeyService
-from app.config import app_config
+from app.config import Settings, app_config
 from app.domain.detectors.contracts import DetectionContext
 from app.domain.detectors.loop_suspect_detector import LoopSuspectDetector
 from app.domain.detectors.near_cap_detector import NearCapDetector
@@ -60,6 +60,7 @@ class ProtectService:
         event_repository: EventRepository | None = None,
         webhook_dispatcher: WebhookDispatcher | None = None,
         now_provider: Callable[[], datetime] | None = None,
+        protect_decision_timeout_ms: int | None = None,
     ) -> None:
         self._ingest_key_service = ingest_key_service
         self._event_repository = event_repository
@@ -68,6 +69,11 @@ class ProtectService:
         self._protect_block_cooldown_seconds = protect_block_cooldown_seconds
         self._webhook_dispatcher = webhook_dispatcher
         self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
+        self._protect_decision_timeout_ms = int(
+            protect_decision_timeout_ms
+            if protect_decision_timeout_ms is not None
+            else Settings().protect_decision_timeout_ms
+        )
         self._fast_warn_detector_registry = DetectorRegistry(detectors=[NearCapDetector()])
         self._behavioral_warn_detector_registry = DetectorRegistry(
             detectors=[
@@ -96,7 +102,7 @@ class ProtectService:
         max_tok = project.protect_max_tok_per_min
         fail_mode = project.protect_fail_mode
         apply_clamp_enabled = bool(project.apply_clamp)
-        decision_timeout_ms = project.protect_decision_timeout_ms
+        decision_timeout_ms = self._protect_decision_timeout_ms
         requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=scoped_id)
 
         if not project.protect_enabled:

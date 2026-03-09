@@ -214,7 +214,6 @@ def _set_protect(
     protect_fail_mode: str = "open",
     protect_max_req_per_min: int | None = None,
     protect_max_tok_per_min: int | None = None,
-    protect_decision_timeout_ms: int = 100,
 ) -> None:
     response = client.put(
         f"/api/v1/projects/{project_id}/protect",
@@ -224,7 +223,6 @@ def _set_protect(
             "apply_clamp": apply_clamp,
             "protect_max_req_per_min": protect_max_req_per_min,
             "protect_max_tok_per_min": protect_max_tok_per_min,
-            "protect_decision_timeout_ms": protect_decision_timeout_ms,
         },
     )
     assert response.status_code == 200

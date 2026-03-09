@@ -78,7 +78,6 @@ def _seed_project(session_factory: DatabaseSessionFactory, *, protect_enabled: b
                 protect_fail_mode="open",
                 protect_max_req_per_min=None,
                 protect_max_tok_per_min=None,
-                protect_decision_timeout_ms=100,
                 created_at=now,
             )
         )

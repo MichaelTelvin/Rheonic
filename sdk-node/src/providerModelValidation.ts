@@ -1,3 +1,5 @@
+import { sdkNodeConfig } from "./config.js";
+
 export class RHEONICValidationError extends Error {
   public readonly provider: string;
   public readonly model: string;
@@ -12,8 +14,6 @@ export class RHEONICValidationError extends Error {
   }
 }
 
-const SUPPORTED_PROVIDERS = ["openai", "anthropic", "google"] as const;
-
 export function validateProviderModel(provider: string, model: string | null | undefined): void {
   const normalizedProvider = provider.trim().toLowerCase();
   if (!normalizedProvider) {
@@ -21,16 +21,16 @@ export function validateProviderModel(provider: string, model: string | null | u
       "RHEONIC: provider must be explicitly provided.",
       provider,
       String(model ?? ""),
-      SUPPORTED_PROVIDERS,
+      sdkNodeConfig.supportedProviders,
     );
   }
 
-  if (!SUPPORTED_PROVIDERS.includes(normalizedProvider as (typeof SUPPORTED_PROVIDERS)[number])) {
+  if (!sdkNodeConfig.supportedProviders.includes(normalizedProvider as (typeof sdkNodeConfig.supportedProviders)[number])) {
     throw new RHEONICValidationError(
       `RHEONIC: unsupported provider: ${provider}`,
       provider,
       String(model ?? ""),
-      SUPPORTED_PROVIDERS,
+      sdkNodeConfig.supportedProviders,
     );
   }
 
@@ -40,7 +40,7 @@ export function validateProviderModel(provider: string, model: string | null | u
       `RHEONIC: model must be explicitly provided for provider ${normalizedProvider}.`,
       normalizedProvider,
       String(model ?? ""),
-      SUPPORTED_PROVIDERS,
+      sdkNodeConfig.supportedProviders,
     );
   }
 }

@@ -33,11 +33,17 @@ def process_outbox_delivery(outbox_id: str) -> None:
     repository = TransportOutboxRepositoryImpl(session_factory=DatabaseSessionFactory())
     outbox = repository.claim_for_send(outbox_id=outbox_id, now=now)
     if outbox is None:
-        logger.info("Outbox delivery skipped; row unavailable", extra={"outbox_id": outbox_id})
+        logger.info("Outbox delivery skipped; row unavailable [outbox_id=%s]", outbox_id, extra={"outbox_id": outbox_id})
         return
 
     logger.info(
-        "Outbox delivery claimed",
+        "Outbox delivery claimed [outbox_id=%s kind=%s event_type=%s project_id=%s attempts=%s max_attempts=%s]",
+        outbox.id,
+        outbox.kind,
+        outbox.event_type,
+        outbox.project_id,
+        int(outbox.attempts),
+        int(outbox.max_attempts),
         extra={
             "outbox_id": outbox.id,
             "kind": outbox.kind,
@@ -56,7 +62,11 @@ def process_outbox_delivery(outbox_id: str) -> None:
             raise RuntimeError(f"unsupported transport kind: {outbox.kind}")
         repository.mark_delivered(outbox_id=outbox.id, now=datetime.now(timezone.utc))
         logger.info(
-            "Outbox delivery succeeded",
+            "Outbox delivery succeeded [outbox_id=%s kind=%s event_type=%s project_id=%s]",
+            outbox.id,
+            outbox.kind,
+            outbox.event_type,
+            outbox.project_id,
             extra={
                 "outbox_id": outbox.id,
                 "kind": outbox.kind,
@@ -79,7 +89,16 @@ def process_outbox_delivery(outbox_id: str) -> None:
             dead=dead,
         )
         logger.warning(
-            "Outbox delivery failed",
+            "Outbox delivery failed [outbox_id=%s kind=%s event_type=%s project_id=%s attempts=%s max_attempts=%s error_code=%s dead=%s retry_delay_seconds=%s]",
+            outbox.id,
+            outbox.kind,
+            outbox.event_type,
+            outbox.project_id,
+            attempts,
+            int(outbox.max_attempts),
+            code,
+            dead,
+            delay_seconds,
             extra={
                 "outbox_id": outbox.id,
                 "kind": outbox.kind,
@@ -96,7 +115,12 @@ def process_outbox_delivery(outbox_id: str) -> None:
             queue = Queue(settings.rq_queue_name, connection=Redis.from_url(settings.redis_url))
             queue.enqueue_in(timedelta(seconds=delay_seconds), process_outbox_delivery, kwargs={"outbox_id": outbox.id})
             logger.info(
-                "Outbox delivery retry scheduled",
+                "Outbox delivery retry scheduled [outbox_id=%s kind=%s event_type=%s project_id=%s retry_delay_seconds=%s]",
+                outbox.id,
+                outbox.kind,
+                outbox.event_type,
+                outbox.project_id,
+                delay_seconds,
                 extra={
                     "outbox_id": outbox.id,
                     "kind": outbox.kind,

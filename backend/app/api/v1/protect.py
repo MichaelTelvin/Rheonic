@@ -53,7 +53,6 @@ class ProjectProtectOut(BaseModel):
     apply_clamp: bool
     protect_max_req_per_min: int | None
     protect_max_tok_per_min: int | None
-    protect_decision_timeout_ms: int
 
 
 class ProjectProtectIn(BaseModel):
@@ -63,7 +62,6 @@ class ProjectProtectIn(BaseModel):
     apply_clamp: bool = False
     protect_max_req_per_min: int | None = Field(default=None, ge=1)
     protect_max_tok_per_min: int | None = Field(default=None, ge=1)
-    protect_decision_timeout_ms: int = Field(default=100, ge=10, le=10_000)
 
 
 class DecisionTimeoutIn(BaseModel):
@@ -181,7 +179,6 @@ def get_project_protect(
             apply_clamp=project.apply_clamp,
             protect_max_req_per_min=project.protect_max_req_per_min,
             protect_max_tok_per_min=project.protect_max_tok_per_min,
-            protect_decision_timeout_ms=project.protect_decision_timeout_ms,
         )
     except HTTPException:
         raise
@@ -207,7 +204,6 @@ def update_project_protect(
             apply_clamp=payload.apply_clamp,
             protect_max_req_per_min=payload.protect_max_req_per_min,
             protect_max_tok_per_min=payload.protect_max_tok_per_min,
-            protect_decision_timeout_ms=payload.protect_decision_timeout_ms,
         )
         return ProjectProtectOut(
             protect_enabled=updated.protect_enabled,
@@ -215,7 +211,6 @@ def update_project_protect(
             apply_clamp=updated.apply_clamp,
             protect_max_req_per_min=updated.protect_max_req_per_min,
             protect_max_tok_per_min=updated.protect_max_tok_per_min,
-            protect_decision_timeout_ms=updated.protect_decision_timeout_ms,
         )
     except HTTPException:
         raise

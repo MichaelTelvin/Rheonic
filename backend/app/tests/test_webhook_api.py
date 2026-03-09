@@ -61,7 +61,6 @@ def _set_protect_enabled(client: TestClient, project_id: str) -> None:
             "apply_clamp": False,
             "protect_max_req_per_min": None,
             "protect_max_tok_per_min": None,
-            "protect_decision_timeout_ms": 100,
         },
     )
     assert response.status_code == 200

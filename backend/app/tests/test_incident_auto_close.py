@@ -175,7 +175,6 @@ def test_protect_decision_ignores_auto_resolved_incidents(tmp_path) -> None:
                 protect_fail_mode="open",
                 protect_max_req_per_min=None,
                 protect_max_tok_per_min=None,
-                protect_decision_timeout_ms=100,
                 created_at=now,
             )
         )
@@ -245,7 +244,6 @@ def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
                 protect_fail_mode="open",
                 protect_max_req_per_min=None,
                 protect_max_tok_per_min=None,
-                protect_decision_timeout_ms=100,
                 created_at=now,
             )
         )

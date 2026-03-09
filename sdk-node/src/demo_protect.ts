@@ -197,7 +197,7 @@ async function main() {
 
   const scenario = (process.env.RHEONIC_SCENARIO ?? "allow").toLowerCase();
   const pauseMs = envInt("RHEONIC_STEP_SLEEP_MS", 200);
-  const protectDecisionTimeoutMs = envInt("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", 100);
+  const protectDecisionTimeoutMs = envInt("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", 250);
   const env = (process.env.RHEONIC_ENVIRONMENT ?? "").trim() || `protect-${Date.now()}`;
   const authToken = process.env.RHEONIC_AUTH_TOKEN ?? "";
   const projectId = process.env.RHEONIC_PROJECT_ID ?? "";
@@ -211,8 +211,8 @@ async function main() {
     environment: env,
     debug: process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true",
     flushIntervalMs: 60_000,
-    protectDecisionTimeoutMs,
   });
+  ((client as unknown as { protectEngine?: { decisionTimeoutMs?: number } }).protectEngine ?? {}).decisionTimeoutMs = protectDecisionTimeoutMs;
 
   let lastDecisionContext: Record<string, unknown> | null = null;
   let lastDecisionValue = "";

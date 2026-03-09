@@ -11,7 +11,6 @@ import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
 import { InfoTooltip } from "../components/InfoTooltip";
 import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
-import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { getProtectReadiness, type ProtectReadiness } from "./protectReadiness";
@@ -204,8 +203,6 @@ export function Protect(): JSX.Element {
         apply_clamp: applyClampInput,
         protect_max_req_per_min,
         protect_max_tok_per_min,
-        protect_decision_timeout_ms:
-          protectSettings?.protect_decision_timeout_ms ?? frontendConfig.protectDefaultDecisionTimeoutMs,
       });
 
       setProtectSettings(updated);

@@ -62,7 +62,6 @@ def _seed_project(session_factory: DatabaseSessionFactory, project_id: str = "p1
                 protect_fail_mode="open",
                 protect_max_req_per_min=None,
                 protect_max_tok_per_min=None,
-                protect_decision_timeout_ms=100,
                 webhook_enabled=True,
                 webhook_url="https://example.test/hook",
                 webhook_secret="abc123",

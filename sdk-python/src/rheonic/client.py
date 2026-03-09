@@ -89,7 +89,6 @@ class Client:
         overflow_policy: OverflowPolicy = "drop_oldest",
         request_timeout_s: float = sdk_config.default_request_timeout_s,
         protect_fail_mode: str = sdk_config.default_protect_fail_mode,
-        protect_decision_timeout_ms: int = sdk_config.default_protect_decision_timeout_ms,
         debug: bool = False,
         http_client: HttpTransport | None = None,
     ) -> None:
@@ -108,7 +107,6 @@ class Client:
             self.overflow_policy = overflow_policy
             self.request_timeout_s = request_timeout_s
             self.protect_fail_mode = protect_fail_mode
-            self.protect_decision_timeout_ms = protect_decision_timeout_ms
 
             self._queue: deque[dict[str, Any]] = deque()
             self._lock = threading.Lock()
@@ -129,7 +127,6 @@ class Client:
                 environment=self.environment,
                 request_timeout_s=self.request_timeout_s,
                 fail_mode=self.protect_fail_mode,
-                decision_timeout_ms=self.protect_decision_timeout_ms,
                 http_client=self._http_client,
                 debug_logger=self.debug_log,
             )
@@ -206,7 +203,11 @@ class Client:
         # Emit SDK debug logs only when debug mode is enabled.
         if not self._debug_enabled:
             return
-        logger.debug(message, extra=extra or None)
+        if extra:
+            rendered = " ".join(f"{key}={extra[key]}" for key in sorted(extra))
+            logger.debug("%s [%s]", message, rendered, extra=extra)
+            return
+        logger.debug(message)
 
     def preflight_protect_decision(self, context: dict[str, object]) -> dict[str, object]:
         # Evaluate protect decision for provider call preflight.
@@ -333,7 +334,6 @@ def create_client(
     overflow_policy: OverflowPolicy = "drop_oldest",
     request_timeout_s: float = sdk_config.default_request_timeout_s,
     protect_fail_mode: str = sdk_config.default_protect_fail_mode,
-    protect_decision_timeout_ms: int = sdk_config.default_protect_decision_timeout_ms,
     debug: bool = False,
 ) -> Client:
     # Create and register default client used by module-level helpers.
@@ -349,7 +349,6 @@ def create_client(
         overflow_policy=overflow_policy,
         request_timeout_s=request_timeout_s,
         protect_fail_mode=protect_fail_mode,
-        protect_decision_timeout_ms=protect_decision_timeout_ms,
         debug=debug,
     )
     return _default_client

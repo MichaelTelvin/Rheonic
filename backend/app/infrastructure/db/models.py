@@ -81,7 +81,6 @@ class ProjectRecord(Base):
     apply_clamp: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
     protect_max_req_per_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     protect_max_tok_per_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    protect_decision_timeout_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=100, server_default="100")
     webhook_enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
     email_enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
     webhook_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)

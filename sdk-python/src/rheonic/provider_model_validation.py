@@ -1,6 +1,5 @@
 from rheonic.protect_engine import RHEONICValidationError
-
-_SUPPORTED_PROVIDERS: tuple[str, ...] = ("openai", "anthropic", "google")
+from rheonic.config import sdk_config
 
 
 def validate_provider_model(provider: str, model: str | None) -> None:
@@ -8,7 +7,7 @@ def validate_provider_model(provider: str, model: str | None) -> None:
     if not normalized_provider:
         raise RHEONICValidationError("RHEONIC: provider must be explicitly provided.")
 
-    if normalized_provider not in _SUPPORTED_PROVIDERS:
+    if normalized_provider not in sdk_config.supported_providers:
         raise RHEONICValidationError(f"RHEONIC: unsupported provider: {provider}")
 
     normalized_model = (model or "").strip()

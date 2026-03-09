@@ -37,7 +37,6 @@ def upgrade() -> None:
         sa.Column("apply_clamp", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("protect_max_req_per_min", sa.Integer(), nullable=True),
         sa.Column("protect_max_tok_per_min", sa.Integer(), nullable=True),
-        sa.Column("protect_decision_timeout_ms", sa.Integer(), server_default="100", nullable=False),
         sa.Column("webhook_enabled", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("webhook_url", sa.String(length=2048), nullable=True),
         sa.Column("webhook_secret", sa.String(length=512), nullable=True),

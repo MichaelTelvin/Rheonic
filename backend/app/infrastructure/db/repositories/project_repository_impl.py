@@ -73,7 +73,6 @@ class ProjectRepositoryImpl(ProjectRepository):
                     apply_clamp=project.apply_clamp,
                     protect_max_req_per_min=project.protect_max_req_per_min,
                     protect_max_tok_per_min=project.protect_max_tok_per_min,
-                    protect_decision_timeout_ms=project.protect_decision_timeout_ms,
                     created_at=project.created_at,
                 )
                 session.add(record)
@@ -117,7 +116,6 @@ class ProjectRepositoryImpl(ProjectRepository):
         apply_clamp: bool,
         protect_max_req_per_min: int | None,
         protect_max_tok_per_min: int | None,
-        protect_decision_timeout_ms: int,
     ) -> Project | None:
         # Update and return project protect settings.
         try:
@@ -130,7 +128,6 @@ class ProjectRepositoryImpl(ProjectRepository):
                 record.apply_clamp = apply_clamp
                 record.protect_max_req_per_min = protect_max_req_per_min
                 record.protect_max_tok_per_min = protect_max_tok_per_min
-                record.protect_decision_timeout_ms = protect_decision_timeout_ms
                 session.add(record)
                 session.commit()
                 session.refresh(record)
@@ -258,7 +255,6 @@ def _to_domain(record: ProjectRecord, settings: Settings | None = None) -> Proje
         apply_clamp=bool(getattr(record, "apply_clamp", False)),
         protect_max_req_per_min=getattr(record, "protect_max_req_per_min", None),
         protect_max_tok_per_min=getattr(record, "protect_max_tok_per_min", None),
-        protect_decision_timeout_ms=int(getattr(record, "protect_decision_timeout_ms", 100) or 100),
         webhook_enabled=bool(getattr(record, "webhook_enabled", False)),
         email_enabled=bool(getattr(record, "email_enabled", False)),
         webhook_url=getattr(record, "webhook_url", None),

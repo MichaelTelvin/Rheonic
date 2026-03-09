@@ -57,7 +57,6 @@ Fields:
 - `apply_clamp`
 - `protect_max_req_per_min`
 - `protect_max_tok_per_min`
-- `protect_decision_timeout_ms`
 
 ## Protect decision
 - `POST /api/v1/protect/decision`
