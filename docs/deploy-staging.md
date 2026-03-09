@@ -8,7 +8,7 @@
 ## Environment file requirements
 1. Create staging env:
 ```bash
-cp .env.example .env
+cp .env.staging.example .env
 ```
 2. Required values:
 - `APP_ENV=staging`
@@ -19,6 +19,11 @@ cp .env.example .env
 - `VITE_API_BASE_URL` (public staging API URL)
 - `FRONTEND_PORT`, `BACKEND_PORT`
 - optional: `RQ_QUEUE_NAME`, `RQ_SCHEDULER_INTERVAL_SECONDS`
+
+## Temporary IP-based staging
+- For first private VPS testing without a domain, use [`.env.staging.example`](/Users/mike/Projects/Rheonic/.env.staging.example).
+- Replace every `YOUR_VPS_IP` placeholder with your actual VPS IP.
+- This keeps your local [`.env`](/Users/mike/Projects/Rheonic/.env) as a dev-only file and avoids mixing localhost values into staging.
 
 ## Secrets handling
 - There is no built-in Vault, SSM, Doppler, or cloud secret-manager integration in this repo today.
@@ -38,6 +43,14 @@ cp .env.example .env
 docker compose -f docker-compose.staging.yml up -d --build
 docker compose -f docker-compose.staging.yml ps
 ```
+
+## Copy env to VPS
+From your local machine:
+```bash
+scp .env root@<staging-ip>:/root/rheonic/.env
+```
+This assumes the repo on the VPS lives at `/root/rheonic`.
+If the repo is elsewhere, change the destination path.
 
 ## Access by IP
 - Frontend: `http://<staging-ip>:${FRONTEND_PORT}`

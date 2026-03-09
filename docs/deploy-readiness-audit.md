@@ -76,6 +76,7 @@
 - Final production domain and DNS cutover.
 - Email provider implementation behind current stub transport (currently deterministic fail-state by design when provider disabled/unimplemented).
 - External log aggregation remains a recommended production upgrade; current compose files now cap Docker log size locally, but logs are not yet shipped off-host.
+- Secrets manager integration (Doppler)
 - Privacy/compliance review:
   - confirm data retention policy for events and incidents,
   - confirm customer-facing privacy language and subprocessors,
