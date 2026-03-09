@@ -198,6 +198,9 @@ def _send_ingest_event(
         "provider": provider,
         "model": model,
         "environment": environment,
+        "latency_ms": 120,
+        "http_status": http_status,
+        **({"error_type": error_type} if error_type else {}),
         "request": {"endpoint": "/chat/completions", "feature": feature, "input_tokens": 1},
         "response": {
             "output_tokens": 1,

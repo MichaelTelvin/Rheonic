@@ -54,6 +54,12 @@ class FakeRedisClient:
         self.values[key] = next_value
         return next_value
 
+    def incrby(self, key: str, amount: int) -> int:
+        current = self.values.get(key, 0)
+        next_value = int(current) + int(amount)
+        self.values[key] = next_value
+        return next_value
+
     def zadd(self, key: str, mapping: dict[str, int]) -> int:
         zset = self.zsets.setdefault(key, {})
         added = 0
@@ -97,6 +103,11 @@ class FakeRedisClient:
     def expire(self, key: str, ttl_seconds: int) -> bool:
         self.ttls[key] = ttl_seconds
         return True
+
+    def delete(self, key: str) -> int:
+        existed = key in self.values
+        self.values.pop(key, None)
+        return 1 if existed else 0
 
 
 class FakeEventRepository:
@@ -511,4 +522,43 @@ def test_protect_metrics_support_provider_filter_with_same_schema(tmp_path) -> N
     anthropic_metrics = client.get(f"/api/v1/metrics/protect?project_id={project_id}&provider=anthropic")
     assert anthropic_metrics.status_code == 200
     assert anthropic_metrics.json()["warned_60m"] >= 1
+    _cleanup_overrides()
+
+
+def test_timeout_report_reconciles_late_warn_decision_metrics(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Timeout Reconcile")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=170)
+
+    request_id = "req-timeout-1"
+    decision_response = client.post(
+        "/api/v1/protect/decision",
+        headers={
+            "X-Project-Ingest-Key": ingest_key,
+            "X-Rheonic-Protect-Request-Id": request_id,
+        },
+        json={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 20},
+    )
+    assert decision_response.status_code == 200
+    assert decision_response.json()["decision"] == "warn"
+
+    timeout_response = client.post(
+        "/api/v1/protect/decision-timeout",
+        headers={
+            "X-Project-Ingest-Key": ingest_key,
+            "X-Rheonic-Protect-Request-Id": request_id,
+        },
+        json={"environment": "dev", "provider": "openai", "request_id": request_id},
+    )
+    assert timeout_response.status_code == 202
+
+    metrics = _protect_metrics(client, project_id)
+    assert metrics["warned_60m"] == 0
+    assert metrics["decision_timeouts_60m"] == 1
+    assert metrics["last"] == {
+        "decision": "allow",
+        "reason": "decision_timeout",
+        "ts": metrics["last"]["ts"],
+    }
     _cleanup_overrides()

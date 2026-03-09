@@ -98,6 +98,9 @@ async function sendIngestEvent(
     provider,
     model,
     environment,
+    latency_ms: 120,
+    http_status: httpStatus,
+    ...(options?.errorType ? { error_type: options.errorType } : {}),
     request: { endpoint: "/chat/completions", feature, input_tokens: 1 },
     response: {
       output_tokens: 1,

@@ -1,4 +1,5 @@
 import { sdkNodeConfig } from "./config.js";
+import { randomUUID } from "node:crypto";
 
 export type ProtectDecision = "allow" | "warn" | "block";
 export type ProtectFailMode = "open" | "closed";
@@ -104,6 +105,7 @@ export class ProtectEngine {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     timeout.unref?.();
     const startedAt = Date.now();
+    const requestId = randomUUID();
 
     try {
       const response = await fetchFn(`${this.baseUrl}/api/v1/protect/decision`, {
@@ -111,6 +113,7 @@ export class ProtectEngine {
         headers: {
           "Content-Type": "application/json",
           "X-Project-Ingest-Key": this.ingestKey,
+          "X-Rheonic-Protect-Request-Id": requestId,
         },
         body: JSON.stringify(context),
         signal: controller.signal,
@@ -170,7 +173,7 @@ export class ProtectEngine {
           latency_ms: Date.now() - startedAt,
           timeout_ms: timeoutMs,
         });
-        void this.reportDecisionTimeout(fetchFn, context.provider);
+        void this.reportDecisionTimeout(fetchFn, context.provider, requestId);
       } else {
         this.debugLog?.("Protect preflight failed", {
           provider: context.provider,
@@ -184,15 +187,16 @@ export class ProtectEngine {
     }
   }
 
-  private async reportDecisionTimeout(fetchFn: typeof fetch, provider: string | undefined): Promise<void> {
+  private async reportDecisionTimeout(fetchFn: typeof fetch, provider: string | undefined, requestId: string): Promise<void> {
     try {
       await fetchFn(`${this.baseUrl}/api/v1/protect/decision-timeout`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Project-Ingest-Key": this.ingestKey,
+          "X-Rheonic-Protect-Request-Id": requestId,
         },
-        body: JSON.stringify({ environment: this.environment, provider }),
+        body: JSON.stringify({ environment: this.environment, provider, request_id: requestId }),
       });
     } catch {
       // Swallow timeout reporting errors; protect evaluation must never throw here.

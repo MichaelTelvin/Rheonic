@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 @dataclass(frozen=True)
 class AppConfig:
     default_log_format: str = "%(asctime)s %(levelname)s %(name)s %(message)s"
-    default_protect_decision_timeout_ms: int = 250
+    default_protect_decision_timeout_ms: int = 300
     rolling_window_seconds: int = 60
     rolling_window_ms: int = rolling_window_seconds * 1000
     rolling_counter_ttl_seconds: int = 600

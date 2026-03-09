@@ -3,6 +3,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from typing import Any
+from uuid import uuid4
 
 from rheonic.config import sdk_config
 from rheonic.logger import get_logger
@@ -72,6 +73,7 @@ class ProtectEngine:
 
         timeout_s = max(self._decision_timeout_ms, 1) / 1000.0
         started_at = time.perf_counter()
+        request_id = uuid4().hex
         try:
             response = self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision",
@@ -79,6 +81,7 @@ class ProtectEngine:
                 headers={
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
+                    "X-Rheonic-Protect-Request-Id": request_id,
                 },
                 timeout_s=timeout_s,
             )
@@ -143,6 +146,7 @@ class ProtectEngine:
                 )
                 self._report_decision_timeout_fire_and_forget(
                     provider=str(provider) if isinstance(provider, str) else None,
+                    request_id=request_id,
                 )
             else:
                 self._debug(
@@ -196,16 +200,17 @@ class ProtectEngine:
             return True
         return False
 
-    def _report_decision_timeout_fire_and_forget(self, provider: str | None) -> None:
+    def _report_decision_timeout_fire_and_forget(self, provider: str | None, request_id: str) -> None:
         # Report decision timeout without blocking caller flow.
         def _send() -> None:
             try:
                 self._post_with_timeout(
                     f"{self._base_url}/api/v1/protect/decision-timeout",
-                    json={"environment": self._environment, "provider": provider},
+                    json={"environment": self._environment, "provider": provider, "request_id": request_id},
                     headers={
                         "Content-Type": "application/json",
                         "X-Project-Ingest-Key": self._ingest_key,
+                        "X-Rheonic-Protect-Request-Id": request_id,
                     },
                     timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),
                 )

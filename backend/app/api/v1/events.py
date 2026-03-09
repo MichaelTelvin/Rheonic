@@ -34,6 +34,9 @@ class EventResponseIn(BaseModel):
 
     output_tokens: int | None = None
     total_tokens: int | None = None
+    latency_ms: int | None = None
+    http_status: int | None = None
+    error_type: str | None = None
 
 
 class EventIn(BaseModel):
@@ -155,10 +158,10 @@ def ingest_event(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,
-            latency_ms=payload.latency_ms,
+            latency_ms=(payload.response.latency_ms if payload.response is not None else payload.latency_ms),
             status=payload.status,
-            error_type=payload.error_type,
-            http_status=payload.http_status,
+            error_type=(payload.response.error_type if payload.response is not None and payload.response.error_type else payload.error_type),
+            http_status=(payload.response.http_status if payload.response is not None and payload.response.http_status is not None else payload.http_status),
             request_endpoint=(payload.request.endpoint if payload.request is not None else None),
             request_feature=(payload.request.feature if payload.request is not None else None),
             created_at=datetime.now(timezone.utc),

@@ -38,16 +38,26 @@ def _timeout_key(project_id: str) -> str:
     return f"pa:{project_id}:timeout:60m"
 
 
+def _request_key(project_id: str, request_id: str) -> str:
+    return f"pa:{project_id}:request:{request_id}"
+
+
+def _timed_out_request_key(project_id: str, request_id: str) -> str:
+    return f"pa:{project_id}:timedout:{request_id}"
+
+
 class ProtectActionStore:
     # Stores protect decision counters and last decision snapshot in Redis.
 
     def __init__(self, redis_client: RedisClient) -> None:
         self._redis_client = redis_client
 
-    def record(self, project_id: str, decision: str, reason: str, ts: datetime | None = None) -> None:
+    def record(self, project_id: str, decision: str, reason: str, request_id: str | None = None, ts: datetime | None = None) -> None:
         # Record warn/block counters and keep the last decision payload for UI.
         timestamp = (ts or datetime.now(timezone.utc)).isoformat()
         try:
+            if request_id and self._redis_client.get(_timed_out_request_key(project_id, request_id)) is not None:
+                return
             if decision == "allow":
                 self._increment_with_ttl(_allow_key(project_id))
             elif decision == "warn":
@@ -57,6 +67,12 @@ class ProtectActionStore:
 
             payload = {"decision": decision, "reason": reason, "ts": timestamp}
             self._redis_client.set(_last_key(project_id), json.dumps(payload), ex=app_config.protect_action_counter_ttl_seconds)
+            if request_id:
+                self._redis_client.set(
+                    _request_key(project_id, request_id),
+                    json.dumps(payload),
+                    ex=app_config.protect_action_counter_ttl_seconds,
+                )
         except Exception:
             logger.warning("Failed recording protect decision counters", extra={"project_id": project_id})
 
@@ -90,10 +106,27 @@ class ProtectActionStore:
                 "decision_latency_p95_60m_ms": None,
             }
 
-    def record_decision_timeout(self, project_id: str) -> None:
+    def record_decision_timeout(self, project_id: str, request_id: str | None = None) -> None:
         # Record one SDK-reported decision-timeout in the 60-minute counter.
         try:
             self._increment_with_ttl(_timeout_key(project_id))
+            now = datetime.now(timezone.utc).isoformat()
+            self._redis_client.set(
+                _last_key(project_id),
+                json.dumps({"decision": "allow", "reason": "decision_timeout", "ts": now}),
+                ex=app_config.protect_action_counter_ttl_seconds,
+            )
+            if request_id:
+                self._redis_client.set(
+                    _timed_out_request_key(project_id, request_id),
+                    "1",
+                    ex=app_config.protect_action_counter_ttl_seconds,
+                )
+                request_raw = self._redis_client.get(_request_key(project_id, request_id))
+                request_payload = self._parse_last(request_raw)
+                if request_payload is not None:
+                    self._decrement_counter_for_decision(project_id=project_id, decision=request_payload["decision"])
+                self._redis_client.delete(_request_key(project_id, request_id))
         except Exception:
             logger.warning("Failed recording protect decision timeout", extra={"project_id": project_id})
 
@@ -155,6 +188,23 @@ class ProtectActionStore:
         value = self._redis_client.incr(key)
         if value == 1:
             self._redis_client.expire(key, app_config.protect_action_counter_ttl_seconds)
+
+    def _decrement_counter_for_decision(self, *, project_id: str, decision: str) -> None:
+        key = (
+            _allow_key(project_id)
+            if decision == "allow"
+            else _warn_key(project_id)
+            if decision == "warn"
+            else _block_key(project_id)
+            if decision == "block"
+            else None
+        )
+        if key is None:
+            return
+        current = self._read_int(key)
+        if current <= 0:
+            return
+        self._redis_client.incrby(key, -1)
 
     def _read_int(self, key: str) -> int:
         raw = self._redis_client.get(key)

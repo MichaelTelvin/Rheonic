@@ -165,3 +165,36 @@ def test_ingest_event_accepts_quoted_and_env_style_ingest_keys() -> None:
     assert env_style.status_code == 202
     assert len(ingest_service.ingested) == 2
     app.dependency_overrides.clear()
+
+
+def test_ingest_event_maps_nested_response_failure_fields_to_domain_event() -> None:
+    ingest_service = FakeIngestService()
+    key_service = FakeIngestKeyService()
+    app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
+    app.dependency_overrides[get_ingest_key_service] = lambda: key_service
+    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev")
+    client = TestClient(app)
+
+    payload = _payload()
+    payload["status"] = "error"
+    payload["response"] = {
+        "total_tokens": 10,
+        "latency_ms": 321,
+        "http_status": 503,
+        "error_type": "provider_5xx",
+    }
+
+    response = client.post(
+        "/api/v1/events",
+        json=payload,
+        headers={"X-Project-Ingest-Key": "active-test-key"},
+    )
+
+    assert response.status_code == 202
+    assert len(ingest_service.ingested) == 1
+    event = ingest_service.ingested[0]
+    assert getattr(event, "status") == "error"
+    assert getattr(event, "latency_ms") == 321
+    assert getattr(event, "http_status") == 503
+    assert getattr(event, "error_type") == "provider_5xx"
+    app.dependency_overrides.clear()

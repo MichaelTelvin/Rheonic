@@ -68,6 +68,7 @@ class DecisionTimeoutIn(BaseModel):
     # Timeout report payload from SDK when decision preflight call times out.
     environment: str
     provider: str | None = None
+    request_id: str | None = None
 
 
 @router.post("/protect/decision", response_model=ProtectDecisionOut)
@@ -77,6 +78,7 @@ def protect_decision(
     service: ProtectService = Depends(get_protect_service),
     protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
+    request_id: str | None = Header(default=None, alias="X-Rheonic-Protect-Request-Id"),
 ) -> ProtectDecisionOut:
     # Evaluate preflight decision from project protect configuration and Redis counters.
     start = perf_counter()
@@ -104,6 +106,7 @@ def protect_decision(
                 project_id=scoped_id,
                 decision=decision.decision,
                 reason=decision.reason,
+                request_id=request_id,
             )
             protect_action_store.record_health(
                 project_id=scoped_id,
@@ -144,6 +147,7 @@ def protect_decision_timeout(
     ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
     protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
+    request_id_header: str | None = Header(default=None, alias="X-Rheonic-Protect-Request-Id"),
 ) -> dict[str, str]:
     # Record one SDK-side preflight timeout for the project mapped from ingest key.
     _ = payload
@@ -155,6 +159,7 @@ def protect_decision_timeout(
             raise HTTPException(status_code=401, detail="invalid ingest key")
         protect_action_store.record_decision_timeout(
             project_id=scoped_project_provider_id(project.id, payload.provider),
+            request_id=request_id_header or payload.request_id,
         )
         return {"status": "accepted"}
     except HTTPException:
