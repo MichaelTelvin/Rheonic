@@ -208,6 +208,7 @@ async function main() {
   let lastDecisionReason = "";
   let lastClampRecommended = null;
   let lastClampApplied = null;
+  let lastDecisionPayload = null;
   const originalEvaluateProtectDecision = client.evaluateProtectDecision.bind(client);
   client.evaluateProtectDecision = async (context) => {
     console.log("=== PROTECT DECISION REQUEST ===");
@@ -220,6 +221,7 @@ async function main() {
       console.log(`=== PROTECT DECISION ERROR === ${message}`);
       throw error;
     }
+    lastDecisionPayload = decision;
     lastDecisionValue = decision.decision;
     lastDecisionReason = decision.reason;
     lastClampRecommended = decision.clamp?.recommended_max_output_tokens ?? null;
