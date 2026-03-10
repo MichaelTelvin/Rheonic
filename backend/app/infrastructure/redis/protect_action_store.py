@@ -85,13 +85,13 @@ class ProtectActionStore:
                 self._redis_client.set(
                     _outcome_key(project_id, request_id),
                     json.dumps(payload),
-                    ex=app_config.protect_action_counter_ttl_seconds,
+                    app_config.protect_action_counter_ttl_seconds,
                 )
             self._apply_outcome_counters(project_id=project_id, payload=payload)
             self._redis_client.set(
                 _last_key(project_id),
                 json.dumps(payload),
-                ex=app_config.protect_action_counter_ttl_seconds,
+                app_config.protect_action_counter_ttl_seconds,
             )
         except Exception:
             logger.warning(
