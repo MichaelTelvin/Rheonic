@@ -158,8 +158,7 @@ class Client:
             self._worker = threading.Thread(target=self._run_flush_loop, daemon=True)
             self._is_closed = False
             self._worker.start()
-            if managed_http_client:
-                self.warm_connections()
+            self.warm_connections()
             atexit.register(self.close)
             logger.info("SDK client initialized")
         except Exception:

@@ -55,8 +55,9 @@ def test_client_flush_sends_header_and_payload() -> None:
     client.flush(timeout_s=0.5)
     client.close()
 
-    assert len(fake_http.calls) == 1
-    assert fake_http.calls[0]["headers"]["X-Project-Ingest-Key"] == "p1"
+    post_calls = [call for call in fake_http.calls if "json" in call]
+    assert len(post_calls) == 1
+    assert post_calls[0]["headers"]["X-Project-Ingest-Key"] == "p1"
 
 
 def test_queue_overflow_drop_newest_policy() -> None:
@@ -76,8 +77,9 @@ def test_queue_overflow_drop_newest_policy() -> None:
     client.flush(timeout_s=0.5)
     client.close()
 
-    assert len(fake_http.calls) == 1
-    assert fake_http.calls[0]["json"]["response"]["total_tokens"] == 1
+    post_calls = [call for call in fake_http.calls if "json" in call]
+    assert len(post_calls) == 1
+    assert post_calls[0]["json"]["response"]["total_tokens"] == 1
     assert client.stats()["dropped"] == 1
 
 
@@ -112,7 +114,6 @@ def test_warm_connections_hits_health_endpoint() -> None:
         http_client=fake_http,  # type: ignore[arg-type]
     )
 
-    client.warm_connections()
     client.close()
 
     get_calls = [call for call in fake_http.calls if call.get("method") == "GET"]
