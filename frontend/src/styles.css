@@ -1393,6 +1393,7 @@ body {
 .dashboard-hero-right {
   justify-self: end;
   width: clamp(280px, 32vw, 340px);
+  padding-top: 6px;
 }
 
 .status-panel {
@@ -2843,31 +2844,28 @@ pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 92px;
-  min-height: 32px;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  font-size: 0.82rem;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: rgba(229, 231, 235, 0.9);
-  background: linear-gradient(180deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0.05));
+  background: rgba(148, 163, 184, 0.08);
   white-space: nowrap;
-  backdrop-filter: blur(3px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 8px rgba(148, 163, 184, 0.07);
 }
 
 .mode-indicator-protect {
-  border-color: rgba(134, 239, 172, 0.14);
+  border-color: rgba(134, 239, 172, 0.16);
   color: rgba(209, 250, 229, 0.92);
-  background: linear-gradient(180deg, rgba(134, 239, 172, 0.09), rgba(134, 239, 172, 0.045));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 0 9px rgba(134, 239, 172, 0.06);
+  background: rgba(134, 239, 172, 0.08);
 }
 
 .mode-indicator-observe {
-  border-color: rgba(167, 139, 250, 0.2);
+  border-color: rgba(167, 139, 250, 0.18);
   color: rgba(237, 233, 254, 0.92);
-  background: linear-gradient(180deg, rgba(167, 139, 250, 0.1), rgba(167, 139, 250, 0.05));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 12px rgba(167, 139, 250, 0.07);
+  background: rgba(167, 139, 250, 0.08);
 }
 
 .app-main-content {
