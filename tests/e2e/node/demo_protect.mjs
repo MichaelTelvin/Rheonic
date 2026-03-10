@@ -201,6 +201,7 @@ async function main() {
     debug: process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true",
     flushIntervalMs: 60_000,
   });
+  await client.warmConnections();
   client.protectEngine.decisionTimeoutMs = protectDecisionTimeoutMs;
 
   let lastDecisionValue = "";
