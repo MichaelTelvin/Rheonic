@@ -12,6 +12,10 @@ This audit maps the current Protect request lifecycle across:
 
 The goal is to stop patching isolated symptoms and harden one canonical contract.
 
+Status:
+- Phase 2 canonical finalization is now implemented.
+- This document now tracks what is finished and what remains.
+
 ## Current Ownership
 
 ### Backend owns
@@ -49,7 +53,7 @@ The goal is to stop patching isolated symptoms and harden one canonical contract
 1. SDK estimates input tokens
 2. SDK calls `POST /api/v1/protect/decision`
 3. backend evaluates policy in `ProtectService.evaluate_decision(...)`
-4. backend writes protect decision counters via `ProtectActionStore.record(...)`
+4. backend finalizes the request outcome through `ProtectActionStore.finalize_outcome(...)`
 5. SDK executes provider call according to returned decision
 6. SDK emits event to `/api/v1/events`
 7. ingest path may open incidents independently
@@ -61,8 +65,8 @@ The goal is to stop patching isolated symptoms and harden one canonical contract
 3. SDK uses local fallback:
    - `allow` if fail mode is `open`
    - `block` if fail mode is `closed`
-4. SDK reports timeout to `POST /api/v1/protect/decision-timeout`
-5. backend writes timeout-derived counters via `ProtectActionStore.record_decision_timeout(...)`
+4. SDK reports timeout or unavailability to the backend fallback endpoint
+5. backend finalizes the same request id through `ProtectActionStore.finalize_outcome(...)`
 6. if provider call was allowed, SDK emits event to `/api/v1/events`
 7. ingest path may still open incidents independently
 
@@ -70,9 +74,8 @@ The goal is to stop patching isolated symptoms and harden one canonical contract
 
 1. SDK times out locally and applies fallback
 2. backend may still complete the original `/protect/decision`
-3. backend may try to write decision counters for that late response
-4. timeout report may also write timeout-derived counters
-5. request-id reconciliation tries to keep only the final effective outcome
+3. backend may still complete the original `/protect/decision`
+4. request-id reconciliation keeps only the final effective outcome
 
 This is the most fragile path in the current design.
 
@@ -83,15 +86,15 @@ This is the most fragile path in the current design.
 | preflight success + allow | allow provider call | allow counter increments | maybe none | mostly stable |
 | preflight success + warn | allow provider call + warn | warn counter increments | may also open incident later | mostly stable |
 | preflight success + block | block provider call | block counter increments | usually no ingest event | mostly stable |
-| timeout + fail-open | allow provider call | should increment allow + timeout | ingest may still open incident | recently fixed |
-| timeout + fail-closed | block provider call | should increment block + timeout | no ingest event | recently fixed |
-| timeout, then late warn | effective outcome should remain fallback result | late warn must not survive | incident path independent | recently fixed |
-| timeout, then late allow, fail-closed | effective outcome should remain block | allow must be removed, block only | no ingest event | recently fixed |
+| timeout + fail-open | allow provider call | increment allow + timeout | ingest may still open incident | covered |
+| timeout + fail-closed | block provider call | increment block + timeout | no ingest event | covered |
+| timeout, then late warn | effective outcome should remain fallback result | late warn must not survive | incident path independent | covered |
+| timeout, then late allow, fail-closed | effective outcome should remain block | allow must not survive | no ingest event | covered |
 | warn + clamp off | provider call allowed, no max-token rewrite | warn counter increments | ingest independent | needs dedicated end-to-end validation |
 | warn + clamp on | provider call allowed, max-token rewrite | warn counter increments | ingest independent | needs dedicated end-to-end validation |
-| backend unavailable at bootstrap | fallback uses SDK cached fail mode | metrics depend on timeout/unavailable reporting | incident path depends on provider call | not fully specified |
-| duplicated timeout report | should be idempotent | counters should not double count | none | not explicitly tested |
-| duplicated decision report | should be idempotent per request id | counters should not double count | none | not explicitly tested |
+| backend unavailable at bootstrap | fallback uses cached bootstrap config | unavailable fallback finalizes one outcome | incident path depends on provider call | covered |
+| duplicated timeout report | should be idempotent | counters should not double count | none | covered |
+| duplicated decision report | should be idempotent per request id | counters should not double count | none | partially covered via finalization |
 
 ## Gaps Already Confirmed
 
@@ -99,11 +102,7 @@ This is the most fragile path in the current design.
 
 Previously, timeout fail-open or fail-closed could behave correctly in SDK while dashboard counters reflected a different outcome.
 
-Reason:
-
-- timeout fallback was executed locally in SDK
-- backend timeout-report path updated counters separately
-- request-id reconciliation was incomplete
+This has now been fixed by canonical request-id finalization.
 
 ### 2. Project fail mode was not available to first timed-out SDK request
 
@@ -121,62 +120,51 @@ Incidents reflect ingest-time anomaly detection.
 
 This is valid, but the product contract is not explicit enough, so the UI semantics are easy to misread.
 
-### 4. Timeout is modeled as a secondary request instead of one final outcome record
+### 4. Remaining gap: fallback health is still mostly operator-facing
 
-Current design:
+The backend now distinguishes:
 
-- primary request: `/protect/decision`
-- secondary request: `/protect/decision-timeout`
+- `live`
+- `timeout_fallback`
+- `unavailable_fallback`
 
-This creates reconciliation complexity and race conditions.
+But the dashboard intentionally rolls these into one user-facing health state instead of exposing raw internals.
 
 ## Structural Weaknesses Still Present
 
-### 1. No canonical per-request protect outcome record
+### 1. Canonical outcome exists, but coverage is still incomplete
 
-Redis stores counters and a `last` snapshot, but not a first-class normalized outcome object for each request lifecycle.
+Redis now stores a short-lived normalized outcome per request id and derives counters through one finalization path.
 
-That means:
+What still remains:
 
-- state must be inferred from counters
-- timeout reconciliation is patchy
-- dashboard semantics depend on derived state
+- clamp on/off needs full end-to-end validation
+- cooldown needs broader scenario coverage outside backend unit tests
+- user-facing health derivation should stay compact and not leak internal source detail
 
-### 2. Timeout and unavailable are conflated in SDK fallback
+### 2. Timeout and unavailable are now separated internally
 
-SDK currently returns:
+SDK and backend now distinguish:
 
-- `decision_unavailable` for generic failures
-- timeout report only for explicit timeout path
+- timeout fallback
+- unavailable fallback
 
-The product should probably distinguish:
+The product surface should still roll these up into one compact health signal.
 
-- `timed_out`
-- `backend_unavailable`
-- `http_error`
-- `invalid_response`
+### 3. Idempotency is modeled, but should stay under test
 
-### 3. Idempotency is not explicitly modeled end-to-end
+The contract now is:
 
-There is request-id reconciliation, but there is no explicit documented contract that says:
+- one request id ends in exactly one final protect outcome
+- repeated fallback reports are ignored
+- late live decisions are ignored after fallback finalization
 
-- one request id must end in exactly one final protect outcome
-- repeated timeout reports are ignored
-- repeated late decisions are ignored after finalization
+### 4. Dashboard visibility should stay product-focused
 
-### 4. Dashboard visibility is too narrow
+The dashboard should show:
 
-Current dashboard counters show:
-
-- allow/warn/block
-- decision timeouts
-
-But they do not clearly show:
-
-- fallback mode usage count
-- backend unavailable count
-- percentage of requests using local fallback
-- whether the latest result was live or fallback-derived
+- one rolled-up system health state
+- not internal fallback/source counters
 
 ## Required Contract
 
@@ -220,6 +208,8 @@ Everything else should derive from that record:
 3. Derive counters from that normalized record update path only
 4. Stop having multiple endpoints mutate counters independently without normalization
 
+Status: complete
+
 ### Phase 3: Scenario-matrix tests
 
 Add table-driven tests covering:
@@ -245,20 +235,14 @@ These tests should assert all of:
 
 ### Phase 4: Dashboard visibility
 
-Expose and render:
+Expose and render one compact user-facing health state derived from internal protect health:
 
-- `fallback_open_60m`
-- `fallback_closed_60m`
-- `backend_unavailable_60m`
-- `timed_out_60m`
-- last protect outcome source
+- `Healthy`
+- `Degraded`
+- `Unavailable`
 
 ## Immediate Next Implementation Target
 
-Before auth-cookie migration, the next serious backend/SDK hardening task should be:
-
-1. add canonical per-request protect outcome storage
-2. route timeout and live decision updates through one finalization path
-3. add scenario-matrix tests before changing more UI logic
-
-This is the minimum needed to make fail paths trustworthy.
+1. finish clamp on/off end-to-end coverage
+2. validate cooldown semantics through the same contract lens
+3. keep docs/charts/tests aligned with the canonical finalization path

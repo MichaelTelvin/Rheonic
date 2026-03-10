@@ -16,7 +16,6 @@ export interface ProtectMetrics {
   last: {
     decision: string;
     reason: string;
-    source?: string;
     ts: string;
   } | null;
 }

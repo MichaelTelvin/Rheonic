@@ -61,6 +61,7 @@ Fields:
 ## Protect decision
 - `POST /api/v1/protect/decision`
 - `POST /api/v1/protect/decision-timeout`
+- `POST /api/v1/protect/decision-unavailable`
 
 Decision order in protect mode:
 1. cooldown -> `block`
@@ -75,6 +76,11 @@ Protect decision response fields include:
   - `applied` (backend recommendation payload; SDK may apply clamp before provider call when enabled)
 
 Observe mode is telemetry-only for enforcement: SDK still calls preflight, and backend mode returns allow (no warn/block enforcement).
+
+Canonical protect outcome:
+- one request id finalizes exactly one effective outcome
+- live decisions and fallback reports converge through the same backend finalization path
+- protect counters and `last` are derived from that one finalization path only
 
 ## Webhook API
 - `GET /api/v1/projects/{project_id}/webhook`

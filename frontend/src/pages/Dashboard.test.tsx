@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
   }
   return {
     ApiError: HoistedApiError,
+    fetchProtectHealth: vi.fn(),
     fetchMetrics: vi.fn(),
     fetchIncidents: vi.fn(),
     fetchProjectProviders: vi.fn(),
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("../api/client", () => {
   return {
     ApiError: mocks.ApiError,
+    fetchProtectHealth: (...args: unknown[]) => mocks.fetchProtectHealth(...args),
     fetchMetrics: (...args: unknown[]) => mocks.fetchMetrics(...args),
     fetchIncidents: (...args: unknown[]) => mocks.fetchIncidents(...args),
     fetchProjectProviders: (...args: unknown[]) => mocks.fetchProjectProviders(...args),
@@ -45,6 +47,7 @@ import { Dashboard } from "./Dashboard";
 describe("Dashboard", () => {
   beforeEach(() => {
     mocks.fetchMetrics.mockReset();
+    mocks.fetchProtectHealth.mockReset();
     mocks.fetchIncidents.mockReset();
     mocks.fetchProjectProviders.mockReset();
     mocks.fetchProtectMetrics.mockReset();
@@ -58,6 +61,7 @@ describe("Dashboard", () => {
       projects: [{ id: "p1", name: "Demo", created_at: new Date().toISOString() }],
     });
     mocks.fetchMetrics.mockResolvedValue({ requests_60s: 3, tokens_60s: 42 });
+    mocks.fetchProtectHealth.mockResolvedValue({ p50_ms: 4, p95_ms: 12, timeouts_60m: 0 });
     mocks.fetchIncidents.mockResolvedValue([]);
     mocks.fetchProjectProviders.mockResolvedValue(["anthropic", "openai"]);
     mocks.fetchProtectMetrics.mockResolvedValue({
@@ -90,6 +94,7 @@ describe("Dashboard", () => {
       </TestRouter>,
     );
     await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1", undefined));
+    expect(mocks.fetchProtectHealth).toHaveBeenCalledWith("p1", undefined);
     expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", undefined);
     expect(screen.getByText("Requests (60s)")).toBeDefined();
     expect(screen.getByText("Tokens (60s)")).toBeDefined();
@@ -107,6 +112,7 @@ describe("Dashboard", () => {
     fireEvent.change(providerSelect, { target: { value: "openai" } });
 
     await waitFor(() => expect(mocks.fetchMetrics).toHaveBeenCalledWith("p1", "openai"));
+    expect(mocks.fetchProtectHealth).toHaveBeenCalledWith("p1", "openai");
     expect(mocks.fetchProtectMetrics).toHaveBeenCalledWith("p1", "openai");
     expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai");
 

@@ -1907,27 +1907,6 @@ select {
   padding: 6px 10px;
 }
 
-.status-block .status-pill {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 4px 9px;
-  font-size: 0.75rem;
-  border: 1px solid transparent;
-  margin: 0 0 6px;
-}
-.status-block .status-pill.connected {
-  color: #d1fae5;
-  background: rgba(134, 239, 172, 0.12);
-  border-color: rgba(134, 239, 172, 0.35);
-}
-
-.status-block .status-pill.disconnected {
-  color: #ffe4e6;
-  background: rgba(253, 164, 175, 0.12);
-  border-color: rgba(253, 164, 175, 0.35);
-}
-
 .warning-text {
   margin: 6px 0;
   color: var(--muted);

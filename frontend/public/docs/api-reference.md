@@ -68,7 +68,6 @@ The `provider` query parameter is optional. Without it, metrics return project t
 - `GET /api/v1/projects/{project_id}/protect`
 - `PUT /api/v1/projects/{project_id}/protect`
 - `POST /api/v1/protect/decision`
-- `POST /api/v1/protect/decision-timeout`
 
 Protect settings include:
 - `protect_enabled`
@@ -86,6 +85,8 @@ Protect decisions return:
 - `snapshot`
 - `apply_clamp_enabled`
 - `clamp`
+
+Timeout and unavailable fallback reporting is handled internally between the SDK and backend. It is not part of the normal project integration surface.
 
 ## Alerts and Webhooks
 - `GET /api/v1/projects/{project_id}/webhook`
