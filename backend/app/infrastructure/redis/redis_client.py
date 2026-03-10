@@ -87,6 +87,14 @@ class RedisClient:
             logger.exception("Redis ZRANGEBYSCORE failed", extra={"key": key})
             raise
 
+    def zrem(self, key: str, *members: object) -> int:
+        # Remove sorted set members.
+        try:
+            return int(self._redis.zrem(key, *members))
+        except Exception:
+            logger.exception("Redis ZREM failed", extra={"key": key})
+            raise
+
     def lpush(self, key: str, value: object) -> int:
         # Push value to the head of a list and return the list length.
         try:

@@ -29,6 +29,7 @@ class ProtectHealthOut(BaseModel):
     # Protect preflight health metrics for dashboard visibility.
     p50_ms: int | None
     p95_ms: int | None
+    timeouts_30m: int
     timeouts_60m: int
 
 
@@ -101,6 +102,7 @@ def get_protect_health(
         return ProtectHealthOut(
             p50_ms=int(metrics["p50_ms"]) if isinstance(metrics.get("p50_ms"), int) else None,
             p95_ms=int(metrics["p95_ms"]) if isinstance(metrics.get("p95_ms"), int) else None,
+            timeouts_30m=int(metrics.get("timeouts_30m", 0)),
             timeouts_60m=int(metrics.get("timeouts_60m", 0)),
         )
     except HTTPException:

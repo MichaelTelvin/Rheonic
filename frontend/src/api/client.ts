@@ -23,6 +23,7 @@ export interface ProtectMetrics {
 export interface ProtectHealthMetrics {
   p50_ms: number | null;
   p95_ms: number | null;
+  timeouts_30m: number;
   timeouts_60m: number;
 }
 

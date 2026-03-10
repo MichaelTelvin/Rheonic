@@ -38,6 +38,10 @@ def _timeout_key(project_id: str) -> str:
     return f"pa:{project_id}:timeout:60m"
 
 
+def _timeout_events_key(project_id: str) -> str:
+    return f"pa:{project_id}:timeout-events:60m"
+
+
 def _outcome_key(project_id: str, request_id: str) -> str:
     return f"pa:{project_id}:outcome:{request_id}"
 
@@ -81,13 +85,13 @@ class ProtectActionStore:
                             },
                         )
                         return
-                    self._remove_outcome_counters(project_id=project_id, payload=existing_payload)
+                    self._remove_outcome_counters(project_id=project_id, payload=existing_payload, request_id=request_id)
                 self._redis_client.set(
                     _outcome_key(project_id, request_id),
                     json.dumps(payload),
                     app_config.protect_action_counter_ttl_seconds,
                 )
-            self._apply_outcome_counters(project_id=project_id, payload=payload)
+            self._apply_outcome_counters(project_id=project_id, payload=payload, request_id=request_id)
             self._redis_client.set(
                 _last_key(project_id),
                 json.dumps(payload),
@@ -176,10 +180,11 @@ class ProtectActionStore:
                 "p50_ms": self._percentile(latencies, 50),
                 "p95_ms": self._percentile(latencies, 95),
                 "timeouts_60m": self._read_int(_timeout_key(project_id)),
+                "timeouts_30m": self._read_recent_timeout_count(project_id=project_id, window_seconds=1800),
             }
         except Exception:
             logger.warning("Failed reading protect health counters", extra={"project_id": project_id})
-            return {"p50_ms": None, "p95_ms": None, "timeouts_60m": 0}
+            return {"p50_ms": None, "p95_ms": None, "timeouts_60m": 0, "timeouts_30m": 0}
 
     def _increment_with_ttl(self, key: str) -> None:
         value = self._redis_client.incr(key)
@@ -207,19 +212,23 @@ class ProtectActionStore:
             return
         self._redis_client.incrby(key, -1)
 
-    def _apply_outcome_counters(self, *, project_id: str, payload: dict[str, str]) -> None:
+    def _apply_outcome_counters(self, *, project_id: str, payload: dict[str, str], request_id: str | None = None) -> None:
         counter_key = self._counter_key_for_decision(project_id=project_id, decision=payload["decision"])
         if counter_key is not None:
             self._increment_with_ttl(counter_key)
         if payload["source"] == app_config.protect_outcome_source_timeout_fallback:
             self._increment_with_ttl(_timeout_key(project_id))
+            if request_id:
+                self._record_timeout_event(project_id=project_id, request_id=request_id, ts=payload["ts"])
 
-    def _remove_outcome_counters(self, *, project_id: str, payload: dict[str, str]) -> None:
+    def _remove_outcome_counters(self, *, project_id: str, payload: dict[str, str], request_id: str | None = None) -> None:
         self._decrement_counter_for_decision(project_id=project_id, decision=payload["decision"])
         if payload["source"] == app_config.protect_outcome_source_timeout_fallback:
             current = self._read_int(_timeout_key(project_id))
             if current > 0:
                 self._redis_client.incrby(_timeout_key(project_id), -1)
+            if request_id:
+                self._redis_client.zrem(_timeout_events_key(project_id), request_id)
 
     def _should_replace_outcome(self, *, existing: dict[str, str], incoming: dict[str, str]) -> bool:
         existing_rank = self._source_rank(existing.get("source", ""))
@@ -290,3 +299,19 @@ class ProtectActionStore:
         rank = math.ceil((percentile / 100) * len(values)) - 1
         index = min(max(rank, 0), len(values) - 1)
         return values[index]
+
+    def _record_timeout_event(self, *, project_id: str, request_id: str, ts: str) -> None:
+        parsed = datetime.fromisoformat(ts)
+        score = int(parsed.timestamp() * 1000)
+        key = _timeout_events_key(project_id)
+        self._redis_client.zadd(key, {request_id: score})
+        self._redis_client.expire(key, app_config.protect_action_counter_ttl_seconds)
+
+    def _read_recent_timeout_count(self, *, project_id: str, window_seconds: int) -> int:
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        cutoff_ms = now_ms - (app_config.protect_action_counter_ttl_seconds * 1000)
+        key = _timeout_events_key(project_id)
+        self._redis_client.zremrangebyscore(key, 0, cutoff_ms)
+        window_start_ms = now_ms - (max(int(window_seconds), 1) * 1000)
+        members = self._redis_client.zrangebyscore(key, window_start_ms, float("inf"))
+        return len(members)

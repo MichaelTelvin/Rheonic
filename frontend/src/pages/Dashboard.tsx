@@ -603,7 +603,7 @@ export function Dashboard(): JSX.Element {
         tone: "unavailable",
       };
     }
-    if ((protectHealth?.timeouts_60m ?? 0) > 0) {
+    if ((protectHealth?.timeouts_30m ?? 0) > 3) {
       return {
         label: "Degraded",
         tone: "degraded",

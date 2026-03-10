@@ -61,7 +61,7 @@ describe("Dashboard", () => {
       projects: [{ id: "p1", name: "Demo", created_at: new Date().toISOString() }],
     });
     mocks.fetchMetrics.mockResolvedValue({ requests_60s: 3, tokens_60s: 42 });
-    mocks.fetchProtectHealth.mockResolvedValue({ p50_ms: 4, p95_ms: 12, timeouts_60m: 0 });
+    mocks.fetchProtectHealth.mockResolvedValue({ p50_ms: 4, p95_ms: 12, timeouts_30m: 0, timeouts_60m: 0 });
     mocks.fetchIncidents.mockResolvedValue([]);
     mocks.fetchProjectProviders.mockResolvedValue(["anthropic", "openai"]);
     mocks.fetchProtectMetrics.mockResolvedValue({

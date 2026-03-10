@@ -97,6 +97,7 @@ class MetricsService:
             p50_values: list[int] = []
             p95_values: list[int] = []
             timeouts_60m = 0
+            timeouts_30m = 0
             for scoped_provider in self._project_providers_for_aggregation(project_id=project_id, provider=provider):
                 metrics = self._protect_action_store.get_health(project_id=scoped_project_provider_id(project_id, scoped_provider))
                 if isinstance(metrics.get("p50_ms"), int):
@@ -104,10 +105,12 @@ class MetricsService:
                 if isinstance(metrics.get("p95_ms"), int):
                     p95_values.append(int(metrics["p95_ms"]))
                 timeouts_60m += int(metrics.get("timeouts_60m", 0) or 0)
+                timeouts_30m += int(metrics.get("timeouts_30m", 0) or 0)
             metrics = {
                 "p50_ms": (round(sum(p50_values) / len(p50_values)) if p50_values else None),
                 "p95_ms": (round(sum(p95_values) / len(p95_values)) if p95_values else None),
                 "timeouts_60m": timeouts_60m,
+                "timeouts_30m": timeouts_30m,
             }
             logger.debug("Protect health read", extra={"project_id": project_id})
             return metrics
