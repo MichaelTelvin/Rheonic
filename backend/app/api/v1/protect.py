@@ -17,6 +17,7 @@ from app.dependencies import (
 )
 from app.domain.models.user import User
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
+from app.config import app_config
 from app.logger import get_logger
 
 logger = get_logger(__name__)
@@ -108,16 +109,16 @@ def protect_decision(
         response.headers["X-Protect-Decision-Latency-Ms"] = str(latency_ms)
         if project_id:
             scoped_id = scoped_project_provider_id(project_id, payload.provider)
-            protect_action_store.record(
+            protect_action_store.finalize_outcome(
                 project_id=scoped_id,
                 decision=decision.decision,
                 reason=decision.reason,
+                source=app_config.protect_outcome_source_live,
                 request_id=request_id,
             )
             protect_action_store.record_health(
                 project_id=scoped_id,
                 latency_ms=latency_ms,
-                timed_out=False,
             )
         logger.info(
             "Protect decision evaluated",
@@ -163,10 +164,12 @@ def protect_decision_timeout(
         project = ingest_key_service.resolve_project(plaintext_key=ingest_key)
         if project is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
-        protect_action_store.record_decision_timeout(
+        protect_action_store.finalize_outcome(
             project_id=scoped_project_provider_id(project.id, payload.provider),
+            decision="block" if project.protect_fail_mode == "closed" else "allow",
+            reason="decision_timeout",
+            source=app_config.protect_outcome_source_timeout_fallback,
             request_id=request_id_header or payload.request_id,
-            effective_decision="block" if project.protect_fail_mode == "closed" else "allow",
         )
         return {"status": "accepted"}
     except HTTPException:

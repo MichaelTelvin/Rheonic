@@ -38,12 +38,8 @@ def _timeout_key(project_id: str) -> str:
     return f"pa:{project_id}:timeout:60m"
 
 
-def _request_key(project_id: str, request_id: str) -> str:
-    return f"pa:{project_id}:request:{request_id}"
-
-
-def _timed_out_request_key(project_id: str, request_id: str) -> str:
-    return f"pa:{project_id}:timedout:{request_id}"
+def _outcome_key(project_id: str, request_id: str) -> str:
+    return f"pa:{project_id}:outcome:{request_id}"
 
 
 class ProtectActionStore:
@@ -52,29 +48,56 @@ class ProtectActionStore:
     def __init__(self, redis_client: RedisClient) -> None:
         self._redis_client = redis_client
 
-    def record(self, project_id: str, decision: str, reason: str, request_id: str | None = None, ts: datetime | None = None) -> None:
-        # Record warn/block counters and keep the last decision payload for UI.
+    def finalize_outcome(
+        self,
+        *,
+        project_id: str,
+        decision: str,
+        reason: str,
+        source: str,
+        request_id: str | None = None,
+        ts: datetime | None = None,
+    ) -> None:
+        # Finalize one canonical protect outcome and derive counters from it.
         timestamp = (ts or datetime.now(timezone.utc)).isoformat()
+        payload = {
+            "decision": decision,
+            "reason": reason,
+            "source": source,
+            "ts": timestamp,
+        }
         try:
-            if request_id and self._redis_client.get(_timed_out_request_key(project_id, request_id)) is not None:
-                return
-            if decision == "allow":
-                self._increment_with_ttl(_allow_key(project_id))
-            elif decision == "warn":
-                self._increment_with_ttl(_warn_key(project_id))
-            elif decision == "block":
-                self._increment_with_ttl(_block_key(project_id))
-
-            payload = {"decision": decision, "reason": reason, "ts": timestamp}
-            self._redis_client.set(_last_key(project_id), json.dumps(payload), ex=app_config.protect_action_counter_ttl_seconds)
             if request_id:
+                existing_payload = self._parse_last(self._redis_client.get(_outcome_key(project_id, request_id)))
+                if existing_payload is not None:
+                    if not self._should_replace_outcome(existing=existing_payload, incoming=payload):
+                        logger.info(
+                            "Ignored protect outcome update",
+                            extra={
+                                "project_id": project_id,
+                                "request_id": request_id,
+                                "existing_source": existing_payload["source"],
+                                "incoming_source": source,
+                            },
+                        )
+                        return
+                    self._remove_outcome_counters(project_id=project_id, payload=existing_payload)
                 self._redis_client.set(
-                    _request_key(project_id, request_id),
+                    _outcome_key(project_id, request_id),
                     json.dumps(payload),
                     ex=app_config.protect_action_counter_ttl_seconds,
                 )
+            self._apply_outcome_counters(project_id=project_id, payload=payload)
+            self._redis_client.set(
+                _last_key(project_id),
+                json.dumps(payload),
+                ex=app_config.protect_action_counter_ttl_seconds,
+            )
         except Exception:
-            logger.warning("Failed recording protect decision counters", extra={"project_id": project_id})
+            logger.warning(
+                "Failed finalizing protect outcome",
+                extra={"project_id": project_id, "request_id": request_id, "decision": decision, "source": source},
+            )
 
     def get_metrics(self, project_id: str) -> dict[str, Any]:
         # Read 60-minute protect decision counters and last decision snapshot.
@@ -106,40 +129,7 @@ class ProtectActionStore:
                 "decision_latency_p95_60m_ms": None,
             }
 
-    def record_decision_timeout(
-        self,
-        project_id: str,
-        request_id: str | None = None,
-        effective_decision: str = "allow",
-    ) -> None:
-        # Record one SDK-reported decision-timeout in the 60-minute counter.
-        try:
-            if request_id:
-                self._redis_client.set(
-                    _timed_out_request_key(project_id, request_id),
-                    "1",
-                    ex=app_config.protect_action_counter_ttl_seconds,
-                )
-                request_raw = self._redis_client.get(_request_key(project_id, request_id))
-                request_payload = self._parse_last(request_raw)
-                if request_payload is not None:
-                    self._decrement_counter_for_decision(project_id=project_id, decision=request_payload["decision"])
-                self._redis_client.delete(_request_key(project_id, request_id))
-            if effective_decision == "block":
-                self._increment_with_ttl(_block_key(project_id))
-            else:
-                self._increment_with_ttl(_allow_key(project_id))
-            self._increment_with_ttl(_timeout_key(project_id))
-            now = datetime.now(timezone.utc).isoformat()
-            self._redis_client.set(
-                _last_key(project_id),
-                json.dumps({"decision": "block" if effective_decision == "block" else "allow", "reason": "decision_timeout", "ts": now}),
-                ex=app_config.protect_action_counter_ttl_seconds,
-            )
-        except Exception:
-            logger.warning("Failed recording protect decision timeout", extra={"project_id": project_id})
-
-    def record_health(self, project_id: str, latency_ms: int, timed_out: bool = False, ts: datetime | None = None) -> None:
+    def record_health(self, project_id: str, latency_ms: int, ts: datetime | None = None) -> None:
         # Record preflight latency samples and timeout counters over a 60-minute window.
         try:
             now_ms = int((ts or datetime.now(timezone.utc)).timestamp() * 1000)
@@ -150,8 +140,6 @@ class ProtectActionStore:
             self._redis_client.zadd(latency_key, {member: now_ms})
             self._redis_client.zremrangebyscore(latency_key, 0, cutoff_ms)
             self._redis_client.expire(latency_key, app_config.protect_action_counter_ttl_seconds)
-            if timed_out:
-                self._increment_with_ttl(_timeout_key(project_id))
         except Exception:
             logger.warning("Failed recording protect health counters", extra={"project_id": project_id})
 
@@ -198,7 +186,7 @@ class ProtectActionStore:
         if value == 1:
             self._redis_client.expire(key, app_config.protect_action_counter_ttl_seconds)
 
-    def _decrement_counter_for_decision(self, *, project_id: str, decision: str) -> None:
+    def _counter_key_for_decision(self, *, project_id: str, decision: str) -> str | None:
         key = (
             _allow_key(project_id)
             if decision == "allow"
@@ -208,12 +196,50 @@ class ProtectActionStore:
             if decision == "block"
             else None
         )
+        return key
+
+    def _decrement_counter_for_decision(self, *, project_id: str, decision: str) -> None:
+        key = self._counter_key_for_decision(project_id=project_id, decision=decision)
         if key is None:
             return
         current = self._read_int(key)
         if current <= 0:
             return
         self._redis_client.incrby(key, -1)
+
+    def _apply_outcome_counters(self, *, project_id: str, payload: dict[str, str]) -> None:
+        counter_key = self._counter_key_for_decision(project_id=project_id, decision=payload["decision"])
+        if counter_key is not None:
+            self._increment_with_ttl(counter_key)
+        if payload["source"] == app_config.protect_outcome_source_timeout_fallback:
+            self._increment_with_ttl(_timeout_key(project_id))
+
+    def _remove_outcome_counters(self, *, project_id: str, payload: dict[str, str]) -> None:
+        self._decrement_counter_for_decision(project_id=project_id, decision=payload["decision"])
+        if payload["source"] == app_config.protect_outcome_source_timeout_fallback:
+            current = self._read_int(_timeout_key(project_id))
+            if current > 0:
+                self._redis_client.incrby(_timeout_key(project_id), -1)
+
+    def _should_replace_outcome(self, *, existing: dict[str, str], incoming: dict[str, str]) -> bool:
+        existing_rank = self._source_rank(existing.get("source", ""))
+        incoming_rank = self._source_rank(incoming.get("source", ""))
+        if incoming_rank < existing_rank:
+            return False
+        if incoming_rank > existing_rank:
+            return True
+        # Same-precedence updates are duplicates unless they change the effective decision.
+        return existing.get("decision") != incoming.get("decision") or existing.get("reason") != incoming.get("reason")
+
+    def _source_rank(self, source: str) -> int:
+        if source == app_config.protect_outcome_source_live:
+            return 1
+        if source in {
+            app_config.protect_outcome_source_timeout_fallback,
+            app_config.protect_outcome_source_unavailable_fallback,
+        }:
+            return 2
+        return 0
 
     def _read_int(self, key: str) -> int:
         raw = self._redis_client.get(key)
@@ -238,10 +264,11 @@ class ProtectActionStore:
             return None
         decision = str(parsed.get("decision") or "")
         reason = str(parsed.get("reason") or "")
+        source = str(parsed.get("source") or "")
         ts = str(parsed.get("ts") or "")
-        if not decision or not reason or not ts:
+        if not decision or not reason or not source or not ts:
             return None
-        return {"decision": decision, "reason": reason, "ts": ts}
+        return {"decision": decision, "reason": reason, "source": source, "ts": ts}
 
     def _parse_latencies(self, members: list[object]) -> list[int]:
         values: list[int] = []

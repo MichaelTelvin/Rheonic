@@ -560,6 +560,7 @@ def test_timeout_report_reconciles_late_warn_decision_metrics(tmp_path) -> None:
     assert metrics["last"] == {
         "decision": "allow",
         "reason": "decision_timeout",
+        "source": "timeout_fallback",
         "ts": metrics["last"]["ts"],
     }
     _cleanup_overrides()
@@ -584,6 +585,7 @@ def test_timeout_report_records_block_when_project_fail_mode_is_closed(tmp_path)
     assert metrics["last"] == {
         "decision": "block",
         "reason": "decision_timeout",
+        "source": "timeout_fallback",
         "ts": metrics["last"]["ts"],
     }
     _cleanup_overrides()
@@ -623,6 +625,7 @@ def test_timeout_report_replaces_prior_allow_with_block_when_project_fail_mode_i
     assert metrics["last"] == {
         "decision": "block",
         "reason": "decision_timeout",
+        "source": "timeout_fallback",
         "ts": metrics["last"]["ts"],
     }
     _cleanup_overrides()

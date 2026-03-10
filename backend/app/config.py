@@ -10,6 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class AppConfig:
     default_log_format: str = "%(asctime)s %(levelname)s %(name)s %(message)s"
     default_protect_decision_timeout_ms: int = 300
+    protect_outcome_source_live: str = "live"
+    protect_outcome_source_timeout_fallback: str = "timeout_fallback"
+    protect_outcome_source_unavailable_fallback: str = "unavailable_fallback"
     rolling_window_seconds: int = 60
     rolling_window_ms: int = rolling_window_seconds * 1000
     rolling_counter_ttl_seconds: int = 600
