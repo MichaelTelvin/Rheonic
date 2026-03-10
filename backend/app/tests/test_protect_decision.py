@@ -554,6 +554,7 @@ def test_timeout_report_reconciles_late_warn_decision_metrics(tmp_path) -> None:
     assert timeout_response.status_code == 202
 
     metrics = _protect_metrics(client, project_id)
+    assert metrics["allowed_60m"] == 1
     assert metrics["warned_60m"] == 0
     assert metrics["decision_timeouts_60m"] == 1
     assert metrics["last"] == {

@@ -109,6 +109,7 @@ class ProtectActionStore:
     def record_decision_timeout(self, project_id: str, request_id: str | None = None) -> None:
         # Record one SDK-reported decision-timeout in the 60-minute counter.
         try:
+            self._increment_with_ttl(_allow_key(project_id))
             self._increment_with_ttl(_timeout_key(project_id))
             now = datetime.now(timezone.utc).isoformat()
             self._redis_client.set(
