@@ -106,15 +106,23 @@ class ProtectActionStore:
                 "decision_latency_p95_60m_ms": None,
             }
 
-    def record_decision_timeout(self, project_id: str, request_id: str | None = None) -> None:
+    def record_decision_timeout(
+        self,
+        project_id: str,
+        request_id: str | None = None,
+        effective_decision: str = "allow",
+    ) -> None:
         # Record one SDK-reported decision-timeout in the 60-minute counter.
         try:
-            self._increment_with_ttl(_allow_key(project_id))
+            if effective_decision == "block":
+                self._increment_with_ttl(_block_key(project_id))
+            else:
+                self._increment_with_ttl(_allow_key(project_id))
             self._increment_with_ttl(_timeout_key(project_id))
             now = datetime.now(timezone.utc).isoformat()
             self._redis_client.set(
                 _last_key(project_id),
-                json.dumps({"decision": "allow", "reason": "decision_timeout", "ts": now}),
+                json.dumps({"decision": "block" if effective_decision == "block" else "allow", "reason": "decision_timeout", "ts": now}),
                 ex=app_config.protect_action_counter_ttl_seconds,
             )
             if request_id:

@@ -166,6 +166,7 @@ def protect_decision_timeout(
         protect_action_store.record_decision_timeout(
             project_id=scoped_project_provider_id(project.id, payload.provider),
             request_id=request_id_header or payload.request_id,
+            effective_decision="block" if project.protect_fail_mode == "closed" else "allow",
         )
         return {"status": "accepted"}
     except HTTPException:
