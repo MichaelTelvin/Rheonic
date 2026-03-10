@@ -46,6 +46,53 @@ function formatAlertAttemptTime(iso: string | null): string {
 type SetupStage = "checking" | "no_project" | "no_selection" | "no_ingest_key" | "no_events" | "complete";
 type ProtectStatus = "awaiting" | "healthy" | "degraded" | "unavailable";
 
+type DashboardCachedState = {
+  hasIngestKey: boolean;
+  hasEvents: boolean;
+  setupStatusResolved: boolean;
+  metrics: RealtimeMetrics | null;
+  lastMetricsSuccessAt: string | null;
+  protectDecisionStats: {
+    allowed_60m: number | null;
+    warned_60m: number | null;
+    blocked_60m: number | null;
+  } | null;
+  incidents: IncidentItem[];
+};
+
+function dashboardCacheKey(projectId: string): string {
+  return `rheonic:dashboard:${projectId}`;
+}
+
+function readDashboardCache(projectId: string): DashboardCachedState | null {
+  try {
+    const raw = window.sessionStorage.getItem(dashboardCacheKey(projectId));
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<DashboardCachedState>;
+    return {
+      hasIngestKey: Boolean(parsed.hasIngestKey),
+      hasEvents: Boolean(parsed.hasEvents),
+      setupStatusResolved: Boolean(parsed.setupStatusResolved),
+      metrics: parsed.metrics ?? null,
+      lastMetricsSuccessAt: parsed.lastMetricsSuccessAt ?? null,
+      protectDecisionStats: parsed.protectDecisionStats ?? null,
+      incidents: Array.isArray(parsed.incidents) ? parsed.incidents : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeDashboardCache(projectId: string, state: DashboardCachedState): void {
+  try {
+    window.sessionStorage.setItem(dashboardCacheKey(projectId), JSON.stringify(state));
+  } catch {
+    // Ignore cache write failures and keep runtime state authoritative.
+  }
+}
+
 export function Dashboard(): JSX.Element {
   const { loadingProjects, projects, projectId } = useProjectContext();
   const navigate = useNavigate();
@@ -113,24 +160,42 @@ export function Dashboard(): JSX.Element {
   }, [incidents]);
 
   useEffect(() => {
-    setMetrics(null);
-    setIncidents([]);
+    const cached = projectId ? readDashboardCache(projectId) : null;
+    setMetrics(cached?.metrics ?? null);
+    setIncidents(cached?.incidents ?? []);
     setRequestsSeries([]);
     setTokensSeries([]);
     seriesByScopeRef.current = {};
     setMetricsWarning(null);
     setGlobalBanner(null);
-    setProtectDecisionStats(null);
+    setProtectDecisionStats(cached?.protectDecisionStats ?? null);
     setProtectHealth(null);
     setLastProtectHealthSuccessAt(null);
     setProtectHealthFetchFailed(false);
     setProviders([]);
     setSelectedProvider("all");
-    setHasIngestKey(false);
-    setHasEvents(false);
-    setSetupStatusResolved(false);
+    setHasIngestKey(cached?.hasIngestKey ?? false);
+    setHasEvents(cached?.hasEvents ?? false);
+    setSetupStatusResolved(cached?.setupStatusResolved ?? false);
     setWebhookIssue(null);
+    setLastMetricsSuccessAt(cached?.lastMetricsSuccessAt ?? null);
   }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+    // Persist the last successful dashboard snapshot so revisiting the page does not flash onboarding state.
+    writeDashboardCache(projectId, {
+      hasIngestKey,
+      hasEvents,
+      setupStatusResolved,
+      metrics,
+      lastMetricsSuccessAt,
+      protectDecisionStats,
+      incidents,
+    });
+  }, [hasEvents, hasIngestKey, incidents, lastMetricsSuccessAt, metrics, projectId, protectDecisionStats, setupStatusResolved]);
 
   useEffect(() => {
     const dismissed = window.localStorage.getItem(setupDismissStorageKey) === "1";
