@@ -563,3 +563,21 @@ def test_timeout_report_reconciles_late_warn_decision_metrics(tmp_path) -> None:
         "ts": metrics["last"]["ts"],
     }
     _cleanup_overrides()
+
+
+def test_protect_config_returns_project_fail_mode_and_server_timeout(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Config")
+    _set_protect(client, project_id, protect_enabled=True, protect_fail_mode="closed")
+
+    response = client.get(
+        "/api/v1/protect/config",
+        headers={"X-Project-Ingest-Key": ingest_key},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "protect_fail_mode": "closed",
+        "protect_decision_timeout_ms": 300,
+    }
+    _cleanup_overrides()

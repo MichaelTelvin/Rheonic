@@ -116,5 +116,7 @@ def test_warm_connections_hits_health_endpoint() -> None:
     client.close()
 
     get_calls = [call for call in fake_http.calls if call.get("method") == "GET"]
-    assert len(get_calls) == 1
+    assert len(get_calls) == 2
     assert get_calls[0]["url"] == "http://localhost:8000/health"
+    assert get_calls[1]["url"] == "http://localhost:8000/api/v1/protect/config"
+    assert get_calls[1]["headers"] == {"X-Project-Ingest-Key": "p1"}

@@ -177,6 +177,34 @@ export class ProtectEngine {
     }
   }
 
+  public async bootstrap(): Promise<void> {
+    try {
+      const response = await requestJson(`${this.baseUrl}/api/v1/protect/config`, {
+        method: "GET",
+        headers: {
+          "X-Project-Ingest-Key": this.ingestKey,
+        },
+      });
+      if (!response.ok) {
+        return;
+      }
+      const parsed = (await response.json()) as {
+        protect_fail_mode?: unknown;
+        protect_decision_timeout_ms?: unknown;
+      };
+      const failMode = parseFailMode(parsed.protect_fail_mode);
+      if (failMode) {
+        this.failMode = failMode;
+      }
+      const decisionTimeout = Number(parsed.protect_decision_timeout_ms);
+      if (Number.isFinite(decisionTimeout) && decisionTimeout > 0) {
+        this.decisionTimeoutMs = Math.floor(decisionTimeout);
+      }
+    } catch {
+      // Best effort only; keep local defaults if bootstrap fails.
+    }
+  }
+
   private async reportDecisionTimeout(provider: string | undefined, requestId: string): Promise<void> {
     try {
       await requestJson(`${this.baseUrl}/api/v1/protect/decision-timeout`, {

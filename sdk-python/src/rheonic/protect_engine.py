@@ -157,6 +157,27 @@ class ProtectEngine:
                 )
             return self._fallback_decision()
 
+    def bootstrap(self) -> None:
+        # Load runtime protect config so timeout fallback matches server-side project mode.
+        try:
+            response = self._get_with_timeout(
+                f"{self._base_url}/api/v1/protect/config",
+                headers={"X-Project-Ingest-Key": self._ingest_key},
+                timeout_s=max(self._request_timeout_s, 0.1),
+            )
+            status_code = int(getattr(response, "status_code", 0))
+            if status_code < 200 or status_code >= 300:
+                return
+            payload = self._parse_json_payload(response)
+            fail_mode = str(payload.get("protect_fail_mode") or self._fail_mode)
+            if fail_mode in {"open", "closed"}:
+                self._fail_mode = fail_mode
+            decision_timeout = payload.get("protect_decision_timeout_ms")
+            if isinstance(decision_timeout, int) and decision_timeout > 0:
+                self._decision_timeout_ms = decision_timeout
+        except Exception:
+            return
+
     def _post_with_timeout(
         self,
         url: str,
@@ -175,6 +196,24 @@ class ProtectEngine:
                 return post(url, json=json, headers=headers, timeout_s=timeout_s)
             except TypeError:
                 return post(url, json=json, headers=headers)
+
+    def _get_with_timeout(
+        self,
+        url: str,
+        headers: dict[str, str],
+        timeout_s: float,
+    ) -> object:
+        # Call transport GET with timeout when supported.
+        if self._http_client is None:
+            raise RuntimeError("protect engine missing HTTP client")
+        get = getattr(self._http_client, "get")
+        try:
+            return get(url, headers=headers, timeout=timeout_s)
+        except TypeError:
+            try:
+                return get(url, headers=headers, timeout_s=timeout_s)
+            except TypeError:
+                return get(url, headers=headers)
 
     def _parse_json_payload(self, response: object) -> dict[str, Any]:
         # Parse JSON response payload when supported by transport.

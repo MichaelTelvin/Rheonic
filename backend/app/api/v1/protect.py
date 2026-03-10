@@ -55,6 +55,12 @@ class ProjectProtectOut(BaseModel):
     protect_max_tok_per_min: int | None
 
 
+class ProtectRuntimeConfigOut(BaseModel):
+    # Runtime protect config consumed by SDK bootstrap using ingest key auth.
+    protect_fail_mode: str
+    protect_decision_timeout_ms: int
+
+
 class ProjectProtectIn(BaseModel):
     # Project protect settings update payload.
     protect_enabled: bool
@@ -167,6 +173,32 @@ def protect_decision_timeout(
     except Exception:
         logger.exception("Protect decision-timeout endpoint failed")
         raise HTTPException(status_code=500, detail="Failed to record decision timeout")
+
+
+@router.get("/protect/config", response_model=ProtectRuntimeConfigOut)
+def get_protect_runtime_config(
+    ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
+    ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
+) -> ProtectRuntimeConfigOut:
+    # Return ingest-key scoped runtime protect config needed by SDK timeout fallback.
+    try:
+        if not ingest_key:
+            raise HTTPException(status_code=401, detail="missing ingest key")
+        project = ingest_key_service.resolve_project(plaintext_key=ingest_key)
+        if project is None:
+            raise HTTPException(status_code=401, detail="invalid ingest key")
+        from app.config import Settings
+
+        settings = Settings()
+        return ProtectRuntimeConfigOut(
+            protect_fail_mode=project.protect_fail_mode,
+            protect_decision_timeout_ms=settings.protect_decision_timeout_ms,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Protect config endpoint failed")
+        raise HTTPException(status_code=500, detail="Failed to fetch protect config")
 
 
 @router.get("/projects/{project_id}/protect", response_model=ProjectProtectOut)

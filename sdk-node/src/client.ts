@@ -159,6 +159,12 @@ export class Client {
     } catch {
       this.debugLog("SDK connection warmup failed");
     }
+    try {
+      await this.protectEngine.bootstrap();
+      this.debugLog("SDK protect config bootstrap completed");
+    } catch {
+      this.debugLog("SDK protect config bootstrap failed");
+    }
   }
 
   public instrumentOpenAI<T extends Record<string, any>>(

@@ -246,14 +246,18 @@ class Client:
             return {"decision": "allow", "reason": "decision_unavailable"}
 
     def warm_connections(self) -> None:
-        # Best-effort warmup of the shared backend HTTP connection.
+        # Best-effort warmup of the shared backend HTTP connection and protect runtime config.
         try:
             response = self._http_client.get(f"{self.base_url}/health")
             status_code = int(getattr(response, "status_code", 0))
             self.debug_log("SDK connection warmup completed", status_code=status_code)
         except Exception:
             self.debug_log("SDK connection warmup failed")
-            return
+        try:
+            self._protect_engine.bootstrap()
+            self.debug_log("SDK protect config bootstrap completed")
+        except Exception:
+            self.debug_log("SDK protect config bootstrap failed")
 
     def instrument_openai(
         self,
