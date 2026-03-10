@@ -71,6 +71,7 @@ export function instrumentAnthropic<T extends Record<string, any>>(
       throw new RHEONICBlockedError(protectDecision.reason);
     }
     const callArgs = maybeApplyAnthropicClamp(args, protectDecision);
+    markClampAppliedIfChanged(protectDecision, extractMaxOutputTokens(args), extractMaxOutputTokens(callArgs));
 
     try {
       const response = await originalCreate(...callArgs);
@@ -215,4 +216,17 @@ function maybeApplyAnthropicClamp(args: unknown[], decision: ProtectEvaluation):
   const nextArgs = [...args];
   nextArgs[0] = payload;
   return nextArgs;
+}
+
+function markClampAppliedIfChanged(
+  decision: ProtectEvaluation,
+  originalMaxTokens: number | undefined,
+  appliedMaxTokens: number | undefined,
+): void {
+  if (!decision.clamp || typeof appliedMaxTokens !== "number") {
+    return;
+  }
+  if (typeof originalMaxTokens !== "number" || appliedMaxTokens < originalMaxTokens) {
+    decision.clamp.applied = true;
+  }
 }

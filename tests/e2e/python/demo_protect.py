@@ -451,10 +451,11 @@ def main() -> None:
             _assert_line("near_cap warn triggered", decision_value == "warn" and decision_reason == "near_cap" and not blocked)
             clamp_is_recommended = isinstance(clamp_recommended, int) and clamp_recommended > 0
             clamp_used = clamp_is_recommended and used_max_tokens == clamp_recommended and provider_calls_delta >= 1
-            if clamp_used:
-                _assert_line("clamp applied / clamp suggested", True)
+            _assert_line("clamp suggested", clamp_is_recommended)
+            if decision_payload.get("apply_clamp_enabled") is True:
+                _assert_line("clamp applied", bool(clamp_applied) and clamp_used)
             else:
-                _assert_line("clamp applied / clamp suggested", clamp_is_recommended)
+                _assert_line("clamp not applied", not bool(clamp_applied) and not clamp_used)
         elif scenario == "cap_breach":
             _assert_line("cap breach blocked", blocked and provider_calls_delta == 0)
         elif scenario == "req_cap_breach":

@@ -366,6 +366,7 @@ def _apply_google_clamp(
         else:
             generation_config["max_output_tokens"] = recommended
         next_kwargs["generation_config"] = generation_config
+        _mark_clamp_applied_if_changed(protect_decision, _extract_max_output_tokens(args, kwargs), _extract_max_output_tokens(tuple(next_args), next_kwargs))
         return tuple(next_args), next_kwargs
 
     if next_args and isinstance(next_args[0], dict):
@@ -377,9 +378,25 @@ def _apply_google_clamp(
             generation_config["max_output_tokens"] = recommended
         payload["generation_config"] = generation_config
         next_args[0] = payload
+        _mark_clamp_applied_if_changed(protect_decision, _extract_max_output_tokens(args, kwargs), _extract_max_output_tokens(tuple(next_args), next_kwargs))
         return tuple(next_args), next_kwargs
 
     generation_config = dict(next_kwargs.get("generation_config")) if isinstance(next_kwargs.get("generation_config"), dict) else {}
     generation_config["max_output_tokens"] = recommended
     next_kwargs["generation_config"] = generation_config
+    _mark_clamp_applied_if_changed(protect_decision, _extract_max_output_tokens(args, kwargs), _extract_max_output_tokens(tuple(next_args), next_kwargs))
     return tuple(next_args), next_kwargs
+
+
+def _mark_clamp_applied_if_changed(
+    protect_decision: dict[str, object],
+    original_max_tokens: int | None,
+    applied_max_tokens: int | None,
+) -> None:
+    clamp = protect_decision.get("clamp")
+    if not isinstance(clamp, dict):
+        return
+    if applied_max_tokens is None:
+        return
+    if original_max_tokens is None or applied_max_tokens < original_max_tokens:
+        clamp["applied"] = True

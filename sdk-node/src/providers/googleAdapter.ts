@@ -70,6 +70,7 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
       throw new RHEONICBlockedError(protectDecision.reason);
     }
     const callArgs = maybeApplyGoogleClamp(args, protectDecision);
+    markClampAppliedIfChanged(protectDecision, extractMaxOutputTokens(args), extractMaxOutputTokens(callArgs));
 
     try {
       const response = await originalGenerate(...callArgs);
@@ -245,4 +246,17 @@ function maybeApplyGoogleClamp(args: unknown[], decision: ProtectEvaluation): un
   existingConfig.generationConfig = generationConfig;
   nextArgs[1] = existingConfig;
   return nextArgs;
+}
+
+function markClampAppliedIfChanged(
+  decision: ProtectEvaluation,
+  originalMaxTokens: number | undefined,
+  appliedMaxTokens: number | undefined,
+): void {
+  if (!decision.clamp || typeof appliedMaxTokens !== "number") {
+    return;
+  }
+  if (typeof originalMaxTokens !== "number" || appliedMaxTokens < originalMaxTokens) {
+    decision.clamp.applied = true;
+  }
 }

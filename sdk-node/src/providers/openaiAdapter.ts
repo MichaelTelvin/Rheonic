@@ -68,6 +68,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
       throw new RHEONICBlockedError(protectDecision.reason);
     }
     const callArgs = maybeApplyOpenAIClamp(args, protectDecision);
+    markClampAppliedIfChanged(protectDecision, extractMaxOutputTokens(args), extractMaxOutputTokens(callArgs));
 
     try {
       const response = await originalCreate(...callArgs);
@@ -180,6 +181,19 @@ function maybeApplyOpenAIClamp(args: unknown[], decision: ProtectEvaluation): un
   const nextArgs = [...args];
   nextArgs[0] = payload;
   return nextArgs;
+}
+
+function markClampAppliedIfChanged(
+  decision: ProtectEvaluation,
+  originalMaxTokens: number | undefined,
+  appliedMaxTokens: number | undefined,
+): void {
+  if (!decision.clamp || typeof appliedMaxTokens !== "number") {
+    return;
+  }
+  if (typeof originalMaxTokens !== "number" || appliedMaxTokens < originalMaxTokens) {
+    decision.clamp.applied = true;
+  }
 }
 
 function extractResponseModel(response: unknown): string | null {
