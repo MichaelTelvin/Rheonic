@@ -78,6 +78,13 @@ class DecisionTimeoutIn(BaseModel):
     request_id: str | None = None
 
 
+class DecisionUnavailableIn(BaseModel):
+    # Failure report payload from SDK when preflight fails without a timeout.
+    environment: str
+    provider: str | None = None
+    request_id: str | None = None
+
+
 @router.post("/protect/decision", response_model=ProtectDecisionOut)
 def protect_decision(
     payload: ProtectDecisionIn,
@@ -177,6 +184,37 @@ def protect_decision_timeout(
     except Exception:
         logger.exception("Protect decision-timeout endpoint failed")
         raise HTTPException(status_code=500, detail="Failed to record decision timeout")
+
+
+@router.post("/protect/decision-unavailable", status_code=202)
+def protect_decision_unavailable(
+    payload: DecisionUnavailableIn,
+    ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
+    protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
+    ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
+    request_id_header: str | None = Header(default=None, alias="X-Rheonic-Protect-Request-Id"),
+) -> dict[str, str]:
+    # Record one SDK-side preflight unavailable fallback for the project mapped from ingest key.
+    _ = payload
+    try:
+        if not ingest_key:
+            raise HTTPException(status_code=401, detail="missing ingest key")
+        project = ingest_key_service.resolve_project(plaintext_key=ingest_key)
+        if project is None:
+            raise HTTPException(status_code=401, detail="invalid ingest key")
+        protect_action_store.finalize_outcome(
+            project_id=scoped_project_provider_id(project.id, payload.provider),
+            decision="block" if project.protect_fail_mode == "closed" else "allow",
+            reason="decision_unavailable",
+            source=app_config.protect_outcome_source_unavailable_fallback,
+            request_id=request_id_header or payload.request_id,
+        )
+        return {"status": "accepted"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Protect decision-unavailable endpoint failed")
+        raise HTTPException(status_code=500, detail="Failed to record decision unavailable fallback")
 
 
 @router.get("/protect/config", response_model=ProtectRuntimeConfigOut)

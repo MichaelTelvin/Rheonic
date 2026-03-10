@@ -6,10 +6,12 @@ import {
   fetchDeliveryFailures,
   fetchIncidents,
   fetchMetrics,
+  fetchProtectHealth,
   fetchProjectProviders,
   fetchProtectMetrics,
   listKeys,
   type IncidentItem,
+  type ProtectHealthMetrics,
   type RealtimeMetrics,
 } from "../api/client";
 import { Card } from "../components/Card";
@@ -42,6 +44,7 @@ function formatAlertAttemptTime(iso: string | null): string {
 }
 
 type SetupStage = "checking" | "no_project" | "no_selection" | "no_ingest_key" | "no_events" | "complete";
+type ProtectStatus = "awaiting" | "healthy" | "degraded" | "unavailable";
 
 export function Dashboard(): JSX.Element {
   const { loadingProjects, projects, projectId } = useProjectContext();
@@ -55,7 +58,10 @@ export function Dashboard(): JSX.Element {
   const [metricsWarning, setMetricsWarning] = useState<string | null>(null);
   const [lastMetricsSuccessAt, setLastMetricsSuccessAt] = useState<string | null>(null);
   const [lastIncidentsSuccessAt, setLastIncidentsSuccessAt] = useState<string | null>(null);
+  const [lastProtectHealthSuccessAt, setLastProtectHealthSuccessAt] = useState<string | null>(null);
   const [metricsFetchFailed, setMetricsFetchFailed] = useState<boolean>(false);
+  const [protectHealthFetchFailed, setProtectHealthFetchFailed] = useState<boolean>(false);
+  const [protectHealth, setProtectHealth] = useState<ProtectHealthMetrics | null>(null);
   const [protectDecisionStats, setProtectDecisionStats] = useState<{
     allowed_60m: number | null;
     warned_60m: number | null;
@@ -115,6 +121,9 @@ export function Dashboard(): JSX.Element {
     setMetricsWarning(null);
     setGlobalBanner(null);
     setProtectDecisionStats(null);
+    setProtectHealth(null);
+    setLastProtectHealthSuccessAt(null);
+    setProtectHealthFetchFailed(false);
     setProviders([]);
     setSelectedProvider("all");
     setHasIngestKey(false);
@@ -304,6 +313,42 @@ export function Dashboard(): JSX.Element {
 
   useEffect(() => {
     if (!projectId) {
+      return;
+    }
+
+    let cancelled = false;
+    const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
+
+    const loadProtectHealth = async (): Promise<void> => {
+      try {
+        const data = await fetchProtectHealth(projectId, providerQuery);
+        if (cancelled) {
+          return;
+        }
+        setProtectHealth(data);
+        setProtectHealthFetchFailed(false);
+        setLastProtectHealthSuccessAt(new Date().toISOString());
+      } catch {
+        if (!cancelled) {
+          setProtectHealthFetchFailed(true);
+          setProtectHealth(null);
+        }
+      }
+    };
+
+    void loadProtectHealth();
+    const interval = window.setInterval(() => {
+      void loadProtectHealth();
+    }, frontendConfig.dashboardProtectStatsPollMs);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [projectId, selectedProvider]);
+
+  useEffect(() => {
+    if (!projectId) {
       setLoadingMetrics(false);
       return;
     }
@@ -464,9 +509,49 @@ export function Dashboard(): JSX.Element {
   }, [projectId]);
 
   const renderMetric = (value: number | null | undefined): string => (value === null || value === undefined ? "—" : String(value));
-  const isApiConnected = Boolean(
-    lastMetricsSuccessAt && !metricsFetchFailed && Date.now() - new Date(lastMetricsSuccessAt).getTime() <= 10_000,
-  );
+  const protectStatus = useMemo<{
+    label: string;
+    tone: ProtectStatus;
+    detail: string;
+  }>(() => {
+    if (!projectId || setupStage !== "complete") {
+      return {
+        label: "Awaiting traffic",
+        tone: "awaiting",
+        detail: "Run one protected call to verify backend connectivity.",
+      };
+    }
+    if (
+      protectHealthFetchFailed ||
+      !lastProtectHealthSuccessAt ||
+      Date.now() - new Date(lastProtectHealthSuccessAt).getTime() > frontendConfig.dashboardProtectStatsPollMs * 2
+    ) {
+      return {
+        label: "Unavailable",
+        tone: "unavailable",
+        detail: "Protect checks are not reaching the backend reliably.",
+      };
+    }
+    if ((protectHealth?.timeouts_60m ?? 0) > 0) {
+      return {
+        label: "Degraded",
+        tone: "degraded",
+        detail: "Recent fallbacks detected while contacting the backend.",
+      };
+    }
+    if ((protectHealth?.p95_ms ?? 0) >= 250) {
+      return {
+        label: "Degraded",
+        tone: "degraded",
+        detail: "Decision latency is elevated but enforcement is still active.",
+      };
+    }
+    return {
+      label: "Healthy",
+      tone: "healthy",
+      detail: "Decisions are enforcing normally.",
+    };
+  }, [lastProtectHealthSuccessAt, projectId, protectHealth, protectHealthFetchFailed, setupStage]);
 
   return (
     <main className="dashboard">
@@ -480,18 +565,19 @@ export function Dashboard(): JSX.Element {
           <div className="dashboard-hero-right">
             <div className="status-panel status-panel--accent" aria-live="polite">
               <div className="status-row">
-                <span className="status-row-label">API</span>
-                <span className={`status-row-value ${isApiConnected ? "connected" : "disconnected"}`}>
-                  {isApiConnected ? "Connected" : "Disconnected"}
+                <span className="status-row-label">Protect status</span>
+                <span className={`status-row-value status-${protectStatus.tone}`}>
+                  {protectStatus.label}
                 </span>
               </div>
+              <div className="status-detail">{protectStatus.detail}</div>
               <div className="status-row">
-                <span className="status-row-label">Metrics updated</span>
-                <span className="status-row-value time-value">{formatTime(lastMetricsSuccessAt)}</span>
+                <span className="status-row-label">Last check</span>
+                <span className="status-row-value time-value">{formatTime(lastProtectHealthSuccessAt)}</span>
               </div>
               <div className="status-row">
-                <span className="status-row-label">Incidents updated</span>
-                <span className="status-row-value time-value">{formatTime(lastIncidentsSuccessAt)}</span>
+                <span className="status-row-label">Dashboard sync</span>
+                <span className="status-row-value time-value">{formatTime(lastMetricsSuccessAt)}</span>
               </div>
             </div>
           </div>

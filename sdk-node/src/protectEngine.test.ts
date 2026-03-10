@@ -541,12 +541,24 @@ test("decision timeout fail-closed blocks provider call", async () => {
 
 test("decision 500 fail-open allows provider call", async () => {
   const originalFetch = globalThis.fetch;
+  const unavailableReports: Array<Record<string, unknown>> = [];
   globalThis.fetch = (async () =>
     ({
       ok: false,
       status: 500,
       json: async () => ({ error: "server" }),
     }) as Response) as typeof fetch;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision-unavailable")) {
+      unavailableReports.push(typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {});
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    return {
+      ok: false,
+      status: 500,
+      json: async () => ({ error: "server" }),
+    } as Response;
+  }) as typeof fetch;
 
   try {
     const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
@@ -554,6 +566,8 @@ test("decision 500 fail-open allows provider call", async () => {
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini" });
     assert.equal(calls.length, 1);
+    assert.equal(unavailableReports.length, 1);
+    assert.equal(unavailableReports[0].provider, "openai");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;
@@ -562,12 +576,18 @@ test("decision 500 fail-open allows provider call", async () => {
 
 test("decision 500 fail-closed blocks provider call", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async () =>
-    ({
+  const unavailableReports: Array<Record<string, unknown>> = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision-unavailable")) {
+      unavailableReports.push(typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {});
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    return {
       ok: false,
       status: 500,
       json: async () => ({ error: "server" }),
-    }) as Response) as typeof fetch;
+    } as Response;
+  }) as typeof fetch;
 
   try {
     const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
@@ -575,6 +595,8 @@ test("decision 500 fail-closed blocks provider call", async () => {
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
     assert.equal(calls.length, 0);
+    assert.equal(unavailableReports.length, 1);
+    assert.equal(unavailableReports[0].provider, "openai");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;
@@ -583,14 +605,20 @@ test("decision 500 fail-closed blocks provider call", async () => {
 
 test("invalid JSON fail-open allows provider call", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async () =>
-    ({
+  const unavailableReports: Array<Record<string, unknown>> = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision-unavailable")) {
+      unavailableReports.push(typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {});
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    return {
       ok: true,
       status: 200,
       json: async () => {
         throw new Error("invalid json");
       },
-    }) as unknown as Response) as typeof fetch;
+    } as unknown as Response;
+  }) as typeof fetch;
 
   try {
     const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "open" });
@@ -598,6 +626,8 @@ test("invalid JSON fail-open allows provider call", async () => {
     instrumentOpenAI(openai, { client });
     await openai.chat.completions.create({ model: "gpt-4o-mini" });
     assert.equal(calls.length, 1);
+    assert.equal(unavailableReports.length, 1);
+    assert.equal(unavailableReports[0].provider, "openai");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;
@@ -606,14 +636,20 @@ test("invalid JSON fail-open allows provider call", async () => {
 
 test("invalid JSON fail-closed blocks provider call", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async () =>
-    ({
+  const unavailableReports: Array<Record<string, unknown>> = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision-unavailable")) {
+      unavailableReports.push(typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {});
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    return {
       ok: true,
       status: 200,
       json: async () => {
         throw new Error("invalid json");
       },
-    }) as unknown as Response) as typeof fetch;
+    } as unknown as Response;
+  }) as typeof fetch;
 
   try {
     const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000, protectFailMode: "closed" });
@@ -621,6 +657,8 @@ test("invalid JSON fail-closed blocks provider call", async () => {
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
     assert.equal(calls.length, 0);
+    assert.equal(unavailableReports.length, 1);
+    assert.equal(unavailableReports[0].provider, "openai");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;

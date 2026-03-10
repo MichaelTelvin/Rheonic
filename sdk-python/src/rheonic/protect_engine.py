@@ -93,6 +93,10 @@ class ProtectEngine:
                     status_code=status_code,
                     latency_ms=int((time.perf_counter() - started_at) * 1000),
                 )
+                self._report_decision_unavailable_fire_and_forget(
+                    provider=str(context.get("provider")) if isinstance(context.get("provider"), str) else None,
+                    request_id=request_id,
+                )
                 return self._fallback_decision()
             payload = self._parse_json_payload(response)
             decision = str(payload.get("decision") or "allow")
@@ -149,11 +153,16 @@ class ProtectEngine:
                     request_id=request_id,
                 )
             else:
+                provider = context.get("provider")
                 self._debug(
                     "Protect preflight failed",
-                    provider=context.get("provider"),
+                    provider=provider,
                     latency_ms=latency_ms,
                     error_type=type(sys.exc_info()[1]).__name__ if sys.exc_info()[1] is not None else "unknown",
+                )
+                self._report_decision_unavailable_fire_and_forget(
+                    provider=str(provider) if isinstance(provider, str) else None,
+                    request_id=request_id,
                 )
             return self._fallback_decision()
 
@@ -245,6 +254,27 @@ class ProtectEngine:
             try:
                 self._post_with_timeout(
                     f"{self._base_url}/api/v1/protect/decision-timeout",
+                    json={"environment": self._environment, "provider": provider, "request_id": request_id},
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Project-Ingest-Key": self._ingest_key,
+                        "X-Rheonic-Protect-Request-Id": request_id,
+                    },
+                    timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),
+                )
+            except Exception:
+                return
+
+        import threading
+
+        threading.Thread(target=_send, daemon=True).start()
+
+    def _report_decision_unavailable_fire_and_forget(self, provider: str | None, request_id: str) -> None:
+        # Report non-timeout preflight fallback without blocking caller flow.
+        def _send() -> None:
+            try:
+                self._post_with_timeout(
+                    f"{self._base_url}/api/v1/protect/decision-unavailable",
                     json={"environment": self._environment, "provider": provider, "request_id": request_id},
                     headers={
                         "Content-Type": "application/json",

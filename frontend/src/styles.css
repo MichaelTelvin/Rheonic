@@ -1419,7 +1419,6 @@ body {
   grid-template-columns: 1fr auto;
   align-items: baseline;
   gap: 10px;
-  white-space: nowrap;
   font-size: 0.82rem;
 }
 
@@ -1434,13 +1433,30 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.status-row-value.connected {
+.status-row-value.connected,
+.status-row-value.status-healthy {
   color: #d1fae5;
   text-shadow: 0 0 8px rgba(134, 239, 172, 0.18);
 }
 
-.status-row-value.disconnected {
+.status-row-value.disconnected,
+.status-row-value.status-unavailable {
   color: #fecdd3;
+}
+
+.status-row-value.status-degraded {
+  color: #fef3c7;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.16);
+}
+
+.status-row-value.status-awaiting {
+  color: rgba(229, 231, 235, 0.84);
+}
+
+.status-detail {
+  color: rgba(229, 231, 235, 0.68);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .status-row-value.protect-on {

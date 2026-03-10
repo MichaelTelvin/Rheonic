@@ -44,6 +44,7 @@ class FakeHttpClient:
         self.ingested_events: list[dict[str, Any]] = []
         self.decision_payloads: list[dict[str, Any]] = []
         self.timeout_reports: list[dict[str, Any]] = []
+        self.unavailable_reports: list[dict[str, Any]] = []
 
     def post(self, url: str, json: dict[str, Any], headers: dict[str, str], **kwargs: Any) -> FakeResponse:
         _ = headers
@@ -51,6 +52,9 @@ class FakeHttpClient:
         self.calls.append(url)
         if url.endswith("/api/v1/protect/decision-timeout"):
             self.timeout_reports.append(json)
+            return FakeResponse(status_code=202, payload={"status": "accepted"})
+        if url.endswith("/api/v1/protect/decision-unavailable"):
+            self.unavailable_reports.append(json)
             return FakeResponse(status_code=202, payload={"status": "accepted"})
         if url.endswith("/api/v1/protect/decision"):
             self.decision_payloads.append(json)
@@ -431,28 +435,32 @@ def test_preflight_timeout_fail_closed_blocks_provider_call() -> None:
 
 
 def test_preflight_500_fail_open_allows_provider_call() -> None:
+    transport = FakeHttpClient({"error": "server"}, decision_status=500)  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="open",
-        http_client=FakeHttpClient({"error": "server"}, decision_status=500),  # type: ignore[arg-type]
+        http_client=transport,
     )
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
     openai_client.chat.completions.create(model="gpt-4o-mini")
     assert len(calls) == 1
+    assert len(transport.unavailable_reports) == 1
+    assert transport.unavailable_reports[0]["provider"] == "openai"
     client.close()
 
 
 def test_preflight_500_fail_closed_blocks_provider_call() -> None:
+    transport = FakeHttpClient({"error": "server"}, decision_status=500)  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="closed",
-        http_client=FakeHttpClient({"error": "server"}, decision_status=500),  # type: ignore[arg-type]
+        http_client=transport,
     )
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
@@ -460,32 +468,38 @@ def test_preflight_500_fail_closed_blocks_provider_call() -> None:
     with pytest.raises(RHEONICBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
     assert calls == []
+    assert len(transport.unavailable_reports) == 1
+    assert transport.unavailable_reports[0]["provider"] == "openai"
     client.close()
 
 
 def test_preflight_invalid_json_fail_open_allows_provider_call() -> None:
+    transport = FakeHttpClient({"invalid_json": True})  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="open",
-        http_client=FakeHttpClient({"invalid_json": True}),  # type: ignore[arg-type]
+        http_client=transport,
     )
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
     openai_client.chat.completions.create(model="gpt-4o-mini")
     assert len(calls) == 1
+    assert len(transport.unavailable_reports) == 1
+    assert transport.unavailable_reports[0]["provider"] == "openai"
     client.close()
 
 
 def test_preflight_invalid_json_fail_closed_blocks_provider_call() -> None:
+    transport = FakeHttpClient({"invalid_json": True})  # type: ignore[arg-type]
     client = Client(
         ingest_key="p1",
         base_url="http://localhost:8000",
         flush_interval_s=30.0,
         protect_fail_mode="closed",
-        http_client=FakeHttpClient({"invalid_json": True}),  # type: ignore[arg-type]
+        http_client=transport,
     )
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
@@ -493,6 +507,8 @@ def test_preflight_invalid_json_fail_closed_blocks_provider_call() -> None:
     with pytest.raises(RHEONICBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
     assert calls == []
+    assert len(transport.unavailable_reports) == 1
+    assert transport.unavailable_reports[0]["provider"] == "openai"
     client.close()
 
 

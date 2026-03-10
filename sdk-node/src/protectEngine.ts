@@ -116,6 +116,7 @@ export class ProtectEngine {
           status_code: response.status,
           latency_ms: Date.now() - startedAt,
         });
+        void this.reportDecisionUnavailable(context.provider, requestId);
         return this.failMode === "closed"
           ? { decision: "block", reason: "decision_unavailable" }
           : { decision: "allow", reason: "decision_unavailable" };
@@ -170,6 +171,7 @@ export class ProtectEngine {
           latency_ms: Date.now() - startedAt,
           error_type: extractErrorType(error),
         });
+        void this.reportDecisionUnavailable(context.provider, requestId);
       }
       return this.failMode === "closed"
         ? { decision: "block", reason: "decision_unavailable" }
@@ -218,6 +220,22 @@ export class ProtectEngine {
       });
     } catch {
       // Swallow timeout reporting errors; protect evaluation must never throw here.
+    }
+  }
+
+  private async reportDecisionUnavailable(provider: string | undefined, requestId: string): Promise<void> {
+    try {
+      await requestJson(`${this.baseUrl}/api/v1/protect/decision-unavailable`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Project-Ingest-Key": this.ingestKey,
+          "X-Rheonic-Protect-Request-Id": requestId,
+        },
+        body: JSON.stringify({ environment: this.environment, provider, request_id: requestId }),
+      });
+    } catch {
+      // Swallow unavailable reporting errors; protect evaluation must never throw here.
     }
   }
 }
