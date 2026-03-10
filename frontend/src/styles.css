@@ -1453,12 +1453,6 @@ body {
   color: rgba(229, 231, 235, 0.84);
 }
 
-.status-detail {
-  color: rgba(229, 231, 235, 0.68);
-  font-size: 0.78rem;
-  line-height: 1.45;
-}
-
 .status-row-value.protect-on {
   color: #d1fae5;
   font-weight: 600;

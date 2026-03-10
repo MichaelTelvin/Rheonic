@@ -158,21 +158,22 @@ export function Dashboard(): JSX.Element {
 
     let cancelled = false;
     const loadSetupSignals = async (): Promise<void> => {
+      let setupSignalsLoaded = false;
       try {
         const [keys, projectProviders] = await Promise.all([listKeys(projectId), fetchProjectProviders(projectId)]);
         if (cancelled) {
           return;
         }
+        setupSignalsLoaded = true;
         setHasIngestKey(keys.some((key) => key.status === "active"));
         setHasEvents(projectProviders.length > 0);
       } catch {
         if (cancelled) {
           return;
         }
-        setHasIngestKey(false);
-        setHasEvents(false);
+        // Keep the last known setup state during transient backend outages.
       } finally {
-        if (!cancelled) {
+        if (!cancelled && setupSignalsLoaded) {
           setSetupStatusResolved(true);
         }
       }
@@ -512,13 +513,11 @@ export function Dashboard(): JSX.Element {
   const protectStatus = useMemo<{
     label: string;
     tone: ProtectStatus;
-    detail: string;
   }>(() => {
     if (!projectId || setupStage !== "complete") {
       return {
         label: "Awaiting traffic",
         tone: "awaiting",
-        detail: "Run one protected call to verify backend connectivity.",
       };
     }
     if (
@@ -529,27 +528,23 @@ export function Dashboard(): JSX.Element {
       return {
         label: "Unavailable",
         tone: "unavailable",
-        detail: "Protect checks are not reaching the backend reliably.",
       };
     }
     if ((protectHealth?.timeouts_60m ?? 0) > 0) {
       return {
         label: "Degraded",
         tone: "degraded",
-        detail: "Recent fallbacks detected while contacting the backend.",
       };
     }
     if ((protectHealth?.p95_ms ?? 0) >= 250) {
       return {
         label: "Degraded",
         tone: "degraded",
-        detail: "Decision latency is elevated but enforcement is still active.",
       };
     }
     return {
       label: "Healthy",
       tone: "healthy",
-      detail: "Decisions are enforcing normally.",
     };
   }, [lastProtectHealthSuccessAt, projectId, protectHealth, protectHealthFetchFailed, setupStage]);
 
@@ -565,15 +560,10 @@ export function Dashboard(): JSX.Element {
           <div className="dashboard-hero-right">
             <div className="status-panel status-panel--accent" aria-live="polite">
               <div className="status-row">
-                <span className="status-row-label">Protect status</span>
+                <span className="status-row-label">System status</span>
                 <span className={`status-row-value status-${protectStatus.tone}`}>
                   {protectStatus.label}
                 </span>
-              </div>
-              <div className="status-detail">{protectStatus.detail}</div>
-              <div className="status-row">
-                <span className="status-row-label">Last check</span>
-                <span className="status-row-value time-value">{formatTime(lastProtectHealthSuccessAt)}</span>
               </div>
               <div className="status-row">
                 <span className="status-row-label">Dashboard sync</span>
