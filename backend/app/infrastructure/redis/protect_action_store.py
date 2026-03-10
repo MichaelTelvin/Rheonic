@@ -114,17 +114,6 @@ class ProtectActionStore:
     ) -> None:
         # Record one SDK-reported decision-timeout in the 60-minute counter.
         try:
-            if effective_decision == "block":
-                self._increment_with_ttl(_block_key(project_id))
-            else:
-                self._increment_with_ttl(_allow_key(project_id))
-            self._increment_with_ttl(_timeout_key(project_id))
-            now = datetime.now(timezone.utc).isoformat()
-            self._redis_client.set(
-                _last_key(project_id),
-                json.dumps({"decision": "block" if effective_decision == "block" else "allow", "reason": "decision_timeout", "ts": now}),
-                ex=app_config.protect_action_counter_ttl_seconds,
-            )
             if request_id:
                 self._redis_client.set(
                     _timed_out_request_key(project_id, request_id),
@@ -136,6 +125,17 @@ class ProtectActionStore:
                 if request_payload is not None:
                     self._decrement_counter_for_decision(project_id=project_id, decision=request_payload["decision"])
                 self._redis_client.delete(_request_key(project_id, request_id))
+            if effective_decision == "block":
+                self._increment_with_ttl(_block_key(project_id))
+            else:
+                self._increment_with_ttl(_allow_key(project_id))
+            self._increment_with_ttl(_timeout_key(project_id))
+            now = datetime.now(timezone.utc).isoformat()
+            self._redis_client.set(
+                _last_key(project_id),
+                json.dumps({"decision": "block" if effective_decision == "block" else "allow", "reason": "decision_timeout", "ts": now}),
+                ex=app_config.protect_action_counter_ttl_seconds,
+            )
         except Exception:
             logger.warning("Failed recording protect decision timeout", extra={"project_id": project_id})
 

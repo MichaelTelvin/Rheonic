@@ -589,6 +589,45 @@ def test_timeout_report_records_block_when_project_fail_mode_is_closed(tmp_path)
     _cleanup_overrides()
 
 
+def test_timeout_report_replaces_prior_allow_with_block_when_project_fail_mode_is_closed(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Timeout Closed Reconcile")
+    _set_protect(client, project_id, protect_enabled=True, protect_fail_mode="closed")
+
+    request_id = "req-timeout-closed-allow"
+    decision_response = client.post(
+        "/api/v1/protect/decision",
+        headers={
+            "X-Project-Ingest-Key": ingest_key,
+            "X-Rheonic-Protect-Request-Id": request_id,
+        },
+        json={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 3},
+    )
+    assert decision_response.status_code == 200
+    assert decision_response.json()["decision"] == "allow"
+
+    timeout_response = client.post(
+        "/api/v1/protect/decision-timeout",
+        headers={
+            "X-Project-Ingest-Key": ingest_key,
+            "X-Rheonic-Protect-Request-Id": request_id,
+        },
+        json={"environment": "dev", "provider": "openai", "request_id": request_id},
+    )
+
+    assert timeout_response.status_code == 202
+    metrics = _protect_metrics(client, project_id)
+    assert metrics["allowed_60m"] == 0
+    assert metrics["blocked_60m"] == 1
+    assert metrics["decision_timeouts_60m"] == 1
+    assert metrics["last"] == {
+        "decision": "block",
+        "reason": "decision_timeout",
+        "ts": metrics["last"]["ts"],
+    }
+    _cleanup_overrides()
+
+
 def test_protect_config_returns_project_fail_mode_and_server_timeout(tmp_path) -> None:
     client, _, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Config")
