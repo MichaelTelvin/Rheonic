@@ -72,6 +72,7 @@ class IncidentRepository(ABC):
         provider: str,
         incident_type: str,
         resolved_at: datetime,
+        created_after: datetime | None = None,
     ) -> list[Incident]:
         # Resolve open incidents for a project/provider/type and return changed rows.
         raise NotImplementedError

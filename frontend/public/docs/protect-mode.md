@@ -42,6 +42,8 @@ Available settings:
 - `loop_suspect`
 - `token_explosion`
 
+Warn outcomes also appear in the dashboard so the reason for a protected request stays visible.
+
 ## Auto Token Clamp
 When `Auto token clamp` is enabled, Rheonic can return a recommended lower output token limit in the decision payload. SDKs can apply that value before the provider request is sent.
 

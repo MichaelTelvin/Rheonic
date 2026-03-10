@@ -142,7 +142,7 @@ ingest: "POST /api/v1/events\ntelemetry ingest\n(project+provider counters/incid
   }
 }
 
-incident_pipeline: "Incident pipeline source\nCounters -> Detector(s) -> IncidentManager" {
+incident_pipeline: "Incident pipeline source\nIngest counters -> Detector(s) -> IncidentManager\n+ preflight near_cap warn -> visible incident" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
@@ -193,6 +193,7 @@ caps -> block: "block"
 caps -> warn_signals: "no block"
 warn_signals -> allow_warn: "warn / allow"
 warn_signals -> transport_outbox: "warn -> decision.warn"
+warn_signals -> incident_pipeline: "near_cap -> visible incident"
 block -> transport_outbox: "block -> incident.block"
 allow_warn -> provider
 preflight -> finalizer: "live outcome"

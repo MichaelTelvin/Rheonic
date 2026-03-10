@@ -113,6 +113,7 @@ class FakeIncidentRepository:
         provider: str,
         incident_type: str,
         resolved_at: datetime,
+        created_after: datetime | None = None,
     ) -> list[Incident]:
         resolved: list[Incident] = []
         for row in self.rows:
@@ -121,6 +122,7 @@ class FakeIncidentRepository:
                 and row.provider == provider
                 and row.incident_type == incident_type
                 and row.status == "open"
+                and (created_after is None or row.created_at >= created_after)
             ):
                 row.status = "resolved"
                 row.resolved_at = resolved_at
@@ -514,6 +516,25 @@ def test_cap_breach_resolves_existing_near_cap_incident_for_same_provider() -> N
     assert len(near_cap_rows) == 1
     assert near_cap_rows[0].status == "resolved"
     assert near_cap_rows[0].resolved_at is not None
+    assert len(cap_breach_rows) == 1
+    assert cap_breach_rows[0].status == "open"
+
+
+def test_cap_breach_does_not_resolve_old_near_cap_outside_recent_window() -> None:
+    service, incidents, _ = _service(protect_enabled=False, req_cap=100, tok_cap=1000, retry_storm_count=10)
+
+    service.ingest(_event("p1", total_tokens=900, feature="tok-cap-breach-window", offset_seconds=0))
+    near_cap_row = next(row for row in incidents.rows if row.incident_type == "near_cap")
+    near_cap_row.created_at = near_cap_row.created_at - timedelta(seconds=301)
+    near_cap_row.last_seen_at = near_cap_row.last_seen_at - timedelta(seconds=301) if near_cap_row.last_seen_at is not None else None
+
+    service.ingest(_event("p1", total_tokens=200, feature="tok-cap-breach-window", offset_seconds=1))
+
+    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
+    cap_breach_rows = [row for row in incidents.rows if row.incident_type == "cap_breach"]
+    assert len(near_cap_rows) == 1
+    assert near_cap_rows[0].status == "open"
+    assert near_cap_rows[0].resolved_at is None
     assert len(cap_breach_rows) == 1
     assert cap_breach_rows[0].status == "open"
 

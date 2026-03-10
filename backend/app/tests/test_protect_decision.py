@@ -287,6 +287,12 @@ def _protect_metrics(client: TestClient, project_id: str, provider: str = "opena
     return response.json()
 
 
+def _incidents(client: TestClient, project_id: str, provider: str = "openai", status: str = "open") -> list[dict[str, object]]:
+    response = client.get(f"/api/v1/incidents?project_id={project_id}&status={status}&provider={provider}")
+    assert response.status_code == 200
+    return response.json()
+
+
 def test_protect_disabled_returns_allow_and_predictive_disabled(tmp_path) -> None:
     client, _, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Disabled")
@@ -410,6 +416,31 @@ def test_near_cap_warn_dispatches_decision_warn_webhook(tmp_path) -> None:
     assert payload["reason"] == "near_cap"
     assert payload["apply_clamp_enabled"] is False
     assert isinstance(payload["clamp"], dict)
+    _cleanup_overrides()
+
+
+def test_near_cap_warn_creates_visible_incident_from_preflight(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Incident")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=150)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "input_tokens_estimate": 10,
+            "max_output_tokens": 64,
+        },
+    )
+    assert decision["decision"] == "warn"
+    incidents = _incidents(client, project_id, provider="openai")
+    assert len(incidents) == 1
+    assert incidents[0]["type"] == "near_cap"
+    assert incidents[0]["evidence"]["near_cap_type"] == "tok"
     _cleanup_overrides()
 
 

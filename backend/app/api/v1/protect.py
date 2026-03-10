@@ -1,20 +1,24 @@
 # Protect mode API endpoints.
+from datetime import datetime, timezone
 from time import perf_counter
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from app.application.services.incident_manager import IncidentManager
 from app.application.services.protect_service import ProtectDecisionContext, ProtectService
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.project_service import ProjectService
 from app.dependencies import (
     get_current_user,
+    get_incident_manager,
     get_ingest_key_service,
     get_project_service,
     get_protect_action_store,
     get_protect_service,
 )
+from app.domain.detectors.contracts import Signal
 from app.domain.models.user import User
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.config import app_config
@@ -91,6 +95,7 @@ def protect_decision(
     response: Response,
     service: ProtectService = Depends(get_protect_service),
     protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
+    incident_manager: IncidentManager = Depends(get_incident_manager),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
     request_id: str | None = Header(default=None, alias="X-Rheonic-Protect-Request-Id"),
 ) -> ProtectDecisionOut:
@@ -126,6 +131,12 @@ def protect_decision(
             protect_action_store.record_health(
                 project_id=scoped_id,
                 latency_ms=latency_ms,
+            )
+            _record_preflight_incident_if_needed(
+                incident_manager=incident_manager,
+                project_id=project_id,
+                payload=payload,
+                decision=decision,
             )
         logger.info(
             "Protect decision evaluated",
@@ -296,3 +307,82 @@ def update_project_protect(
     except Exception:
         logger.exception("Update project protect settings failed", extra={"project_id": project_id})
         raise HTTPException(status_code=500, detail="Failed to update project protect settings")
+
+
+def _record_preflight_incident_if_needed(
+    *,
+    incident_manager: IncidentManager,
+    project_id: str,
+    payload: ProtectDecisionIn,
+    decision,
+) -> None:
+    # Keep user-visible incidents aligned with live preflight warnings that do not originate from ingest.
+    if decision.decision != "warn" or decision.reason != app_config.incident_type_near_cap:
+        return
+    signal = _build_near_cap_signal_from_decision(project_id=project_id, payload=payload, decision=decision)
+    incident_manager.process_signal(
+        project_id=project_id,
+        provider=payload.provider,
+        model=payload.model,
+        environment=payload.environment,
+        now=datetime.now(timezone.utc),
+        signal=signal,
+        mode="protect",
+    )
+
+
+def _build_near_cap_signal_from_decision(
+    *,
+    project_id: str,
+    payload: ProtectDecisionIn,
+    decision,
+) -> Signal:
+    # Derive the same near-cap fingerprint and evidence shape from the predictive decision snapshot.
+    snapshot = decision.snapshot or {}
+    predictive = snapshot.get("predictive", {}) if isinstance(snapshot, dict) else {}
+    requests_60s = _safe_int(snapshot.get("requests_60s"))
+    tokens_60s = _safe_int(snapshot.get("tokens_60s"))
+    req_cap = _safe_int(snapshot.get("threshold_req_60s"))
+    tok_cap = _safe_int(snapshot.get("threshold_tok_60s"))
+    estimated_next_tokens = _safe_int(predictive.get("estimated_next_tokens")) if isinstance(predictive, dict) else None
+    req_ratio = ((requests_60s + 1) / req_cap) if req_cap else None
+    tok_ratio = ((tokens_60s + estimated_next_tokens) / tok_cap) if (tok_cap and estimated_next_tokens is not None) else None
+    req_near_cap = bool(req_ratio is not None and req_ratio >= app_config.protect_near_cap_factor)
+    tok_near_cap = bool(tok_ratio is not None and tok_ratio >= app_config.protect_near_cap_factor)
+    near_cap_type = "both" if req_near_cap and tok_near_cap else ("req" if req_near_cap else "tok")
+    evidence: dict[str, object] = {
+        "provider": payload.provider,
+        "model": payload.model,
+        "environment": payload.environment,
+        "requests_60s": requests_60s,
+        "tokens_60s": tokens_60s,
+        "req_cap": req_cap,
+        "tok_cap": tok_cap,
+        "warn_ratio": app_config.protect_near_cap_factor,
+        "estimated_next_tokens": estimated_next_tokens,
+        "req_ratio_to_cap": _round_ratio(req_ratio),
+        "tok_ratio_to_cap": _round_ratio(tok_ratio),
+        "req_near_cap": req_near_cap,
+        "tok_near_cap": tok_near_cap,
+        "near_cap_type": near_cap_type,
+        "reason": app_config.incident_type_near_cap,
+    }
+    return Signal(
+        detector=app_config.incident_type_near_cap,
+        scope_provider=payload.provider,
+        fingerprint=f"{project_id}:{payload.provider}:{app_config.incident_type_near_cap}:{near_cap_type}",
+        evidence=evidence,
+    )
+
+
+def _safe_int(value: object) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _round_ratio(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return round(value, 4)

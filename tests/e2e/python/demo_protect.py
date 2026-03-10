@@ -80,8 +80,8 @@ class LoggingHttpClient:
             print(json_lib.dumps(payload, indent=2, sort_keys=True))
         return response
 
-    def get(self, url: str, headers: dict[str, str] | None = None) -> httpx.Response:
-        return self._client.get(url, headers=headers)
+    def get(self, url: str, headers: dict[str, str] | None = None, timeout: float | None = None) -> httpx.Response:
+        return self._client.get(url, headers=headers, timeout=timeout)
 
     def close(self) -> None:
         self._client.close()

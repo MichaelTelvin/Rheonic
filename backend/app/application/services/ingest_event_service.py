@@ -1,6 +1,6 @@
 # Application service for event ingestion.
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.event_repository import EventRepository
@@ -51,6 +51,7 @@ class IngestEventService:
         self._loop_count = loop_count
         self._token_explosion_ratio = token_explosion_ratio
         self._token_explosion_abs = token_explosion_abs
+        self._incident_dedup_window_seconds = incident_dedup_window_seconds
         self._detector_registry = DetectorRegistry(
             detectors=[
                 NearCapDetector(),
@@ -114,12 +115,13 @@ class IngestEventService:
             cap_breach_signals = self._cap_breach_signal_if_any(ctx)
             if cap_breach_signals:
                 # Dominance L3: cap_breach suppresses all other signals for this ingest event.
-                # A live cap breach also supersedes any previously open near-cap incident for the same provider.
+                # A live cap breach supersedes only recent open near-cap incidents from the same provider.
                 self._incident_repository.resolve_open_incidents_by_type(
                     project_id=event.project_id,
                     provider=provider,
                     incident_type=app_config.incident_type_near_cap,
                     resolved_at=self._now_provider(),
+                    created_after=self._now_provider() - timedelta(seconds=self._incident_dedup_window_seconds),
                 )
                 signals = cap_breach_signals
             else:

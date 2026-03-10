@@ -36,7 +36,7 @@ class IncidentManager:
         mode: str,
     ) -> None:
         for signal in signals:
-            self._process_signal(
+            self.process_signal(
                 project_id=project_id,
                 provider=provider,
                 model=model,
@@ -46,7 +46,7 @@ class IncidentManager:
                 mode=mode,
             )
 
-    def _process_signal(
+    def process_signal(
         self,
         *,
         project_id: str,
@@ -57,6 +57,7 @@ class IncidentManager:
         signal: Signal,
         mode: str,
     ) -> None:
+        # Upsert one incident signal inside the dedup window.
         evidence = dict(signal.evidence)
         evidence["provider"] = provider
         evidence["model"] = model

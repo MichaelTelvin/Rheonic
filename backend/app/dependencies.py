@@ -6,6 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.application.services.auth_service import AuthService
 from app.application.services.detect_incidents_service import DetectIncidentsService
+from app.application.services.incident_manager import IncidentManager
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.metrics_service import MetricsService
@@ -174,6 +175,19 @@ def get_detect_incidents_service() -> DetectIncidentsService:
         return service
     except Exception:
         logger.exception("Failed to construct detect incidents service")
+        raise
+
+
+def get_incident_manager() -> IncidentManager:
+    # Provide an incident upsert manager shared by ingest and preflight warning paths.
+    try:
+        return IncidentManager(
+            incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
+            incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
+            webhook_dispatcher=get_webhook_dispatcher(),
+        )
+    except Exception:
+        logger.exception("Failed to construct incident manager")
         raise
 
 

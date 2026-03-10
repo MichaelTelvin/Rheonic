@@ -38,11 +38,22 @@ class HttpResponse(Protocol):
 class HttpTransport(Protocol):
     # Small transport protocol for SDK HTTP clients.
 
-    def post(self, url: str, json: dict[str, Any], headers: dict[str, str]) -> HttpResponse:
+    def post(
+        self,
+        url: str,
+        json: dict[str, Any],
+        headers: dict[str, str],
+        timeout: float | None = None,
+    ) -> HttpResponse:
         # Send one JSON request.
         ...
 
-    def get(self, url: str, headers: dict[str, str] | None = None) -> HttpResponse:
+    def get(
+        self,
+        url: str,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> HttpResponse:
         # Send one GET request.
         ...
 
@@ -57,7 +68,13 @@ class _UrllibTransport:
     def __init__(self, timeout_s: float = sdk_config.default_request_timeout_s) -> None:
         self._timeout_s = timeout_s
 
-    def post(self, url: str, json: dict[str, Any], headers: dict[str, str]) -> "_SimpleResponse":
+    def post(
+        self,
+        url: str,
+        json: dict[str, Any],
+        headers: dict[str, str],
+        timeout: float | None = None,
+    ) -> "_SimpleResponse":
         payload = request.Request(
             url=url,
             data=bytes(json_lib.dumps(json), encoding="utf-8"),
@@ -65,19 +82,24 @@ class _UrllibTransport:
             method="POST",
         )
         try:
-            with request.urlopen(payload, timeout=self._timeout_s) as response:
+            with request.urlopen(payload, timeout=timeout or self._timeout_s) as response:
                 return _SimpleResponse(status_code=response.getcode())
         except error.HTTPError as exc:
             return _SimpleResponse(status_code=exc.code)
 
-    def get(self, url: str, headers: dict[str, str] | None = None) -> "_SimpleResponse":
+    def get(
+        self,
+        url: str,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> "_SimpleResponse":
         payload = request.Request(
             url=url,
             headers=headers or {},
             method="GET",
         )
         try:
-            with request.urlopen(payload, timeout=self._timeout_s) as response:
+            with request.urlopen(payload, timeout=timeout or self._timeout_s) as response:
                 return _SimpleResponse(status_code=response.getcode())
         except error.HTTPError as exc:
             return _SimpleResponse(status_code=exc.code)
@@ -247,7 +269,10 @@ class Client:
     def warm_connections(self) -> None:
         # Best-effort warmup of the shared backend HTTP connection and protect runtime config.
         try:
-            response = self._http_client.get(f"{self.base_url}/health")
+            response = self._http_client.get(
+                f"{self.base_url}/health",
+                timeout=min(self.request_timeout_s, 1.0),
+            )
             status_code = int(getattr(response, "status_code", 0))
             self.debug_log("SDK connection warmup completed", status_code=status_code)
         except Exception:

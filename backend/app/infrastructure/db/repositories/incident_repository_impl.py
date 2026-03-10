@@ -203,18 +203,21 @@ class IncidentRepositoryImpl(IncidentRepository):
         provider: str,
         incident_type: str,
         resolved_at: datetime,
+        created_after: datetime | None = None,
     ) -> list[Incident]:
-        # Resolve all open incidents for the same project/provider/type.
+        # Resolve open incidents for the same project/provider/type, optionally bounded to a recent window.
         try:
             with self._session_factory.create_session() as session:
-                records = (
+                query = (
                     session.query(IncidentRecord)
                     .filter(IncidentRecord.project_id == project_id)
                     .filter(IncidentRecord.provider == provider)
                     .filter(IncidentRecord.type == incident_type)
                     .filter(IncidentRecord.status == "open")
-                    .all()
                 )
+                if created_after is not None:
+                    query = query.filter(IncidentRecord.created_at >= created_after)
+                records = query.all()
                 if not records:
                     return []
                 for record in records:
@@ -225,13 +228,24 @@ class IncidentRepositoryImpl(IncidentRepository):
                 resolved = [_to_domain(record) for record in records]
             logger.info(
                 "Open incidents resolved by type",
-                extra={"project_id": project_id, "provider": provider, "incident_type": incident_type, "count": len(resolved)},
+                extra={
+                    "project_id": project_id,
+                    "provider": provider,
+                    "incident_type": incident_type,
+                    "count": len(resolved),
+                    "created_after": created_after.isoformat() if created_after is not None else None,
+                },
             )
             return resolved
         except Exception:
             logger.exception(
                 "Failed resolving open incidents by type",
-                extra={"project_id": project_id, "provider": provider, "incident_type": incident_type},
+                extra={
+                    "project_id": project_id,
+                    "provider": provider,
+                    "incident_type": incident_type,
+                    "created_after": created_after.isoformat() if created_after is not None else None,
+                },
             )
             raise
 

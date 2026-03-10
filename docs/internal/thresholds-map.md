@@ -11,13 +11,13 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 
 ## Incident Dedup and Lifecycle
 - `incident_dedup_window_seconds`: if an open incident with same `(project_id, provider, incident_type)` is inside the window, update it instead of creating a new row.
-- `incident_auto_close_seconds`: inactivity cooldown before open incidents are auto-resolved. Default: 30 minutes.
+- `incident_auto_close_seconds`: inactivity cooldown before open incidents are auto-resolved. Default: 60 minutes.
 - `auto_close_run_interval_seconds`: scheduler cadence for running auto-close.
 
 ## Ingest Dominance (per event)
 - Dominance level 3: `cap_breach`
   - suppresses: `near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`
-  - resolves any already-open `near_cap` incident for the same `(project_id, provider)`
+  - resolves only recent open `near_cap` incidents for the same `(project_id, provider)` inside the dedup window
 - Dominance level 2: `near_cap` (only when no cap breach)
   - suppresses: `retry_storm`, `loop_suspect`, `token_explosion`
 - Dominance level 1: `retry_storm`, `loop_suspect`, `token_explosion`
@@ -36,8 +36,8 @@ This map reflects the deterministic anomaly model now used by ingest and protect
   - `near_cap(req)` -> `req_near_cap=true`, `tok_near_cap=false`, `near_cap_type="req"`
   - `near_cap(both)` -> both booleans true, `near_cap_type="both"`
 - When it applies:
-  - Protect preflight: decision `warn` with webhook `decision.warn`.
-- Ingest (observe/protect): emits `near_cap` incident only when no `cap_breach` dominates that same event. If a later `cap_breach` is reached for the same provider, the open `near_cap` incident is resolved.
+  - Protect preflight: decision `warn` with webhook `decision.warn` and visible `near_cap` incident upsert.
+- Ingest (observe/protect): emits `near_cap` incident only when no `cap_breach` dominates that same event. If a later `cap_breach` is reached for the same provider, only recent open `near_cap` incidents inside the dedup window are resolved.
 
 ## Retry Storm Detector
 - `retry_storm_window_seconds`: lookback window for failure burst detection.
