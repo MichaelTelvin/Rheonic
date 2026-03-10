@@ -50,6 +50,7 @@ export class Client {
   private failed = 0;
   private isClosed = false;
   private warmupPromise: Promise<void> | null = null;
+  private warmupCompleted = false;
 
   public constructor(config: ClientConfig) {
     this.baseUrl = config.baseUrl ?? process.env.RHEONIC_BASE_URL ?? sdkNodeConfig.defaultBaseUrl;
@@ -78,7 +79,7 @@ export class Client {
       initialFailMode,
       debugLog: this.debugLog.bind(this),
     });
-    this.warmupPromise = this.warmConnections();
+    this.warmupPromise = this.runWarmup();
 
     this.timer = setInterval(() => {
       void this.flush();
@@ -143,14 +144,35 @@ export class Client {
   }
 
   public async evaluateProtectDecision(context: ProtectContext): Promise<ProtectEvaluation> {
-    if (this.warmupPromise) {
-      await this.warmupPromise;
-      this.warmupPromise = null;
-    }
+    await this.ensureWarmup();
     return this.protectEngine.evaluate(context);
   }
 
   public async warmConnections(): Promise<void> {
+    if (this.warmupCompleted) {
+      return;
+    }
+    if (this.warmupPromise) {
+      await this.warmupPromise;
+      this.warmupPromise = null;
+      return;
+    }
+    this.warmupPromise = this.runWarmup();
+    await this.warmupPromise;
+    this.warmupPromise = null;
+  }
+
+  private async ensureWarmup(): Promise<void> {
+    if (this.warmupCompleted) {
+      return;
+    }
+    if (this.warmupPromise) {
+      await this.warmupPromise;
+      this.warmupPromise = null;
+    }
+  }
+
+  private async runWarmup(): Promise<void> {
     try {
       const response = await requestJson(`${this.baseUrl}/health`, {
         method: "GET",
@@ -165,6 +187,7 @@ export class Client {
     } catch {
       this.debugLog("SDK protect config bootstrap failed");
     }
+    this.warmupCompleted = true;
   }
 
   public instrumentOpenAI<T extends Record<string, any>>(
