@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -47,6 +47,7 @@ type SetupStage = "checking" | "no_project" | "no_selection" | "no_ingest_key" |
 type ProtectStatus = "awaiting" | "healthy" | "degraded" | "unavailable";
 
 type DashboardCachedState = {
+  selectedProvider: string;
   hasIngestKey: boolean;
   hasEvents: boolean;
   setupStatusResolved: boolean;
@@ -60,6 +61,10 @@ type DashboardCachedState = {
   incidents: IncidentItem[];
 };
 
+function buildInitialDashboardState(projectId: string | null | undefined): DashboardCachedState | null {
+  return projectId ? readDashboardCache(projectId) : null;
+}
+
 function dashboardCacheKey(projectId: string): string {
   return `rheonic:dashboard:${projectId}`;
 }
@@ -72,6 +77,7 @@ function readDashboardCache(projectId: string): DashboardCachedState | null {
     }
     const parsed = JSON.parse(raw) as Partial<DashboardCachedState>;
     return {
+      selectedProvider: typeof parsed.selectedProvider === "string" ? normalizeProviderValue(parsed.selectedProvider) || "all" : "all",
       hasIngestKey: Boolean(parsed.hasIngestKey),
       hasEvents: Boolean(parsed.hasEvents),
       setupStatusResolved: Boolean(parsed.setupStatusResolved),
@@ -96,14 +102,15 @@ function writeDashboardCache(projectId: string, state: DashboardCachedState): vo
 export function Dashboard(): JSX.Element {
   const { loadingProjects, projects, projectId } = useProjectContext();
   const navigate = useNavigate();
+  const initialDashboardState = buildInitialDashboardState(projectId);
 
-  const [metrics, setMetrics] = useState<RealtimeMetrics | null>(null);
-  const [incidents, setIncidents] = useState<IncidentItem[]>([]);
+  const [metrics, setMetrics] = useState<RealtimeMetrics | null>(initialDashboardState?.metrics ?? null);
+  const [incidents, setIncidents] = useState<IncidentItem[]>(initialDashboardState?.incidents ?? []);
   const [requestsSeries, setRequestsSeries] = useState<number[]>([]);
   const [tokensSeries, setTokensSeries] = useState<number[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState<boolean>(false);
   const [metricsWarning, setMetricsWarning] = useState<string | null>(null);
-  const [lastMetricsSuccessAt, setLastMetricsSuccessAt] = useState<string | null>(null);
+  const [lastMetricsSuccessAt, setLastMetricsSuccessAt] = useState<string | null>(initialDashboardState?.lastMetricsSuccessAt ?? null);
   const [lastIncidentsSuccessAt, setLastIncidentsSuccessAt] = useState<string | null>(null);
   const [lastProtectHealthSuccessAt, setLastProtectHealthSuccessAt] = useState<string | null>(null);
   const [metricsFetchFailed, setMetricsFetchFailed] = useState<boolean>(false);
@@ -113,16 +120,16 @@ export function Dashboard(): JSX.Element {
     allowed_60m: number | null;
     warned_60m: number | null;
     blocked_60m: number | null;
-  } | null>(null);
+  } | null>(initialDashboardState?.protectDecisionStats ?? null);
   const [globalBanner, setGlobalBanner] = useState<string | null>(null);
   const [providers, setProviders] = useState<string[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<string>("all");
+  const [selectedProvider, setSelectedProvider] = useState<string>(initialDashboardState?.selectedProvider ?? "all");
   const providerRequestSeq = useRef<number>(0);
   const metricsRequestSeq = useRef<number>(0);
   const seriesByScopeRef = useRef<Record<string, { requests: number[]; tokens: number[] }>>({});
-  const [hasIngestKey, setHasIngestKey] = useState<boolean>(false);
-  const [hasEvents, setHasEvents] = useState<boolean>(false);
-  const [setupStatusResolved, setSetupStatusResolved] = useState<boolean>(false);
+  const [hasIngestKey, setHasIngestKey] = useState<boolean>(initialDashboardState?.hasIngestKey ?? false);
+  const [hasEvents, setHasEvents] = useState<boolean>(initialDashboardState?.hasEvents ?? false);
+  const [setupStatusResolved, setSetupStatusResolved] = useState<boolean>(initialDashboardState?.setupStatusResolved ?? false);
   const [setupBannerDismissed, setSetupBannerDismissed] = useState<boolean>(false);
   const [webhookIssue, setWebhookIssue] = useState<{ count: number; lastAt: string | null } | null>(null);
 
@@ -159,7 +166,7 @@ export function Dashboard(): JSX.Element {
     return counts;
   }, [incidents]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const cached = projectId ? readDashboardCache(projectId) : null;
     setMetrics(cached?.metrics ?? null);
     setIncidents(cached?.incidents ?? []);
@@ -173,7 +180,7 @@ export function Dashboard(): JSX.Element {
     setLastProtectHealthSuccessAt(null);
     setProtectHealthFetchFailed(false);
     setProviders([]);
-    setSelectedProvider("all");
+    setSelectedProvider(cached?.selectedProvider ?? "all");
     setHasIngestKey(cached?.hasIngestKey ?? false);
     setHasEvents(cached?.hasEvents ?? false);
     setSetupStatusResolved(cached?.setupStatusResolved ?? false);
@@ -187,6 +194,7 @@ export function Dashboard(): JSX.Element {
     }
     // Persist the last successful dashboard snapshot so revisiting the page does not flash onboarding state.
     writeDashboardCache(projectId, {
+      selectedProvider,
       hasIngestKey,
       hasEvents,
       setupStatusResolved,
@@ -195,7 +203,7 @@ export function Dashboard(): JSX.Element {
       protectDecisionStats,
       incidents,
     });
-  }, [hasEvents, hasIngestKey, incidents, lastMetricsSuccessAt, metrics, projectId, protectDecisionStats, setupStatusResolved]);
+  }, [hasEvents, hasIngestKey, incidents, lastMetricsSuccessAt, metrics, projectId, protectDecisionStats, selectedProvider, setupStatusResolved]);
 
   useEffect(() => {
     const dismissed = window.localStorage.getItem(setupDismissStorageKey) === "1";
