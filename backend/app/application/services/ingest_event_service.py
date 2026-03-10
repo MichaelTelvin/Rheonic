@@ -43,6 +43,7 @@ class IngestEventService:
     ) -> None:
         self._event_repository = event_repository
         self._realtime_counters = realtime_counters
+        self._incident_repository = incident_repository
         self._project_repository = project_repository
         self._retry_storm_window_seconds = retry_storm_window_seconds
         self._retry_storm_count = retry_storm_count
@@ -101,6 +102,7 @@ class IngestEventService:
                 current_event=event,
                 recent_events=recent_events,
                 warn_ratio=app_config.protect_near_cap_factor,
+                predictive_near_cap=False,
                 retry_storm_window_seconds=self._retry_storm_window_seconds,
                 retry_storm_count=self._retry_storm_count,
                 loop_window_seconds=self._loop_window_seconds,
@@ -112,6 +114,13 @@ class IngestEventService:
             cap_breach_signals = self._cap_breach_signal_if_any(ctx)
             if cap_breach_signals:
                 # Dominance L3: cap_breach suppresses all other signals for this ingest event.
+                # A live cap breach also supersedes any previously open near-cap incident for the same provider.
+                self._incident_repository.resolve_open_incidents_by_type(
+                    project_id=event.project_id,
+                    provider=provider,
+                    incident_type=app_config.incident_type_near_cap,
+                    resolved_at=self._now_provider(),
+                )
                 signals = cap_breach_signals
             else:
                 near_cap_signals = [signal for signal in signals if signal.detector == "near_cap"]

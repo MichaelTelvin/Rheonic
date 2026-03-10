@@ -9,11 +9,15 @@ class NearCapDetector(Detector):
         tok_ratio = None
         req_near = False
         tok_near = False
+        req_numerator = ctx.current_requests_60s + (1 if ctx.predictive_near_cap else 0)
+        tok_numerator = ctx.current_tokens_60s
+        if ctx.predictive_near_cap and ctx.estimated_next_tokens is not None:
+            tok_numerator += ctx.estimated_next_tokens
         if ctx.req_cap is not None and ctx.req_cap > 0:
-            req_ratio = float(ctx.current_requests_60s + 1) / float(ctx.req_cap)
+            req_ratio = float(req_numerator) / float(ctx.req_cap)
             req_near = req_ratio >= ctx.warn_ratio
-        if ctx.tok_cap is not None and ctx.tok_cap > 0 and ctx.estimated_next_tokens is not None:
-            tok_ratio = float(ctx.current_tokens_60s + ctx.estimated_next_tokens) / float(ctx.tok_cap)
+        if ctx.tok_cap is not None and ctx.tok_cap > 0:
+            tok_ratio = float(tok_numerator) / float(ctx.tok_cap)
             tok_near = tok_ratio >= ctx.warn_ratio
         if not (req_near or tok_near):
             return []

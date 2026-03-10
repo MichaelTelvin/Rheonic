@@ -33,6 +33,7 @@ class DetectionContext:
     current_event: Event | None = None
     recent_events: list[Event] = field(default_factory=list)
     warn_ratio: float = 0.85
+    predictive_near_cap: bool = True
     retry_storm_window_seconds: int = 60
     retry_storm_count: int = 5
     loop_window_seconds: int = 30

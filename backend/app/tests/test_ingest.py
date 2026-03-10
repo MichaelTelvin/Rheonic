@@ -106,6 +106,27 @@ class FakeIncidentRepository:
         row.resolved_at = datetime.now(timezone.utc)
         return row
 
+    def resolve_open_incidents_by_type(
+        self,
+        *,
+        project_id: str,
+        provider: str,
+        incident_type: str,
+        resolved_at: datetime,
+    ) -> list[Incident]:
+        resolved: list[Incident] = []
+        for row in self.rows:
+            if (
+                row.project_id == project_id
+                and row.provider == provider
+                and row.incident_type == incident_type
+                and row.status == "open"
+            ):
+                row.status = "resolved"
+                row.resolved_at = resolved_at
+                resolved.append(row)
+        return resolved
+
     def auto_resolve_stale_open_incidents(self, *, cutoff: datetime, resolved_at: datetime) -> tuple[list[Incident], set[tuple[str, str]]]:
         _ = cutoff
         resolved: list[Incident] = []
@@ -359,7 +380,7 @@ def test_cap_breach_repeated_events_update_same_incident_within_dedup_window() -
 
 def test_near_cap_opens_incident_in_observe_without_webhook() -> None:
     service, incidents, webhook = _service(protect_enabled=False, req_cap=None, tok_cap=1000)
-    service.ingest(_event("p1", total_tokens=600, offset_seconds=0))
+    service.ingest(_event("p1", total_tokens=900, offset_seconds=0))
 
     near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
     assert len(near_cap_rows) == 1
@@ -372,7 +393,7 @@ def test_near_cap_opens_incident_in_observe_without_webhook() -> None:
 
 def test_near_cap_in_protect_mode_does_not_emit_incident_warn_webhook() -> None:
     service, incidents, webhook = _service(protect_enabled=True, req_cap=None, tok_cap=1000)
-    service.ingest(_event("p1", total_tokens=600, offset_seconds=0))
+    service.ingest(_event("p1", total_tokens=900, offset_seconds=0))
 
     near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
     assert len(near_cap_rows) == 1
@@ -381,7 +402,7 @@ def test_near_cap_in_protect_mode_does_not_emit_incident_warn_webhook() -> None:
 
 def test_near_cap_req_only_evidence_and_fingerprint() -> None:
     service, incidents, _ = _service(protect_enabled=False, req_cap=10, tok_cap=10_000)
-    for i in range(8):
+    for i in range(9):
         service.ingest(_event("p1", total_tokens=1, offset_seconds=i))
 
     near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
@@ -394,8 +415,10 @@ def test_near_cap_req_only_evidence_and_fingerprint() -> None:
 
 
 def test_near_cap_both_evidence_and_fingerprint() -> None:
-    service, incidents, _ = _service(protect_enabled=False, req_cap=2, tok_cap=1000)
-    service.ingest(_event("p1", total_tokens=900, offset_seconds=0))
+    service, incidents, _ = _service(protect_enabled=False, req_cap=10, tok_cap=1000)
+    for i in range(8):
+        service.ingest(_event("p1", total_tokens=1, offset_seconds=i))
+    service.ingest(_event("p1", total_tokens=900, offset_seconds=8))
 
     near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
     assert len(near_cap_rows) == 1
@@ -407,21 +430,22 @@ def test_near_cap_both_evidence_and_fingerprint() -> None:
 
 
 def test_near_cap_dedupes_per_subtype_req_and_tok_are_separate() -> None:
-    service, incidents, _ = _service(protect_enabled=False, req_cap=10, tok_cap=1000)
+    service, incidents, _ = _service(protect_enabled=False, req_cap=20, tok_cap=1000)
 
-    # tok-only subtype first
-    service.ingest(_event("p1", total_tokens=600, offset_seconds=0))
-    # req-only subtype later
-    for i in range(1, 9):
+    # req-only subtype first
+    for i in range(17):
         service.ingest(_event("p1", total_tokens=1, offset_seconds=i))
+
+    # Move counters into both-near territory without breaching either cap.
+    service.ingest(_event("p1", total_tokens=900, offset_seconds=17))
 
     near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap" and row.status == "open"]
     assert len(near_cap_rows) == 2
     types = sorted(str(row.evidence.get("near_cap_type")) for row in near_cap_rows)
-    assert types == ["req", "tok"]
+    assert types == ["both", "req"]
     fingerprints = sorted(str(row.fingerprint) for row in near_cap_rows)
     assert any(fp.endswith(":req") for fp in fingerprints)
-    assert any(fp.endswith(":tok") for fp in fingerprints)
+    assert any(fp.endswith(":both") for fp in fingerprints)
 
 
 def test_token_explosion_incident_emits_warn_in_protect_mode() -> None:
@@ -474,12 +498,32 @@ def test_dominance_cap_breach_suppresses_near_cap() -> None:
     assert all(row.incident_type != "near_cap" for row in incidents.rows)
 
 
+def test_cap_breach_resolves_existing_near_cap_incident_for_same_provider() -> None:
+    service, incidents, _ = _service(protect_enabled=False, req_cap=100, tok_cap=1000, retry_storm_count=10)
+
+    service.ingest(_event("p1", total_tokens=900, feature="tok-cap-breach-sequence", offset_seconds=0))
+
+    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
+    assert len(near_cap_rows) == 1
+    assert near_cap_rows[0].status == "open"
+
+    service.ingest(_event("p1", total_tokens=200, feature="tok-cap-breach-sequence", offset_seconds=1))
+
+    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
+    cap_breach_rows = [row for row in incidents.rows if row.incident_type == "cap_breach"]
+    assert len(near_cap_rows) == 1
+    assert near_cap_rows[0].status == "resolved"
+    assert near_cap_rows[0].resolved_at is not None
+    assert len(cap_breach_rows) == 1
+    assert cap_breach_rows[0].status == "open"
+
+
 def test_dominance_near_cap_suppresses_behavioral_signals() -> None:
     service, incidents, _ = _service(protect_enabled=True, req_cap=100, tok_cap=1000, retry_storm_count=1, loop_count=1)
     service.ingest(
         _event(
             "p1",
-            total_tokens=600,
+            total_tokens=900,
             status="error",
             http_status=500,
             error_type="provider_5xx",

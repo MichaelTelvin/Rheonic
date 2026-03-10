@@ -17,6 +17,7 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 ## Ingest Dominance (per event)
 - Dominance level 3: `cap_breach`
   - suppresses: `near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`
+  - resolves any already-open `near_cap` incident for the same `(project_id, provider)`
 - Dominance level 2: `near_cap` (only when no cap breach)
   - suppresses: `retry_storm`, `loop_suspect`, `token_explosion`
 - Dominance level 1: `retry_storm`, `loop_suspect`, `token_explosion`
@@ -24,16 +25,19 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 
 ## Protect Near-Cap Threshold
 - `protect_near_cap_factor`: warn ratio used by preflight near-cap checks.
-- Near-cap checks:
+- Protect preflight near-cap checks:
   - tokens: `tokens_60s + estimated_next_tokens >= tok_cap * protect_near_cap_factor`
   - requests: `requests_60s + 1 >= req_cap * protect_near_cap_factor`
+- Ingest near-cap checks:
+  - tokens: `tokens_60s >= tok_cap * protect_near_cap_factor`
+  - requests: `requests_60s >= req_cap * protect_near_cap_factor`
 - Near-cap subtypes (same incident type, split fingerprints):
   - `near_cap(tok)` -> `tok_near_cap=true`, `req_near_cap=false`, `near_cap_type="tok"`
   - `near_cap(req)` -> `req_near_cap=true`, `tok_near_cap=false`, `near_cap_type="req"`
   - `near_cap(both)` -> both booleans true, `near_cap_type="both"`
 - When it applies:
   - Protect preflight: decision `warn` with webhook `decision.warn`.
-  - Ingest (observe/protect): emits `near_cap` incident only when no `cap_breach` dominates that same event.
+- Ingest (observe/protect): emits `near_cap` incident only when no `cap_breach` dominates that same event. If a later `cap_breach` is reached for the same provider, the open `near_cap` incident is resolved.
 
 ## Retry Storm Detector
 - `retry_storm_window_seconds`: lookback window for failure burst detection.

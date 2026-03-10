@@ -75,10 +75,13 @@ Incident behavior:
 For a single ingested event, incident emission follows this dominance:
 1. `cap_breach` dominates all
    - suppresses `near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`
+   - resolves any already-open `near_cap` incident for the same `(project_id, provider)`
 2. `near_cap` dominates behavioral signals when no cap breach exists
    - suppresses `retry_storm`, `loop_suspect`, `token_explosion`
 3. Behavioral coexistence is allowed
    - `retry_storm`, `loop_suspect`, `token_explosion` may coexist
+
+For ingest incident emission, near-cap uses observed counters after the current event is counted.
 
 ## Webhooks
 - Protect mode:

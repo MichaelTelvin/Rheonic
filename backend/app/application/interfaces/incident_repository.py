@@ -65,6 +65,18 @@ class IncidentRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def resolve_open_incidents_by_type(
+        self,
+        *,
+        project_id: str,
+        provider: str,
+        incident_type: str,
+        resolved_at: datetime,
+    ) -> list[Incident]:
+        # Resolve open incidents for a project/provider/type and return changed rows.
+        raise NotImplementedError
+
+    @abstractmethod
     def auto_resolve_stale_open_incidents(
         self,
         *,
