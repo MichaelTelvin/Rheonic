@@ -1,11 +1,11 @@
-import { buildEvent, createClient, type Client } from "./index.js";
+import { buildEvent, createClient } from "../../../sdk-node/dist/index.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-function loadRheonicEnvFromDotenv(): void {
+function loadRheonicEnvFromDotenv() {
   const currentFile = fileURLToPath(import.meta.url);
-  const dotenvPath = resolve(dirname(currentFile), "../../.env");
+  const dotenvPath = resolve(dirname(currentFile), "../../../.env");
   let content = "";
   try {
     content = readFileSync(dotenvPath, "utf8");
@@ -25,17 +25,11 @@ function loadRheonicEnvFromDotenv(): void {
   }
 }
 
-function sleep(ms: number): Promise<void> {
+function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchRealtimeSnapshot(
-  backendBaseUrl: string,
-  projectId: string,
-  authToken: string,
-  provider: string,
-  phase: string,
-): Promise<void> {
+async function fetchRealtimeSnapshot(backendBaseUrl, projectId, authToken, provider, phase) {
   if (!authToken || !projectId) {
     console.log(`[SNAPSHOT] ${phase}: (snapshot skipped: no auth token/project id)`);
     return;
@@ -49,16 +43,11 @@ async function fetchRealtimeSnapshot(
     console.log(`[SNAPSHOT] ${phase}: unavailable (status=${response.status})`);
     return;
   }
-  const payload = (await response.json()) as Record<string, unknown>;
+  const payload = await response.json();
   console.log(`[SNAPSHOT] ${phase}: req60=${payload.requests_60s} tok60=${payload.tokens_60s}`);
 }
 
-async function fetchIncidentSummary(
-  backendBaseUrl: string,
-  projectId: string,
-  authToken: string,
-  provider: string,
-): Promise<void> {
+async function fetchIncidentSummary(backendBaseUrl, projectId, authToken, provider) {
   if (!authToken || !projectId) {
     console.log("[OBSERVE] incidents: (skipped: no auth token/project id)");
     return;
@@ -72,8 +61,8 @@ async function fetchIncidentSummary(
     console.log(`[OBSERVE] incidents summary unavailable (status=${response.status})`);
     return;
   }
-  const incidents = (await response.json()) as Array<{ type?: string }>;
-  const counts = new Map<string, number>();
+  const incidents = await response.json();
+  const counts = new Map();
   for (const incident of incidents) {
     const t = (incident.type ?? "unknown").toString();
     counts.set(t, (counts.get(t) ?? 0) + 1);
@@ -85,31 +74,13 @@ async function fetchIncidentSummary(
   console.log(`[OBSERVE] incidents open=${incidents.length} types=${compact || "none"}`);
 }
 
-async function printPhase(
-  backendBaseUrl: string,
-  phase: string,
-  projectId: string,
-  authToken: string,
-  provider: string,
-): Promise<void> {
+async function printPhase(backendBaseUrl, phase, projectId, authToken, provider) {
   await fetchRealtimeSnapshot(backendBaseUrl, projectId, authToken, provider, phase);
   await fetchIncidentSummary(backendBaseUrl, projectId, authToken, provider);
 }
 
-async function sendEvent(
-  client: Client,
-  provider: string,
-  model: string,
-  endpoint: string,
-  totalTokens: number,
-  feature: string,
-  options?: { status?: string; httpStatus?: number; errorType?: string },
-): Promise<void> {
-  const event: ReturnType<typeof buildEvent> & {
-    status?: string;
-    http_status?: number;
-    error_type?: string;
-  } = buildEvent({
+async function sendEvent(client, provider, model, endpoint, totalTokens, feature, options) {
+  const event = buildEvent({
     provider,
     model,
     environment: client.environment,
@@ -127,7 +98,7 @@ async function sendEvent(
   await client.captureEvent(event);
 }
 
-function printUsageExamples(): void {
+function printUsageExamples() {
   console.log("Example:");
   console.log("  RHEONIC_PROVIDER=openai");
   console.log("  RHEONIC_MODEL=gpt-4o-mini");
@@ -144,10 +115,9 @@ function printUsageExamples(): void {
   console.log("  RHEONIC_AUTH_TOKEN=<jwt> RHEONIC_PROJECT_ID=<project_id>");
 }
 
-async function runDemo(): Promise<void> {
+async function runDemo() {
   loadRheonicEnvFromDotenv();
   const backendBaseUrl = (process.env.RHEONIC_BACKEND_URL ?? "http://localhost:8000").replace(/\/$/, "");
-
   const ingestKey = process.env.RHEONIC_INGEST_KEY;
   if (!ingestKey) {
     console.error("RHEONIC_INGEST_KEY is required. Create a key in dashboard Keys page.");
@@ -172,7 +142,7 @@ async function runDemo(): Promise<void> {
     return;
   }
 
-  const endpointByProvider: Record<string, string> = {
+  const endpointByProvider = {
     openai: "/chat/completions",
     anthropic: "/v1/messages",
     google: "/v1beta/models/generateContent",
@@ -187,12 +157,11 @@ async function runDemo(): Promise<void> {
   const capBreachReqCount = Number(process.env.RHEONIC_CAP_BREACH_REQ_COUNT ?? 6);
   const capBreachReqTokens = Number(process.env.RHEONIC_CAP_BREACH_REQ_TOKENS ?? 1);
   const nearCapTokens = Number(process.env.RHEONIC_NEAR_CAP_TOKENS ?? 3200);
-
   const authToken = process.env.RHEONIC_AUTH_TOKEN ?? "";
   const projectId = process.env.RHEONIC_PROJECT_ID ?? "";
   const environment = (process.env.RHEONIC_ENVIRONMENT ?? "").trim() || `demo-${Date.now()}`;
 
-  const client: Client = createClient({
+  const client = createClient({
     ingestKey,
     environment,
     debug: process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true",
@@ -204,14 +173,14 @@ async function runDemo(): Promise<void> {
     `[DEMO] params retry_storm_count=${retryStormCount} loop_count=${loopCount} token_explosion_tokens=${tokenExplosionTokens} cap_breach_tokens=${capBreachTokens} cap_breach_req_count=${capBreachReqCount} cap_breach_req_tokens=${capBreachReqTokens} near_cap_tokens=${nearCapTokens} step_sleep_ms=${stepSleepMs}`,
   );
 
-  const runSteady = async (): Promise<void> => {
+  const runSteady = async () => {
     console.log("\n[STEP] Steady traffic / no anomaly");
     await sendEvent(client, provider, model, endpoint, 42, "steady-1");
     await client.flush();
     await printPhase(backendBaseUrl, "steady", projectId, authToken, provider);
   };
 
-  const runRetryStorm = async (): Promise<void> => {
+  const runRetryStorm = async () => {
     console.log("\n[STEP] Retry storm");
     for (let i = 0; i < retryStormCount; i += 1) {
       await sendEvent(client, provider, model, endpoint, 50, `retry-${i + 1}`, {
@@ -225,7 +194,7 @@ async function runDemo(): Promise<void> {
     await printPhase(backendBaseUrl, "retry_storm", projectId, authToken, provider);
   };
 
-  const runNearCap = async (): Promise<void> => {
+  const runNearCap = async () => {
     console.log("\n[STEP] Near-cap logging (observe)");
     console.log("[STEP] Requires project token/request cap configured in Settings page.");
     await sendEvent(client, provider, model, endpoint, nearCapTokens, "near-cap");
@@ -233,7 +202,7 @@ async function runDemo(): Promise<void> {
     await printPhase(backendBaseUrl, "near_cap", projectId, authToken, provider);
   };
 
-  const runLoopSuspect = async (): Promise<void> => {
+  const runLoopSuspect = async () => {
     console.log("\n[STEP] Loop suspect");
     for (let i = 0; i < loopCount; i += 1) {
       await sendEvent(client, provider, model, endpoint, 60, "loop-fixed-signature");
@@ -243,14 +212,14 @@ async function runDemo(): Promise<void> {
     await printPhase(backendBaseUrl, "loop_suspect", projectId, authToken, provider);
   };
 
-  const runTokenExplosion = async (): Promise<void> => {
+  const runTokenExplosion = async () => {
     console.log("\n[STEP] Token explosion");
     await sendEvent(client, provider, model, endpoint, tokenExplosionTokens, "token-explosion");
     await client.flush();
     await printPhase(backendBaseUrl, "token_explosion", projectId, authToken, provider);
   };
 
-  const runCapBreach = async (): Promise<void> => {
+  const runCapBreach = async () => {
     console.log("\n[STEP] Cap breach logging (observe)");
     console.log("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).");
     await sendEvent(client, provider, model, endpoint, capBreachTokens, "cap-breach");
@@ -258,7 +227,7 @@ async function runDemo(): Promise<void> {
     await printPhase(backendBaseUrl, "cap_breach", projectId, authToken, provider);
   };
 
-  const runReqCapBreach = async (): Promise<void> => {
+  const runReqCapBreach = async () => {
     console.log("\n[STEP] Request cap breach logging (observe)");
     console.log("[STEP] Requires project request cap configured in Mode page (max requests per minute).");
     for (let i = 0; i < capBreachReqCount; i += 1) {
@@ -305,7 +274,7 @@ async function runDemo(): Promise<void> {
   client.close();
 }
 
-runDemo().catch((err: unknown) => {
+runDemo().catch((err) => {
   console.error(err);
   process.exitCode = 1;
 });

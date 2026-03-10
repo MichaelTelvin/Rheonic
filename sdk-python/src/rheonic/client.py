@@ -112,8 +112,8 @@ class Client:
         # Initialize client queue, worker thread, and HTTP transport.
         try:
             env_debug = os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"}
-        self._debug_enabled = debug or env_debug
-        configure_logging(level="DEBUG" if self._debug_enabled else None)
+            self._debug_enabled = debug or env_debug
+            configure_logging(level="DEBUG" if self._debug_enabled else None)
 
             self.ingest_key = ingest_key
             resolved_base_url = base_url or os.getenv("RHEONIC_BASE_URL", sdk_config.default_base_url)

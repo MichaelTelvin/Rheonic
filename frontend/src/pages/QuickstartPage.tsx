@@ -290,9 +290,7 @@ except RHEONICBlockedError:
           <article className="quickstart-docs-content">
             <h1>Quickstart</h1>
             <p className="quickstart-v2-lede">
-              Follow these steps to start in Observe mode,
-              <br />
-              verify traffic, then enable Protect once caps are configured.
+              Follow these steps to start in Observe mode, verify traffic, then enable Protect once caps are configured.
             </p>
 
             <section id="project" className="quickstart-step-card">

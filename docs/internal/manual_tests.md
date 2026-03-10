@@ -4,7 +4,7 @@ All API paths remain under `/api/v1/...`.
 
 ### 1) Observe mode telemetry only
 1. Set project mode to Observe.
-2. Run `demo.py` or `demo.ts` with `RHEONIC_DEMO_CASE=steady`.
+2. Run `tests/e2e/python/demo.py` or `tests/e2e/node/demo.mjs` with `RHEONIC_DEMO_CASE=steady`.
 3. Expected:
 - Events ingest succeeds.
 - Realtime counters move.
@@ -15,7 +15,7 @@ All API paths remain under `/api/v1/...`.
 
 ### 2) Protect allow path
 1. Set mode Protect and high caps.
-2. Run `demo_protect.py` or `demo_protect.ts` with `RHEONIC_SCENARIO=allow`.
+2. Run `tests/e2e/python/demo_protect.py` or `tests/e2e/node/demo_protect.mjs` with `RHEONIC_SCENARIO=allow`.
 3. Expected:
 - Decision response `allow`.
 - Provider stub is called.

@@ -6,7 +6,8 @@ from typing import Any
 
 import httpx
 
-sdk_src = Path(__file__).resolve().parent / "src"
+repo_root = Path(__file__).resolve().parents[3]
+sdk_src = repo_root / "sdk-python" / "src"
 if str(sdk_src) not in sys.path:
     sys.path.insert(0, str(sdk_src))
 
@@ -14,7 +15,7 @@ from rheonic import build_event, capture_event, create_client
 
 
 def _load_rheonic_env_from_dotenv() -> None:
-    dotenv_path = Path(__file__).resolve().parents[1] / ".env"
+    dotenv_path = repo_root / ".env"
     if not dotenv_path.exists():
         return
     for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():

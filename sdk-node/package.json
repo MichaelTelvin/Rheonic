@@ -1,18 +1,61 @@
 {
   "name": "rheonic-node",
   "version": "0.1.0",
-  "private": true,
+  "description": "Node.js SDK for Rheonic observability and protect preflight enforcement.",
+  "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "demo": "node dist/demo.js",
     "test": "npm run build && node --test dist/protectEngine.test.js"
   },
+  "keywords": [
+    "llm",
+    "ai",
+    "observability",
+    "guardrails",
+    "openai",
+    "anthropic",
+    "google"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rheonic/rheonic.git",
+    "directory": "sdk-node"
+  },
+  "homepage": "https://rheonic.dev",
+  "bugs": {
+    "url": "https://github.com/rheonic/rheonic/issues"
+  },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
-    "@dqbd/tiktoken": "^1.0.22",
-    "@google/generative-ai": "^0.21.0"
+    "@dqbd/tiktoken": "^1.0.22"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.39.0",
+    "@google/generative-ai": ">=0.21.0",
+    "openai": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "@google/generative-ai": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^22.8.7",

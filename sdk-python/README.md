@@ -1,20 +1,27 @@
 # Rheonic Python SDK
 
-This SDK runs inside your app process and sends telemetry events to this Rheonic service.
+The Rheonic Python SDK runs inside your app process, captures provider telemetry, and can request protect preflight decisions before provider calls.
 
 ## Install
 
 ```bash
-cd sdk-python
-pip install -e .
+pip install rheonic
+```
+
+Optional provider extras:
+
+```bash
+pip install "rheonic[openai]"
+pip install "rheonic[anthropic]"
+pip install "rheonic[google]"
+pip install "rheonic[providers]"
 ```
 
 ## Configuration
 
 - Required: `ingest_key`
-- Optional: `base_url` (defaults to `RHEONIC_BASE_URL` env var, else `http://localhost:8000`)
+- Optional: `base_url` (defaults to `RHEONIC_BASE_URL`, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
-- Demo env var: `RHEONIC_INGEST_KEY`
 
 Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
 
@@ -51,10 +58,10 @@ import os
 from openai import OpenAI
 from rheonic import create_client, instrument_openai
 
-burnguard = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"])
+rheonic_client = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"])
 openai_client = instrument_openai(
     OpenAI(api_key="..."),
-    client=burnguard,
+    client=rheonic_client,
     endpoint="/chat/completions",
     feature="assistant",
 )
@@ -83,50 +90,27 @@ google_model = client.instrument_google(genai.GenerativeModel("gemini-1.5-pro"))
 google_model.generate_content("Hello Google model")
 ```
 
-## Verify it works
-
-```bash
-export RHEONIC_INGEST_KEY="<copy from Keys modal>"
-python demo.py
-```
-
-The demo sends one event, flushes, prints stats, and exits.
-
-Backend-down smoke test (must exit cleanly and show failures):
-
-```bash
-RHEONIC_BASE_URL=http://127.0.0.1:59999 python demo.py
-```
-
-## Check dashboard metrics
-
-After running `python demo.py` with backend/frontend up:
-- create/select project in dashboard
-- create key in Keys modal, copy it once, and export `RHEONIC_INGEST_KEY`
-- open the dashboard (default `http://localhost:5173`)
-- confirm metrics changed after ingest
-
-## Manual protect demo
-
-Runs a local protect preflight + provider-stub call flow against:
-- backend: `http://localhost:8000`
-- provider stub: `http://localhost:8099`
-
-```bash
-export RHEONIC_INGEST_KEY="<copy from Keys modal>"
-export RHEONIC_SCENARIO=allow   # allow | warn | block
-python demo_protect.py
-```
-
-Optional overrides:
-- `RHEONIC_BACKEND_URL`
-- `RHEONIC_PROVIDER_URL`
-- `RHEONIC_MAX_TOKENS`
-- `RHEONIC_MODEL`
-- `RHEONIC_ENVIRONMENT`
-
 Runtime call path:
 - SDK instrumentation calls `POST /api/v1/protect/decision` then `POST /api/v1/events`.
 - Project mode in dashboard controls decision behavior:
   - Observe: allow only.
   - Protect: allow/warn/block with cooldown.
+
+## Provider SDKs
+
+Install only the provider SDKs you use, either directly or through extras:
+
+```bash
+pip install openai
+pip install anthropic
+pip install google-generativeai
+```
+
+## Source Repo E2E Utilities
+
+If you are working inside the Rheonic source repository, the demo entrypoints live under:
+
+- `tests/e2e/python/demo.py`
+- `tests/e2e/python/demo_protect.py`
+- `tests/e2e/python/latency_probe.py`
+- `tests/e2e/python/tokenization_probe.py`

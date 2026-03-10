@@ -1,11 +1,11 @@
-import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, RHEONICBlockedError } from "./index.js";
+import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, RHEONICBlockedError } from "../../../sdk-node/dist/index.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-function loadRheonicEnvFromDotenv(): void {
+function loadRheonicEnvFromDotenv() {
   const currentFile = fileURLToPath(import.meta.url);
-  const dotenvPath = resolve(dirname(currentFile), "../../.env");
+  const dotenvPath = resolve(dirname(currentFile), "../../../.env");
   let content = "";
   try {
     content = readFileSync(dotenvPath, "utf8");
@@ -29,34 +29,34 @@ loadRheonicEnvFromDotenv();
 
 const backendBaseUrl = process.env.RHEONIC_BACKEND_URL ?? "http://localhost:8000";
 const providerStubUrl = process.env.RHEONIC_PROVIDER_URL ?? "http://localhost:8099";
-let lastProviderCall: Record<string, unknown> | null = null;
+let lastProviderCall = null;
 
-function sleep(ms: number): Promise<void> {
+function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function envInt(name: string, fallback: number): number {
+function envInt(name, fallback) {
   const raw = process.env[name];
   if (typeof raw !== "string" || raw.trim() === "") return fallback;
   const parsed = Number.parseInt(raw.trim(), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-async function providerCount(): Promise<number> {
+async function providerCount() {
   const res = await fetch(`${providerStubUrl}/count`);
   if (!res.ok) throw new Error(`provider_stub_count_failed:${res.status}`);
-  const payload = (await res.json()) as { count?: number };
+  const payload = await res.json();
   return Number(payload.count ?? 0);
 }
 
-async function resetProvider(): Promise<void> {
+async function resetProvider() {
   const res = await fetch(`${providerStubUrl}/reset`, { method: "POST" });
   if (!res.ok) throw new Error(`provider_stub_reset_failed:${res.status}`);
 }
 
-async function callProviderStub(payload: unknown): Promise<void> {
+async function callProviderStub(payload) {
   if (payload && typeof payload === "object") {
-    lastProviderCall = payload as Record<string, unknown>;
+    lastProviderCall = payload;
   }
   const res = await fetch(`${providerStubUrl}/call`, {
     method: "POST",
@@ -66,31 +66,22 @@ async function callProviderStub(payload: unknown): Promise<void> {
   if (!res.ok) throw new Error(`provider_stub_call_failed:${res.status}`);
 }
 
-function providerLastCall(): Record<string, unknown> | null {
+function providerLastCall() {
   return lastProviderCall;
 }
 
-function extractUsedMaxTokens(payload: Record<string, unknown> | null): number | null {
+function extractUsedMaxTokens(payload) {
   if (!payload) return null;
   const value = payload.max_tokens;
   if (typeof value === "number" && Number.isFinite(value)) return Math.floor(value);
   return null;
 }
 
-function assertLine(label: string, passed: boolean): void {
-  // deterministic, human-readable checks.
+function assertLine(label, passed) {
   console.log(passed ? `[ASSERT] ${label}` : `[ASSERT] ${label} (FAILED)`);
 }
 
-async function sendIngestEvent(
-  ingestKey: string,
-  provider: string,
-  model: string,
-  totalTokens: number,
-  feature: string,
-  environment: string,
-  options?: { status?: string; httpStatus?: number; errorType?: string },
-): Promise<void> {
+async function sendIngestEvent(ingestKey, provider, model, totalTokens, feature, environment, options) {
   const status = options?.status ?? "ok";
   const httpStatus = options?.httpStatus ?? 200;
   const payload = {
@@ -122,11 +113,7 @@ async function sendIngestEvent(
   if (!response.ok) throw new Error(`ingest_failed:${response.status}`);
 }
 
-async function listOpenIncidents(
-  projectId: string,
-  provider: string,
-  authToken: string,
-): Promise<Array<{ type: string; evidence?: { near_cap_type?: string } }>> {
+async function listOpenIncidents(projectId, provider, authToken) {
   if (!projectId || !authToken) return [];
   const params = new URLSearchParams({ project_id: projectId, status: "open", provider });
   const response = await fetch(`${backendBaseUrl}/api/v1/incidents?${params.toString()}`, {
@@ -139,23 +126,22 @@ async function listOpenIncidents(
     }
     throw new Error(`list_incidents_failed:${response.status}`);
   }
-  const rows = (await response.json()) as Array<{ type: string; evidence?: { near_cap_type?: string } }>;
-  return rows;
+  return await response.json();
 }
 
-async function getProjectReqCap(projectId: string, authToken: string): Promise<number | null> {
+async function getProjectReqCap(projectId, authToken) {
   if (!projectId || !authToken) return null;
   const response = await fetch(`${backendBaseUrl}/api/v1/projects/${projectId}/protect`, {
     headers: { Authorization: `Bearer ${authToken}` },
   });
   if (!response.ok) return null;
-  const payload = (await response.json()) as { protect_max_req_per_min?: unknown };
+  const payload = await response.json();
   const value = payload.protect_max_req_per_min;
   if (typeof value !== "number" || !Number.isFinite(value) || value < 1) return null;
   return Math.floor(value);
 }
 
-async function runProviderCall(provider: string, model: string, maxTokens: number, openai: any, anthropic: any, googleModel: any): Promise<boolean> {
+async function runProviderCall(provider, model, maxTokens, openai, anthropic, googleModel) {
   try {
     if (provider === "anthropic") {
       await anthropic.messages.create({
@@ -215,16 +201,14 @@ async function main() {
     debug: process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true",
     flushIntervalMs: 60_000,
   });
-  ((client as unknown as { protectEngine?: { decisionTimeoutMs?: number } }).protectEngine ?? {}).decisionTimeoutMs = protectDecisionTimeoutMs;
+  client.protectEngine.decisionTimeoutMs = protectDecisionTimeoutMs;
 
-  let lastDecisionContext: Record<string, unknown> | null = null;
   let lastDecisionValue = "";
   let lastDecisionReason = "";
-  let lastClampRecommended: number | null = null;
-  let lastClampApplied: boolean | null = null;
+  let lastClampRecommended = null;
+  let lastClampApplied = null;
   const originalEvaluateProtectDecision = client.evaluateProtectDecision.bind(client);
-  client.evaluateProtectDecision = async (context: Parameters<typeof originalEvaluateProtectDecision>[0]) => {
-    lastDecisionContext = context as unknown as Record<string, unknown>;
+  client.evaluateProtectDecision = async (context) => {
     console.log("=== PROTECT DECISION REQUEST ===");
     console.log(JSON.stringify(context, null, 2));
     let decision;
@@ -247,7 +231,7 @@ async function main() {
   const openai = {
     chat: {
       completions: {
-        create: async (payload: any) => {
+        create: async (payload) => {
           await callProviderStub(payload);
           return { model: payload.model, usage: { total_tokens: 10 } };
         },
@@ -256,7 +240,7 @@ async function main() {
   };
   const anthropic = {
     messages: {
-      create: async (payload: any) => {
+      create: async (payload) => {
         await callProviderStub(payload);
         return { model: payload.model, usage: { input_tokens: 6, output_tokens: 4 } };
       },
@@ -264,7 +248,7 @@ async function main() {
   };
   const googleModel = {
     model,
-    generateContent: async (payload: any) => {
+    generateContent: async (payload) => {
       const requestPayload = typeof payload === "string" ? { prompt: payload } : payload;
       await callProviderStub(requestPayload);
       return { response: { usageMetadata: { totalTokenCount: 10 } } };
@@ -272,9 +256,9 @@ async function main() {
   };
 
   const decisionFeature = scenario === "loop_suspect" ? "loop-fixed-signature" : "manual-protect-demo";
-  instrumentOpenAI(openai as any, { client, feature: decisionFeature, environment: env });
-  instrumentAnthropic(anthropic as any, { client, feature: decisionFeature, environment: env });
-  instrumentGoogle(googleModel as any, { client, feature: decisionFeature, environment: env });
+  instrumentOpenAI(openai, { client, feature: decisionFeature, environment: env });
+  instrumentAnthropic(anthropic, { client, feature: decisionFeature, environment: env });
+  instrumentGoogle(googleModel, { client, feature: decisionFeature, environment: env });
 
   console.log(`[DEMO] provider=${provider} model=${model} scenario=${scenario}`);
   console.log(`[DEMO] environment=${env}`);
@@ -341,7 +325,7 @@ async function main() {
     await sleep(pauseMs);
   }
 
-  let blocked: boolean;
+  let blocked;
   if (scenario === "cooldown") {
     const blockedFirst = await runProviderCall(provider, model, callMaxTokens, openai, anthropic, googleModel);
     const blockedSecond = await runProviderCall(provider, model, callMaxTokens, openai, anthropic, googleModel);
@@ -353,19 +337,17 @@ async function main() {
   const after = await providerCount();
   const providerCallsDelta = after - before;
   const usedMaxTokens = extractUsedMaxTokens(providerLastCall());
-  const clampRecommended = lastClampRecommended;
-  const clampApplied = lastClampApplied;
 
   console.log(`[RESULT] blocked=${blocked} provider_calls_delta=${providerCallsDelta}`);
   if (scenario === "near_cap") {
-    console.log(`[CLAMP] recommended=${clampRecommended} applied=${clampApplied} used_max_tokens=${usedMaxTokens}`);
+    console.log(`[CLAMP] recommended=${lastClampRecommended} applied=${lastClampApplied} used_max_tokens=${usedMaxTokens}`);
   }
 
-  let incidentTypes = new Set<string>();
+  let incidentTypes = new Set();
   if (projectId && authToken) {
     const incidents = await listOpenIncidents(projectId, provider, authToken);
-    const counts = new Map<string, number>();
-    const nearTypes = new Set<string>();
+    const counts = new Map();
+    const nearTypes = new Set();
     for (const incident of incidents) counts.set(incident.type, (counts.get(incident.type) ?? 0) + 1);
     for (const incident of incidents) {
       if (incident.type === "near_cap" && typeof incident.evidence?.near_cap_type === "string" && incident.evidence.near_cap_type) {
@@ -392,8 +374,8 @@ async function main() {
     assertLine("allow passed", !blocked && providerCallsDelta >= 1 && decision === "allow");
   } else if (scenario === "near_cap") {
     assertLine("near_cap warn triggered", !blocked && decision === "warn" && reason === "near_cap");
-    const clampSuggested = typeof clampRecommended === "number" && clampRecommended > 0;
-    const clampEnforced = clampSuggested && usedMaxTokens === clampRecommended && providerCallsDelta >= 1;
+    const clampSuggested = typeof lastClampRecommended === "number" && lastClampRecommended > 0;
+    const clampEnforced = clampSuggested && usedMaxTokens === lastClampRecommended && providerCallsDelta >= 1;
     assertLine("clamp applied / clamp suggested", clampSuggested || clampEnforced);
   } else if (scenario === "cap_breach") {
     assertLine("cap breach blocked", blocked && providerCallsDelta === 0 && incidentTypes.has("cap_breach"));

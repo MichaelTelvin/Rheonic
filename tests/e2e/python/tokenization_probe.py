@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-sdk_src = Path(__file__).resolve().parent / "src"
+sdk_src = Path(__file__).resolve().parents[3] / "sdk-python" / "src"
 if str(sdk_src) not in sys.path:
     sys.path.insert(0, str(sdk_src))
 

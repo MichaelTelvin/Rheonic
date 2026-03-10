@@ -1,20 +1,18 @@
 # Rheonic Node SDK
 
-This SDK runs inside your app process and sends telemetry events to this Rheonic service.
+The Rheonic Node SDK runs inside your app process, captures provider telemetry, and can request protect preflight decisions before provider calls.
 
 ## Install
 
 ```bash
-cd sdk-node
-npm install
+npm install rheonic-node
 ```
 
 ## Configuration
 
 - Required: `ingestKey`
-- Optional: `baseUrl` (defaults to `RHEONIC_BASE_URL` env var, else `http://localhost:8000`)
+- Optional: `baseUrl` (defaults to `RHEONIC_BASE_URL`, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
-- Demo env var: `RHEONIC_INGEST_KEY`
 
 Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
 
@@ -25,7 +23,7 @@ Create one long-lived SDK client at app startup and reuse it for all provider ca
 ## Integration Path 1: Manual Capture (generic)
 
 ```ts
-import { buildEvent, captureEvent, createClient } from "./src/index";
+import { buildEvent, createClient } from "rheonic-node";
 
 const client = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
 
@@ -45,11 +43,11 @@ Initialize `client` once during app startup, then reuse that same instance for m
 
 ```ts
 import OpenAI from "openai";
-import { createClient, instrumentOpenAI } from "./src/index";
+import { createClient, instrumentOpenAI } from "rheonic-node";
 
-const burnguard = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
+const rheonicClient = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
 const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
-  client: burnguard,
+  client: rheonicClient,
   endpoint: "/chat/completions",
   feature: "assistant",
 });
@@ -60,7 +58,7 @@ const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { createClient } from "./src/index";
+import { createClient } from "rheonic-node";
 
 const client = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
 
@@ -76,31 +74,25 @@ const googleModel = client.instrumentGoogle(genAI.getGenerativeModel({ model: "g
 await googleModel.generateContent("Hello Google model");
 ```
 
-## Verify it works
-
-```bash
-npm run build
-export RHEONIC_INGEST_KEY="<copy from Keys modal>"
-node dist/demo.js
-```
-
-The demo sends one event, flushes, and prints SDK stats.
-
-Backend-down smoke test (must exit cleanly and show failures):
-
-```bash
-RHEONIC_BASE_URL=http://127.0.0.1:59999 node dist/demo.js
-```
-
-Before running the demo:
-1. Create/select a project in the dashboard.
-2. Open `Keys` modal and create a key.
-3. Copy the plaintext key once and export `RHEONIC_INGEST_KEY`.
-
-Then check dashboard metrics for the selected project.
-
 Runtime call path:
 - SDK instrumentation calls `POST /api/v1/protect/decision` then `POST /api/v1/events`.
 - Project mode in dashboard controls decision behavior:
   - Observe: allow only.
   - Protect: allow/warn/block with cooldown.
+
+## Provider SDKs
+
+Install only the provider SDKs you use:
+
+```bash
+npm install openai
+npm install @anthropic-ai/sdk
+npm install @google/generative-ai
+```
+
+## Source Repo E2E Utilities
+
+If you are working inside the Rheonic source repository, the demo entrypoints live under:
+
+- `tests/e2e/node/demo.mjs`
+- `tests/e2e/node/demo_protect.mjs`
