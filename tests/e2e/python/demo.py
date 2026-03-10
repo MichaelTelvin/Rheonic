@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 import sys
 from typing import Any
@@ -113,9 +114,78 @@ def _print_incident_summary(backend_base_url: str, project_id: str, auth_token: 
     print(f"[OBSERVE] incidents open={len(incidents)} types={compact}")
 
 
-def _print_phase(backend_base_url: str, phase: str, project_id: str, auth_token: str, provider: str) -> None:
+def _parse_incident_time(incident: dict[str, Any]) -> datetime | None:
+    for field in ("last_seen_at", "created_at"):
+        raw_value = incident.get(field)
+        if not isinstance(raw_value, str) or not raw_value:
+            continue
+        normalized = raw_value.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            continue
+    return None
+
+
+def _print_recent_incident_summary(
+    backend_base_url: str,
+    project_id: str,
+    auth_token: str,
+    provider: str,
+    *,
+    phase_started_at: datetime,
+) -> None:
+    if not auth_token or not project_id:
+        print("[OBSERVE] recent incidents: (skipped: no auth token/project id)")
+        return
+    params = {"project_id": project_id, "status": "open"}
+    if provider != "all":
+        params["provider"] = provider
+    response = httpx.get(
+        f"{backend_base_url}/api/v1/incidents",
+        params=params,
+        headers={"Authorization": f"Bearer {auth_token}"},
+        timeout=5.0,
+    )
+    if response.status_code != 200:
+        print(f"[OBSERVE] recent incidents unavailable (status={response.status_code})")
+        return
+    payload = response.json()
+    incidents = payload if isinstance(payload, list) else []
+    recent_incidents: list[dict[str, Any]] = []
+    for incident in incidents:
+        if not isinstance(incident, dict):
+            continue
+        incident_time = _parse_incident_time(incident)
+        if incident_time is None or incident_time < phase_started_at:
+            continue
+        recent_incidents.append(incident)
+    counts: dict[str, int] = {}
+    for incident in recent_incidents:
+        incident_type = str(incident.get("type", "unknown"))
+        counts[incident_type] = counts.get(incident_type, 0) + 1
+    compact = ", ".join(f"{key}={counts[key]}" for key in sorted(counts)) if counts else "none"
+    print(f"[OBSERVE] recent incidents={len(recent_incidents)} types={compact}")
+
+
+def _print_phase(
+    backend_base_url: str,
+    phase: str,
+    project_id: str,
+    auth_token: str,
+    provider: str,
+    *,
+    phase_started_at: datetime,
+) -> None:
     _print_realtime_snapshot(backend_base_url, project_id, auth_token, provider, phase)
     _print_incident_summary(backend_base_url, project_id, auth_token, provider)
+    _print_recent_incident_summary(
+        backend_base_url,
+        project_id,
+        auth_token,
+        provider,
+        phase_started_at=phase_started_at,
+    )
 
 
 def _usage() -> None:
@@ -199,19 +269,36 @@ def main() -> None:
 
         def run_steady() -> None:
             print("\n[STEP] Steady traffic / no anomaly")
+            phase_started_at = datetime.now().astimezone()
             _send_event(provider, model, endpoint, 42, "steady-1", environment)
             client.flush()
-            _print_phase(backend_base_url, "steady", project_id, auth_token, provider)
+            _print_phase(
+                backend_base_url,
+                "steady",
+                project_id,
+                auth_token,
+                provider,
+                phase_started_at=phase_started_at,
+            )
 
         def run_near_cap() -> None:
             print("\n[STEP] Near-cap logging (observe)")
             print("[STEP] Requires project token/request cap configured in Settings page.")
+            phase_started_at = datetime.now().astimezone()
             _send_event(provider, model, endpoint, near_cap_tokens, "near-cap", environment)
             client.flush()
-            _print_phase(backend_base_url, "near_cap", project_id, auth_token, provider)
+            _print_phase(
+                backend_base_url,
+                "near_cap",
+                project_id,
+                auth_token,
+                provider,
+                phase_started_at=phase_started_at,
+            )
 
         def run_retry_storm() -> None:
             print("\n[STEP] Retry storm")
+            phase_started_at = datetime.now().astimezone()
             for i in range(retry_storm_count):
                 _send_event(
                     provider,
@@ -226,32 +313,64 @@ def main() -> None:
                 )
                 time.sleep(step_sleep_ms / 1000)
             client.flush()
-            _print_phase(backend_base_url, "retry_storm", project_id, auth_token, provider)
+            _print_phase(
+                backend_base_url,
+                "retry_storm",
+                project_id,
+                auth_token,
+                provider,
+                phase_started_at=phase_started_at,
+            )
 
         def run_loop_suspect() -> None:
             print("\n[STEP] Loop suspect")
+            phase_started_at = datetime.now().astimezone()
             for i in range(loop_count):
                 _send_event(provider, model, endpoint, 60, "loop-fixed-signature", environment)
                 time.sleep(step_sleep_ms / 1000)
             client.flush()
-            _print_phase(backend_base_url, "loop_suspect", project_id, auth_token, provider)
+            _print_phase(
+                backend_base_url,
+                "loop_suspect",
+                project_id,
+                auth_token,
+                provider,
+                phase_started_at=phase_started_at,
+            )
 
         def run_token_explosion() -> None:
             print("\n[STEP] Token explosion")
+            phase_started_at = datetime.now().astimezone()
             _send_event(provider, model, endpoint, token_explosion_tokens, "token-explosion", environment)
             client.flush()
-            _print_phase(backend_base_url, "token_explosion", project_id, auth_token, provider)
+            _print_phase(
+                backend_base_url,
+                "token_explosion",
+                project_id,
+                auth_token,
+                provider,
+                phase_started_at=phase_started_at,
+            )
 
         def run_cap_breach() -> None:
             print("\n[STEP] Cap breach logging (observe)")
             print("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).")
+            phase_started_at = datetime.now().astimezone()
             _send_event(provider, model, endpoint, cap_breach_tokens, "cap-breach", environment)
             client.flush()
-            _print_phase(backend_base_url, "cap_breach", project_id, auth_token, provider)
+            _print_phase(
+                backend_base_url,
+                "cap_breach",
+                project_id,
+                auth_token,
+                provider,
+                phase_started_at=phase_started_at,
+            )
 
         def run_req_cap_breach() -> None:
             print("\n[STEP] Request cap breach logging (observe)")
             print("[STEP] Requires project request cap configured in Mode page (max requests per minute).")
+            phase_started_at = datetime.now().astimezone()
             for i in range(cap_breach_req_count):
                 _send_event(
                     provider,
@@ -265,7 +384,14 @@ def main() -> None:
                 )
                 time.sleep(step_sleep_ms / 1000)
             client.flush()
-            _print_phase(backend_base_url, "req_cap_breach", project_id, auth_token, provider)
+            _print_phase(
+                backend_base_url,
+                "req_cap_breach",
+                project_id,
+                auth_token,
+                provider,
+                phase_started_at=phase_started_at,
+            )
 
         if demo_case == "all":
             run_steady()

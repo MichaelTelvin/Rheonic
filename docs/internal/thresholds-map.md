@@ -11,7 +11,7 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 
 ## Incident Dedup and Lifecycle
 - `incident_dedup_window_seconds`: if an open incident with same `(project_id, provider, incident_type)` is inside the window, update it instead of creating a new row.
-- `incident_auto_close_seconds`: inactivity cooldown before open incidents are auto-resolved.
+- `incident_auto_close_seconds`: inactivity cooldown before open incidents are auto-resolved. Default: 30 minutes.
 - `auto_close_run_interval_seconds`: scheduler cadence for running auto-close.
 
 ## Ingest Dominance (per event)

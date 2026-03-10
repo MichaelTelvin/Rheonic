@@ -106,7 +106,7 @@ class Settings(BaseSettings):
     loop_count: int = app_config.loop_count
     token_explosion_ratio: float = app_config.token_explosion_ratio
     token_explosion_abs: int = app_config.token_explosion_abs
-    incident_auto_close_seconds: int = 300
+    incident_auto_close_seconds: int = 1800
     auto_close_run_interval_seconds: int = 60
     event_retention_days: int = 30
     protect_block_cooldown_seconds: int = 60
