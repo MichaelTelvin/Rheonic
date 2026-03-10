@@ -80,8 +80,14 @@ class LoggingHttpClient:
             print(json_lib.dumps(payload, indent=2, sort_keys=True))
         return response
 
-    def get(self, url: str, headers: dict[str, str] | None = None, timeout: float | None = None) -> httpx.Response:
-        return self._client.get(url, headers=headers, timeout=timeout)
+    def get(
+        self,
+        url: str,
+        headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> httpx.Response:
+        return self._client.get(url, headers=headers, params=params, timeout=timeout)
 
     def close(self) -> None:
         self._client.close()
@@ -186,6 +192,7 @@ def _make_google_stub() -> Any:
 
 
 def _send_ingest_event(
+    transport: LoggingHttpClient,
     ingest_key: str,
     provider: str,
     model: str,
@@ -215,7 +222,7 @@ def _send_ingest_event(
         },
         "status": status,
     }
-    response = httpx.post(
+    response = transport.post(
         f"{BACKEND_BASE_URL}/api/v1/events",
         json=payload,
         headers={"X-Project-Ingest-Key": ingest_key},
@@ -224,13 +231,18 @@ def _send_ingest_event(
     response.raise_for_status()
 
 
-def _list_open_incidents(project_id: str, provider: str, auth_token: str) -> list[dict[str, Any]]:
+def _list_open_incidents(
+    transport: LoggingHttpClient,
+    project_id: str,
+    provider: str,
+    auth_token: str,
+) -> list[dict[str, Any]]:
     if not auth_token or not project_id:
         print("[INCIDENTS] skipped (missing RHEONIC_AUTH_TOKEN or RHEONIC_PROJECT_ID)")
         return []
     params = {"project_id": project_id, "status": "open", "provider": provider}
     try:
-        response = httpx.get(
+        response = transport.get(
             f"{BACKEND_BASE_URL}/api/v1/incidents",
             params=params,
             headers={"Authorization": f"Bearer {auth_token}"},
@@ -247,8 +259,8 @@ def _list_open_incidents(project_id: str, provider: str, auth_token: str) -> lis
         raise
 
 
-def _print_incidents(project_id: str, provider: str, auth_token: str) -> None:
-    incidents = _list_open_incidents(project_id, provider, auth_token)
+def _print_incidents(transport: LoggingHttpClient, project_id: str, provider: str, auth_token: str) -> None:
+    incidents = _list_open_incidents(transport, project_id, provider, auth_token)
     counts: dict[str, int] = {}
     near_types: list[str] = []
     for incident in incidents:
@@ -349,12 +361,12 @@ def main() -> None:
         if scenario == "near_cap":
             print("\n[STEP] Seed near-cap traffic then expect warn")
             seed_tokens = int(os.getenv("RHEONIC_NEAR_CAP_SEED_TOKENS", "1600"))
-            _send_ingest_event(ingest_key, provider, model, total_tokens=seed_tokens, feature="near-cap-seed", environment=env)
+            _send_ingest_event(transport, ingest_key, provider, model, total_tokens=seed_tokens, feature="near-cap-seed", environment=env)
             time.sleep(pause_ms / 1000)
         elif scenario == "cap_breach":
             print("\n[STEP] Seed cap breach then expect block")
             breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
-            _send_ingest_event(ingest_key, provider, model, total_tokens=breach_tokens, feature="cap-breach-seed", environment=env)
+            _send_ingest_event(transport, ingest_key, provider, model, total_tokens=breach_tokens, feature="cap-breach-seed", environment=env)
             time.sleep(pause_ms / 1000)
         elif scenario == "req_cap_breach":
             print("\n[STEP] Seed req cap breach then expect block")
@@ -362,6 +374,7 @@ def main() -> None:
             req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
             for i in range(count):
                 _send_ingest_event(
+                    transport,
                     ingest_key,
                     provider,
                     model,
@@ -375,6 +388,7 @@ def main() -> None:
             count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "6"))
             for i in range(count):
                 _send_ingest_event(
+                    transport,
                     ingest_key,
                     provider,
                     model,
@@ -390,19 +404,19 @@ def main() -> None:
             print("\n[STEP] Seed loop suspect then expect warn")
             count = int(os.getenv("RHEONIC_LOOP_COUNT", "7"))
             for _ in range(count):
-                _send_ingest_event(ingest_key, provider, model, total_tokens=60, feature="loop-fixed-signature", environment=env)
+                _send_ingest_event(transport, ingest_key, provider, model, total_tokens=60, feature="loop-fixed-signature", environment=env)
                 time.sleep(pause_ms / 1000)
         elif scenario == "token_explosion":
             print("\n[STEP] Seed token explosion then expect warn")
             huge = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "9000"))
-            _send_ingest_event(ingest_key, provider, model, total_tokens=huge, feature="token-explosion-seed", environment=env)
+            _send_ingest_event(transport, ingest_key, provider, model, total_tokens=huge, feature="token-explosion-seed", environment=env)
             call_max_tokens = max(max_tokens, huge)
             print(f"[STEP] token_explosion call max_tokens={call_max_tokens}")
             time.sleep(pause_ms / 1000)
         elif scenario == "cooldown":
             print("\n[STEP] Seed cap breach then verify cooldown blocks repeated call")
             breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
-            _send_ingest_event(ingest_key, provider, model, total_tokens=breach_tokens, feature="cooldown-breach-seed", environment=env)
+            _send_ingest_event(transport, ingest_key, provider, model, total_tokens=breach_tokens, feature="cooldown-breach-seed", environment=env)
             time.sleep(pause_ms / 1000)
 
         if scenario == "cooldown":
@@ -427,7 +441,7 @@ def main() -> None:
         if scenario == "near_cap":
             print(f"[CLAMP] recommended={clamp_recommended} applied={clamp_applied} used_max_tokens={used_max_tokens}")
         if project_id and auth_token:
-            _print_incidents(project_id, provider, auth_token)
+            _print_incidents(transport, project_id, provider, auth_token)
         else:
             print("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID and RHEONIC_AUTH_TOKEN)")
 

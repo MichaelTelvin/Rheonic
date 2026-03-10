@@ -11,9 +11,33 @@ export interface IncidentItemProps {
   onResolve: (incidentId: string) => Promise<void>;
 }
 
+function formatEvidenceValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime()) && /[tT]/.test(value)) {
+      return `${parsed.toLocaleDateString()} ${parsed.toLocaleTimeString()}`;
+    }
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => formatEvidenceValue(entry));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, formatEvidenceValue(entry)]),
+    );
+  }
+
+  return value;
+}
+
 export function IncidentItem({ incident, resolving, onResolve }: IncidentItemProps): JSX.Element {
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const canResolve = incident.status === "open";
+  // Show evidence timestamps in the viewer's local timezone while keeping the raw values stored in backend state.
+  const formattedEvidence = formatEvidenceValue(incident.evidence);
 
   return (
     <Card>
@@ -38,7 +62,7 @@ export function IncidentItem({ incident, resolving, onResolve }: IncidentItemPro
         </button>
       </div>
 
-      {showDetails ? <pre>{JSON.stringify(incident.evidence, null, 2)}</pre> : null}
+      {showDetails ? <pre>{JSON.stringify(formattedEvidence, null, 2)}</pre> : null}
     </Card>
   );
 }
