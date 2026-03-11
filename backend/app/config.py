@@ -1,6 +1,7 @@
 # Application configuration objects.
 from dataclasses import dataclass
 import hashlib
+from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -159,6 +160,20 @@ class Settings(BaseSettings):
         if not (self.redis_url or "").strip():
             redis_auth = f":{self.redis_password}@" if self.redis_password else ""
             self.redis_url = f"redis://{redis_auth}{self.redis_host}:{self.redis_port}/{self.redis_db}"
+        elif self.redis_password:
+            parsed = urlsplit(self.redis_url)
+            if parsed.scheme.startswith("redis") and parsed.hostname and parsed.password is None:
+                redis_netloc = parsed.hostname
+                if parsed.port is not None:
+                    redis_netloc = f"{redis_netloc}:{parsed.port}"
+                parsed = SplitResult(
+                    scheme=parsed.scheme,
+                    netloc=f":{self.redis_password}@{redis_netloc}",
+                    path=parsed.path,
+                    query=parsed.query,
+                    fragment=parsed.fragment,
+                )
+                self.redis_url = urlunsplit(parsed)
         return self
 
     @model_validator(mode="after")
