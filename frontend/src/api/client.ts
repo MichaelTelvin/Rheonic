@@ -142,24 +142,32 @@ export class ApiError extends Error {
 
 let unauthorizedHandler: (() => void) | null = null;
 let refreshInFlight: Promise<boolean> | null = null;
+let lastRefreshSucceededAtMs = 0;
+const recentRefreshRetryWindowMs = 1500;
 
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const isAuthRoute = path.startsWith("/api/v1/auth/");
+export function resetClientAuthStateForTests(): void {
+  unauthorizedHandler = null;
+  refreshInFlight = null;
+  lastRefreshSucceededAtMs = 0;
+}
+
+async function executeRequest(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-
-  const response = await fetch(`${frontendConfig.apiBaseUrl}${path}`, {
+  return await fetch(`${frontendConfig.apiBaseUrl}${path}`, {
     headers,
     credentials: "include",
     ...init,
   });
+}
 
+async function parseApiError(response: Response): Promise<ApiError> {
   let responseMessage = `Request failed: ${response.status}`;
   let responseCode: string | undefined;
   try {
@@ -176,31 +184,41 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     // ignore non-json error payloads
   }
+  return new ApiError(response.status, responseMessage, responseCode);
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isAuthRoute = path.startsWith("/api/v1/auth/");
+  const response = await executeRequest(path, init);
 
   if (response.status === 401) {
     if (!isAuthRoute) {
+      if (Date.now() - lastRefreshSucceededAtMs <= recentRefreshRetryWindowMs) {
+        const recentRetryResponse = await executeRequest(path, init);
+        if (recentRetryResponse.ok) {
+          return (await recentRetryResponse.json()) as T;
+        }
+        if (recentRetryResponse.status !== 401) {
+          throw await parseApiError(recentRetryResponse);
+        }
+      }
       const refreshed = await refreshSession();
       if (refreshed) {
-        const retryHeaders = new Headers(init?.headers ?? {});
-        if (!retryHeaders.has("Content-Type")) {
-          retryHeaders.set("Content-Type", "application/json");
-        }
-        const retryResponse = await fetch(`${frontendConfig.apiBaseUrl}${path}`, {
-          headers: retryHeaders,
-          credentials: "include",
-          ...init,
-        });
+        const retryResponse = await executeRequest(path, init);
         if (retryResponse.ok) {
           return (await retryResponse.json()) as T;
+        }
+        if (retryResponse.status !== 401) {
+          throw await parseApiError(retryResponse);
         }
       }
     }
     unauthorizedHandler?.();
-    throw new ApiError(response.status, responseMessage, responseCode);
+    throw await parseApiError(response);
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, responseMessage, responseCode);
+    throw await parseApiError(response);
   }
 
   return (await response.json()) as T;
@@ -219,6 +237,9 @@ async function refreshSession(): Promise<boolean> {
         },
         credentials: "include",
       });
+      if (response.ok) {
+        lastRefreshSucceededAtMs = Date.now();
+      }
       return response.ok;
     } catch {
       return false;

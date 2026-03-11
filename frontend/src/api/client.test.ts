@@ -13,6 +13,7 @@ import {
   login,
   logout,
   register,
+  resetClientAuthStateForTests,
   resolveIncident,
   revokeKey,
   rotateKey,
@@ -22,7 +23,7 @@ import {
 describe("api client", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
-    setUnauthorizedHandler(null);
+    resetClientAuthStateForTests();
   });
 
   it("includes credentials and json content type", async () => {
@@ -94,6 +95,51 @@ describe("api client", () => {
     expect(fetchMock.mock.calls[0]?.[1]?.credentials).toBe("include");
     expect(fetchMock.mock.calls[1]?.[1]?.credentials).toBe("include");
     expect(fetchMock.mock.calls[2]?.[1]?.credentials).toBe("include");
+  });
+
+  it("retries stale 401s once after a recent refresh without sending a second refresh request", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-11T12:00:00Z"));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { code: "unauthorized", message: "expired" } }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ user: { id: "u1", email: "u@example.com" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { code: "unauthorized", message: "stale 401" } }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ requests_60s: 1, tokens_60s: 2 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchProjects();
+    await fetchMetrics("p1");
+
+    const refreshCalls = fetchMock.mock.calls.filter((call) => String(call[0]).endsWith("/api/v1/auth/refresh"));
+    expect(refreshCalls).toHaveLength(1);
+    vi.useRealTimers();
   });
 
   it("uses structured error payload message and code", async () => {
