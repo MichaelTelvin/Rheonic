@@ -52,7 +52,7 @@ inputs: "Decision inputs\nrolling counters (project+provider)\ncaps\nestimated_n
   }
 }
 
-caps: "Caps check (block)\nrequests_60s >= req_cap -> req_cap_breach\ntokens_60s >= tok_cap -> tok_cap_breach\ncooldown_active -> block" {
+caps: "Caps check (block)\ncooldown_active -> block\ntokens_60s >= tok_cap -> tok_cap_breach\nrequests_60s >= req_cap -> req_cap_breach" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
@@ -162,7 +162,7 @@ metrics: "Protect metrics\nproject totals aggregate across providers\noptional p
   }
 }
 
-finalizer: "Canonical outcome finalizer\none request_id -> one outcome\nsource: live | timeout | unavailable" {
+finalizer: "Canonical outcome finalizer\none request_id -> one outcome\nsource: live | timeout_fallback | unavailable_fallback" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"

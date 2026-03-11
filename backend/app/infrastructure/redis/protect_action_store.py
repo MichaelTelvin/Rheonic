@@ -150,7 +150,11 @@ class ProtectActionStore:
     def set_block_cooldown(self, project_id: str, blocked_until_ms: int, cooldown_seconds: int) -> None:
         # Persist project-level protect cooldown window in Redis.
         try:
-            self._redis_client.set(f"protect:cooldown:{project_id}", str(int(blocked_until_ms)), ex=max(int(cooldown_seconds), 1))
+            self._redis_client.set(
+                f"protect:cooldown:{project_id}",
+                str(int(blocked_until_ms)),
+                max(int(cooldown_seconds), 1),
+            )
         except Exception:
             logger.warning("Failed setting protect cooldown", extra={"project_id": project_id})
 

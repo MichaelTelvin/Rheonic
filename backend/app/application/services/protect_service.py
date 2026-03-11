@@ -403,32 +403,6 @@ class ProtectService:
                 apply_clamp_enabled=apply_clamp_enabled,
                 clamp=clamp,
             )
-            return project_id, ProtectDecision(
-                decision="warn",
-                reason=reason,
-                fail_mode=fail_mode,
-                decision_timeout_ms=decision_timeout_ms,
-                retry_after_seconds=None,
-                blocked_until=None,
-                snapshot={
-                    "requests_60s": requests_60s,
-                    "tokens_60s": tokens_60s,
-                    "threshold_req_60s": max_req,
-                    "threshold_tok_60s": max_tok,
-                    "decision_timeout_ms": decision_timeout_ms,
-                    "predictive": {
-                        "enabled": bool(estimated_next_tokens is not None),
-                        "estimated_next_tokens": estimated_next_tokens,
-                        "would_exceed_tokens_cap": bool(
-                            max_tok is not None
-                            and estimated_next_tokens is not None
-                            and (tokens_60s + estimated_next_tokens >= max_tok)
-                        ),
-                    },
-                },
-                apply_clamp_enabled=apply_clamp_enabled,
-                clamp=clamp,
-            )
 
         decision = "allow"
         reason = "ok"

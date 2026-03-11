@@ -65,9 +65,10 @@ Fields:
 
 Decision order in protect mode:
 1. cooldown -> `block`
-2. req/tok cap breach -> `block`
-3. warn signals (`near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`) -> `warn`
-4. otherwise `allow`
+2. token cap breach -> `block`
+3. request cap breach -> `block`
+4. warn signals (`near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`) -> `warn`
+5. otherwise `allow`
 
 Protect decision response fields include:
 - `apply_clamp_enabled`
@@ -80,6 +81,7 @@ Observe mode is telemetry-only for enforcement: SDK still calls preflight, and b
 Canonical protect outcome:
 - one request id finalizes exactly one effective outcome
 - live decisions and fallback reports converge through the same backend finalization path
+- outcome sources are `live`, `timeout_fallback`, or `unavailable_fallback`
 - protect counters and `last` are derived from that one finalization path only
 
 ## Webhook API

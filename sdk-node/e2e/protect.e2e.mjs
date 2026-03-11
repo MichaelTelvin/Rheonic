@@ -27,6 +27,28 @@ async function providerCount() {
   return Number(payload.count ?? 0);
 }
 
+async function providerLastCall() {
+  const response = await fetch(`${providerStubUrl}/last`);
+  return await response.json();
+}
+
+function makeOpenAIStub() {
+  return {
+    chat: {
+      completions: {
+        create: async (payload) => {
+          await fetch(`${providerStubUrl}/call`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          return { model: payload.model ?? "gpt-4o-mini", usage: { total_tokens: 10 } };
+        },
+      },
+    },
+  };
+}
+
 async function main() {
   const nonce = Date.now();
   const email = `node-e2e-${nonce}@example.com`;
@@ -48,9 +70,9 @@ async function main() {
     body: JSON.stringify({
       protect_enabled: true,
       protect_fail_mode: "open",
+      apply_clamp: false,
       protect_max_req_per_min: 10000,
       protect_max_tok_per_min: 50000,
-      protect_decision_timeout_ms: 100,
     }),
   });
 
@@ -86,20 +108,7 @@ async function main() {
     ingestKey: createdKey.key,
     flushIntervalMs: 60000,
   });
-  const openai = {
-    chat: {
-      completions: {
-        create: async (payload) => {
-          await fetch(`${providerStubUrl}/call`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          return { model: payload.model ?? "gpt-4o-mini", usage: { total_tokens: 10 } };
-        },
-      },
-    },
-  };
+  const openai = makeOpenAIStub();
   const anthropic = {
     messages: {
       create: async (payload) => {
@@ -162,18 +171,46 @@ async function main() {
     await openai.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 2000,
-      messages: [{ role: "user", content: "Predictive warning near cap check for node e2e." }],
+      messages: [{ role: "user", content: "Predictive warning near cap check for node e2e clamp off." }],
     });
   } catch (error) {
     blocked = error instanceof RHEONICBlockedError;
   }
   assert.equal(blocked, false);
   assert.equal((await providerCount()) - initialProviderCalls, 4);
+  assert.equal(Number((await providerLastCall()).payload?.max_tokens ?? 0), 2000);
+
+  await api(`/api/v1/projects/${project.id}/protect`, {
+    method: "PUT",
+    headers: authHeaders,
+    body: JSON.stringify({
+      protect_enabled: true,
+      protect_fail_mode: "open",
+      apply_clamp: true,
+      protect_max_req_per_min: 10000,
+      protect_max_tok_per_min: 50000,
+    }),
+  });
+
+  blocked = false;
+  try {
+    await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: "Predictive warning near cap check for node e2e clamp on." }],
+    });
+  } catch (error) {
+    blocked = error instanceof RHEONICBlockedError;
+  }
+  assert.equal(blocked, false);
+  assert.equal((await providerCount()) - initialProviderCalls, 5);
+  const clampedMaxTokens = Number((await providerLastCall()).payload?.max_tokens ?? 0);
+  assert.ok(clampedMaxTokens > 0 && clampedMaxTokens < 2000);
 
   const protectMetrics = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
     headers: authHeaders,
   });
-  assert.ok(Number(protectMetrics.warned_60m ?? 0) >= 1);
+  assert.ok(Number(protectMetrics.warned_60m ?? 0) >= 2);
   const openIncidents = await api(
     `/api/v1/incidents?project_id=${encodeURIComponent(project.id)}&status=open&provider=openai`,
     { headers: authHeaders },
@@ -181,6 +218,95 @@ async function main() {
   assert.ok(Array.isArray(openIncidents));
   assert.ok(openIncidents.some((row) => row.type === "near_cap"));
 
+  const metricsBeforeCooldown = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
+    headers: authHeaders,
+  });
+  const blockedBeforeCooldown = Number(metricsBeforeCooldown.blocked_60m ?? 0);
+
+  await api(`/api/v1/projects/${project.id}/protect`, {
+    method: "PUT",
+    headers: authHeaders,
+    body: JSON.stringify({
+      protect_enabled: true,
+      protect_fail_mode: "open",
+      apply_clamp: false,
+      protect_max_req_per_min: 1,
+      protect_max_tok_per_min: 50000,
+    }),
+  });
+
+  let firstBlockReason = "";
+  try {
+    await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 128,
+      messages: [{ role: "user", content: "Cooldown backend block check." }],
+    });
+  } catch (error) {
+    assert.ok(error instanceof RHEONICBlockedError);
+    firstBlockReason = error.reason;
+  }
+  assert.equal(firstBlockReason, "req_cap_breach");
+  assert.equal((await providerCount()) - initialProviderCalls, 5);
+
+  const metricsAfterInitialBlock = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
+    headers: authHeaders,
+  });
+  assert.equal(Number(metricsAfterInitialBlock.blocked_60m ?? 0), blockedBeforeCooldown + 1);
+  assert.equal(String(metricsAfterInitialBlock.last?.reason ?? ""), "req_cap_breach");
+  assert.equal(String(metricsAfterInitialBlock.last?.source ?? ""), "live");
+
+  let localCooldownReason = "";
+  try {
+    await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 128,
+      messages: [{ role: "user", content: "Cooldown local cached block check." }],
+    });
+  } catch (error) {
+    assert.ok(error instanceof RHEONICBlockedError);
+    localCooldownReason = error.reason;
+  }
+  assert.equal(localCooldownReason, "cooldown_active");
+  assert.equal((await providerCount()) - initialProviderCalls, 5);
+
+  const metricsAfterLocalCooldown = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
+    headers: authHeaders,
+  });
+  assert.equal(Number(metricsAfterLocalCooldown.blocked_60m ?? 0), blockedBeforeCooldown + 1);
+  assert.equal(String(metricsAfterLocalCooldown.last?.reason ?? ""), "req_cap_breach");
+
+  const cooldownClient = createClient({
+    baseUrl: backendBaseUrl,
+    ingestKey: createdKey.key,
+    flushIntervalMs: 60000,
+  });
+  await cooldownClient.warmConnections();
+  const cooldownOpenAI = makeOpenAIStub();
+  instrumentOpenAI(cooldownOpenAI, { client: cooldownClient, feature: "node-e2e-cooldown" });
+
+  let backendCooldownReason = "";
+  try {
+    await cooldownOpenAI.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 128,
+      messages: [{ role: "user", content: "Cooldown backend live decision check." }],
+    });
+  } catch (error) {
+    assert.ok(error instanceof RHEONICBlockedError);
+    backendCooldownReason = error.reason;
+  }
+  assert.equal(backendCooldownReason, "cooldown_active");
+  assert.equal((await providerCount()) - initialProviderCalls, 5);
+
+  const metricsAfterBackendCooldown = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
+    headers: authHeaders,
+  });
+  assert.equal(Number(metricsAfterBackendCooldown.blocked_60m ?? 0), blockedBeforeCooldown + 2);
+  assert.equal(String(metricsAfterBackendCooldown.last?.reason ?? ""), "cooldown_active");
+  assert.equal(String(metricsAfterBackendCooldown.last?.source ?? ""), "live");
+
+  cooldownClient.close();
   client.close();
   console.log("node protect e2e PASSED");
 }

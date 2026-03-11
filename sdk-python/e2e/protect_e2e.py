@@ -55,9 +55,9 @@ def _seed() -> AuthContext:
         json={
             "protect_enabled": True,
             "protect_fail_mode": "open",
+            "apply_clamp": False,
             "protect_max_req_per_min": 10000,
             "protect_max_tok_per_min": 50000,
-            "protect_decision_timeout_ms": 100,
         },
     )
 
@@ -80,6 +80,29 @@ def _provider_count() -> int:
     response = httpx.get(f"{PROVIDER_STUB_URL}/count", timeout=3.0)
     response.raise_for_status()
     return int(response.json().get("count") or 0)
+
+
+def _provider_last_call() -> dict:
+    response = httpx.get(f"{PROVIDER_STUB_URL}/last", timeout=3.0)
+    response.raise_for_status()
+    payload = response.json()
+    return payload if isinstance(payload, dict) else {}
+
+
+def _make_openai_stub():
+    class Completions:
+        @staticmethod
+        def create(**kwargs):
+            httpx.post(f"{PROVIDER_STUB_URL}/call", json=kwargs, timeout=3.0).raise_for_status()
+            return type("Response", (), {"model": kwargs.get("model", "gpt-4o-mini"), "usage": type("Usage", (), {"total_tokens": 10})()})()
+
+    class Chat:
+        completions = Completions()
+
+    class OpenAIStub:
+        chat = Chat()
+
+    return OpenAIStub()
 
 
 def run() -> None:
@@ -108,18 +131,6 @@ def run() -> None:
         base_url=BACKEND_BASE_URL,
         flush_interval_s=60.0,
     )
-
-    class Completions:
-        @staticmethod
-        def create(**kwargs):
-            httpx.post(f"{PROVIDER_STUB_URL}/call", json=kwargs, timeout=3.0).raise_for_status()
-            return type("Response", (), {"model": kwargs.get("model", "gpt-4o-mini"), "usage": type("Usage", (), {"total_tokens": 10})()})()
-
-    class Chat:
-        completions = Completions()
-
-    class OpenAIStub:
-        chat = Chat()
 
     class AnthropicMessages:
         @staticmethod
@@ -156,7 +167,7 @@ def run() -> None:
             httpx.post(f"{PROVIDER_STUB_URL}/call", json={"prompt": prompt}, timeout=3.0).raise_for_status()
             return GoogleResponse()
 
-    openai = OpenAIStub()
+    openai = _make_openai_stub()
     anthropic = AnthropicStub()
     google_model = GoogleModelStub()
     instrument_openai(openai, client=client, feature="python-e2e")
@@ -191,15 +202,43 @@ def run() -> None:
         openai.chat.completions.create(
             model="gpt-4o-mini",
             max_tokens=2000,
-            messages=[{"role": "user", "content": "Predictive warning near cap check for python e2e."}],
+            messages=[{"role": "user", "content": "Predictive warning near cap check for python e2e clamp off."}],
         )
     except RHEONICBlockedError:
         blocked = True
     assert blocked is False
     assert _provider_count() - initial_provider_calls == 4
+    assert int((_provider_last_call().get("payload") or {}).get("max_tokens") or 0) == 2000
+
+    _api(
+        f"/api/v1/projects/{auth.project_id}/protect",
+        method="PUT",
+        token=auth.token,
+        json={
+            "protect_enabled": True,
+            "protect_fail_mode": "open",
+            "apply_clamp": True,
+            "protect_max_req_per_min": 10000,
+            "protect_max_tok_per_min": 50000,
+        },
+    )
+
+    blocked = False
+    try:
+        openai.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": "Predictive warning near cap check for python e2e clamp on."}],
+        )
+    except RHEONICBlockedError:
+        blocked = True
+    assert blocked is False
+    assert _provider_count() - initial_provider_calls == 5
+    clamped_max_tokens = int((_provider_last_call().get("payload") or {}).get("max_tokens") or 0)
+    assert 0 < clamped_max_tokens < 2000
 
     protect_metrics = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
-    assert int(protect_metrics.get("warned_60m") or 0) >= 1
+    assert int(protect_metrics.get("warned_60m") or 0) >= 2
     open_incidents = _api(
         f"/api/v1/incidents?project_id={auth.project_id}&status=open&provider=openai",
         token=auth.token,
@@ -207,6 +246,81 @@ def run() -> None:
     assert isinstance(open_incidents, list)
     assert any(str(row.get("type")) == "near_cap" for row in open_incidents)
 
+    metrics_before_cooldown = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
+    blocked_before_cooldown = int(metrics_before_cooldown.get("blocked_60m") or 0)
+
+    _api(
+        f"/api/v1/projects/{auth.project_id}/protect",
+        method="PUT",
+        token=auth.token,
+        json={
+            "protect_enabled": True,
+            "protect_fail_mode": "open",
+            "apply_clamp": False,
+            "protect_max_req_per_min": 1,
+            "protect_max_tok_per_min": 50000,
+        },
+    )
+
+    first_block_reason = ""
+    try:
+        openai.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=128,
+            messages=[{"role": "user", "content": "Cooldown backend block check."}],
+        )
+    except RHEONICBlockedError as error:
+        first_block_reason = error.reason
+    assert first_block_reason == "req_cap_breach"
+    assert _provider_count() - initial_provider_calls == 5
+
+    metrics_after_initial_block = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
+    assert int(metrics_after_initial_block.get("blocked_60m") or 0) == blocked_before_cooldown + 1
+    assert str((metrics_after_initial_block.get("last") or {}).get("reason") or "") == "req_cap_breach"
+    assert str((metrics_after_initial_block.get("last") or {}).get("source") or "") == "live"
+
+    local_cooldown_reason = ""
+    try:
+        openai.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=128,
+            messages=[{"role": "user", "content": "Cooldown local cached block check."}],
+        )
+    except RHEONICBlockedError as error:
+        local_cooldown_reason = error.reason
+    assert local_cooldown_reason == "cooldown_active"
+    assert _provider_count() - initial_provider_calls == 5
+
+    metrics_after_local_cooldown = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
+    assert int(metrics_after_local_cooldown.get("blocked_60m") or 0) == blocked_before_cooldown + 1
+    assert str((metrics_after_local_cooldown.get("last") or {}).get("reason") or "") == "req_cap_breach"
+
+    cooldown_client = create_client(
+        ingest_key=auth.ingest_key,
+        base_url=BACKEND_BASE_URL,
+        flush_interval_s=60.0,
+    )
+    cooldown_openai = _make_openai_stub()
+    instrument_openai(cooldown_openai, client=cooldown_client, feature="python-e2e-cooldown")
+
+    backend_cooldown_reason = ""
+    try:
+        cooldown_openai.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=128,
+            messages=[{"role": "user", "content": "Cooldown backend live decision check."}],
+        )
+    except RHEONICBlockedError as error:
+        backend_cooldown_reason = error.reason
+    assert backend_cooldown_reason == "cooldown_active"
+    assert _provider_count() - initial_provider_calls == 5
+
+    metrics_after_backend_cooldown = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
+    assert int(metrics_after_backend_cooldown.get("blocked_60m") or 0) == blocked_before_cooldown + 2
+    assert str((metrics_after_backend_cooldown.get("last") or {}).get("reason") or "") == "cooldown_active"
+    assert str((metrics_after_backend_cooldown.get("last") or {}).get("source") or "") == "live"
+
+    cooldown_client.close()
     client.close()
     print("python protect e2e PASSED")
 

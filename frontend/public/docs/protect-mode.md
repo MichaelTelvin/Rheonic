@@ -13,7 +13,8 @@ Protect mode adds a preflight decision before a provider call. It uses recent pr
 - telemetry is recorded,
 - the preflight can return `allow`, `warn`, or `block`,
 - request and token caps are enforced,
-- cooldown and other protect signals can prevent a provider call.
+- cooldown and cap breaches can prevent a provider call,
+- behavioral protect signals remain warn-only.
 
 ## Where to Configure It
 Open the `Protect` page in the dashboard for the selected project.

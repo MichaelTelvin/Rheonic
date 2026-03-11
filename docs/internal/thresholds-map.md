@@ -56,13 +56,14 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 
 ## Protect Enforcement
 - Hard block conditions (protect mode only):
-  - `requests_60s >= protect_max_req_per_min` -> reason `req_cap_breach`
+  - active cooldown -> reason `cooldown_active`
   - `tokens_60s >= protect_max_tok_per_min` -> reason `tok_cap_breach`
+  - `requests_60s >= protect_max_req_per_min` -> reason `req_cap_breach`
 - Warn-only signals (protect mode only):
-- `near_cap`
-- `retry_storm`
-- `loop_suspect`
-- `token_explosion`
+  - `near_cap`
+  - `retry_storm`
+  - `loop_suspect`
+  - `token_explosion`
 - `protect_block_cooldown_seconds`: cooldown after block.
 - `protect_decision_timeout_ms`: backend-only preflight timeout budget set from server config, not project/user settings.
 - `protect_fail_mode`:

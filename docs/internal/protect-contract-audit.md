@@ -90,8 +90,9 @@ This is the most fragile path in the current design.
 | timeout + fail-closed | block provider call | increment block + timeout | no ingest event | covered |
 | timeout, then late warn | effective outcome should remain fallback result | late warn must not survive | incident path independent | covered |
 | timeout, then late allow, fail-closed | effective outcome should remain block | allow must not survive | no ingest event | covered |
-| warn + clamp off | provider call allowed, no max-token rewrite | warn counter increments | ingest independent | needs dedicated end-to-end validation |
-| warn + clamp on | provider call allowed, max-token rewrite | warn counter increments | ingest independent | needs dedicated end-to-end validation |
+| warn + clamp off | provider call allowed, no max-token rewrite | warn counter increments | ingest independent | covered |
+| warn + clamp on | provider call allowed, max-token rewrite | warn counter increments | ingest independent | covered |
+| live block, then cooldown | first call blocks on live decision, repeated same-client call blocks locally, fresh client sees `cooldown_active` live | blocked counter increments only for live backend outcomes; `last.reason` ends as `cooldown_active` | no ingest event | covered |
 | backend unavailable at bootstrap | fallback uses cached bootstrap config | unavailable fallback finalizes one outcome | incident path depends on provider call | covered |
 | duplicated timeout report | should be idempotent | counters should not double count | none | covered |
 | duplicated decision report | should be idempotent per request id | counters should not double count | none | partially covered via finalization |
@@ -138,8 +139,6 @@ Redis now stores a short-lived normalized outcome per request id and derives cou
 
 What still remains:
 
-- clamp on/off needs full end-to-end validation
-- cooldown needs broader scenario coverage outside backend unit tests
 - user-facing health derivation should stay compact and not leak internal source detail
 
 ### 2. Timeout and unavailable are now separated internally
@@ -243,6 +242,4 @@ Expose and render one compact user-facing health state derived from internal pro
 
 ## Immediate Next Implementation Target
 
-1. finish clamp on/off end-to-end coverage
-2. validate cooldown semantics through the same contract lens
-3. keep docs/charts/tests aligned with the canonical finalization path
+1. keep docs/charts/tests aligned with the canonical finalization path
