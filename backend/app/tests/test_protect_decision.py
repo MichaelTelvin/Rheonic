@@ -889,6 +889,6 @@ def test_protect_config_returns_project_fail_mode_and_server_timeout(tmp_path) -
     assert response.status_code == 200
     assert response.json() == {
         "protect_fail_mode": "closed",
-        "protect_decision_timeout_ms": 100,
+        "protect_decision_timeout_ms": 150,
     }
     _cleanup_overrides()
