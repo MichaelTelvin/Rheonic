@@ -290,7 +290,9 @@ except RHEONICBlockedError:
           <article className="quickstart-docs-content">
             <h1>Quickstart</h1>
             <p className="quickstart-v2-lede">
-              Follow these steps to start in Observe mode, verify traffic, then enable Protect once caps are configured.
+              Follow these steps to start in Observe mode, verify traffic,
+              <br />
+              then enable Protect once caps are configured.
             </p>
 
             <section id="project" className="quickstart-step-card">
@@ -370,6 +372,10 @@ OPENAI_API_KEY=<provider_key>`}
                 </div>
                 <CodeBlock code={protect} language={runtime === "node" ? "ts" : "python"} />
               </div>
+              <p className="quickstart-step-muted">
+                Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all
+                capture and instrumentation calls so Rheonic can avoid repeated protect cold-start latency.
+              </p>
             </section>
 
             <section id="verify" className="quickstart-step-card">
