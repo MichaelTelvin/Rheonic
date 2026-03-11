@@ -2,16 +2,15 @@
 
 ## Prerequisites
 - VPS with Docker + Docker Compose plugin.
+- Doppler CLI installed on the VPS.
 - `staging.rheonic.dev` DNS record pointed at the VPS IP.
 - Open ports `80` and `443` to the internet.
 - Repo checked out on server.
+- Doppler `rheonic/stg` config populated with the current staging values.
+- A read-only `DOPPLER_TOKEN` stored on the VPS outside the repo, for example in `/root/.config/rheonic/doppler.env`.
 
-## Environment file requirements
-1. Create staging env:
-```bash
-cp .env.staging.example .env
-```
-2. Required values:
+## Required staging values
+Store these in Doppler `stg`:
 - `APP_ENV=staging`
 - `JWT_SECRET` (>=32 chars)
 - `WEBHOOK_SECRET_ENCRYPTION_KEY` (>=32 chars)
@@ -29,31 +28,35 @@ cp .env.staging.example .env
 - Backend and frontend are not published directly to host ports in the staging stack.
 
 ## Secrets handling
-- There is no built-in Vault, SSM, Doppler, or cloud secret-manager integration in this repo today.
-- Staging currently relies on environment-variable injection via the host `.env` file consumed by Docker Compose.
-- See [`docs/secrets-management.md`](/Users/mike/Projects/Rheonic/docs/secrets-management.md) for the recommended migration path away from host-managed `.env` files.
-- Treat `.env` as a host secret:
-  - do not commit it,
-  - keep file permissions restricted (for example `chmod 600 .env`),
-  - provision it from your server secret store or CI/CD secret injection if you have one outside the repo.
-- Minimum staging secrets:
-  - `POSTGRES_PASSWORD`
-  - `JWT_SECRET`
-  - `WEBHOOK_SECRET_ENCRYPTION_KEY`
+- Staging runs directly from Doppler-injected environment variables.
+- The only host-level bootstrap secret is `DOPPLER_TOKEN`.
+- Do not keep a persisted application `.env` on the VPS once the Doppler flow is verified.
+- See [`docs/secrets-management.md`](/Users/mike/Projects/Rheonic/docs/secrets-management.md) for the staging secret-manager model.
 
 ## Exact deploy commands
+`deploy/staging_doppler.sh` auto-loads `DOPPLER_TOKEN` from `/root/.config/rheonic/doppler.env` by default.
+
 ```bash
-docker compose -f docker-compose.staging.yml up -d --build
-docker compose -f docker-compose.staging.yml ps
+cd /root/rheonic
+bash deploy/staging_doppler.sh up -d --build
+bash deploy/staging_doppler.sh ps
 ```
 
-## Copy env to VPS
-From your local machine:
+## Token bootstrap
+Create a root-only token file on the VPS:
 ```bash
-scp .env root@<staging-ip>:/root/rheonic/.env
+mkdir -p /root/.config/rheonic
+chmod 700 /root/.config/rheonic
+printf 'DOPPLER_TOKEN=%s\n' '<service-token>' > /root/.config/rheonic/doppler.env
+chmod 600 /root/.config/rheonic/doppler.env
 ```
-This assumes the repo on the VPS lives at `/root/rheonic`.
-If the repo is elsewhere, change the destination path.
+Then verify Doppler access:
+```bash
+set -a
+source /root/.config/rheonic/doppler.env
+set +a
+doppler secrets download --project rheonic --config stg --no-file --format env | head
+```
 
 ## Access by IP
 - App: `https://staging.rheonic.dev`
@@ -64,14 +67,14 @@ If the repo is elsewhere, change the destination path.
 - Migrations run automatically via `db_init`.
 - Verify:
 ```bash
-docker compose -f docker-compose.staging.yml logs db_init
+bash deploy/staging_doppler.sh logs db_init
 ```
 
 ## Start workers/scheduler
 - Included in the staging compose stack.
 - Verify running:
 ```bash
-docker compose -f docker-compose.staging.yml ps worker scheduler
+bash deploy/staging_doppler.sh ps worker scheduler
 ```
 
 ## Verification checklist
@@ -79,17 +82,17 @@ docker compose -f docker-compose.staging.yml ps worker scheduler
 - TLS certificate is issued successfully by Caddy.
 - Backend liveness and readiness from inside the backend container:
 ```bash
-docker compose -f docker-compose.staging.yml exec backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health').read().decode())"
-docker compose -f docker-compose.staging.yml exec backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/ready').read().decode())"
+bash deploy/staging_doppler.sh exec backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health').read().decode())"
+bash deploy/staging_doppler.sh exec backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/ready').read().decode())"
 ```
 - services show healthy or running:
 ```bash
-docker compose -f docker-compose.staging.yml ps
+bash deploy/staging_doppler.sh ps
 ```
 - Queue/worker visible:
 ```bash
-docker compose -f docker-compose.staging.yml exec redis redis-cli LLEN rq:queue:${RQ_QUEUE_NAME:-rheonic}
-docker compose -f docker-compose.staging.yml exec redis redis-cli KEYS "rq:worker:*"
+bash deploy/staging_doppler.sh exec redis sh -lc 'if [ -n "$REDIS_PASSWORD" ]; then redis-cli -a "$REDIS_PASSWORD" LLEN "rq:queue:${RQ_QUEUE_NAME:-rheonic}"; else redis-cli LLEN "rq:queue:${RQ_QUEUE_NAME:-rheonic}"; fi'
+bash deploy/staging_doppler.sh exec redis sh -lc 'if [ -n "$REDIS_PASSWORD" ]; then redis-cli -a "$REDIS_PASSWORD" KEYS "rq:worker:*"; else redis-cli KEYS "rq:worker:*"; fi'
 ```
 - Email transport status (stub behavior expected unless real provider implemented):
   - check backend/worker logs for `email_provider_not_configured` on email jobs.
@@ -100,11 +103,11 @@ docker compose -f docker-compose.staging.yml exec redis redis-cli KEYS "rq:worke
 
 ## Inspect logs
 ```bash
-docker compose -f docker-compose.staging.yml logs -f backend
-docker compose -f docker-compose.staging.yml logs -f worker
-docker compose -f docker-compose.staging.yml logs -f scheduler
-docker compose -f docker-compose.staging.yml logs -f frontend
-docker compose -f docker-compose.staging.yml logs -f caddy
+bash deploy/staging_doppler.sh logs -f backend
+bash deploy/staging_doppler.sh logs -f worker
+bash deploy/staging_doppler.sh logs -f scheduler
+bash deploy/staging_doppler.sh logs -f frontend
+bash deploy/staging_doppler.sh logs -f caddy
 ```
 - container log rotation is enabled in the staging compose file to cap local Docker log growth.
 

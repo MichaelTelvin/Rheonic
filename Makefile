@@ -16,10 +16,10 @@ down-test:
 	@docker compose -p rheonic_test -f docker-compose.test.yml down -v
 
 up-staging:
-	@docker compose -f docker-compose.staging.yml up -d --build
+	@bash deploy/staging_doppler.sh up -d --build
 
 down-staging:
-	@docker compose -f docker-compose.staging.yml down
+	@bash deploy/staging_doppler.sh down
 
 up-prod:
 	@docker compose -f docker-compose.prod.yml up -d --build
@@ -28,7 +28,7 @@ down-prod:
 	@docker compose -f docker-compose.prod.yml down
 
 smoke-staging:
-	@bash -lc "set -euo pipefail; docker compose -f docker-compose.staging.yml ps; curl -fsS \"http://localhost:$${BACKEND_PORT:-8000}/health\" >/dev/null; curl -fsS \"http://localhost:$${BACKEND_PORT:-8000}/ready\" >/dev/null; docker compose -f docker-compose.staging.yml logs --tail=80 backend worker scheduler"
+	@bash -lc "set -euo pipefail; bash deploy/staging_doppler.sh ps; bash deploy/staging_doppler.sh exec backend python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)\" >/dev/null; bash deploy/staging_doppler.sh exec backend python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2)\" >/dev/null; bash deploy/staging_doppler.sh logs --tail=80 backend worker scheduler"
 
 ifneq ($(filter backend frontend sdk-node sdk-python test-backend test-frontend test-sdk-node test-sdk-python,$(MAKECMDGOALS)),)
 test:

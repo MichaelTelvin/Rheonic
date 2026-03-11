@@ -11,8 +11,8 @@ docker compose down
 
 ### Staging
 ```bash
-docker compose -f docker-compose.staging.yml up -d --build
-docker compose -f docker-compose.staging.yml down
+bash deploy/staging_doppler.sh up -d --build
+bash deploy/staging_doppler.sh down
 ```
 
 ### Production

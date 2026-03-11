@@ -6,11 +6,20 @@ x-default-logging: &default-logging
     max-size: "10m"
     max-file: "5"
 
+x-runtime-env: &runtime-env
+  APP_ENV: ${APP_ENV}
+  DATABASE_URL: ${DATABASE_URL}
+  REDIS_URL: ${REDIS_URL}
+  JWT_SECRET: ${JWT_SECRET}
+  CORS_ORIGINS: ${CORS_ORIGINS}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  WEBHOOK_ALLOW_PRIVATE_HOSTS: ${WEBHOOK_ALLOW_PRIVATE_HOSTS:-false}
+  WEBHOOK_SECRET_ENCRYPTION_KEY: ${WEBHOOK_SECRET_ENCRYPTION_KEY}
+  RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
+
 services:
   postgres:
     image: postgres:16-alpine
-    env_file:
-      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -29,8 +38,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    env_file:
-      - .env
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     command:
       [
         "sh",
@@ -58,15 +67,8 @@ services:
       context: ./backend
       args:
         INSTALL_DEV: "false"
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      APP_ENV: ${APP_ENV}
-      JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGINS: ${CORS_ORIGINS}
-      RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
+      <<: *runtime-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,15 +84,8 @@ services:
       context: ./backend
       args:
         INSTALL_DEV: "false"
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      APP_ENV: ${APP_ENV}
-      JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGINS: ${CORS_ORIGINS}
-      RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
+      <<: *runtime-env
       TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-true}
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
     depends_on:
@@ -115,13 +110,8 @@ services:
       context: ./backend
       args:
         INSTALL_DEV: "false"
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      APP_ENV: ${APP_ENV}
-      RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
+      <<: *runtime-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -148,14 +138,9 @@ services:
       context: ./backend
       args:
         INSTALL_DEV: "false"
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      APP_ENV: ${APP_ENV}
+      <<: *runtime-env
       AUTO_CLOSE_RUN_INTERVAL_SECONDS: ${AUTO_CLOSE_RUN_INTERVAL_SECONDS:-60}
-      RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
       RQ_SCHEDULER_INTERVAL_SECONDS: ${RQ_SCHEDULER_INTERVAL_SECONDS:-15}
     depends_on:
       postgres:

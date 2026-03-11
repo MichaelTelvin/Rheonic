@@ -27,8 +27,8 @@ This repo is already environment-driven, so integration should happen outside ap
 ## Integration pattern for this repo
 1. Store staging or production secrets in the secret manager.
 2. Authenticate the deploy host, CI runner, or entrypoint process to that manager.
-3. Export the required values as environment variables just before `docker compose up`.
-4. Keep `.env.example` only as a shape/template, not as a deployed secret file.
+3. Start Compose through the secret manager so the required values are present in the process environment.
+4. Keep `.env.example` only as a shape/template for local workflows, not as a deployed secret file.
 
 ## Practical options
 
@@ -37,7 +37,8 @@ This repo is already environment-driven, so integration should happen outside ap
 - Typical pattern:
   - store all env vars in a Doppler project/config,
   - provide `DOPPLER_TOKEN` from CI or the server,
-  - run Compose through `doppler run -- docker compose -f docker-compose.staging.yml up -d`.
+  - run Compose through `doppler run --project rheonic --config stg -- docker compose -f docker-compose.staging.yml up -d --build`.
+- In this repo, staging Compose no longer needs a persisted app `.env` file when run this way.
 
 ### 1Password
 - Good fit when the team already lives in 1Password.
@@ -66,13 +67,7 @@ This repo is already environment-driven, so integration should happen outside ap
 
 ## Minimum server workflow
 ```bash
-# Example shape only. Use your secret manager instead of plaintext files.
-export JWT_SECRET=...
-export WEBHOOK_SECRET_ENCRYPTION_KEY=...
-export DATABASE_URL=...
-export REDIS_URL=...
-
-docker compose -f docker-compose.staging.yml up -d --build
+bash deploy/staging_doppler.sh up -d --build
 ```
 
-The preferred version is the same flow, but with those exports performed by `doppler run`, `op run`, or Vault Agent rather than by a human-maintained file.
+The only host-level bootstrap secret in that flow is the secret-manager token itself.
