@@ -143,7 +143,7 @@ class Settings(BaseSettings):
 
     @property
     def auth_refresh_cookie_name(self) -> str:
-        return "__Host-rheonic_refresh" if self.auth_cookie_secure else "rheonic_refresh"
+        return "__Secure-rheonic_refresh" if self.auth_cookie_secure else "rheonic_refresh"
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -58,3 +58,15 @@ def test_settings_prod_requires_strong_webhook_secret_key(monkeypatch: pytest.Mo
 
     with pytest.raises(ValueError, match="WEBHOOK_SECRET_ENCRYPTION_KEY"):
         Settings()
+
+
+def test_settings_prod_cookie_names_use_valid_secure_prefixes(monkeypatch: pytest.MonkeyPatch) -> None:
+    _base_required_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "staging")
+    monkeypatch.setenv("JWT_SECRET", "x" * 48)
+    monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
+    monkeypatch.setenv("WEBHOOK_SECRET_ENCRYPTION_KEY", "k" * 32)
+
+    settings = Settings()
+    assert settings.auth_access_cookie_name == "__Host-rheonic_access"
+    assert settings.auth_refresh_cookie_name == "__Secure-rheonic_refresh"
