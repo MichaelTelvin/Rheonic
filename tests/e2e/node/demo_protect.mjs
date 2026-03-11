@@ -6,22 +6,31 @@ import { DashboardSession } from "./dashboard_session.mjs";
 
 function loadRheonicEnvFromDotenv() {
   const currentFile = fileURLToPath(import.meta.url);
-  const dotenvPath = resolve(dirname(currentFile), "../../../.env");
-  let content = "";
-  try {
-    content = readFileSync(dotenvPath, "utf8");
-  } catch {
-    return;
+  const repoRoot = resolve(dirname(currentFile), "../../..");
+  const candidatePaths = [];
+  if ((process.env.RHEONIC_ENV_FILE ?? "").trim()) {
+    candidatePaths.push(process.env.RHEONIC_ENV_FILE.trim());
   }
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#") || !line.includes("=")) continue;
-    const index = line.indexOf("=");
-    const key = line.slice(0, index).trim();
-    if (!key.startsWith("RHEONIC_")) continue;
-    const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
-    if (!(key in process.env)) {
-      process.env[key] = value;
+  candidatePaths.push(resolve(repoRoot, ".env.staging.demo"));
+  candidatePaths.push(resolve(repoRoot, ".env"));
+
+  for (const dotenvPath of candidatePaths) {
+    let content = "";
+    try {
+      content = readFileSync(dotenvPath, "utf8");
+    } catch {
+      continue;
+    }
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#") || !line.includes("=")) continue;
+      const index = line.indexOf("=");
+      const key = line.slice(0, index).trim();
+      if (!key.startsWith("RHEONIC_")) continue;
+      const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
+      if (!(key in process.env)) {
+        process.env[key] = value;
+      }
     }
   }
 }

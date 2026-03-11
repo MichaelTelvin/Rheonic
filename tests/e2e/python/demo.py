@@ -20,19 +20,29 @@ from dashboard_session import DashboardSession
 
 
 def _load_rheonic_env_from_dotenv() -> None:
-    dotenv_path = repo_root / ".env"
-    if not dotenv_path.exists():
-        return
-    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+    explicit_path = (os.getenv("RHEONIC_ENV_FILE") or "").strip()
+    candidate_paths = []
+    if explicit_path:
+        candidate_paths.append(Path(explicit_path))
+    candidate_paths.extend(
+        [
+            repo_root / ".env.staging.demo",
+            repo_root / ".env",
+        ]
+    )
+    for dotenv_path in candidate_paths:
+        if not dotenv_path.exists():
             continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if not key.startswith("RHEONIC_"):
-            continue
-        if key not in os.environ:
-            os.environ[key] = value.strip().strip('"').strip("'")
+        for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key.startswith("RHEONIC_"):
+                continue
+            if key not in os.environ:
+                os.environ[key] = value.strip().strip('"').strip("'")
 
 
 def _send_event(
