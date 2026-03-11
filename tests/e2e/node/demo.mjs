@@ -2,6 +2,7 @@ import { buildEvent, createClient } from "../../../sdk-node/dist/index.js";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DashboardSession } from "./dashboard_session.mjs";
 
 function loadRheonicEnvFromDotenv() {
   const currentFile = fileURLToPath(import.meta.url);
@@ -29,39 +30,38 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchRealtimeSnapshot(backendBaseUrl, projectId, authToken, provider, phase) {
-  if (!authToken || !projectId) {
-    console.log(`[SNAPSHOT] ${phase}: (snapshot skipped: no auth token/project id)`);
+async function fetchRealtimeSnapshot(dashboardSession, projectId, provider, phase) {
+  if (!dashboardSession || !projectId) {
+    console.log(`[SNAPSHOT] ${phase}: (snapshot skipped: no dashboard session/project id)`);
     return;
   }
   const params = new URLSearchParams({ project_id: projectId });
   if (provider !== "all") params.set("provider", provider);
-  const response = await fetch(`${backendBaseUrl}/api/v1/metrics/realtime?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${authToken}` },
-  });
-  if (!response.ok) {
-    console.log(`[SNAPSHOT] ${phase}: unavailable (status=${response.status})`);
+  try {
+    const payload = await dashboardSession.request(`/api/v1/metrics/realtime?${params.toString()}`);
+    console.log(`[SNAPSHOT] ${phase}: req60=${payload.requests_60s} tok60=${payload.tokens_60s}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[SNAPSHOT] ${phase}: unavailable (${message})`);
     return;
   }
-  const payload = await response.json();
-  console.log(`[SNAPSHOT] ${phase}: req60=${payload.requests_60s} tok60=${payload.tokens_60s}`);
 }
 
-async function fetchIncidentSummary(backendBaseUrl, projectId, authToken, provider) {
-  if (!authToken || !projectId) {
-    console.log("[OBSERVE] incidents: (skipped: no auth token/project id)");
+async function fetchIncidentSummary(dashboardSession, projectId, provider) {
+  if (!dashboardSession || !projectId) {
+    console.log("[OBSERVE] incidents: (skipped: no dashboard session/project id)");
     return;
   }
   const params = new URLSearchParams({ project_id: projectId, status: "open" });
   if (provider !== "all") params.set("provider", provider);
-  const response = await fetch(`${backendBaseUrl}/api/v1/incidents?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${authToken}` },
-  });
-  if (!response.ok) {
-    console.log(`[OBSERVE] incidents summary unavailable (status=${response.status})`);
+  let incidents;
+  try {
+    incidents = await dashboardSession.request(`/api/v1/incidents?${params.toString()}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(`[OBSERVE] incidents summary unavailable (${message})`);
     return;
   }
-  const incidents = await response.json();
   const counts = new Map();
   for (const incident of incidents) {
     const t = (incident.type ?? "unknown").toString();
@@ -74,9 +74,9 @@ async function fetchIncidentSummary(backendBaseUrl, projectId, authToken, provid
   console.log(`[OBSERVE] incidents open=${incidents.length} types=${compact || "none"}`);
 }
 
-async function printPhase(backendBaseUrl, phase, projectId, authToken, provider) {
-  await fetchRealtimeSnapshot(backendBaseUrl, projectId, authToken, provider, phase);
-  await fetchIncidentSummary(backendBaseUrl, projectId, authToken, provider);
+async function printPhase(dashboardSession, phase, projectId, provider) {
+  await fetchRealtimeSnapshot(dashboardSession, projectId, provider, phase);
+  await fetchIncidentSummary(dashboardSession, projectId, provider);
 }
 
 async function sendEvent(client, provider, model, endpoint, totalTokens, feature, options) {
@@ -112,7 +112,7 @@ function printUsageExamples() {
   console.log("  RHEONIC_CAP_BREACH_REQ_TOKENS=1");
   console.log("  RHEONIC_NEAR_CAP_TOKENS=3200");
   console.log("  Optional snapshot/incident summary:");
-  console.log("  RHEONIC_AUTH_TOKEN=<jwt> RHEONIC_PROJECT_ID=<project_id>");
+  console.log("  RHEONIC_AUTH_EMAIL=<email> RHEONIC_AUTH_PASSWORD=<password> RHEONIC_PROJECT_ID=<project_id>");
 }
 
 async function runDemo() {
@@ -157,9 +157,23 @@ async function runDemo() {
   const capBreachReqCount = Number(process.env.RHEONIC_CAP_BREACH_REQ_COUNT ?? 6);
   const capBreachReqTokens = Number(process.env.RHEONIC_CAP_BREACH_REQ_TOKENS ?? 1);
   const nearCapTokens = Number(process.env.RHEONIC_NEAR_CAP_TOKENS ?? 3200);
-  const authToken = process.env.RHEONIC_AUTH_TOKEN ?? "";
   const projectId = process.env.RHEONIC_PROJECT_ID ?? "";
+  const authEmail = (process.env.RHEONIC_AUTH_EMAIL ?? "").trim().toLowerCase();
+  const authPassword = process.env.RHEONIC_AUTH_PASSWORD ?? "";
   const environment = (process.env.RHEONIC_ENVIRONMENT ?? "").trim() || `demo-${Date.now()}`;
+  let dashboardSession = null;
+
+  if (projectId && authEmail && authPassword) {
+    dashboardSession = new DashboardSession(backendBaseUrl);
+    try {
+      await dashboardSession.login(authEmail, authPassword);
+      console.log("[OBSERVE] dashboard cookie session ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`[OBSERVE] dashboard cookie session unavailable (${message})`);
+      dashboardSession = null;
+    }
+  }
 
   const client = createClient({
     ingestKey,
@@ -177,7 +191,7 @@ async function runDemo() {
     console.log("\n[STEP] Steady traffic / no anomaly");
     await sendEvent(client, provider, model, endpoint, 42, "steady-1");
     await client.flush();
-    await printPhase(backendBaseUrl, "steady", projectId, authToken, provider);
+    await printPhase(dashboardSession, "steady", projectId, provider);
   };
 
   const runRetryStorm = async () => {
@@ -191,7 +205,7 @@ async function runDemo() {
       await sleep(stepSleepMs);
     }
     await client.flush();
-    await printPhase(backendBaseUrl, "retry_storm", projectId, authToken, provider);
+    await printPhase(dashboardSession, "retry_storm", projectId, provider);
   };
 
   const runNearCap = async () => {
@@ -199,7 +213,7 @@ async function runDemo() {
     console.log("[STEP] Requires project token/request cap configured in Settings page.");
     await sendEvent(client, provider, model, endpoint, nearCapTokens, "near-cap");
     await client.flush();
-    await printPhase(backendBaseUrl, "near_cap", projectId, authToken, provider);
+    await printPhase(dashboardSession, "near_cap", projectId, provider);
   };
 
   const runLoopSuspect = async () => {
@@ -209,14 +223,14 @@ async function runDemo() {
       await sleep(stepSleepMs);
     }
     await client.flush();
-    await printPhase(backendBaseUrl, "loop_suspect", projectId, authToken, provider);
+    await printPhase(dashboardSession, "loop_suspect", projectId, provider);
   };
 
   const runTokenExplosion = async () => {
     console.log("\n[STEP] Token explosion");
     await sendEvent(client, provider, model, endpoint, tokenExplosionTokens, "token-explosion");
     await client.flush();
-    await printPhase(backendBaseUrl, "token_explosion", projectId, authToken, provider);
+    await printPhase(dashboardSession, "token_explosion", projectId, provider);
   };
 
   const runCapBreach = async () => {
@@ -224,7 +238,7 @@ async function runDemo() {
     console.log("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).");
     await sendEvent(client, provider, model, endpoint, capBreachTokens, "cap-breach");
     await client.flush();
-    await printPhase(backendBaseUrl, "cap_breach", projectId, authToken, provider);
+    await printPhase(dashboardSession, "cap_breach", projectId, provider);
   };
 
   const runReqCapBreach = async () => {
@@ -238,7 +252,7 @@ async function runDemo() {
       await sleep(stepSleepMs);
     }
     await client.flush();
-    await printPhase(backendBaseUrl, "req_cap_breach", projectId, authToken, provider);
+    await printPhase(dashboardSession, "req_cap_breach", projectId, provider);
   };
 
   if (demoCase === "all") {

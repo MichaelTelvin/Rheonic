@@ -9,10 +9,14 @@ import httpx
 
 repo_root = Path(__file__).resolve().parents[3]
 sdk_src = repo_root / "sdk-python" / "src"
+tests_src = repo_root / "tests" / "e2e" / "python"
 if str(sdk_src) not in sys.path:
     sys.path.insert(0, str(sdk_src))
+if str(tests_src) not in sys.path:
+    sys.path.insert(0, str(tests_src))
 
 from rheonic import build_event, capture_event, create_client
+from dashboard_session import DashboardSession
 
 
 def _load_rheonic_env_from_dotenv() -> None:
@@ -61,24 +65,15 @@ def _send_event(
     capture_event(event)
 
 
-def _print_realtime_snapshot(backend_base_url: str, project_id: str, auth_token: str, provider: str, phase: str) -> None:
-    if not auth_token or not project_id:
-        print(f"[SNAPSHOT] {phase}: (snapshot skipped: no auth token/project id)")
+def _print_realtime_snapshot(dashboard_session: DashboardSession | None, project_id: str, provider: str, phase: str) -> None:
+    if dashboard_session is None or not project_id:
+        print(f"[SNAPSHOT] {phase}: (snapshot skipped: no dashboard session/project id)")
         return
     params = {"project_id": project_id}
     if provider and provider != "all":
         params["provider"] = provider
     try:
-        response = httpx.get(
-            f"{backend_base_url}/api/v1/metrics/realtime",
-            params=params,
-            headers={"Authorization": f"Bearer {auth_token}"},
-            timeout=5.0,
-        )
-        if response.status_code != 200:
-            print(f"[SNAPSHOT] {phase}: unavailable (status={response.status_code})")
-            return
-        payload = response.json()
+        payload = dashboard_session.request("/api/v1/metrics/realtime", params=params)
         if not isinstance(payload, dict):
             print(f"[SNAPSHOT] {phase}: unavailable (unexpected payload)")
             return
@@ -89,23 +84,19 @@ def _print_realtime_snapshot(backend_base_url: str, project_id: str, auth_token:
         print(f"[SNAPSHOT] {phase}: unavailable ({error})")
 
 
-def _print_incident_summary(backend_base_url: str, project_id: str, auth_token: str, provider: str) -> None:
-    if not auth_token or not project_id:
-        print("[OBSERVE] incidents: (skipped: no auth token/project id)")
+def _print_incident_summary(dashboard_session: DashboardSession | None, project_id: str, provider: str) -> None:
+    if dashboard_session is None or not project_id:
+        print("[OBSERVE] incidents: (skipped: no dashboard session/project id)")
         return
     params = {"project_id": project_id, "status": "open"}
     if provider != "all":
         params["provider"] = provider
-    response = httpx.get(
-        f"{backend_base_url}/api/v1/incidents",
-        params=params,
-        headers={"Authorization": f"Bearer {auth_token}"},
-        timeout=5.0,
-    )
-    if response.status_code != 200:
-        print(f"[OBSERVE] incidents summary unavailable (status={response.status_code})")
+    try:
+        payload = dashboard_session.request("/api/v1/incidents", params=params)
+    except Exception as error:
+        print(f"[OBSERVE] incidents summary unavailable ({error})")
         return
-    incidents = response.json() if isinstance(response.json(), list) else []
+    incidents = payload if isinstance(payload, list) else []
     counts: dict[str, int] = {}
     for incident in incidents:
         incident_type = str(incident.get("type", "unknown"))
@@ -128,29 +119,23 @@ def _parse_incident_time(incident: dict[str, Any]) -> datetime | None:
 
 
 def _print_recent_incident_summary(
-    backend_base_url: str,
+    dashboard_session: DashboardSession | None,
     project_id: str,
-    auth_token: str,
     provider: str,
     *,
     phase_started_at: datetime,
 ) -> None:
-    if not auth_token or not project_id:
-        print("[OBSERVE] recent incidents: (skipped: no auth token/project id)")
+    if dashboard_session is None or not project_id:
+        print("[OBSERVE] recent incidents: (skipped: no dashboard session/project id)")
         return
     params = {"project_id": project_id, "status": "open"}
     if provider != "all":
         params["provider"] = provider
-    response = httpx.get(
-        f"{backend_base_url}/api/v1/incidents",
-        params=params,
-        headers={"Authorization": f"Bearer {auth_token}"},
-        timeout=5.0,
-    )
-    if response.status_code != 200:
-        print(f"[OBSERVE] recent incidents unavailable (status={response.status_code})")
+    try:
+        payload = dashboard_session.request("/api/v1/incidents", params=params)
+    except Exception as error:
+        print(f"[OBSERVE] recent incidents unavailable ({error})")
         return
-    payload = response.json()
     incidents = payload if isinstance(payload, list) else []
     recent_incidents: list[dict[str, Any]] = []
     for incident in incidents:
@@ -169,20 +154,18 @@ def _print_recent_incident_summary(
 
 
 def _print_phase(
-    backend_base_url: str,
+    dashboard_session: DashboardSession | None,
     phase: str,
     project_id: str,
-    auth_token: str,
     provider: str,
     *,
     phase_started_at: datetime,
 ) -> None:
-    _print_realtime_snapshot(backend_base_url, project_id, auth_token, provider, phase)
-    _print_incident_summary(backend_base_url, project_id, auth_token, provider)
+    _print_realtime_snapshot(dashboard_session, project_id, provider, phase)
+    _print_incident_summary(dashboard_session, project_id, provider)
     _print_recent_incident_summary(
-        backend_base_url,
+        dashboard_session,
         project_id,
-        auth_token,
         provider,
         phase_started_at=phase_started_at,
     )
@@ -201,7 +184,7 @@ def _usage() -> None:
     print("  RHEONIC_CAP_BREACH_REQ_COUNT=6")
     print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
     print("  RHEONIC_NEAR_CAP_TOKENS=3200")
-    print("  Optional snapshot/incident summary: RHEONIC_AUTH_TOKEN, RHEONIC_PROJECT_ID")
+    print("  Optional snapshot/incident summary: RHEONIC_AUTH_EMAIL, RHEONIC_AUTH_PASSWORD, RHEONIC_PROJECT_ID")
 
 
 def main() -> None:
@@ -244,8 +227,18 @@ def main() -> None:
     cap_breach_req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
     near_cap_tokens = int(os.getenv("RHEONIC_NEAR_CAP_TOKENS", "3200"))
 
-    auth_token = os.getenv("RHEONIC_AUTH_TOKEN", "")
     project_id = os.getenv("RHEONIC_PROJECT_ID", "")
+    auth_email = (os.getenv("RHEONIC_AUTH_EMAIL", "") or "").strip().lower()
+    auth_password = os.getenv("RHEONIC_AUTH_PASSWORD", "")
+    dashboard_session: DashboardSession | None = None
+    if project_id and auth_email and auth_password:
+        dashboard_session = DashboardSession(backend_base_url)
+        try:
+            dashboard_session.login(auth_email, auth_password)
+            print("[OBSERVE] dashboard cookie session ready")
+        except Exception as error:
+            print(f"[OBSERVE] dashboard cookie session unavailable ({error})")
+            dashboard_session = None
 
     client = None
     try:
@@ -273,10 +266,9 @@ def main() -> None:
             _send_event(provider, model, endpoint, 42, "steady-1", environment)
             client.flush()
             _print_phase(
-                backend_base_url,
+                dashboard_session,
                 "steady",
                 project_id,
-                auth_token,
                 provider,
                 phase_started_at=phase_started_at,
             )
@@ -288,10 +280,9 @@ def main() -> None:
             _send_event(provider, model, endpoint, near_cap_tokens, "near-cap", environment)
             client.flush()
             _print_phase(
-                backend_base_url,
+                dashboard_session,
                 "near_cap",
                 project_id,
-                auth_token,
                 provider,
                 phase_started_at=phase_started_at,
             )
@@ -314,10 +305,9 @@ def main() -> None:
                 time.sleep(step_sleep_ms / 1000)
             client.flush()
             _print_phase(
-                backend_base_url,
+                dashboard_session,
                 "retry_storm",
                 project_id,
-                auth_token,
                 provider,
                 phase_started_at=phase_started_at,
             )
@@ -330,10 +320,9 @@ def main() -> None:
                 time.sleep(step_sleep_ms / 1000)
             client.flush()
             _print_phase(
-                backend_base_url,
+                dashboard_session,
                 "loop_suspect",
                 project_id,
-                auth_token,
                 provider,
                 phase_started_at=phase_started_at,
             )
@@ -344,10 +333,9 @@ def main() -> None:
             _send_event(provider, model, endpoint, token_explosion_tokens, "token-explosion", environment)
             client.flush()
             _print_phase(
-                backend_base_url,
+                dashboard_session,
                 "token_explosion",
                 project_id,
-                auth_token,
                 provider,
                 phase_started_at=phase_started_at,
             )
@@ -359,10 +347,9 @@ def main() -> None:
             _send_event(provider, model, endpoint, cap_breach_tokens, "cap-breach", environment)
             client.flush()
             _print_phase(
-                backend_base_url,
+                dashboard_session,
                 "cap_breach",
                 project_id,
-                auth_token,
                 provider,
                 phase_started_at=phase_started_at,
             )
@@ -385,10 +372,9 @@ def main() -> None:
                 time.sleep(step_sleep_ms / 1000)
             client.flush()
             _print_phase(
-                backend_base_url,
+                dashboard_session,
                 "req_cap_breach",
                 project_id,
-                auth_token,
                 provider,
                 phase_started_at=phase_started_at,
             )
@@ -425,6 +411,8 @@ def main() -> None:
     finally:
         if client is not None:
             client.close()
+        if dashboard_session is not None:
+            dashboard_session.close()
 
 
 if __name__ == "__main__":

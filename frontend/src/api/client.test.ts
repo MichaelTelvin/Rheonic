@@ -4,36 +4,31 @@ import {
   ApiError,
   createKey,
   createProject,
+  fetchCurrentUser,
   fetchIncidents,
   fetchMetrics,
   fetchProjectProviders,
   fetchProtectMetrics,
   fetchProjects,
   login,
+  logout,
   register,
   resolveIncident,
   revokeKey,
   rotateKey,
   setUnauthorizedHandler,
 } from "./client";
-import { frontendConfig } from "../config";
 
 describe("api client", () => {
   beforeEach(() => {
-    window.localStorage.clear();
-    window.sessionStorage.clear();
     vi.unstubAllGlobals();
     setUnauthorizedHandler(null);
   });
 
-  it("attaches auth token and json content type", async () => {
-    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "t1");
+  it("includes credentials and json content type", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          access_token: "t2",
-          refresh_token: "r2",
-          token_type: "bearer",
           user: { id: "u1", email: "a@b.com" },
         }),
         {
@@ -47,8 +42,8 @@ describe("api client", () => {
     await login("a@b.com", "password123");
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const headers = init.headers as Headers;
-    expect(headers.get("Authorization")).toBe("Bearer t1");
     expect(headers.get("Content-Type")).toBe("application/json");
+    expect(init.credentials).toBe("include");
   });
 
   it("invokes unauthorized handler on 401", async () => {
@@ -69,8 +64,6 @@ describe("api client", () => {
   });
 
   it("retries once after successful refresh on 401", async () => {
-    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "expired");
-    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-1");
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -82,9 +75,6 @@ describe("api client", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            access_token: "new-access",
-            refresh_token: "new-refresh",
-            token_type: "bearer",
             user: { id: "u1", email: "u@example.com", created_at: new Date().toISOString() },
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
@@ -100,9 +90,10 @@ describe("api client", () => {
 
     await fetchProjects();
 
-    expect(window.sessionStorage.getItem(frontendConfig.authTokenStorageKey)).toBe("new-access");
-    expect(window.sessionStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBe("new-refresh");
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[0]?.[1]?.credentials).toBe("include");
+    expect(fetchMock.mock.calls[1]?.[1]?.credentials).toBe("include");
+    expect(fetchMock.mock.calls[2]?.[1]?.credentials).toBe("include");
   });
 
   it("uses structured error payload message and code", async () => {
@@ -138,6 +129,9 @@ describe("api client", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await register("a@b.com", "password123");
+    await login("a@b.com", "password123");
+    await fetchCurrentUser();
+    await logout();
     await fetchMetrics("p 1");
     await fetchMetrics("p 1", "openai");
     await fetchProtectMetrics("p 1", "openai");
@@ -153,6 +147,9 @@ describe("api client", () => {
 
     const calledPaths = fetchMock.mock.calls.map((call) => String(call[0]));
     expect(calledPaths.some((path) => path.endsWith("/api/v1/auth/register"))).toBe(true);
+    expect(calledPaths.some((path) => path.endsWith("/api/v1/auth/login"))).toBe(true);
+    expect(calledPaths.some((path) => path.endsWith("/api/v1/auth/me"))).toBe(true);
+    expect(calledPaths.some((path) => path.endsWith("/api/v1/auth/logout"))).toBe(true);
     expect(calledPaths.some((path) => path.includes("/api/v1/metrics/realtime?project_id=p%201"))).toBe(true);
     expect(calledPaths.some((path) => path.includes("/api/v1/metrics/realtime?project_id=p%201&provider=openai"))).toBe(true);
     expect(calledPaths.some((path) => path.includes("/api/v1/metrics/protect?project_id=p%201&provider=openai"))).toBe(true);

@@ -11,14 +11,18 @@ import httpx
 
 repo_root = Path(__file__).resolve().parents[3]
 sdk_src = repo_root / "sdk-python" / "src"
+tests_src = repo_root / "tests" / "e2e" / "python"
 if str(sdk_src) not in sys.path:
     sys.path.insert(0, str(sdk_src))
+if str(tests_src) not in sys.path:
+    sys.path.insert(0, str(tests_src))
 
 from rheonic.client import Client
 from rheonic.protect_engine import RHEONICBlockedError
 from rheonic.providers.anthropic_adapter import instrument_anthropic
 from rheonic.providers.google_adapter import instrument_google
 from rheonic.providers.openai_adapter import instrument_openai
+from dashboard_session import DashboardSession
 
 
 def _load_rheonic_env_from_dotenv() -> None:
@@ -232,35 +236,28 @@ def _send_ingest_event(
 
 
 def _list_open_incidents(
-    transport: LoggingHttpClient,
+    dashboard_session: DashboardSession | None,
     project_id: str,
     provider: str,
-    auth_token: str,
+    auth_email: str,
 ) -> list[dict[str, Any]]:
-    if not auth_token or not project_id:
-        print("[INCIDENTS] skipped (missing RHEONIC_AUTH_TOKEN or RHEONIC_PROJECT_ID)")
+    if dashboard_session is None or not project_id:
+        print("[INCIDENTS] skipped (missing dashboard cookie session or RHEONIC_PROJECT_ID)")
         return []
     params = {"project_id": project_id, "status": "open", "provider": provider}
     try:
-        response = transport.get(
-            f"{BACKEND_BASE_URL}/api/v1/incidents",
-            params=params,
-            headers={"Authorization": f"Bearer {auth_token}"},
-            timeout=5.0,
-        )
-        response.raise_for_status()
-        payload = response.json()
+        payload = dashboard_session.request("/api/v1/incidents", params=params)
         return payload if isinstance(payload, list) else []
-    except httpx.HTTPStatusError as exc:
-        status_code = exc.response.status_code if exc.response is not None else None
+    except httpx.HTTPError as exc:
+        status_code = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None else None
         if status_code in {401, 403}:
-            print(f"[INCIDENTS] skipped ({status_code} auth error; update RHEONIC_AUTH_TOKEN)")
+            print(f"[INCIDENTS] skipped ({status_code} auth error; update dashboard cookie credentials for {auth_email})")
             return []
         raise
 
 
-def _print_incidents(transport: LoggingHttpClient, project_id: str, provider: str, auth_token: str) -> None:
-    incidents = _list_open_incidents(transport, project_id, provider, auth_token)
+def _print_incidents(dashboard_session: DashboardSession | None, project_id: str, provider: str, auth_email: str) -> None:
+    incidents = _list_open_incidents(dashboard_session, project_id, provider, auth_email)
     counts: dict[str, int] = {}
     near_types: list[str] = []
     for incident in incidents:
@@ -323,7 +320,17 @@ def main() -> None:
     pause_ms = int(os.getenv("RHEONIC_STEP_SLEEP_MS", "200"))
     decision_timeout_ms = int(os.getenv("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", "250"))
     project_id = os.getenv("RHEONIC_PROJECT_ID", "")
-    auth_token = os.getenv("RHEONIC_AUTH_TOKEN", "")
+    auth_email = (os.getenv("RHEONIC_AUTH_EMAIL", "") or "").strip().lower()
+    auth_password = os.getenv("RHEONIC_AUTH_PASSWORD", "")
+    dashboard_session: DashboardSession | None = None
+    if project_id and auth_email and auth_password:
+        dashboard_session = DashboardSession(BACKEND_BASE_URL)
+        try:
+            dashboard_session.login(auth_email, auth_password)
+            print("[INCIDENTS] dashboard cookie session ready")
+        except Exception as error:
+            print(f"[INCIDENTS] dashboard cookie session unavailable ({error})")
+            dashboard_session = None
 
     transport = LoggingHttpClient(timeout_s=5.0)
     client = Client(
@@ -440,10 +447,10 @@ def main() -> None:
         print(f"[RESULT] blocked={blocked} provider_calls_delta={provider_calls_delta}")
         if scenario == "near_cap":
             print(f"[CLAMP] recommended={clamp_recommended} applied={clamp_applied} used_max_tokens={used_max_tokens}")
-        if project_id and auth_token:
-            _print_incidents(transport, project_id, provider, auth_token)
+        if project_id and dashboard_session is not None:
+            _print_incidents(dashboard_session, project_id, provider, auth_email)
         else:
-            print("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID and RHEONIC_AUTH_TOKEN)")
+            print("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID, RHEONIC_AUTH_EMAIL, and RHEONIC_AUTH_PASSWORD)")
 
         if scenario == "allow":
             _assert_line("allow passed", not blocked and provider_calls_delta >= 1 and decision_value == "allow")
@@ -477,6 +484,8 @@ def main() -> None:
     finally:
         client.close()
         transport.close()
+        if dashboard_session is not None:
+            dashboard_session.close()
 
 
 if __name__ == "__main__":

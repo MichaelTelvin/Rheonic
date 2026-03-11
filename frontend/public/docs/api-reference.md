@@ -6,8 +6,10 @@ All API routes are served under `/api/v1/...`.
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/auth/me`
 
-Dashboard-authenticated routes use bearer auth. Runtime ingest and protect routes use `X-Project-Ingest-Key`.
+Dashboard-authenticated routes use secure `HttpOnly` cookies set by the auth endpoints. Runtime ingest and protect routes use `X-Project-Ingest-Key`.
 
 ## Projects
 - `GET /api/v1/projects`

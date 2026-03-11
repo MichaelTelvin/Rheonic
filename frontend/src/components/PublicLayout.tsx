@@ -1,8 +1,8 @@
 import { useEffect, useState, type MouseEvent as ReactMouseEvent, type PropsWithChildren } from "react";
 import { Link } from "react-router-dom";
 import { fetchPublicConfig } from "../api/client";
-import { getAuthItem, removeAuthItem } from "../authStorage";
 import { frontendConfig } from "../config";
+import { useAuthContext } from "../context/AuthContext";
 import { RheonicLogoMark } from "./RheonicLogoMark";
 
 interface PublicLayoutProps extends PropsWithChildren {
@@ -27,11 +27,10 @@ export function PublicLayout({
   showBetaBadge = false,
   children,
 }: PublicLayoutProps): JSX.Element {
-  const token = getAuthItem(frontendConfig.authTokenStorageKey);
-  const isSignedIn = Boolean(token);
-  const docsHref = token ? "/docs" : "/login";
-  const authHref = isSignedIn ? "/" : navAuthHref;
-  const authLabel = isSignedIn ? "Sign out" : navAuthLabel;
+  const { isAuthenticated, signOut } = useAuthContext();
+  const docsHref = isAuthenticated ? "/docs" : "/login";
+  const authHref = isAuthenticated ? "/" : navAuthHref;
+  const authLabel = isAuthenticated ? "Sign out" : navAuthLabel;
   const [scrolled, setScrolled] = useState(false);
   const [publicContactEmail, setPublicContactEmail] = useState<string>(frontendConfig.publicContactEmail || "feedback@example.com");
   const isV2Surface = shellClassName?.includes("public-shell-marketing") || shellClassName?.includes("quickstart-v2-shell");
@@ -73,14 +72,13 @@ export function PublicLayout({
   }, []);
 
   const handleSignOut = (event: ReactMouseEvent<HTMLAnchorElement>): void => {
-    if (!isSignedIn) {
+    if (!isAuthenticated) {
       return;
     }
     event.preventDefault();
-    removeAuthItem(frontendConfig.authTokenStorageKey);
-    removeAuthItem(frontendConfig.authRefreshTokenStorageKey);
-    removeAuthItem(frontendConfig.authUserStorageKey);
-    window.location.assign("/");
+    void signOut().finally(() => {
+      window.location.assign("/");
+    });
   };
 
   return (
@@ -113,7 +111,7 @@ export function PublicLayout({
                   ·
                 </span>
                 <Link to={authHref} onClick={handleSignOut}>
-                  {isSignedIn ? "Sign out" : "Sign in"}
+                  {isAuthenticated ? "Sign out" : "Sign in"}
                 </Link>
                 <span aria-hidden="true" className="public-footer-dot">
                   ·
@@ -152,7 +150,7 @@ export function PublicLayout({
                   ·
                 </span>
                 <Link to={authHref} onClick={handleSignOut}>
-                  {isSignedIn ? "Sign out" : "Sign in"}
+                  {isAuthenticated ? "Sign out" : "Sign in"}
                 </Link>
               </div>
               <p>© 2026 Rheonic</p>
@@ -164,7 +162,7 @@ export function PublicLayout({
                 {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
                 {showDocsLink ? <Link to={docsHref}>{docsLinkLabel}</Link> : null}
                 <Link to={authHref} onClick={handleSignOut}>
-                  {isSignedIn ? "Sign out" : "Sign in"}
+                  {isAuthenticated ? "Sign out" : "Sign in"}
                 </Link>
               </div>
               <p>© {new Date().getFullYear()} Rheonic</p>

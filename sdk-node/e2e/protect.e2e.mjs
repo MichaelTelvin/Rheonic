@@ -1,25 +1,10 @@
 import assert from "node:assert/strict";
 
 import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, RHEONICBlockedError } from "../dist/index.js";
+import { DashboardSession } from "./dashboard_session.mjs";
 
 const backendBaseUrl = process.env.RHEONIC_E2E_BACKEND_URL ?? "http://backend_test:8000";
 const providerStubUrl = process.env.RHEONIC_E2E_PROVIDER_URL ?? "http://provider_stub_test:8099";
-
-async function api(path, options = {}) {
-  const mergedHeaders = {
-    "Content-Type": "application/json",
-    ...(options.headers ?? {}),
-  };
-  const response = await fetch(`${backendBaseUrl}${path}`, {
-    ...options,
-    headers: mergedHeaders,
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(`API ${path} failed (${response.status}): ${JSON.stringify(payload)}`);
-  }
-  return payload;
-}
 
 async function providerCount() {
   const response = await fetch(`${providerStubUrl}/count`);
@@ -53,20 +38,18 @@ async function main() {
   const nonce = Date.now();
   const email = `node-e2e-${nonce}@example.com`;
   const password = "password123";
+  const session = new DashboardSession(backendBaseUrl);
 
-  await api("/api/v1/auth/register", { method: "POST", body: JSON.stringify({ email, password }) });
-  const login = await api("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
-  const authHeaders = { Authorization: `Bearer ${login.access_token}` };
+  await session.request("/api/v1/auth/register", { method: "POST", body: JSON.stringify({ email, password }) });
+  await session.login(email, password);
 
-  const project = await api("/api/v1/projects", {
+  const project = await session.request("/api/v1/projects", {
     method: "POST",
-    headers: authHeaders,
     body: JSON.stringify({ name: `Node E2E ${nonce}` }),
   });
 
-  await api(`/api/v1/projects/${project.id}/protect`, {
+  await session.request(`/api/v1/projects/${project.id}/protect`, {
     method: "PUT",
-    headers: authHeaders,
     body: JSON.stringify({
       protect_enabled: true,
       protect_fail_mode: "open",
@@ -76,9 +59,8 @@ async function main() {
     }),
   });
 
-  const createdKey = await api(`/api/v1/projects/${project.id}/keys`, {
+  const createdKey = await session.request(`/api/v1/projects/${project.id}/keys`, {
     method: "POST",
-    headers: authHeaders,
     body: JSON.stringify({ name: "node-e2e" }),
   });
 
@@ -180,9 +162,8 @@ async function main() {
   assert.equal((await providerCount()) - initialProviderCalls, 4);
   assert.equal(Number((await providerLastCall()).payload?.max_tokens ?? 0), 2000);
 
-  await api(`/api/v1/projects/${project.id}/protect`, {
+  await session.request(`/api/v1/projects/${project.id}/protect`, {
     method: "PUT",
-    headers: authHeaders,
     body: JSON.stringify({
       protect_enabled: true,
       protect_fail_mode: "open",
@@ -207,25 +188,17 @@ async function main() {
   const clampedMaxTokens = Number((await providerLastCall()).payload?.max_tokens ?? 0);
   assert.ok(clampedMaxTokens > 0 && clampedMaxTokens < 2000);
 
-  const protectMetrics = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
-    headers: authHeaders,
-  });
+  const protectMetrics = await session.request(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`);
   assert.ok(Number(protectMetrics.warned_60m ?? 0) >= 2);
-  const openIncidents = await api(
-    `/api/v1/incidents?project_id=${encodeURIComponent(project.id)}&status=open&provider=openai`,
-    { headers: authHeaders },
-  );
+  const openIncidents = await session.request(`/api/v1/incidents?project_id=${encodeURIComponent(project.id)}&status=open&provider=openai`);
   assert.ok(Array.isArray(openIncidents));
   assert.ok(openIncidents.some((row) => row.type === "near_cap"));
 
-  const metricsBeforeCooldown = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
-    headers: authHeaders,
-  });
+  const metricsBeforeCooldown = await session.request(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`);
   const blockedBeforeCooldown = Number(metricsBeforeCooldown.blocked_60m ?? 0);
 
-  await api(`/api/v1/projects/${project.id}/protect`, {
+  await session.request(`/api/v1/projects/${project.id}/protect`, {
     method: "PUT",
-    headers: authHeaders,
     body: JSON.stringify({
       protect_enabled: true,
       protect_fail_mode: "open",
@@ -249,9 +222,7 @@ async function main() {
   assert.equal(firstBlockReason, "req_cap_breach");
   assert.equal((await providerCount()) - initialProviderCalls, 5);
 
-  const metricsAfterInitialBlock = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
-    headers: authHeaders,
-  });
+  const metricsAfterInitialBlock = await session.request(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`);
   assert.equal(Number(metricsAfterInitialBlock.blocked_60m ?? 0), blockedBeforeCooldown + 1);
   assert.equal(String(metricsAfterInitialBlock.last?.reason ?? ""), "req_cap_breach");
   assert.equal(String(metricsAfterInitialBlock.last?.source ?? ""), "live");
@@ -270,9 +241,7 @@ async function main() {
   assert.equal(localCooldownReason, "cooldown_active");
   assert.equal((await providerCount()) - initialProviderCalls, 5);
 
-  const metricsAfterLocalCooldown = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
-    headers: authHeaders,
-  });
+  const metricsAfterLocalCooldown = await session.request(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`);
   assert.equal(Number(metricsAfterLocalCooldown.blocked_60m ?? 0), blockedBeforeCooldown + 1);
   assert.equal(String(metricsAfterLocalCooldown.last?.reason ?? ""), "req_cap_breach");
 
@@ -299,15 +268,14 @@ async function main() {
   assert.equal(backendCooldownReason, "cooldown_active");
   assert.equal((await providerCount()) - initialProviderCalls, 5);
 
-  const metricsAfterBackendCooldown = await api(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`, {
-    headers: authHeaders,
-  });
+  const metricsAfterBackendCooldown = await session.request(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`);
   assert.equal(Number(metricsAfterBackendCooldown.blocked_60m ?? 0), blockedBeforeCooldown + 2);
   assert.equal(String(metricsAfterBackendCooldown.last?.reason ?? ""), "cooldown_active");
   assert.equal(String(metricsAfterBackendCooldown.last?.source ?? ""), "live");
 
   cooldownClient.close();
   client.close();
+  await session.request("/api/v1/auth/logout", { method: "POST" }, false);
   console.log("node protect e2e PASSED");
 }
 

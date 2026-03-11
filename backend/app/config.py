@@ -73,7 +73,6 @@ class Settings(BaseSettings):
     jwt_alg: str = "HS256"
     jwt_expires_min: int = 60
     jwt_refresh_expires_min: int = 10080
-    rheonic_auth_token: str = ""
 
     # Redis settings.
     redis_host: str = "redis"
@@ -128,6 +127,22 @@ class Settings(BaseSettings):
     @property
     def is_production_like(self) -> bool:
         return self.app_env_normalized in {"prod", "production", "staging"}
+
+    @property
+    def auth_cookie_secure(self) -> bool:
+        return self.is_production_like
+
+    @property
+    def auth_cookie_samesite(self) -> str:
+        return "lax"
+
+    @property
+    def auth_access_cookie_name(self) -> str:
+        return "__Host-rheonic_access" if self.auth_cookie_secure else "rheonic_access"
+
+    @property
+    def auth_refresh_cookie_name(self) -> str:
+        return "__Host-rheonic_refresh" if self.auth_cookie_secure else "rheonic_refresh"
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -26,30 +26,28 @@ def _event_payload(total_tokens: int, provider: str, model: str, env: str = "dev
     }
 
 
-def _auth_headers(client: TestClient) -> dict[str, str]:
+def _register_and_login(client: TestClient) -> None:
     email = f"anomaly-{datetime.now(timezone.utc).timestamp()}@example.com"
     password = "Password123!"
     register_response = client.post("/api/v1/auth/register", json={"email": email, "password": password})
     assert register_response.status_code == 200
     login_response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert login_response.status_code == 200
-    token = login_response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
 
 
-def _create_project_and_key(client: TestClient, name: str, headers: dict[str, str]) -> tuple[str, str]:
-    project_response = client.post("/api/v1/projects", json={"name": name}, headers=headers)
+def _create_project_and_key(client: TestClient, name: str) -> tuple[str, str]:
+    project_response = client.post("/api/v1/projects", json={"name": name})
     assert project_response.status_code == 200
     project_id = project_response.json()["id"]
-    key_response = client.post(f"/api/v1/projects/{project_id}/keys", json={"name": "dev"}, headers=headers)
+    key_response = client.post(f"/api/v1/projects/{project_id}/keys", json={"name": "dev"})
     assert key_response.status_code == 200
     return project_id, key_response.json()["key"]
 
 
 def test_incidents_provider_filter_returns_scoped_rows() -> None:
     client = _make_client()
-    headers = _auth_headers(client)
-    project_id, ingest_key = _create_project_and_key(client, "provider filter", headers)
+    _register_and_login(client)
+    project_id, ingest_key = _create_project_and_key(client, "provider filter")
 
     # Configure protect for deterministic warn-capable flow and send retry failures.
     set_protect = client.put(
@@ -60,7 +58,6 @@ def test_incidents_provider_filter_returns_scoped_rows() -> None:
             "protect_max_req_per_min": 1000,
             "protect_max_tok_per_min": 100000,
         },
-        headers=headers,
     )
     assert set_protect.status_code == 200
 
@@ -80,18 +77,17 @@ def test_incidents_provider_filter_returns_scoped_rows() -> None:
         )
         assert r.status_code == 202
 
-    all_rows = client.get(f"/api/v1/incidents?project_id={project_id}&status=open", headers=headers)
+    all_rows = client.get(f"/api/v1/incidents?project_id={project_id}&status=open")
     assert all_rows.status_code == 200
     assert len(all_rows.json()) >= 2
 
-    openai_rows = client.get(f"/api/v1/incidents?project_id={project_id}&status=open&provider=openai", headers=headers)
+    openai_rows = client.get(f"/api/v1/incidents?project_id={project_id}&status=open&provider=openai")
     assert openai_rows.status_code == 200
     assert openai_rows.json()
     assert all(row["evidence"].get("provider") == "openai" for row in openai_rows.json())
 
     anthropic_rows = client.get(
         f"/api/v1/incidents?project_id={project_id}&status=open&provider=anthropic",
-        headers=headers,
     )
     assert anthropic_rows.status_code == 200
     assert anthropic_rows.json()
@@ -100,8 +96,8 @@ def test_incidents_provider_filter_returns_scoped_rows() -> None:
 
 def test_incident_dedup_updates_existing_row_count() -> None:
     client = _make_client()
-    headers = _auth_headers(client)
-    project_id, ingest_key = _create_project_and_key(client, "dedup updates", headers)
+    _register_and_login(client)
+    project_id, ingest_key = _create_project_and_key(client, "dedup updates")
 
     set_protect = client.put(
         f"/api/v1/projects/{project_id}/protect",
@@ -111,7 +107,6 @@ def test_incident_dedup_updates_existing_row_count() -> None:
             "protect_max_req_per_min": 1000,
             "protect_max_tok_per_min": 100000,
         },
-        headers=headers,
     )
     assert set_protect.status_code == 200
 
@@ -123,7 +118,7 @@ def test_incident_dedup_updates_existing_row_count() -> None:
         )
         assert r.status_code == 202
 
-    rows = client.get(f"/api/v1/incidents?project_id={project_id}&status=open&provider=openai", headers=headers)
+    rows = client.get(f"/api/v1/incidents?project_id={project_id}&status=open&provider=openai")
     assert rows.status_code == 200
     assert len(rows.json()) >= 1
     retry_rows = [row for row in rows.json() if row["type"] == "retry_storm"]
@@ -133,8 +128,8 @@ def test_incident_dedup_updates_existing_row_count() -> None:
 
 def test_retry_storm_ingest_returns_202_and_incident_is_listed() -> None:
     client = _make_client()
-    headers = _auth_headers(client)
-    project_id, ingest_key = _create_project_and_key(client, "retry storm ingest", headers)
+    _register_and_login(client)
+    project_id, ingest_key = _create_project_and_key(client, "retry storm ingest")
 
     set_protect = client.put(
         f"/api/v1/projects/{project_id}/protect",
@@ -144,7 +139,6 @@ def test_retry_storm_ingest_returns_202_and_incident_is_listed() -> None:
             "protect_max_req_per_min": 1000,
             "protect_max_tok_per_min": 100000,
         },
-        headers=headers,
     )
     assert set_protect.status_code == 200
 
@@ -156,7 +150,7 @@ def test_retry_storm_ingest_returns_202_and_incident_is_listed() -> None:
         )
         assert response.status_code == 202
 
-    rows = client.get(f"/api/v1/incidents?project_id={project_id}&status=open&provider=openai", headers=headers)
+    rows = client.get(f"/api/v1/incidents?project_id={project_id}&status=open&provider=openai")
     assert rows.status_code == 200
     retry_rows = [row for row in rows.json() if row["type"] == "retry_storm"]
     assert retry_rows

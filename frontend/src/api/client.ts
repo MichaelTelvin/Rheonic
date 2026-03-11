@@ -1,5 +1,4 @@
 import { frontendConfig } from "../config";
-import { getAuthItem, setAuthItem } from "../authStorage";
 
 export interface RealtimeMetrics {
   requests_60s: number;
@@ -113,9 +112,6 @@ export interface AuthUser {
 }
 
 export interface LoginResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
   user: AuthUser;
 }
 
@@ -145,25 +141,22 @@ export class ApiError extends Error {
 }
 
 let unauthorizedHandler: (() => void) | null = null;
-let refreshInFlight: Promise<string | null> | null = null;
+let refreshInFlight: Promise<boolean> | null = null;
 
 export function setUnauthorizedHandler(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getAuthItem(frontendConfig.authTokenStorageKey);
   const isAuthRoute = path.startsWith("/api/v1/auth/");
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
 
   const response = await fetch(`${frontendConfig.apiBaseUrl}${path}`, {
     headers,
+    credentials: "include",
     ...init,
   });
 
@@ -186,15 +179,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (response.status === 401) {
     if (!isAuthRoute) {
-      const refreshedToken = await refreshAccessToken();
-      if (refreshedToken) {
+      const refreshed = await refreshSession();
+      if (refreshed) {
         const retryHeaders = new Headers(init?.headers ?? {});
         if (!retryHeaders.has("Content-Type")) {
           retryHeaders.set("Content-Type", "application/json");
         }
-        retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
         const retryResponse = await fetch(`${frontendConfig.apiBaseUrl}${path}`, {
           headers: retryHeaders,
+          credentials: "include",
           ...init,
         });
         if (retryResponse.ok) {
@@ -213,13 +206,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+async function refreshSession(): Promise<boolean> {
   if (refreshInFlight) {
     return refreshInFlight;
-  }
-  const refreshToken = getAuthItem(frontendConfig.authRefreshTokenStorageKey);
-  if (!refreshToken) {
-    return null;
   }
   refreshInFlight = (async () => {
     try {
@@ -228,21 +217,11 @@ async function refreshAccessToken(): Promise<string | null> {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        credentials: "include",
       });
-      if (!response.ok) {
-        return null;
-      }
-      const payload = (await response.json()) as LoginResponse;
-      if (!payload.access_token || !payload.refresh_token) {
-        return null;
-      }
-      setAuthItem(frontendConfig.authTokenStorageKey, payload.access_token);
-      setAuthItem(frontendConfig.authRefreshTokenStorageKey, payload.refresh_token);
-      setAuthItem(frontendConfig.authUserStorageKey, JSON.stringify(payload.user));
-      return payload.access_token;
+      return response.ok;
     } catch {
-      return null;
+      return false;
     } finally {
       refreshInFlight = null;
     }
@@ -262,6 +241,27 @@ export async function login(email: string, password: string): Promise<LoginRespo
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
+}
+
+export async function fetchCurrentUser(): Promise<AuthUser> {
+  return request<AuthUser>("/api/v1/auth/me");
+}
+
+export async function logout(): Promise<{ status: string }> {
+  const response = await fetch(`${frontendConfig.apiBaseUrl}/api/v1/auth/logout`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  });
+  if (response.status === 401) {
+    return { status: "ok" };
+  }
+  if (!response.ok) {
+    throw new ApiError(response.status, `Request failed: ${response.status}`);
+  }
+  return (await response.json()) as { status: string };
 }
 
 export async function fetchMetrics(projectId: string, provider?: string): Promise<RealtimeMetrics> {

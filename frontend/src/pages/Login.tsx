@@ -1,9 +1,9 @@
 import { FormEvent, useRef, useState } from "react";
 
-import { ApiError, login, register, type LoginResponse } from "../api/client";
+import { ApiError, login, register, type AuthUser } from "../api/client";
 
 interface LoginProps {
-  onAuthSuccess: (auth: LoginResponse) => void;
+  onAuthSuccess: (user: AuthUser) => void;
 }
 
 export function Login({ onAuthSuccess }: LoginProps): JSX.Element {
@@ -38,7 +38,7 @@ export function Login({ onAuthSuccess }: LoginProps): JSX.Element {
         await register(normalizedEmail, password);
       }
       const auth = await login(normalizedEmail, password);
-      onAuthSuccess(auth);
+      onAuthSuccess(auth.user);
     } catch (submitError) {
       if (submitInputVersion !== inputVersionRef.current) {
         return;

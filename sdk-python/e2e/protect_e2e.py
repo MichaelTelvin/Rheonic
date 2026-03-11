@@ -17,16 +17,17 @@ PROVIDER_STUB_URL = os.getenv("RHEONIC_E2E_PROVIDER_URL", "http://provider_stub_
 
 @dataclass
 class AuthContext:
-    token: str
+    session: httpx.Client
     project_id: str
     ingest_key: str
 
 
-def _api(path: str, *, method: str = "GET", json: dict | None = None, token: str | None = None) -> dict:
-    headers = {"Content-Type": "application/json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    response = httpx.request(method, f"{BACKEND_BASE_URL}{path}", json=json, headers=headers, timeout=5.0)
+def _api(client: httpx.Client, path: str, *, method: str = "GET", json: dict | None = None, retry: bool = True) -> dict:
+    response = client.request(method, path, json=json)
+    if response.status_code == 401 and retry and not path.startswith("/api/v1/auth/"):
+        refresh_response = client.post("/api/v1/auth/refresh")
+        if refresh_response.is_success:
+            return _api(client, path, method=method, json=json, retry=False)
     response.raise_for_status()
     return response.json()
 
@@ -35,23 +36,23 @@ def _seed() -> AuthContext:
     nonce = int(time.time() * 1000)
     email = f"python-e2e-{nonce}@example.com"
     password = "password123"
+    session = httpx.Client(base_url=BACKEND_BASE_URL, timeout=5.0)
 
-    _api("/api/v1/auth/register", method="POST", json={"email": email, "password": password})
-    login = _api("/api/v1/auth/login", method="POST", json={"email": email, "password": password})
-    token = str(login["access_token"])
+    _api(session, "/api/v1/auth/register", method="POST", json={"email": email, "password": password})
+    _api(session, "/api/v1/auth/login", method="POST", json={"email": email, "password": password}, retry=False)
 
     project = _api(
+        session,
         "/api/v1/projects",
         method="POST",
-        token=token,
         json={"name": f"Python E2E {nonce}"},
     )
     project_id = str(project["id"])
 
     _api(
+        session,
         f"/api/v1/projects/{project_id}/protect",
         method="PUT",
-        token=token,
         json={
             "protect_enabled": True,
             "protect_fail_mode": "open",
@@ -62,13 +63,13 @@ def _seed() -> AuthContext:
     )
 
     key_payload = _api(
+        session,
         f"/api/v1/projects/{project_id}/keys",
         method="POST",
-        token=token,
         json={"name": "python-e2e"},
     )
 
-    return AuthContext(token=token, project_id=project_id, ingest_key=str(key_payload["key"]))
+    return AuthContext(session=session, project_id=project_id, ingest_key=str(key_payload["key"]))
 
 
 def _provider_reset() -> None:
@@ -211,9 +212,9 @@ def run() -> None:
     assert int((_provider_last_call().get("payload") or {}).get("max_tokens") or 0) == 2000
 
     _api(
+        auth.session,
         f"/api/v1/projects/{auth.project_id}/protect",
         method="PUT",
-        token=auth.token,
         json={
             "protect_enabled": True,
             "protect_fail_mode": "open",
@@ -237,22 +238,22 @@ def run() -> None:
     clamped_max_tokens = int((_provider_last_call().get("payload") or {}).get("max_tokens") or 0)
     assert 0 < clamped_max_tokens < 2000
 
-    protect_metrics = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
+    protect_metrics = _api(auth.session, f"/api/v1/metrics/protect?project_id={auth.project_id}")
     assert int(protect_metrics.get("warned_60m") or 0) >= 2
     open_incidents = _api(
+        auth.session,
         f"/api/v1/incidents?project_id={auth.project_id}&status=open&provider=openai",
-        token=auth.token,
     )
     assert isinstance(open_incidents, list)
     assert any(str(row.get("type")) == "near_cap" for row in open_incidents)
 
-    metrics_before_cooldown = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
+    metrics_before_cooldown = _api(auth.session, f"/api/v1/metrics/protect?project_id={auth.project_id}")
     blocked_before_cooldown = int(metrics_before_cooldown.get("blocked_60m") or 0)
 
     _api(
+        auth.session,
         f"/api/v1/projects/{auth.project_id}/protect",
         method="PUT",
-        token=auth.token,
         json={
             "protect_enabled": True,
             "protect_fail_mode": "open",
@@ -274,7 +275,7 @@ def run() -> None:
     assert first_block_reason == "req_cap_breach"
     assert _provider_count() - initial_provider_calls == 5
 
-    metrics_after_initial_block = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
+    metrics_after_initial_block = _api(auth.session, f"/api/v1/metrics/protect?project_id={auth.project_id}")
     assert int(metrics_after_initial_block.get("blocked_60m") or 0) == blocked_before_cooldown + 1
     assert str((metrics_after_initial_block.get("last") or {}).get("reason") or "") == "req_cap_breach"
     assert str((metrics_after_initial_block.get("last") or {}).get("source") or "") == "live"
@@ -291,7 +292,7 @@ def run() -> None:
     assert local_cooldown_reason == "cooldown_active"
     assert _provider_count() - initial_provider_calls == 5
 
-    metrics_after_local_cooldown = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
+    metrics_after_local_cooldown = _api(auth.session, f"/api/v1/metrics/protect?project_id={auth.project_id}")
     assert int(metrics_after_local_cooldown.get("blocked_60m") or 0) == blocked_before_cooldown + 1
     assert str((metrics_after_local_cooldown.get("last") or {}).get("reason") or "") == "req_cap_breach"
 
@@ -315,13 +316,14 @@ def run() -> None:
     assert backend_cooldown_reason == "cooldown_active"
     assert _provider_count() - initial_provider_calls == 5
 
-    metrics_after_backend_cooldown = _api(f"/api/v1/metrics/protect?project_id={auth.project_id}", token=auth.token)
+    metrics_after_backend_cooldown = _api(auth.session, f"/api/v1/metrics/protect?project_id={auth.project_id}")
     assert int(metrics_after_backend_cooldown.get("blocked_60m") or 0) == blocked_before_cooldown + 2
     assert str((metrics_after_backend_cooldown.get("last") or {}).get("reason") or "") == "cooldown_active"
     assert str((metrics_after_backend_cooldown.get("last") or {}).get("source") or "") == "live"
 
     cooldown_client.close()
     client.close()
+    auth.session.close()
     print("python protect e2e PASSED")
 
 

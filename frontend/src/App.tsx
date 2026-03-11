@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
-import { setUnauthorizedHandler, type AuthUser, type LoginResponse } from "./api/client";
-import { getAuthItem, removeAuthItem, setAuthItem } from "./authStorage";
+import { ApiError, fetchCurrentUser, logout, setUnauthorizedHandler, type AuthUser } from "./api/client";
 import { CurrentProjectBar } from "./components/CurrentProjectBar";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { Sidebar } from "./components/Sidebar";
 import { AppToastHost } from "./components/AppToastHost";
-import { frontendConfig } from "./config";
+import { AuthContext } from "./context/AuthContext";
 import { ProjectProvider } from "./context/ProjectContext";
 import { Architecture } from "./pages/Architecture";
 import { Alerts } from "./pages/Alerts";
@@ -25,7 +24,7 @@ import { TermsPage } from "./pages/TermsPage";
 
 interface AuthenticatedAppLayoutProps {
   userEmail: string | null;
-  onSignOut: () => void;
+  onSignOut: () => void | Promise<void>;
 }
 
 function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayoutProps): JSX.Element {
@@ -86,7 +85,8 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
 }
 
 interface RequireAuthProps {
-  token: string | null;
+  isAuthenticated: boolean;
+  sessionResolved: boolean;
   children: JSX.Element;
 }
 
@@ -100,52 +100,86 @@ function ScrollToTop(): null {
   return null;
 }
 
-function RequireAuth({ token, children }: RequireAuthProps): JSX.Element {
-  if (!token) {
+function RequireAuth({ isAuthenticated, sessionResolved, children }: RequireAuthProps): JSX.Element {
+  if (!sessionResolved) {
+    return <main className="auth-page" aria-busy="true" />;
+  }
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
   return children;
 }
 
 export function App(): JSX.Element {
-  const [token, setToken] = useState<string | null>(() => getAuthItem(frontendConfig.authTokenStorageKey));
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    const value = getAuthItem(frontendConfig.authUserStorageKey);
-    if (!value) {
-      return null;
-    }
-    try {
-      return JSON.parse(value) as AuthUser;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [sessionResolved, setSessionResolved] = useState<boolean>(false);
 
-  const signOut = useCallback((): void => {
-    removeAuthItem(frontendConfig.authTokenStorageKey);
-    removeAuthItem(frontendConfig.authRefreshTokenStorageKey);
-    removeAuthItem(frontendConfig.authUserStorageKey);
-    setToken(null);
+  const clearSession = useCallback((): void => {
     setUser(null);
+    setSessionResolved(true);
   }, []);
 
   useEffect(() => {
-    setUnauthorizedHandler(signOut);
+    setUnauthorizedHandler(clearSession);
     return () => {
       setUnauthorizedHandler(null);
     };
-  }, [signOut]);
+  }, [clearSession]);
 
-  const onAuthSuccess = (auth: LoginResponse): void => {
-    setAuthItem(frontendConfig.authTokenStorageKey, auth.access_token);
-    setAuthItem(frontendConfig.authRefreshTokenStorageKey, auth.refresh_token);
-    setAuthItem(frontendConfig.authUserStorageKey, JSON.stringify(auth.user));
-    setToken(auth.access_token);
-    setUser(auth.user);
+  useEffect(() => {
+    let cancelled = false;
+
+    const restoreSession = async (): Promise<void> => {
+      try {
+        const currentUser = await fetchCurrentUser();
+        if (!cancelled) {
+          setUser(currentUser);
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        if (!(error instanceof ApiError) || error.status !== 401) {
+          console.error("Failed to restore browser session", error);
+        }
+        setUser(null);
+      } finally {
+        if (!cancelled) {
+          setSessionResolved(true);
+        }
+      }
+    };
+
+    void restoreSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const signOut = useCallback(async (): Promise<void> => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout request failed", error);
+    } finally {
+      clearSession();
+    }
+  }, [clearSession]);
+
+  const onAuthSuccess = (nextUser: AuthUser): void => {
+    setUser(nextUser);
+    setSessionResolved(true);
+  };
+
+  const authContextValue = {
+    isAuthenticated: Boolean(user),
+    sessionResolved,
+    user,
+    signOut,
   };
 
   return (
-    <>
+    <AuthContext.Provider value={authContextValue}>
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
@@ -155,16 +189,24 @@ export function App(): JSX.Element {
         <Route path="/docs" element={<Navigate to="/app/docs" replace />} />
         <Route
           path="/login"
-          element={token ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />}
+          element={
+            !sessionResolved ? <main className="auth-page" aria-busy="true" /> : (
+              user ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />
+            )
+          }
         />
         <Route
           path="/signup"
-          element={token ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />}
+          element={
+            !sessionResolved ? <main className="auth-page" aria-busy="true" /> : (
+              user ? <Navigate to="/app" replace /> : <Login onAuthSuccess={onAuthSuccess} />
+            )
+          }
         />
         <Route
           path="/app/*"
           element={
-            <RequireAuth token={token}>
+            <RequireAuth isAuthenticated={Boolean(user)} sessionResolved={sessionResolved}>
               <ProjectProvider>
                 <AuthenticatedAppLayout userEmail={user?.email ?? null} onSignOut={signOut} />
               </ProjectProvider>
@@ -173,6 +215,6 @@ export function App(): JSX.Element {
         />
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </AuthContext.Provider>
   );
 }

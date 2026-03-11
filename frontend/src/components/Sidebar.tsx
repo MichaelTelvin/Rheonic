@@ -3,7 +3,7 @@ import { RheonicLogoMark } from "./RheonicLogoMark";
 
 interface SidebarProps {
   userEmail: string | null;
-  onSignOut: () => void;
+  onSignOut: () => void | Promise<void>;
   onSendFeedback: () => void;
 }
 

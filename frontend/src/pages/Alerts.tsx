@@ -8,12 +8,11 @@ import {
   updateProjectWebhook,
   type ProjectWebhookSettings,
 } from "../api/client";
-import { getAuthItem } from "../authStorage";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
 import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
 import { showAppToast } from "../components/AppToastHost";
-import { frontendConfig } from "../config";
+import { useAuthContext } from "../context/AuthContext";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 
@@ -37,6 +36,7 @@ function statusUpdated(previous: ProjectWebhookSettings | null, next: ProjectWeb
 
 export function Alerts(): JSX.Element {
   const { projectId } = useProjectContext();
+  const { user } = useAuthContext();
   const webhookTestMarkerKey = projectId ? `rheonic:webhookTestAt:${projectId}` : null;
 
   const [webhookSettings, setWebhookSettings] = useState<ProjectWebhookSettings | null>(null);
@@ -48,18 +48,7 @@ export function Alerts(): JSX.Element {
   const [webhookTesting, setWebhookTesting] = useState<boolean>(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
   const [protectEnabled, setProtectEnabled] = useState<boolean>(false);
-  const accountEmail = useMemo(() => {
-    const raw = getAuthItem(frontendConfig.authUserStorageKey);
-    if (!raw) {
-      return "your account email";
-    }
-    try {
-      const parsed = JSON.parse(raw) as { email?: string };
-      return parsed.email || "your account email";
-    } catch {
-      return "your account email";
-    }
-  }, []);
+  const accountEmail = user?.email ?? "your account email";
 
   const reloadWebhookSettings = async (preserveInputs = false): Promise<void> => {
     if (!projectId) {

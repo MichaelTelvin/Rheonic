@@ -2,6 +2,7 @@ import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, 
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DashboardSession } from "./dashboard_session.mjs";
 
 function loadRheonicEnvFromDotenv() {
   const currentFile = fileURLToPath(import.meta.url);
@@ -113,29 +114,29 @@ async function sendIngestEvent(ingestKey, provider, model, totalTokens, feature,
   if (!response.ok) throw new Error(`ingest_failed:${response.status}`);
 }
 
-async function listOpenIncidents(projectId, provider, authToken) {
-  if (!projectId || !authToken) return [];
+async function listOpenIncidents(projectId, provider, dashboardSession) {
+  if (!projectId || !dashboardSession) return [];
   const params = new URLSearchParams({ project_id: projectId, status: "open", provider });
-  const response = await fetch(`${backendBaseUrl}/api/v1/incidents?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${authToken}` },
-  });
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      console.log(`[INCIDENTS] skipped (${response.status} auth error; update RHEONIC_AUTH_TOKEN)`);
+  try {
+    return await dashboardSession.request(`/api/v1/incidents?${params.toString()}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("(401)") || message.includes("(403)")) {
+      console.log("[INCIDENTS] skipped (dashboard cookie session is not authenticated)");
       return [];
     }
-    throw new Error(`list_incidents_failed:${response.status}`);
+    throw error;
   }
-  return await response.json();
 }
 
-async function getProjectReqCap(projectId, authToken) {
-  if (!projectId || !authToken) return null;
-  const response = await fetch(`${backendBaseUrl}/api/v1/projects/${projectId}/protect`, {
-    headers: { Authorization: `Bearer ${authToken}` },
-  });
-  if (!response.ok) return null;
-  const payload = await response.json();
+async function getProjectReqCap(projectId, dashboardSession) {
+  if (!projectId || !dashboardSession) return null;
+  let payload;
+  try {
+    payload = await dashboardSession.request(`/api/v1/projects/${projectId}/protect`);
+  } catch {
+    return null;
+  }
   const value = payload.protect_max_req_per_min;
   if (typeof value !== "number" || !Number.isFinite(value) || value < 1) return null;
   return Math.floor(value);
@@ -188,8 +189,22 @@ async function main() {
   const pauseMs = envInt("RHEONIC_STEP_SLEEP_MS", 200);
   const protectDecisionTimeoutMs = envInt("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", 250);
   const env = (process.env.RHEONIC_ENVIRONMENT ?? "").trim() || `protect-${Date.now()}`;
-  const authToken = process.env.RHEONIC_AUTH_TOKEN ?? "";
   const projectId = process.env.RHEONIC_PROJECT_ID ?? "";
+  const authEmail = (process.env.RHEONIC_AUTH_EMAIL ?? "").trim().toLowerCase();
+  const authPassword = process.env.RHEONIC_AUTH_PASSWORD ?? "";
+  let dashboardSession = null;
+
+  if (projectId && authEmail && authPassword) {
+    dashboardSession = new DashboardSession(backendBaseUrl);
+    try {
+      await dashboardSession.login(authEmail, authPassword);
+      console.log("[INCIDENTS] dashboard cookie session ready");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`[INCIDENTS] dashboard cookie session unavailable (${message})`);
+      dashboardSession = null;
+    }
+  }
 
   await resetProvider();
   const before = await providerCount();
@@ -284,7 +299,7 @@ async function main() {
   } else if (scenario === "req_cap_breach") {
     let count = envInt("RHEONIC_REQ_CAP_BREACH_COUNT", 6);
     const reqTokens = envInt("RHEONIC_CAP_BREACH_REQ_TOKENS", 1);
-    const reqCap = await getProjectReqCap(projectId, authToken);
+    const reqCap = await getProjectReqCap(projectId, dashboardSession);
     if (typeof reqCap === "number") {
       count = Math.max(count, reqCap + 1);
     }
@@ -347,8 +362,8 @@ async function main() {
   }
 
   let incidentTypes = new Set();
-  if (projectId && authToken) {
-    const incidents = await listOpenIncidents(projectId, provider, authToken);
+  if (projectId && dashboardSession) {
+    const incidents = await listOpenIncidents(projectId, provider, dashboardSession);
     const counts = new Map();
     const nearTypes = new Set();
     for (const incident of incidents) counts.set(incident.type, (counts.get(incident.type) ?? 0) + 1);
@@ -368,7 +383,7 @@ async function main() {
       console.log(`[INCIDENTS] open=${incidents.length} types=${compact || "none"}`);
     }
   } else {
-    console.log("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID and RHEONIC_AUTH_TOKEN)");
+    console.log("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID, RHEONIC_AUTH_EMAIL, and RHEONIC_AUTH_PASSWORD)");
   }
 
   const decision = lastDecisionValue;

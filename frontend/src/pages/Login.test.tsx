@@ -47,9 +47,6 @@ describe("Login", () => {
     const user = userEvent.setup();
     const onAuthSuccess = vi.fn();
     mockLogin.mockResolvedValue({
-      access_token: "token",
-      refresh_token: "refresh",
-      token_type: "bearer",
       user: { id: "u1", email: "test@example.com", created_at: new Date().toISOString() },
     });
 
@@ -60,7 +57,7 @@ describe("Login", () => {
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith("test@example.com", "password123");
-      expect(onAuthSuccess).toHaveBeenCalled();
+      expect(onAuthSuccess).toHaveBeenCalledWith(expect.objectContaining({ email: "test@example.com" }));
     });
   });
 
@@ -68,9 +65,6 @@ describe("Login", () => {
     const user = userEvent.setup();
     mockRegister.mockResolvedValue({ id: "u1", email: "new@example.com", created_at: new Date().toISOString() });
     mockLogin.mockResolvedValue({
-      access_token: "token",
-      refresh_token: "refresh",
-      token_type: "bearer",
       user: { id: "u1", email: "new@example.com", created_at: new Date().toISOString() },
     });
 
@@ -100,9 +94,6 @@ describe("Login", () => {
   it("submits form on Enter key", async () => {
     const user = userEvent.setup();
     mockLogin.mockResolvedValue({
-      access_token: "token",
-      refresh_token: "refresh",
-      token_type: "bearer",
       user: { id: "u1", email: "enter@example.com", created_at: new Date().toISOString() },
     });
     render(<Login onAuthSuccess={vi.fn()} />);

@@ -64,7 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=origins or (["http://localhost:5173"] if _settings.app_env_normalized == "dev" else []),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Project-Ingest-Key", "X-Idempotency-Key"],
+        allow_headers=["Content-Type", "Accept", "Origin", "X-Project-Ingest-Key", "X-Idempotency-Key"],
     )
 
     @app.middleware("http")

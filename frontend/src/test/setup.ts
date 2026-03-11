@@ -50,6 +50,11 @@ Object.defineProperty(globalThis, "IntersectionObserver", {
   configurable: true,
 });
 
+Object.defineProperty(window, "scrollTo", {
+  value: () => {},
+  configurable: true,
+});
+
 const mockCanvasContext = {
   clearRect: () => {},
   setTransform: () => {},

@@ -6,6 +6,10 @@ All routes are under `/api/v1/...`.
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/auth/me`
+
+Dashboard/browser auth is cookie-based (`HttpOnly` access + refresh cookies). Runtime ingest auth remains `X-Project-Ingest-Key`.
 
 ## Projects and keys
 - `GET /api/v1/projects`

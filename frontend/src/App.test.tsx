@@ -1,16 +1,30 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ApiError } from "./api/client";
 import { TestRouter } from "./test/testRouter";
 
-const { mockSetUnauthorizedHandler, mockFetchProjects, mockFetchProjectProtect } = vi.hoisted(() => ({
+const {
+  mockSetUnauthorizedHandler,
+  mockFetchCurrentUser,
+  mockLogout,
+  mockFetchProjects,
+  mockFetchProjectProtect,
+} = vi.hoisted(() => ({
   mockSetUnauthorizedHandler: vi.fn(),
+  mockFetchCurrentUser: vi.fn(),
+  mockLogout: vi.fn(),
   mockFetchProjects: vi.fn(),
   mockFetchProjectProtect: vi.fn(),
 }));
 
-vi.mock("./api/client", () => {
+vi.mock("./api/client", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./api/client")>();
   return {
+    ...original,
     setUnauthorizedHandler: mockSetUnauthorizedHandler,
+    fetchCurrentUser: (...args: unknown[]) => mockFetchCurrentUser(...args),
+    logout: (...args: unknown[]) => mockLogout(...args),
     fetchProjects: (...args: unknown[]) => mockFetchProjects(...args),
     fetchProjectProtect: (...args: unknown[]) => mockFetchProjectProtect(...args),
   };
@@ -18,16 +32,10 @@ vi.mock("./api/client", () => {
 
 vi.mock("./pages/Login", () => {
   return {
-    Login: ({
-      onAuthSuccess,
-    }: {
-      onAuthSuccess: (auth: { access_token: string; refresh_token: string; user: { email: string } }) => void;
-    }) => (
+    Login: ({ onAuthSuccess }: { onAuthSuccess: (user: { email: string }) => void }) => (
       <button
         type="button"
-        onClick={() =>
-          onAuthSuccess({ access_token: "token-1", refresh_token: "refresh-1", user: { email: "user@example.com" } } as any)
-        }
+        onClick={() => onAuthSuccess({ id: "u1", email: "user@example.com", created_at: new Date().toISOString() } as any)}
       >
         Mock Login
       </button>
@@ -45,15 +53,16 @@ vi.mock("./pages/Incidents", () => ({ Incidents: () => <div>Incidents Page</div>
 vi.mock("./pages/NotFound", () => ({ NotFound: () => <div>Page not found</div> }));
 
 import { App } from "./App";
-import { frontendConfig } from "./config";
 
 describe("App", () => {
   beforeEach(() => {
-    window.localStorage.clear();
-    window.sessionStorage.clear();
     mockSetUnauthorizedHandler.mockClear();
+    mockFetchCurrentUser.mockReset();
+    mockLogout.mockReset();
     mockFetchProjects.mockReset();
     mockFetchProjectProtect.mockReset();
+    mockFetchCurrentUser.mockRejectedValue(new ApiError(401, "not authenticated"));
+    mockLogout.mockResolvedValue({ status: "ok" });
     mockFetchProjects.mockResolvedValue([{ id: "p1", name: "Demo", created_at: new Date().toISOString() }]);
     mockFetchProjectProtect.mockResolvedValue({
       protect_enabled: false,
@@ -109,17 +118,13 @@ describe("App", () => {
     expect(screen.getByText(/Rheonic is provided for business evaluation and operational monitoring/i)).toBeDefined();
   });
 
-  it("stores auth payload and renders dashboard after login success", async () => {
+  it("renders dashboard after login success", async () => {
     render(
       <TestRouter initialEntries={["/login"]}>
         <App />
       </TestRouter>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Mock Login" }));
-
-    expect(window.sessionStorage.getItem(frontendConfig.authTokenStorageKey)).toBe("token-1");
-    expect(window.sessionStorage.getItem(frontendConfig.authRefreshTokenStorageKey)).toBe("refresh-1");
-    expect(window.sessionStorage.getItem(frontendConfig.authUserStorageKey)).toContain("user@example.com");
+    fireEvent.click(await screen.findByRole("button", { name: "Mock Login" }));
     expect(await screen.findByText("Dashboard Page")).toBeDefined();
   });
 
@@ -133,12 +138,11 @@ describe("App", () => {
   });
 
   it("redirects authenticated user from /login to /app", async () => {
-    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
-    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
-    window.sessionStorage.setItem(
-      frontendConfig.authUserStorageKey,
-      JSON.stringify({ id: "u1", email: "persisted@example.com", created_at: new Date().toISOString() }),
-    );
+    mockFetchCurrentUser.mockResolvedValue({
+      id: "u1",
+      email: "persisted@example.com",
+      created_at: new Date().toISOString(),
+    });
 
     render(
       <TestRouter initialEntries={["/login"]}>
@@ -150,13 +154,6 @@ describe("App", () => {
   });
 
   it("renders not found page for unknown non-app routes", async () => {
-    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
-    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
-    window.sessionStorage.setItem(
-      frontendConfig.authUserStorageKey,
-      JSON.stringify({ id: "u1", email: "persisted@example.com", created_at: new Date().toISOString() }),
-    );
-
     render(
       <TestRouter initialEntries={["/incidents"]}>
         <App />
@@ -167,12 +164,11 @@ describe("App", () => {
   });
 
   it("renders not found page for unknown app routes", async () => {
-    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
-    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
-    window.sessionStorage.setItem(
-      frontendConfig.authUserStorageKey,
-      JSON.stringify({ id: "u1", email: "persisted@example.com", created_at: new Date().toISOString() }),
-    );
+    mockFetchCurrentUser.mockResolvedValue({
+      id: "u1",
+      email: "persisted@example.com",
+      created_at: new Date().toISOString(),
+    });
 
     render(
       <TestRouter initialEntries={["/app/unknown"]}>
@@ -183,13 +179,12 @@ describe("App", () => {
     expect(await screen.findByText("Page not found")).toBeDefined();
   });
 
-  it("renders authenticated layout from existing storage and signs out", async () => {
-    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
-    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
-    window.sessionStorage.setItem(
-      frontendConfig.authUserStorageKey,
-      JSON.stringify({ id: "u1", email: "persisted@example.com", created_at: new Date().toISOString() }),
-    );
+  it("restores authenticated session and signs out through backend logout", async () => {
+    mockFetchCurrentUser.mockResolvedValue({
+      id: "u1",
+      email: "persisted@example.com",
+      created_at: new Date().toISOString(),
+    });
 
     render(
       <TestRouter initialEntries={["/app"]}>
@@ -202,7 +197,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
     await waitFor(() => {
-      expect(window.sessionStorage.getItem(frontendConfig.authTokenStorageKey)).toBeNull();
+      expect(mockLogout).toHaveBeenCalled();
     });
     expect(screen.getByRole("button", { name: "Mock Login" })).toBeDefined();
   });
@@ -219,12 +214,11 @@ describe("App", () => {
   });
 
   it("routes between sidebar pages", async () => {
-    window.sessionStorage.setItem(frontendConfig.authTokenStorageKey, "token-2");
-    window.sessionStorage.setItem(frontendConfig.authRefreshTokenStorageKey, "refresh-2");
-    window.sessionStorage.setItem(
-      frontendConfig.authUserStorageKey,
-      JSON.stringify({ id: "u1", email: "persisted@example.com", created_at: new Date().toISOString() }),
-    );
+    mockFetchCurrentUser.mockResolvedValue({
+      id: "u1",
+      email: "persisted@example.com",
+      created_at: new Date().toISOString(),
+    });
 
     render(
       <TestRouter initialEntries={["/app"]}>
@@ -249,5 +243,4 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("link", { name: "Docs" }));
     expect(await screen.findByText("Architecture Page")).toBeDefined();
   });
-
 });

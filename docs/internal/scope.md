@@ -13,7 +13,7 @@ Backend foundation
 - Health endpoint
 
 Auth and tenancy
-- User auth (`/api/v1/auth/register`, `/api/v1/auth/login`, refresh flow)
+- User auth (`/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/refresh`, `/api/v1/auth/logout`, `/api/v1/auth/me`) via secure cookies
 - Project ownership enforcement across project/key/metrics/incidents APIs
 - Ingest auth via project ingest key
 

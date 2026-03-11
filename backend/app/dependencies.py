@@ -1,8 +1,7 @@
 # Dependency wiring for API routes.
 from functools import lru_cache
 
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, Request
 
 from app.application.services.auth_service import AuthService
 from app.application.services.detect_incidents_service import DetectIncidentsService
@@ -31,9 +30,6 @@ from app.logger import get_logger
 from app.security.jwt_tokens import decode_access_token
 
 logger = get_logger(__name__)
-_bearer = HTTPBearer(auto_error=False)
-
-
 @lru_cache
 def get_db_session_factory() -> DatabaseSessionFactory:
     # Provide a shared database session factory.
@@ -246,14 +242,13 @@ def get_auth_service() -> AuthService:
         raise
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-) -> User:
-    # Validate bearer token and load user.
-    if credentials is None or credentials.scheme.lower() != "bearer":
+def get_current_user(request: Request) -> User:
+    # Validate cookie-based access token and load user.
+    access_token = request.cookies.get(get_settings().auth_access_cookie_name)
+    if not access_token:
         raise HTTPException(status_code=401, detail="not authenticated")
     token_payload = decode_access_token(
-        token=credentials.credentials,
+        token=access_token,
         secret=get_settings().jwt_secret,
         algorithm=get_settings().jwt_alg,
     )
