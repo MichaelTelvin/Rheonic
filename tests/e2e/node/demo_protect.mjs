@@ -100,12 +100,22 @@ function extractUsedMaxTokens(payload) {
   if (!payload) return null;
   const value = payload.max_tokens;
   if (typeof value === "number" && Number.isFinite(value)) return Math.floor(value);
+  const generationConfig = payload.generation_config;
+  if (generationConfig && typeof generationConfig === "object") {
+    const maxOutput = generationConfig.max_output_tokens;
+    if (typeof maxOutput === "number" && Number.isFinite(maxOutput)) return Math.floor(maxOutput);
+  }
   return null;
 }
 
+function resolveSimulatedTotalTokens(payload, fallback = 10) {
+  const maxTokens = extractUsedMaxTokens(payload);
+  return typeof maxTokens === "number" && maxTokens > 0 ? maxTokens : fallback;
+}
+
 function printConfigHint() {
-  console.log("Run with Doppler: make protect-stg-node RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cooldown");
-  console.log("Or use a single explicit file: RHEONIC_ENV_FILE=.env.staging.demo node tests/e2e/node/demo_protect.mjs");
+  console.log("Run: make protect-stg-node RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach");
+  console.log("Optional exact provider-call visibility: python3 tests/e2e/provider_stub.py");
 }
 
 function assertLine(label, passed) {
@@ -181,7 +191,10 @@ async function runProviderCall(provider, model, maxTokens, openai, anthropic, go
         max_tokens: maxTokens,
       });
     } else if (provider === "google") {
-      await googleModel.generateContent("protect demo request");
+      await googleModel.generateContent({
+        prompt: "protect demo request",
+        generation_config: { max_output_tokens: maxTokens },
+      });
     } else {
       await openai.chat.completions.create({
         model,
@@ -284,7 +297,7 @@ async function main() {
       completions: {
         create: async (payload) => {
           await callProviderStub(payload);
-          return { model: payload.model, usage: { total_tokens: 10 } };
+          return { model: payload.model, usage: { total_tokens: resolveSimulatedTotalTokens(payload) } };
         },
       },
     },
@@ -293,7 +306,8 @@ async function main() {
     messages: {
       create: async (payload) => {
         await callProviderStub(payload);
-        return { model: payload.model, usage: { input_tokens: 6, output_tokens: 4 } };
+        const totalTokens = resolveSimulatedTotalTokens(payload);
+        return { model: payload.model, usage: { input_tokens: 1, output_tokens: Math.max(totalTokens - 1, 1) } };
       },
     },
   };
@@ -302,7 +316,7 @@ async function main() {
     generateContent: async (payload) => {
       const requestPayload = typeof payload === "string" ? { prompt: payload } : payload;
       await callProviderStub(requestPayload);
-      return { response: { usageMetadata: { totalTokenCount: 10 } } };
+      return { response: { usageMetadata: { totalTokenCount: resolveSimulatedTotalTokens(requestPayload) } } };
     },
   };
 

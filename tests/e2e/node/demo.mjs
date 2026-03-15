@@ -28,8 +28,7 @@ function loadRheonicEnvFromDotenv() {
 }
 
 function printConfigHint() {
-  console.log("  Run with Doppler: make demo-stg-node RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach");
-  console.log("  Or use a single explicit file: RHEONIC_ENV_FILE=.env.staging.demo node tests/e2e/node/demo.mjs");
+  console.log("  Run: make demo-stg-node RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach");
 }
 
 function printUsageExamples() {

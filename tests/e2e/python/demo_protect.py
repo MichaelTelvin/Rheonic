@@ -161,7 +161,21 @@ def _extract_used_max_tokens(payload: dict[str, Any] | None) -> int | None:
         return raw
     if isinstance(raw, float):
         return int(raw)
+    generation_config = payload.get("generation_config")
+    if isinstance(generation_config, dict):
+        raw = generation_config.get("max_output_tokens")
+        if isinstance(raw, int):
+            return raw
+        if isinstance(raw, float):
+            return int(raw)
     return None
+
+
+def _resolve_simulated_total_tokens(payload: dict[str, Any] | None, fallback: int = 10) -> int:
+    used_max_tokens = _extract_used_max_tokens(payload)
+    if isinstance(used_max_tokens, int) and used_max_tokens > 0:
+        return used_max_tokens
+    return fallback
 
 
 def _assert_line(label: str, passed: bool) -> None:
@@ -169,8 +183,8 @@ def _assert_line(label: str, passed: bool) -> None:
 
 
 def _print_config_hint() -> None:
-    print("Run with Doppler: make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cooldown")
-    print("Or use a single explicit file: RHEONIC_ENV_FILE=.env.staging.demo python3 tests/e2e/python/demo_protect.py")
+    print("Run: make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach")
+    print("Optional exact provider-call visibility: python3 tests/e2e/provider_stub.py")
 
 
 def _make_openai_stub() -> Any:
@@ -178,7 +192,7 @@ def _make_openai_stub() -> Any:
         @staticmethod
         def create(**kwargs: Any) -> Any:
             _notify_provider_call(kwargs)
-            usage = type("Usage", (), {"total_tokens": 10})()
+            usage = type("Usage", (), {"total_tokens": _resolve_simulated_total_tokens(kwargs)})()
             return type("Response", (), {"model": kwargs.get("model"), "usage": usage})()
 
     class Chat:
@@ -195,7 +209,8 @@ def _make_anthropic_stub() -> Any:
         @staticmethod
         def create(**kwargs: Any) -> Any:
             _notify_provider_call(kwargs)
-            usage = type("Usage", (), {"input_tokens": 6, "output_tokens": 4})()
+            total_tokens = _resolve_simulated_total_tokens(kwargs)
+            usage = type("Usage", (), {"input_tokens": 1, "output_tokens": max(total_tokens - 1, 1)})()
             return type("Response", (), {"model": kwargs.get("model"), "usage": usage})()
 
     class AnthropicStub:
@@ -215,9 +230,10 @@ def _make_google_stub() -> Any:
         model_name = ""
 
         @staticmethod
-        def generate_content(prompt: str) -> Any:
-            payload = {"prompt": prompt}
+        def generate_content(prompt: str | dict[str, Any]) -> Any:
+            payload = prompt if isinstance(prompt, dict) else {"prompt": prompt}
             _notify_provider_call(payload)
+            UsageMetadata.total_token_count = _resolve_simulated_total_tokens(payload)
             return GoogleResponse()
 
     return GoogleModelStub()
@@ -334,7 +350,12 @@ def _run_provider_call(provider: str, model: str, max_tokens: int, openai: Any, 
                 max_tokens=max_tokens,
             )
         elif provider == "google":
-            google.generate_content("protect demo request")
+            google.generate_content(
+                {
+                    "prompt": "protect demo request",
+                    "generation_config": {"max_output_tokens": max_tokens},
+                }
+            )
         else:
             openai.chat.completions.create(
                 model=model,

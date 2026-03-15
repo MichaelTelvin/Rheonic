@@ -188,8 +188,7 @@ def _usage() -> None:
     print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
     print("  RHEONIC_NEAR_CAP_TOKENS=3200")
     print("  Optional snapshot/incident summary: RHEONIC_AUTH_EMAIL, RHEONIC_AUTH_PASSWORD, RHEONIC_PROJECT_ID")
-    print("  Run with Doppler: make demo-stg-python RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach")
-    print("  Or use a single explicit file: RHEONIC_ENV_FILE=.env.staging.demo python3 tests/e2e/python/demo.py")
+    print("  Run: make demo-stg-python RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach")
 
 
 def main() -> None:
