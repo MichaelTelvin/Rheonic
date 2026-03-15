@@ -342,6 +342,8 @@ async function main() {
     const seed = Number(process.env.RHEONIC_CAP_BREACH_TOKENS ?? 5000);
     console.log("[STEP] Seed cap breach then expect block");
     await sendIngestEvent(ingestKey, provider, model, seed, "cap-breach-seed", env);
+    callMaxTokens = Math.max(maxTokens, seed);
+    console.log(`[STEP] cap_breach call max_tokens=${callMaxTokens}`);
     await sleep(pauseMs);
   } else if (scenario === "req_cap_breach") {
     let count = envInt("RHEONIC_REQ_CAP_BREACH_COUNT", 6);
@@ -387,6 +389,8 @@ async function main() {
     const seed = envInt("RHEONIC_CAP_BREACH_TOKENS", 5000);
     console.log("[STEP] Seed cap breach then verify cooldown blocks repeated call");
     await sendIngestEvent(ingestKey, provider, model, seed, "cooldown-breach-seed", env);
+    callMaxTokens = Math.max(maxTokens, seed);
+    console.log(`[STEP] cooldown call max_tokens=${callMaxTokens}`);
     await sleep(pauseMs);
   }
 

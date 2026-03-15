@@ -445,6 +445,8 @@ def main() -> None:
             print("\n[STEP] Seed cap breach then expect block")
             breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
             _send_ingest_event(transport, ingest_key, provider, model, total_tokens=breach_tokens, feature="cap-breach-seed", environment=env)
+            call_max_tokens = max(max_tokens, breach_tokens)
+            print(f"[STEP] cap_breach call max_tokens={call_max_tokens}")
             time.sleep(pause_ms / 1000)
         elif scenario == "req_cap_breach":
             print("\n[STEP] Seed req cap breach then expect block")
@@ -500,6 +502,8 @@ def main() -> None:
             print("\n[STEP] Seed cap breach then verify cooldown blocks repeated call")
             breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
             _send_ingest_event(transport, ingest_key, provider, model, total_tokens=breach_tokens, feature="cooldown-breach-seed", environment=env)
+            call_max_tokens = max(max_tokens, breach_tokens)
+            print(f"[STEP] cooldown call max_tokens={call_max_tokens}")
             time.sleep(pause_ms / 1000)
 
         if scenario == "cooldown":
