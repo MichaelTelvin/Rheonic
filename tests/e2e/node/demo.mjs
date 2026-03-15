@@ -117,7 +117,7 @@ function printUsageExamples() {
   console.log("  RHEONIC_LOOP_COUNT=7");
   console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=9000");
   console.log("  RHEONIC_CAP_BREACH_TOKENS=4000");
-  console.log("  RHEONIC_CAP_BREACH_REQ_COUNT=6");
+  console.log("  RHEONIC_REQ_CAP_BREACH_COUNT=6");
   console.log("  RHEONIC_CAP_BREACH_REQ_TOKENS=1");
   console.log("  RHEONIC_NEAR_CAP_TOKENS=3200");
   console.log("  Optional snapshot/incident summary:");
@@ -163,7 +163,7 @@ async function runDemo() {
   const loopCount = Number(process.env.RHEONIC_LOOP_COUNT ?? 7);
   const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 9000);
   const capBreachTokens = Number(process.env.RHEONIC_CAP_BREACH_TOKENS ?? 4000);
-  const capBreachReqCount = Number(process.env.RHEONIC_CAP_BREACH_REQ_COUNT ?? 6);
+  const capBreachReqCount = Number(process.env.RHEONIC_REQ_CAP_BREACH_COUNT ?? 6);
   const capBreachReqTokens = Number(process.env.RHEONIC_CAP_BREACH_REQ_TOKENS ?? 1);
   const nearCapTokens = Number(process.env.RHEONIC_NEAR_CAP_TOKENS ?? 3200);
   const projectId = process.env.RHEONIC_PROJECT_ID ?? "";

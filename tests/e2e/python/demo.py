@@ -191,7 +191,7 @@ def _usage() -> None:
     print("  RHEONIC_LOOP_COUNT=7")
     print("  RHEONIC_TOKEN_EXPLOSION_TOKENS=9000")
     print("  RHEONIC_CAP_BREACH_TOKENS=4000")
-    print("  RHEONIC_CAP_BREACH_REQ_COUNT=6")
+    print("  RHEONIC_REQ_CAP_BREACH_COUNT=6")
     print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
     print("  RHEONIC_NEAR_CAP_TOKENS=3200")
     print("  Optional snapshot/incident summary: RHEONIC_AUTH_EMAIL, RHEONIC_AUTH_PASSWORD, RHEONIC_PROJECT_ID")
@@ -233,7 +233,7 @@ def main() -> None:
     loop_count = int(os.getenv("RHEONIC_LOOP_COUNT", "7"))
     token_explosion_tokens = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "9000"))
     cap_breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "4000"))
-    cap_breach_req_count = int(os.getenv("RHEONIC_CAP_BREACH_REQ_COUNT", "6"))
+    cap_breach_req_count = int(os.getenv("RHEONIC_REQ_CAP_BREACH_COUNT", "6"))
     cap_breach_req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
     near_cap_tokens = int(os.getenv("RHEONIC_NEAR_CAP_TOKENS", "3200"))
 
