@@ -14,4 +14,4 @@ if ! command -v doppler >/dev/null 2>&1; then
   exit 1
 fi
 
-exec doppler run --project "$project" --config "$config" -- "$@"
+exec doppler run --project "$project" --config "$config" --preserve-env=true -- "$@"
