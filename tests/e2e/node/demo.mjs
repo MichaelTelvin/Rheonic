@@ -1,40 +1,54 @@
 import { buildEvent, createClient } from "../../../sdk-node/dist/index.js";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { DashboardSession } from "./dashboard_session.mjs";
 
 function loadRheonicEnvFromDotenv() {
-  const currentFile = fileURLToPath(import.meta.url);
-  const repoRoot = resolve(dirname(currentFile), "../../..");
-  const candidatePaths = [];
-  if ((process.env.RHEONIC_ENV_FILE ?? "").trim()) {
-    candidatePaths.push(process.env.RHEONIC_ENV_FILE.trim());
+  const explicitPath = (process.env.RHEONIC_ENV_FILE ?? "").trim();
+  if (!explicitPath) {
+    return;
   }
-  candidatePaths.push(resolve(repoRoot, ".env.staging.demo"));
-  candidatePaths.push(resolve(repoRoot, ".env"));
-
-  for (const dotenvPath of candidatePaths) {
-    let content = "";
-    try {
-      content = readFileSync(dotenvPath, "utf8");
-    } catch {
-      continue;
-    }
-    for (const rawLine of content.split(/\r?\n/)) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith("#") || !line.includes("=")) continue;
-      const index = line.indexOf("=");
-      const key = line.slice(0, index).trim();
-      if (!key.startsWith("RHEONIC_")) continue;
-      const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
-      if (!(key in process.env)) {
-        process.env[key] = value;
-      }
+  let content = "";
+  try {
+    content = readFileSync(explicitPath, "utf8");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`RHEONIC_ENV_FILE not found: ${explicitPath} (${message})`);
+  }
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#") || !line.includes("=")) continue;
+    const index = line.indexOf("=");
+    const key = line.slice(0, index).trim();
+    if (!key.startsWith("RHEONIC_")) continue;
+    const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
+    if (!(key in process.env)) {
+      process.env[key] = value;
     }
   }
 }
 
+function printConfigHint() {
+  console.log("  Run with Doppler: make demo-stg-node RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach");
+  console.log("  Or use a single explicit file: RHEONIC_ENV_FILE=.env.staging.demo node tests/e2e/node/demo.mjs");
+}
+
+function printUsageExamples() {
+  console.log("Example:");
+  console.log("  RHEONIC_PROVIDER=openai");
+  console.log("  RHEONIC_MODEL=gpt-4o-mini");
+  console.log("  RHEONIC_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all");
+  console.log("  RHEONIC_STEP_SLEEP_MS=200");
+  console.log("  RHEONIC_RETRY_STORM_COUNT=6");
+  console.log("  RHEONIC_LOOP_COUNT=7");
+  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=9000");
+  console.log("  RHEONIC_CAP_BREACH_TOKENS=4000");
+  console.log("  RHEONIC_REQ_CAP_BREACH_COUNT=6");
+  console.log("  RHEONIC_CAP_BREACH_REQ_TOKENS=1");
+  console.log("  RHEONIC_NEAR_CAP_TOKENS=3200");
+  console.log("  Optional snapshot/incident summary:");
+  console.log("  RHEONIC_AUTH_EMAIL=<email> RHEONIC_AUTH_PASSWORD=<password> RHEONIC_PROJECT_ID=<project_id>");
+  printConfigHint();
+}
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -105,23 +119,6 @@ async function sendEvent(client, provider, model, endpoint, totalTokens, feature
     event.error_type = options.errorType;
   }
   await client.captureEvent(event);
-}
-
-function printUsageExamples() {
-  console.log("Example:");
-  console.log("  RHEONIC_PROVIDER=openai");
-  console.log("  RHEONIC_MODEL=gpt-4o-mini");
-  console.log("  RHEONIC_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all");
-  console.log("  RHEONIC_STEP_SLEEP_MS=200");
-  console.log("  RHEONIC_RETRY_STORM_COUNT=6");
-  console.log("  RHEONIC_LOOP_COUNT=7");
-  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=9000");
-  console.log("  RHEONIC_CAP_BREACH_TOKENS=4000");
-  console.log("  RHEONIC_REQ_CAP_BREACH_COUNT=6");
-  console.log("  RHEONIC_CAP_BREACH_REQ_TOKENS=1");
-  console.log("  RHEONIC_NEAR_CAP_TOKENS=3200");
-  console.log("  Optional snapshot/incident summary:");
-  console.log("  RHEONIC_AUTH_EMAIL=<email> RHEONIC_AUTH_PASSWORD=<password> RHEONIC_PROJECT_ID=<project_id>");
 }
 
 async function runDemo() {

@@ -1,36 +1,28 @@
 import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, RHEONICBlockedError } from "../../../sdk-node/dist/index.js";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { DashboardSession } from "./dashboard_session.mjs";
 
 function loadRheonicEnvFromDotenv() {
-  const currentFile = fileURLToPath(import.meta.url);
-  const repoRoot = resolve(dirname(currentFile), "../../..");
-  const candidatePaths = [];
-  if ((process.env.RHEONIC_ENV_FILE ?? "").trim()) {
-    candidatePaths.push(process.env.RHEONIC_ENV_FILE.trim());
+  const explicitPath = (process.env.RHEONIC_ENV_FILE ?? "").trim();
+  if (!explicitPath) {
+    return;
   }
-  candidatePaths.push(resolve(repoRoot, ".env.staging.demo"));
-  candidatePaths.push(resolve(repoRoot, ".env"));
-
-  for (const dotenvPath of candidatePaths) {
-    let content = "";
-    try {
-      content = readFileSync(dotenvPath, "utf8");
-    } catch {
-      continue;
-    }
-    for (const rawLine of content.split(/\r?\n/)) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith("#") || !line.includes("=")) continue;
-      const index = line.indexOf("=");
-      const key = line.slice(0, index).trim();
-      if (!key.startsWith("RHEONIC_")) continue;
-      const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
-      if (!(key in process.env)) {
-        process.env[key] = value;
-      }
+  let content = "";
+  try {
+    content = readFileSync(explicitPath, "utf8");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`RHEONIC_ENV_FILE not found: ${explicitPath} (${message})`);
+  }
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#") || !line.includes("=")) continue;
+    const index = line.indexOf("=");
+    const key = line.slice(0, index).trim();
+    if (!key.startsWith("RHEONIC_")) continue;
+    const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
+    if (!(key in process.env)) {
+      process.env[key] = value;
     }
   }
 }
@@ -85,6 +77,11 @@ function extractUsedMaxTokens(payload) {
   const value = payload.max_tokens;
   if (typeof value === "number" && Number.isFinite(value)) return Math.floor(value);
   return null;
+}
+
+function printConfigHint() {
+  console.log("Run with Doppler: make protect-stg-node RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cooldown");
+  console.log("Or use a single explicit file: RHEONIC_ENV_FILE=.env.staging.demo node tests/e2e/node/demo_protect.mjs");
 }
 
 function assertLine(label, passed) {
@@ -179,18 +176,21 @@ async function main() {
   const ingestKey = process.env.RHEONIC_INGEST_KEY;
   if (!ingestKey) {
     console.error("RHEONIC_INGEST_KEY is required.");
+    printConfigHint();
     process.exit(1);
   }
 
   const provider = (process.env.RHEONIC_PROVIDER ?? "").trim().toLowerCase();
   if (!provider || !["openai", "anthropic", "google"].includes(provider)) {
     console.error("RHEONIC_PROVIDER is required (openai | anthropic | google).");
+    printConfigHint();
     process.exit(1);
   }
 
   const model = (process.env.RHEONIC_MODEL ?? "").trim();
   if (!model) {
     console.error(`RHEONIC_MODEL is required for provider ${provider}.`);
+    printConfigHint();
     process.exit(1);
   }
 

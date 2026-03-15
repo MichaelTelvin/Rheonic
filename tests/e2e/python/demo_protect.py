@@ -27,28 +27,21 @@ from dashboard_session import DashboardSession
 
 def _load_rheonic_env_from_dotenv() -> None:
     explicit_path = (os.getenv("RHEONIC_ENV_FILE") or "").strip()
-    candidate_paths = []
-    if explicit_path:
-        candidate_paths.append(Path(explicit_path))
-    candidate_paths.extend(
-        [
-            repo_root / ".env.staging.demo",
-            repo_root / ".env",
-        ]
-    )
-    for dotenv_path in candidate_paths:
-        if not dotenv_path.exists():
+    if not explicit_path:
+        return
+    dotenv_path = Path(explicit_path)
+    if not dotenv_path.exists():
+        raise FileNotFoundError(f"RHEONIC_ENV_FILE not found: {dotenv_path}")
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
             continue
-        for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            key = key.strip()
-            if not key.startswith("RHEONIC_"):
-                continue
-            if key not in os.environ:
-                os.environ[key] = value.strip().strip('"').strip("'")
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key.startswith("RHEONIC_"):
+            continue
+        if key not in os.environ:
+            os.environ[key] = value.strip().strip('"').strip("'")
 
 
 _load_rheonic_env_from_dotenv()
@@ -150,6 +143,11 @@ def _extract_used_max_tokens(payload: dict[str, Any] | None) -> int | None:
 
 def _assert_line(label: str, passed: bool) -> None:
     print(f"[ASSERT] {label}" if passed else f"[ASSERT] {label} (FAILED)")
+
+
+def _print_config_hint() -> None:
+    print("Run with Doppler: make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cooldown")
+    print("Or use a single explicit file: RHEONIC_ENV_FILE=.env.staging.demo python3 tests/e2e/python/demo_protect.py")
 
 
 def _make_openai_stub() -> Any:
@@ -313,16 +311,19 @@ def main() -> None:
     ingest_key = os.getenv("RHEONIC_INGEST_KEY")
     if not ingest_key:
         print("RHEONIC_INGEST_KEY is required")
+        _print_config_hint()
         sys.exit(1)
 
     provider = (os.getenv("RHEONIC_PROVIDER", "") or "").strip().lower()
     if provider not in {"openai", "anthropic", "google"}:
         print("RHEONIC_PROVIDER is required (openai | anthropic | google)")
+        _print_config_hint()
         sys.exit(1)
 
     model = (os.getenv("RHEONIC_MODEL", "") or "").strip()
     if not model:
         print(f"RHEONIC_MODEL is required for provider {provider}")
+        _print_config_hint()
         sys.exit(1)
 
     scenario = (os.getenv("RHEONIC_SCENARIO") or "allow").strip().lower()

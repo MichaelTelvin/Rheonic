@@ -1,4 +1,19 @@
-.PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e up-deps up-dev down-dev up-test down-test up-staging down-staging up-prod down-prod smoke-staging backend frontend sdk-node sdk-python e2e diagrams diagrams-check
+.PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e up-deps up-dev down-dev up-test down-test up-staging down-staging up-prod down-prod smoke-staging demo-stg-python demo-stg-node protect-stg-python protect-stg-node backend frontend sdk-node sdk-python e2e diagrams diagrams-check
+
+DOPPLER_DEMO_PROJECT ?= rheonic
+DOPPLER_DEMO_CONFIG ?= stgdemo
+RHEONIC_STEP_SLEEP_MS ?= 200
+RHEONIC_RETRY_STORM_COUNT ?= 6
+RHEONIC_LOOP_COUNT ?= 7
+RHEONIC_TOKEN_EXPLOSION_TOKENS ?= 9000
+RHEONIC_CAP_BREACH_TOKENS ?= 4000
+RHEONIC_REQ_CAP_BREACH_COUNT ?= 6
+RHEONIC_CAP_BREACH_REQ_TOKENS ?= 1
+RHEONIC_NEAR_CAP_TOKENS ?= 3200
+RHEONIC_MAX_TOKENS ?= 128
+RHEONIC_NEAR_CAP_SEED_TOKENS ?= 1600
+DEMO_STG_USAGE = make demo-stg-python RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach
+PROTECT_STG_USAGE = make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cooldown
 
 up-deps:
 	@docker compose up -d postgres redis
@@ -29,6 +44,18 @@ down-prod:
 
 smoke-staging:
 	@bash -lc "set -euo pipefail; bash deploy/staging_doppler.sh ps; bash deploy/staging_doppler.sh exec backend python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)\" >/dev/null; bash deploy/staging_doppler.sh exec backend python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2)\" >/dev/null; bash deploy/staging_doppler.sh logs --tail=80 backend worker scheduler"
+
+demo-stg-python:
+	@bash -lc 'set -euo pipefail; test -n "$(RHEONIC_PROVIDER)" || { echo "RHEONIC_PROVIDER is required. Example: $(DEMO_STG_USAGE)" >&2; exit 1; }; test -n "$(RHEONIC_MODEL)" || { echo "RHEONIC_MODEL is required. Example: $(DEMO_STG_USAGE)" >&2; exit 1; }; test -n "$(RHEONIC_DEMO_CASE)" || { echo "RHEONIC_DEMO_CASE is required. Example: $(DEMO_STG_USAGE)" >&2; exit 1; }; env DOPPLER_PROJECT="$(DOPPLER_DEMO_PROJECT)" DOPPLER_CONFIG="$(DOPPLER_DEMO_CONFIG)" RHEONIC_PROVIDER="$(RHEONIC_PROVIDER)" RHEONIC_MODEL="$(RHEONIC_MODEL)" RHEONIC_DEMO_CASE="$(RHEONIC_DEMO_CASE)" RHEONIC_STEP_SLEEP_MS="$(RHEONIC_STEP_SLEEP_MS)" RHEONIC_RETRY_STORM_COUNT="$(RHEONIC_RETRY_STORM_COUNT)" RHEONIC_LOOP_COUNT="$(RHEONIC_LOOP_COUNT)" RHEONIC_TOKEN_EXPLOSION_TOKENS="$(RHEONIC_TOKEN_EXPLOSION_TOKENS)" RHEONIC_CAP_BREACH_TOKENS="$(RHEONIC_CAP_BREACH_TOKENS)" RHEONIC_REQ_CAP_BREACH_COUNT="$(RHEONIC_REQ_CAP_BREACH_COUNT)" RHEONIC_CAP_BREACH_REQ_TOKENS="$(RHEONIC_CAP_BREACH_REQ_TOKENS)" RHEONIC_NEAR_CAP_TOKENS="$(RHEONIC_NEAR_CAP_TOKENS)" $(if $(RHEONIC_ENVIRONMENT),RHEONIC_ENVIRONMENT="$(RHEONIC_ENVIRONMENT)") $(if $(RHEONIC_DEBUG),RHEONIC_DEBUG="$(RHEONIC_DEBUG)") bash tests/e2e/run_stgdemo.sh python3 tests/e2e/python/demo.py'
+
+demo-stg-node:
+	@bash -lc 'set -euo pipefail; test -n "$(RHEONIC_PROVIDER)" || { echo "RHEONIC_PROVIDER is required. Example: make demo-stg-node RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach" >&2; exit 1; }; test -n "$(RHEONIC_MODEL)" || { echo "RHEONIC_MODEL is required. Example: make demo-stg-node RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach" >&2; exit 1; }; test -n "$(RHEONIC_DEMO_CASE)" || { echo "RHEONIC_DEMO_CASE is required. Example: make demo-stg-node RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach" >&2; exit 1; }; env DOPPLER_PROJECT="$(DOPPLER_DEMO_PROJECT)" DOPPLER_CONFIG="$(DOPPLER_DEMO_CONFIG)" RHEONIC_PROVIDER="$(RHEONIC_PROVIDER)" RHEONIC_MODEL="$(RHEONIC_MODEL)" RHEONIC_DEMO_CASE="$(RHEONIC_DEMO_CASE)" RHEONIC_STEP_SLEEP_MS="$(RHEONIC_STEP_SLEEP_MS)" RHEONIC_RETRY_STORM_COUNT="$(RHEONIC_RETRY_STORM_COUNT)" RHEONIC_LOOP_COUNT="$(RHEONIC_LOOP_COUNT)" RHEONIC_TOKEN_EXPLOSION_TOKENS="$(RHEONIC_TOKEN_EXPLOSION_TOKENS)" RHEONIC_CAP_BREACH_TOKENS="$(RHEONIC_CAP_BREACH_TOKENS)" RHEONIC_REQ_CAP_BREACH_COUNT="$(RHEONIC_REQ_CAP_BREACH_COUNT)" RHEONIC_CAP_BREACH_REQ_TOKENS="$(RHEONIC_CAP_BREACH_REQ_TOKENS)" RHEONIC_NEAR_CAP_TOKENS="$(RHEONIC_NEAR_CAP_TOKENS)" $(if $(RHEONIC_ENVIRONMENT),RHEONIC_ENVIRONMENT="$(RHEONIC_ENVIRONMENT)") $(if $(RHEONIC_DEBUG),RHEONIC_DEBUG="$(RHEONIC_DEBUG)") bash tests/e2e/run_stgdemo.sh node tests/e2e/node/demo.mjs'
+
+protect-stg-python:
+	@bash -lc 'set -euo pipefail; test -n "$(RHEONIC_PROVIDER)" || { echo "RHEONIC_PROVIDER is required. Example: $(PROTECT_STG_USAGE)" >&2; exit 1; }; test -n "$(RHEONIC_MODEL)" || { echo "RHEONIC_MODEL is required. Example: $(PROTECT_STG_USAGE)" >&2; exit 1; }; test -n "$(RHEONIC_SCENARIO)" || { echo "RHEONIC_SCENARIO is required. Example: $(PROTECT_STG_USAGE)" >&2; exit 1; }; env DOPPLER_PROJECT="$(DOPPLER_DEMO_PROJECT)" DOPPLER_CONFIG="$(DOPPLER_DEMO_CONFIG)" RHEONIC_PROVIDER="$(RHEONIC_PROVIDER)" RHEONIC_MODEL="$(RHEONIC_MODEL)" RHEONIC_SCENARIO="$(RHEONIC_SCENARIO)" RHEONIC_STEP_SLEEP_MS="$(RHEONIC_STEP_SLEEP_MS)" RHEONIC_RETRY_STORM_COUNT="$(RHEONIC_RETRY_STORM_COUNT)" RHEONIC_LOOP_COUNT="$(RHEONIC_LOOP_COUNT)" RHEONIC_TOKEN_EXPLOSION_TOKENS="$(RHEONIC_TOKEN_EXPLOSION_TOKENS)" RHEONIC_CAP_BREACH_TOKENS="$(RHEONIC_CAP_BREACH_TOKENS)" RHEONIC_REQ_CAP_BREACH_COUNT="$(RHEONIC_REQ_CAP_BREACH_COUNT)" RHEONIC_CAP_BREACH_REQ_TOKENS="$(RHEONIC_CAP_BREACH_REQ_TOKENS)" RHEONIC_MAX_TOKENS="$(RHEONIC_MAX_TOKENS)" RHEONIC_NEAR_CAP_SEED_TOKENS="$(RHEONIC_NEAR_CAP_SEED_TOKENS)" $(if $(RHEONIC_PROTECT_DECISION_TIMEOUT_MS),RHEONIC_PROTECT_DECISION_TIMEOUT_MS="$(RHEONIC_PROTECT_DECISION_TIMEOUT_MS)") $(if $(RHEONIC_ENVIRONMENT),RHEONIC_ENVIRONMENT="$(RHEONIC_ENVIRONMENT)") $(if $(RHEONIC_DEBUG),RHEONIC_DEBUG="$(RHEONIC_DEBUG)") bash tests/e2e/run_stgdemo.sh python3 tests/e2e/python/demo_protect.py'
+
+protect-stg-node:
+	@bash -lc 'set -euo pipefail; test -n "$(RHEONIC_PROVIDER)" || { echo "RHEONIC_PROVIDER is required. Example: make protect-stg-node RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cooldown" >&2; exit 1; }; test -n "$(RHEONIC_MODEL)" || { echo "RHEONIC_MODEL is required. Example: make protect-stg-node RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cooldown" >&2; exit 1; }; test -n "$(RHEONIC_SCENARIO)" || { echo "RHEONIC_SCENARIO is required. Example: make protect-stg-node RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cooldown" >&2; exit 1; }; env DOPPLER_PROJECT="$(DOPPLER_DEMO_PROJECT)" DOPPLER_CONFIG="$(DOPPLER_DEMO_CONFIG)" RHEONIC_PROVIDER="$(RHEONIC_PROVIDER)" RHEONIC_MODEL="$(RHEONIC_MODEL)" RHEONIC_SCENARIO="$(RHEONIC_SCENARIO)" RHEONIC_STEP_SLEEP_MS="$(RHEONIC_STEP_SLEEP_MS)" RHEONIC_RETRY_STORM_COUNT="$(RHEONIC_RETRY_STORM_COUNT)" RHEONIC_LOOP_COUNT="$(RHEONIC_LOOP_COUNT)" RHEONIC_TOKEN_EXPLOSION_TOKENS="$(RHEONIC_TOKEN_EXPLOSION_TOKENS)" RHEONIC_CAP_BREACH_TOKENS="$(RHEONIC_CAP_BREACH_TOKENS)" RHEONIC_REQ_CAP_BREACH_COUNT="$(RHEONIC_REQ_CAP_BREACH_COUNT)" RHEONIC_CAP_BREACH_REQ_TOKENS="$(RHEONIC_CAP_BREACH_REQ_TOKENS)" RHEONIC_MAX_TOKENS="$(RHEONIC_MAX_TOKENS)" RHEONIC_NEAR_CAP_SEED_TOKENS="$(RHEONIC_NEAR_CAP_SEED_TOKENS)" $(if $(RHEONIC_PROTECT_DECISION_TIMEOUT_MS),RHEONIC_PROTECT_DECISION_TIMEOUT_MS="$(RHEONIC_PROTECT_DECISION_TIMEOUT_MS)") $(if $(RHEONIC_ENVIRONMENT),RHEONIC_ENVIRONMENT="$(RHEONIC_ENVIRONMENT)") $(if $(RHEONIC_DEBUG),RHEONIC_DEBUG="$(RHEONIC_DEBUG)") bash tests/e2e/run_stgdemo.sh node tests/e2e/node/demo_protect.mjs'
 
 ifneq ($(filter backend frontend sdk-node sdk-python test-backend test-frontend test-sdk-node test-sdk-python,$(MAKECMDGOALS)),)
 test:

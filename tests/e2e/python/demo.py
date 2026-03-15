@@ -21,28 +21,21 @@ from dashboard_session import DashboardSession
 
 def _load_rheonic_env_from_dotenv() -> None:
     explicit_path = (os.getenv("RHEONIC_ENV_FILE") or "").strip()
-    candidate_paths = []
-    if explicit_path:
-        candidate_paths.append(Path(explicit_path))
-    candidate_paths.extend(
-        [
-            repo_root / ".env.staging.demo",
-            repo_root / ".env",
-        ]
-    )
-    for dotenv_path in candidate_paths:
-        if not dotenv_path.exists():
+    if not explicit_path:
+        return
+    dotenv_path = Path(explicit_path)
+    if not dotenv_path.exists():
+        raise FileNotFoundError(f"RHEONIC_ENV_FILE not found: {dotenv_path}")
+    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
             continue
-        for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            key = key.strip()
-            if not key.startswith("RHEONIC_"):
-                continue
-            if key not in os.environ:
-                os.environ[key] = value.strip().strip('"').strip("'")
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key.startswith("RHEONIC_"):
+            continue
+        if key not in os.environ:
+            os.environ[key] = value.strip().strip('"').strip("'")
 
 
 def _send_event(
@@ -195,6 +188,8 @@ def _usage() -> None:
     print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
     print("  RHEONIC_NEAR_CAP_TOKENS=3200")
     print("  Optional snapshot/incident summary: RHEONIC_AUTH_EMAIL, RHEONIC_AUTH_PASSWORD, RHEONIC_PROJECT_ID")
+    print("  Run with Doppler: make demo-stg-python RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach")
+    print("  Or use a single explicit file: RHEONIC_ENV_FILE=.env.staging.demo python3 tests/e2e/python/demo.py")
 
 
 def main() -> None:
