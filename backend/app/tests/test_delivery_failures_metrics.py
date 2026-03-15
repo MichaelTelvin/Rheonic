@@ -117,3 +117,66 @@ def test_get_delivery_failures_counts_failed_and_dead_and_ignores_delivered(tmp_
     assert payload["count"] == 2
     assert payload["last_attempt_at"] is not None
     assert str(payload["last_attempt_at"]).startswith("2026-03-05T12:00:08")
+
+
+def test_get_delivery_failures_ignores_webhook_tests(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/delivery_failures_metrics_ignore_test.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    outbox_repo = TransportOutboxRepositoryImpl(session_factory=session_factory)
+
+    base = datetime(2026, 3, 5, 12, 0, 0, tzinfo=timezone.utc)
+    test_row, _ = outbox_repo.create_or_get_deduped(
+        project_id="p1",
+        kind="webhook",
+        event_type="webhook.test",
+        destination="https://example.test/hook",
+        subject=None,
+        template=None,
+        payload={"event": "webhook.test"},
+        dedupe_key="webhook-test-row",
+        max_attempts=1,
+        now=base,
+    )
+    real_row, _ = outbox_repo.create_or_get_deduped(
+        project_id="p1",
+        kind="webhook",
+        event_type="incident.warn",
+        destination="https://example.test/hook",
+        subject=None,
+        template=None,
+        payload={"event": "incident.warn"},
+        dedupe_key="real-webhook-row",
+        max_attempts=1,
+        now=base + timedelta(seconds=1),
+    )
+
+    outbox_repo.claim_for_send(outbox_id=test_row.id, now=base + timedelta(seconds=2))
+    outbox_repo.mark_failed(
+        outbox_id=test_row.id,
+        now=base + timedelta(seconds=3),
+        error_code="timeout",
+        error_message="timed out",
+        next_attempt_at=None,
+        dead=True,
+    )
+    outbox_repo.claim_for_send(outbox_id=real_row.id, now=base + timedelta(seconds=4))
+    outbox_repo.mark_failed(
+        outbox_id=real_row.id,
+        now=base + timedelta(seconds=5),
+        error_code="webhook_http_error",
+        error_message="HTTP 500",
+        next_attempt_at=None,
+        dead=True,
+    )
+
+    service = MetricsService(
+        realtime_counters=_FakeRealtimeCounters(),
+        protect_action_store=_FakeProtectActionStore(),
+        project_repository=_FakeProjectRepository(),
+        transport_outbox_repository=outbox_repo,
+    )
+
+    payload = service.get_delivery_failures(project_id="p1", kind="webhook")
+    assert payload["count"] == 1
+    assert str(payload["last_attempt_at"]).startswith("2026-03-05T12:00:05")

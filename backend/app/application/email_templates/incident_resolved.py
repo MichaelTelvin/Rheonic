@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from app.application.email_templates.base_layout import format_timestamp, render_base_email
+from app.application.email_templates.base_layout import format_timestamp, humanize_incident_type, render_base_email
 
 
 def render_incident_resolved(payload: dict[str, object]) -> dict[str, str]:
     project_id = str(payload.get("project_id") or "-")
     incident_id = str(payload.get("incident_id") or "-")
-    incident_type = str(payload.get("incident_type") or "-")
+    incident_type = humanize_incident_type(payload.get("incident_type"))
     resolved_by = str(payload.get("resolved_by") or "-")
     resolved_at = format_timestamp(payload.get("resolved_at"))
     created_at = format_timestamp(payload.get("created_at"))
@@ -35,7 +35,7 @@ def render_incident_resolved(payload: dict[str, object]) -> dict[str, str]:
         ],
     )
     return {
-        "subject": f"[Rheonic] incident.resolved {incident_type} ({project_id})",
+        "subject": f"[Rheonic] Resolved: {incident_type} ({project_id})",
         "html": rendered["html"],
         "text": rendered["text"],
     }

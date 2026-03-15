@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
     fetchIncidents: vi.fn(),
     fetchProjectProviders: vi.fn(),
     fetchProtectMetrics: vi.fn(),
+    fetchDeliveryFailures: vi.fn(),
     listKeys: vi.fn(),
     resolveIncident: vi.fn(),
     useProjectContext: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock("../api/client", () => {
     fetchIncidents: (...args: unknown[]) => mocks.fetchIncidents(...args),
     fetchProjectProviders: (...args: unknown[]) => mocks.fetchProjectProviders(...args),
     fetchProtectMetrics: (...args: unknown[]) => mocks.fetchProtectMetrics(...args),
+    fetchDeliveryFailures: (...args: unknown[]) => mocks.fetchDeliveryFailures(...args),
     listKeys: (...args: unknown[]) => mocks.listKeys(...args),
     resolveIncident: (...args: unknown[]) => mocks.resolveIncident(...args),
   };
@@ -51,6 +53,7 @@ describe("Dashboard", () => {
     mocks.fetchIncidents.mockReset();
     mocks.fetchProjectProviders.mockReset();
     mocks.fetchProtectMetrics.mockReset();
+    mocks.fetchDeliveryFailures.mockReset();
     mocks.listKeys.mockReset();
     mocks.resolveIncident.mockReset();
     mocks.useProjectContext.mockReset();
@@ -73,6 +76,7 @@ describe("Dashboard", () => {
       decision_latency_p95_60m_ms: null,
       last: null,
     });
+    mocks.fetchDeliveryFailures.mockResolvedValue({ count: 0, last_attempt_at: null });
     mocks.listKeys.mockResolvedValue([{ id: "k1", name: "Key", status: "active" }]);
   });
 
@@ -222,5 +226,19 @@ describe("Dashboard", () => {
     expect(screen.queryByRole("button", { name: "Keys" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Alerts" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Enable protection" })).toBeNull();
+  });
+
+  it("shows dismissible webhook issue banner with updated action copy", async () => {
+    mocks.fetchDeliveryFailures.mockResolvedValue({ count: 2, last_attempt_at: "2026-03-15T18:00:00Z" });
+    render(
+      <TestRouter>
+        <Dashboard />
+      </TestRouter>,
+    );
+
+    expect(await screen.findByText("Webhook delivery issues")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Check URL" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    await waitFor(() => expect(screen.queryByText("Webhook delivery issues")).toBeNull());
   });
 });

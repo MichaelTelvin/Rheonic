@@ -311,6 +311,14 @@ def _build_email_transport(*, settings: Settings):
 
 
 def _enqueue_webhook_failure_email(*, outbox, settings: Settings) -> None:
+    if outbox.event_type == "webhook.test":
+        logger.info(
+            "Skipping webhook failure email for webhook test [outbox_id=%s project_id=%s]",
+            outbox.id,
+            outbox.project_id,
+            extra={"outbox_id": outbox.id, "project_id": outbox.project_id, "event_type": outbox.event_type},
+        )
+        return
     project_repository = ProjectRepositoryImpl(session_factory=DatabaseSessionFactory())
     project = project_repository.get_project(outbox.project_id)
     if project is None or not project.protect_enabled or not project.webhook_enabled or not project.email_enabled:

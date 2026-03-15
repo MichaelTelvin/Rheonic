@@ -48,20 +48,26 @@ export function Alerts(): JSX.Element {
   const [webhookTesting, setWebhookTesting] = useState<boolean>(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
   const [protectEnabled, setProtectEnabled] = useState<boolean>(false);
+  const [loadingSettings, setLoadingSettings] = useState<boolean>(true);
   const accountEmail = user?.email ?? "your account email";
 
   const reloadWebhookSettings = async (preserveInputs = false): Promise<void> => {
     if (!projectId) {
       return;
     }
-    const [settings, protectSettings] = await Promise.all([fetchProjectWebhook(projectId), fetchProjectProtect(projectId)]);
-    setWebhookSettings(settings);
-    setProtectEnabled(Boolean(protectSettings.protect_enabled));
-    if (!preserveInputs) {
-      setWebhookEnabledInput(settings.enabled);
-      setEmailEnabledInput(Boolean(settings.email_enabled));
-      setWebhookUrlInput(settings.url ?? "");
-      setWebhookSecretInput("");
+    setLoadingSettings(true);
+    try {
+      const [settings, protectSettings] = await Promise.all([fetchProjectWebhook(projectId), fetchProjectProtect(projectId)]);
+      setWebhookSettings(settings);
+      setProtectEnabled(Boolean(protectSettings.protect_enabled));
+      if (!preserveInputs) {
+        setWebhookEnabledInput(settings.enabled);
+        setEmailEnabledInput(Boolean(settings.email_enabled));
+        setWebhookUrlInput(settings.url ?? "");
+        setWebhookSecretInput("");
+      }
+    } finally {
+      setLoadingSettings(false);
     }
   };
 
@@ -70,11 +76,13 @@ export function Alerts(): JSX.Element {
       setWebhookSettings(null);
       setWebhookError(null);
       setProtectEnabled(false);
+      setLoadingSettings(false);
       return;
     }
 
     let cancelled = false;
     const loadSettings = async (): Promise<void> => {
+      setLoadingSettings(true);
       try {
         const [settings, protectSettings] = await Promise.all([
           fetchProjectWebhook(projectId),
@@ -94,6 +102,10 @@ export function Alerts(): JSX.Element {
         if (!cancelled) {
           setWebhookSettings(null);
           setWebhookError(error instanceof Error ? error.message : "Failed to load webhook settings.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingSettings(false);
         }
       }
     };
@@ -230,6 +242,20 @@ export function Alerts(): JSX.Element {
         <div className="dashboard-content page-stack">
           <h1 className="page-title">Alerts</h1>
           <section className="empty">Select a project to configure webhook alerts.</section>
+        </div>
+      </main>
+    );
+  }
+
+  if (loadingSettings && webhookSettings === null) {
+    return (
+      <main className="dashboard">
+        <div className="dashboard-content page-stack alerts-page-stack">
+          <section>
+            <h1 className="page-title">Alerts</h1>
+            <p className="page-subtitle">Configure protect lifecycle alert routes for email and webhook delivery</p>
+          </section>
+          <section className="empty">Loading alert settings...</section>
         </div>
       </main>
     );

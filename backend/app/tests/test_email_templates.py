@@ -1,4 +1,5 @@
 from app.application.email_templates.base_layout import format_timestamp
+from app.application.email_templates.base_layout import format_evidence, humanize_incident_type
 from app.application.email_templates.registry import render_template
 import pytest
 
@@ -8,6 +9,19 @@ def test_format_timestamp_renders_human_readable_utc() -> None:
     assert format_timestamp("2026-03-05T10:00:00+00:00") == "Mar 05, 2026 10:00 UTC"
     assert format_timestamp("") == "-"
     assert format_timestamp(None) == "-"
+
+
+def test_email_template_helpers_render_human_readable_values() -> None:
+    assert humanize_incident_type("retry_storm") == "Retry storm"
+    assert humanize_incident_type("cap_breach") == "Cap breach"
+    evidence_copy = format_evidence({
+        "count": 1,
+        "provider": "openai",
+        "last_seen_at": "2026-03-15T18:28:46.668971+00:00",
+    })
+    assert "Count: 1" in evidence_copy
+    assert "Provider: openai" in evidence_copy
+    assert "Last Seen At: Mar 15, 2026 18:28 UTC" in evidence_copy
 
 
 def test_feedback_template_snapshot_is_deterministic() -> None:
@@ -46,7 +60,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "sent_at": "2026-03-05T10:01:10Z",
                 "evidence": {"count": 3, "window_seconds": 60},
             },
-            "[Rheonic] incident.warn retry_storm (p1)",
+            "[Rheonic] Warning: Retry storm (p1)",
             "Incident warning opened",
             "Action: Warn",
         ),
@@ -83,7 +97,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "environment": "prod",
                 "sent_at": "2026-03-05T10:04:01Z",
             },
-            "[Rheonic] incident.resolved loop_suspect (p3)",
+            "[Rheonic] Resolved: Loop suspect (p3)",
             "Incident resolved",
             "Resolved by: auto",
         ),
@@ -115,6 +129,39 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
         assert "Protect alert" in rendered["html"]
         assert "UTC" in rendered["text"]
         assert render_template(template, payload) == rendered
+
+    warn_rendered = render_template(
+        "incident_warn",
+        {
+            "project_id": "p1",
+            "incident_id": "inc-1",
+            "incident_type": "retry_storm",
+            "provider": "openai",
+            "created_at": "2026-03-05T10:00:00Z",
+            "last_seen_at": "2026-03-05T10:01:00Z",
+            "sent_at": "2026-03-05T10:01:10Z",
+            "evidence": {
+                "count": 1,
+                "environment": "staging-test",
+                "estimated_next_tokens": 50,
+                "failure_count": 5,
+                "last_seen_at": "2026-03-15T18:28:46.668971+00:00",
+                "model": "gpt-4o-mini",
+                "provider": "openai",
+                "reason": "retry_storm",
+                "req_cap": 400,
+                "requests_60s": 5,
+                "threshold_count": 5,
+                "tok_cap": 1700,
+                "tokens_60s": 250,
+                "window_seconds": 60,
+            },
+        },
+    )
+    assert "Incident type: Retry storm" in warn_rendered["text"]
+    assert "Evidence: Reason: retry_storm" in warn_rendered["text"]
+    assert "Estimated Next Tokens: 50" in warn_rendered["text"]
+    assert "Last Seen At: Mar 15, 2026 18:28 UTC" in warn_rendered["text"]
 
 
 def test_removed_templates_are_not_registered() -> None:

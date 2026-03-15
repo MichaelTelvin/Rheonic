@@ -45,6 +45,8 @@ All API paths remain under `/api/v1/...`.
 3. Expected:
 - Decision response `warn` and reason `near_cap`.
 - Provider call still succeeds.
+- Dashboard shows a visible `near_cap` incident.
+- No customer email is sent just for the near-cap warning path.
 
 ### 3a) Protect near-cap clamp OFF
 1. Set mode Protect and disable Auto token clamp in Settings.
@@ -89,6 +91,14 @@ Expected:
 - Provider call still succeeds.
 - Webhook event `decision.warn` is dispatched in protect mode.
 - No customer email is sent for `decision.warn` alone.
+
+### 5a) Webhook test should not create delivery-failure alerts
+1. Save a failing webhook URL in Alerts.
+2. Click `Test webhook`.
+3. Expected:
+- Alerts page shows the test result.
+- Dashboard does not show the webhook delivery issues banner because test sends are excluded.
+- No `webhook.delivery_failed` customer email is sent for the test failure alone.
 
 ### 6) Incident lifecycle
 1. Trigger an incident type in observe or protect mode.

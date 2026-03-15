@@ -166,17 +166,19 @@ class TransportOutboxRepositoryImpl(TransportOutboxRepository):
         *,
         project_id: str,
         kind: Literal["webhook", "email"],
+        exclude_event_types: tuple[str, ...] = (),
     ) -> TransportOutbox | None:
         try:
             with self._session_factory.create_session() as session:
-                record = (
+                query = (
                     session.query(TransportOutboxRecord)
                     .filter(TransportOutboxRecord.project_id == project_id)
                     .filter(TransportOutboxRecord.kind == kind)
                     .filter(TransportOutboxRecord.status.in_(["delivered", "failed", "dead"]))
-                    .order_by(TransportOutboxRecord.updated_at.desc())
-                    .first()
                 )
+                if exclude_event_types:
+                    query = query.filter(~TransportOutboxRecord.event_type.in_(exclude_event_types))
+                record = query.order_by(TransportOutboxRecord.updated_at.desc()).first()
                 if record is None:
                     return None
                 return _to_domain(record)
@@ -192,16 +194,19 @@ class TransportOutboxRepositoryImpl(TransportOutboxRepository):
         *,
         project_id: str,
         kind: Literal["webhook", "email"],
+        exclude_event_types: tuple[str, ...] = (),
     ) -> int:
         try:
             with self._session_factory.create_session() as session:
-                return int(
+                query = (
                     session.query(TransportOutboxRecord)
                     .filter(TransportOutboxRecord.project_id == project_id)
                     .filter(TransportOutboxRecord.kind == kind)
                     .filter(TransportOutboxRecord.status.in_(["failed", "dead"]))
-                    .count()
                 )
+                if exclude_event_types:
+                    query = query.filter(~TransportOutboxRecord.event_type.in_(exclude_event_types))
+                return int(query.count())
         except Exception:
             logger.exception(
                 "Failed counting failed/dead outbox rows",

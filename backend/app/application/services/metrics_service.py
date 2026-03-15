@@ -131,13 +131,18 @@ class MetricsService:
     def get_delivery_failures(self, *, project_id: str, kind: Literal["webhook", "email"] = "webhook") -> dict[str, object]:
         if self._transport_outbox_repository is None:
             return {"count": 0, "last_attempt_at": None}
+        # Delivery-health cards should reflect real alert dispatches, not
+        # ad hoc webhook test probes triggered from the settings screen.
+        exclude_event_types = ("webhook.test",) if kind == "webhook" else ()
         count = self._transport_outbox_repository.count_failed_or_dead_by_project_kind(
             project_id=project_id,
             kind=kind,
+            exclude_event_types=exclude_event_types,
         )
         latest = self._transport_outbox_repository.get_latest_terminal_by_project_kind(
             project_id=project_id,
             kind=kind,
+            exclude_event_types=exclude_event_types,
         )
         last_attempt_at = None
         if latest is not None and latest.status in {"failed", "dead"}:

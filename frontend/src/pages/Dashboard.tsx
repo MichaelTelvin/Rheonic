@@ -132,8 +132,10 @@ export function Dashboard(): JSX.Element {
   const [setupStatusResolved, setSetupStatusResolved] = useState<boolean>(initialDashboardState?.setupStatusResolved ?? false);
   const [setupBannerDismissed, setSetupBannerDismissed] = useState<boolean>(false);
   const [webhookIssue, setWebhookIssue] = useState<{ count: number; lastAt: string | null } | null>(null);
+  const [webhookIssueDismissedToken, setWebhookIssueDismissedToken] = useState<string | null>(null);
 
   const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
+  const webhookIssueDismissStorageKey = useMemo<string>(() => `rheonic:webhookIssueDismissed:${projectId ?? "none"}`, [projectId]);
   const setupStage = useMemo<SetupStage>(() => {
     if (loadingProjects) {
       return "checking";
@@ -157,6 +159,8 @@ export function Dashboard(): JSX.Element {
   }, [hasEvents, hasIngestKey, loadingProjects, projectId, projects.length, setupStatusResolved]);
   const isSetupComplete = setupStage === "complete";
   const showSetupBanner = !loadingProjects && setupStage !== "complete" && !setupBannerDismissed;
+  const webhookIssueToken = webhookIssue ? `${webhookIssue.lastAt ?? "none"}:${webhookIssue.count}` : null;
+  const showWebhookIssueBanner = Boolean(projectId && webhookIssue && webhookIssueToken !== webhookIssueDismissedToken);
 
   const incidentSummary = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -185,6 +189,7 @@ export function Dashboard(): JSX.Element {
     setHasEvents(cached?.hasEvents ?? false);
     setSetupStatusResolved(cached?.setupStatusResolved ?? false);
     setWebhookIssue(null);
+    setWebhookIssueDismissedToken(null);
     setLastMetricsSuccessAt(cached?.lastMetricsSuccessAt ?? null);
   }, [projectId]);
 
@@ -209,6 +214,11 @@ export function Dashboard(): JSX.Element {
     const dismissed = window.localStorage.getItem(setupDismissStorageKey) === "1";
     setSetupBannerDismissed(dismissed);
   }, [setupDismissStorageKey]);
+
+  useEffect(() => {
+    const dismissed = window.localStorage.getItem(webhookIssueDismissStorageKey);
+    setWebhookIssueDismissedToken(dismissed);
+  }, [webhookIssueDismissStorageKey]);
 
   useEffect(() => {
     if (setupStage !== "complete") {
@@ -267,6 +277,14 @@ export function Dashboard(): JSX.Element {
     window.localStorage.setItem(setupDismissStorageKey, "1");
     setSetupBannerDismissed(true);
   }, [setupDismissStorageKey]);
+
+  const dismissWebhookIssueBanner = useCallback((): void => {
+    if (!webhookIssueToken) {
+      return;
+    }
+    window.localStorage.setItem(webhookIssueDismissStorageKey, webhookIssueToken);
+    setWebhookIssueDismissedToken(webhookIssueToken);
+  }, [webhookIssueDismissStorageKey, webhookIssueToken]);
 
   const setupBannerContent = useMemo<{
     title: string;
@@ -671,7 +689,7 @@ export function Dashboard(): JSX.Element {
           </section>
         ) : null}
 
-        {projectId && webhookIssue ? (
+        {showWebhookIssueBanner ? (
           <Card className="dashboard-alert-card">
             <h2 className="card-title">Webhook delivery issues</h2>
             <p className="subtle">
@@ -680,7 +698,10 @@ export function Dashboard(): JSX.Element {
             </p>
             <div className="modal-actions form-actions">
               <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
-                Open Alerts
+                Check URL
+              </button>
+              <button type="button" className="modal-button" onClick={dismissWebhookIssueBanner}>
+                Dismiss
               </button>
             </div>
           </Card>

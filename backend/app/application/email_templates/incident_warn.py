@@ -1,20 +1,23 @@
 from __future__ import annotations
 
-import json
-
-from app.application.email_templates.base_layout import format_timestamp, render_base_email
+from app.application.email_templates.base_layout import (
+    format_evidence,
+    format_timestamp,
+    humanize_incident_type,
+    render_base_email,
+)
 
 
 def render_incident_warn(payload: dict[str, object]) -> dict[str, str]:
     project_id = str(payload.get("project_id") or "-")
     incident_id = str(payload.get("incident_id") or "-")
-    incident_type = str(payload.get("incident_type") or "-")
+    incident_type = humanize_incident_type(payload.get("incident_type"))
     provider = str(payload.get("provider") or "-")
     created_at = format_timestamp(payload.get("created_at"))
     last_seen_at = format_timestamp(payload.get("last_seen_at"))
     sent_at = format_timestamp(payload.get("sent_at"))
     evidence = payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
-    evidence_json = json.dumps(evidence, sort_keys=True, separators=(",", ":"))
+    evidence_copy = format_evidence(evidence)
 
     rendered = render_base_email(
         eyebrow="Protect alert",
@@ -29,11 +32,11 @@ def render_incident_warn(payload: dict[str, object]) -> dict[str, str]:
             ("Created at", created_at),
             ("Last seen at", last_seen_at),
             ("Sent at", sent_at),
-            ("Evidence", evidence_json),
+            ("Evidence", evidence_copy),
         ],
     )
     return {
-        "subject": f"[Rheonic] incident.warn {incident_type} ({project_id})",
+        "subject": f"[Rheonic] Warning: {incident_type} ({project_id})",
         "html": rendered["html"],
         "text": rendered["text"],
     }

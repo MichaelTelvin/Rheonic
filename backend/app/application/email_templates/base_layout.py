@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from html import escape
+import json
 
 
 def format_timestamp(value: object) -> str:
@@ -18,6 +19,61 @@ def format_timestamp(value: object) -> str:
     return parsed.astimezone(timezone.utc).strftime("%b %d, %Y %H:%M UTC")
 
 
+def humanize_incident_type(value: object) -> str:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return "-"
+    mapping = {
+        "cap_breach": "Cap breach",
+        "near_cap": "Near cap",
+        "retry_storm": "Retry storm",
+        "loop_suspect": "Loop suspect",
+        "token_explosion": "Token explosion",
+    }
+    return mapping.get(normalized, normalized.replace("_", " ").replace("-", " ").title())
+
+
+def format_evidence(value: object) -> str:
+    if not isinstance(value, dict) or not value:
+        return "-"
+    preferred_order = [
+        "reason",
+        "count",
+        "failure_count",
+        "threshold_count",
+        "window_seconds",
+        "requests_60s",
+        "tokens_60s",
+        "estimated_next_tokens",
+        "req_cap",
+        "tok_cap",
+        "provider",
+        "model",
+        "environment",
+        "last_seen_at",
+    ]
+    seen: set[str] = set()
+    lines: list[str] = []
+    for key in preferred_order + sorted(str(item) for item in value.keys()):
+        if key in seen or key not in value:
+            continue
+        seen.add(key)
+        raw = value.get(key)
+        if raw is None:
+            continue
+        label = key.replace("_", " ").title()
+        if key.endswith("_at"):
+            rendered = format_timestamp(raw)
+        elif isinstance(raw, bool):
+            rendered = "Yes" if raw else "No"
+        elif isinstance(raw, (dict, list)):
+            rendered = json.dumps(raw, sort_keys=True)
+        else:
+            rendered = str(raw)
+        lines.append(f"{label}: {rendered}")
+    return "\n".join(lines) if lines else "-"
+
+
 def render_base_email(*, eyebrow: str, title: str, subtitle: str, fields: list[tuple[str, str]]) -> dict[str, str]:
     safe_title = escape(title)
     safe_subtitle = escape(subtitle)
@@ -27,7 +83,7 @@ def render_base_email(*, eyebrow: str, title: str, subtitle: str, fields: list[t
     rows_html = "".join(
         "<tr>"
         f"<td style=\"padding:10px 14px;vertical-align:top;font:600 12px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#667085;text-transform:uppercase;letter-spacing:0.04em;border-top:1px solid #eaecf0;white-space:nowrap;\">{escape(label)}</td>"
-        f"<td style=\"padding:10px 14px;vertical-align:top;font:400 14px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#101828;border-top:1px solid #eaecf0;\">{escape(value)}</td>"
+        f"<td style=\"padding:10px 14px;vertical-align:top;font:400 14px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#101828;border-top:1px solid #eaecf0;white-space:pre-wrap;\">{escape(value).replace(chr(10), '<br/>')}</td>"
         "</tr>"
         for label, value in normalized_fields
     )
@@ -37,7 +93,14 @@ def render_base_email(*, eyebrow: str, title: str, subtitle: str, fields: list[t
         "<div style=\"margin:0;padding:32px 16px;\">"
         "<div style=\"max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e4e7ec;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(16,24,40,0.08);\">"
         "<div style=\"padding:28px 28px 18px;background:linear-gradient(135deg,#101828 0%,#1d2939 100%);\">"
-        "<div style=\"font:700 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#cbd5e1;\">Rheonic</div>"
+        "<div style=\"display:flex;align-items:center;gap:10px;\">"
+        "<span style=\"display:inline-block;position:relative;width:24px;height:24px;border:2px solid #8da2ff;border-radius:7px;box-sizing:border-box;\">"
+        "<span style=\"position:absolute;left:3px;top:9px;width:7px;height:2px;background:#8da2ff;border-radius:2px;\"></span>"
+        "<span style=\"position:absolute;right:3px;top:9px;width:7px;height:2px;background:#8da2ff;border-radius:2px;\"></span>"
+        "<span style=\"position:absolute;left:7px;top:7px;width:6px;height:6px;border:2px solid #8da2ff;border-radius:50%;\"></span>"
+        "</span>"
+        "<span style=\"font:700 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#cbd5e1;\">Rheonic</span>"
+        "</div>"
         f"<div style=\"margin-top:12px;font:600 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#f59e0b;\">{safe_eyebrow}</div>"
         f"<h1 style=\"margin:10px 0 0;font:700 30px/1.15 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#ffffff;\">{safe_title}</h1>"
         f"<p style=\"margin:14px 0 0;font:400 15px/1.7 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#d0d5dd;\">{safe_subtitle}</p>"
