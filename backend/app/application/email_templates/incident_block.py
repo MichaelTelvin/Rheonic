@@ -1,6 +1,17 @@
 from __future__ import annotations
 
-from app.application.email_templates.base_layout import render_base_email
+from app.application.email_templates.base_layout import format_timestamp, render_base_email
+
+
+def _reason_copy(reason: str) -> tuple[str, str]:
+    normalized = (reason or "").strip().lower()
+    if normalized == "tok_cap_breach":
+        return "Token cap exceeded", "The project crossed its configured token limit."
+    if normalized == "req_cap_breach":
+        return "Request cap exceeded", "The project crossed its configured request-rate limit."
+    if normalized == "cooldown_active":
+        return "Cooldown active", "Protect is still in the cooldown window from a previous block."
+    return normalized or "-", "Protect blocked provider traffic because a project cap was exceeded."
 
 
 def render_incident_block(payload: dict[str, object]) -> dict[str, str]:
@@ -11,25 +22,34 @@ def render_incident_block(payload: dict[str, object]) -> dict[str, str]:
     tokens_60s = str(payload.get("tokens_60s") or "-")
     req_cap = str(payload.get("req_cap") or "-")
     tok_cap = str(payload.get("tok_cap") or "-")
-    sent_at = str(payload.get("sent_at") or "-")
+    blocked_until = format_timestamp(payload.get("blocked_until"))
+    retry_after_seconds = payload.get("retry_after_seconds")
+    sent_at = format_timestamp(payload.get("sent_at"))
+    reason_title, reason_subtitle = _reason_copy(reason)
+    retry_after_copy = "-"
+    if isinstance(retry_after_seconds, int) and retry_after_seconds > 0:
+        retry_after_copy = f"{retry_after_seconds} seconds"
 
     rendered = render_base_email(
-        title="incident.block",
-        subtitle="Protect preflight blocked provider traffic.",
+        eyebrow="Protect alert",
+        title="Provider traffic blocked",
+        subtitle=reason_subtitle,
         fields=[
-            ("project_id", project_id),
-            ("provider", provider),
-            ("reason", reason),
-            ("requests_60s", requests_60s),
-            ("tokens_60s", tokens_60s),
-            ("req_cap", req_cap),
-            ("tok_cap", tok_cap),
-            ("sent_at", sent_at),
+            ("Project ID", project_id),
+            ("Provider", provider),
+            ("Action", "Blocked"),
+            ("Reason", reason_title),
+            ("Requests / 60s", requests_60s),
+            ("Tokens / 60s", tokens_60s),
+            ("Request cap", req_cap),
+            ("Token cap", tok_cap),
+            ("Blocked until", blocked_until),
+            ("Retry after", retry_after_copy),
+            ("Sent at", sent_at),
         ],
     )
     return {
-        "subject": f"[Rheonic] incident.block {reason} ({project_id})",
+        "subject": f"[Rheonic] Blocked: {reason_title} ({project_id})",
         "html": rendered["html"],
         "text": rendered["text"],
     }
-

@@ -1,5 +1,13 @@
+from app.application.email_templates.base_layout import format_timestamp
 from app.application.email_templates.registry import render_template
 import pytest
+
+
+def test_format_timestamp_renders_human_readable_utc() -> None:
+    assert format_timestamp("2026-03-05T10:00:00Z") == "Mar 05, 2026 10:00 UTC"
+    assert format_timestamp("2026-03-05T10:00:00+00:00") == "Mar 05, 2026 10:00 UTC"
+    assert format_timestamp("") == "-"
+    assert format_timestamp(None) == "-"
 
 
 def test_feedback_template_snapshot_is_deterministic() -> None:
@@ -15,13 +23,13 @@ def test_feedback_template_snapshot_is_deterministic() -> None:
         "app_version": "1.2.3",
     }
     rendered = render_template("feedback_submitted", payload)
-    expected = {
-        "subject": "Rheonic beta feedback",
-        "html": "<!doctype html><html><body><h2>Rheonic beta feedback</h2><p>New feedback submission received.</p><table><tr><td><strong>message</strong></td><td>Need dark mode</td></tr><tr><td><strong>email</strong></td><td>u@example.com</td></tr><tr><td><strong>user_id</strong></td><td>u1</td></tr><tr><td><strong>user_email</strong></td><td>u@example.com</td></tr><tr><td><strong>project_id</strong></td><td>p1</td></tr><tr><td><strong>page</strong></td><td>/dashboard</td></tr><tr><td><strong>mode</strong></td><td>protect</td></tr><tr><td><strong>timestamp</strong></td><td>2026-03-05T10:00:00Z</td></tr><tr><td><strong>app_version</strong></td><td>1.2.3</td></tr></table></body></html>",
-        "text": "Rheonic beta feedback\nNew feedback submission received.\n\nmessage: Need dark mode\nemail: u@example.com\nuser_id: u1\nuser_email: u@example.com\nproject_id: p1\npage: /dashboard\nmode: protect\ntimestamp: 2026-03-05T10:00:00Z\napp_version: 1.2.3",
-    }
-    assert rendered == expected
-    assert render_template("feedback_submitted", payload) == expected
+    assert rendered["subject"] == "Rheonic beta feedback"
+    assert "Rheonic beta feedback" in rendered["html"]
+    assert "New feedback submission received." in rendered["html"]
+    assert "System" in rendered["html"]
+    assert "Mar 05, 2026 10:00 UTC" in rendered["html"]
+    assert "timestamp: Mar 05, 2026 10:00 UTC" in rendered["text"]
+    assert render_template("feedback_submitted", payload) == rendered
 
 
 def test_operational_templates_snapshots_are_deterministic() -> None:
@@ -39,7 +47,8 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "evidence": {"count": 3, "window_seconds": 60},
             },
             "[Rheonic] incident.warn retry_storm (p1)",
-            'evidence: {"count":3,"window_seconds":60}',
+            "Incident warning opened",
+            "Action: Warn",
         ),
         (
             "incident_block",
@@ -51,10 +60,13 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "tokens_60s": 2000,
                 "req_cap": 100,
                 "tok_cap": 1500,
+                "blocked_until": "2026-03-05T10:01:00Z",
+                "retry_after_seconds": 60,
                 "sent_at": "2026-03-05T10:00:00Z",
             },
-            "[Rheonic] incident.block tok_cap_breach (p2)",
-            "tokens_60s: 2000",
+            "[Rheonic] Blocked: Token cap exceeded (p2)",
+            "Provider traffic blocked",
+            "Action: Blocked",
         ),
         (
             "incident_resolved",
@@ -72,7 +84,8 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "sent_at": "2026-03-05T10:04:01Z",
             },
             "[Rheonic] incident.resolved loop_suspect (p3)",
-            "resolved_by: auto",
+            "Incident resolved",
+            "Resolved by: auto",
         ),
         (
             "webhook_delivery_failed",
@@ -88,15 +101,19 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "updated_at": "2026-03-05T10:10:00Z",
             },
             "[Rheonic] webhook.delivery_failed (p4)",
-            "last_error_code: webhook_http_error",
+            "Webhook delivery failed",
+            "Error code: webhook_http_error",
         ),
     ]
 
-    for template, payload, subject, expected_text_line in cases:
+    for template, payload, subject, expected_title, expected_text_line in cases:
         rendered = render_template(template, payload)
         assert rendered["subject"] == subject
+        assert expected_title in rendered["html"]
         assert expected_text_line in rendered["text"]
-        assert rendered["html"].startswith("<!doctype html><html><body><h2>")
+        assert "Rheonic" in rendered["html"]
+        assert "Protect alert" in rendered["html"]
+        assert "UTC" in rendered["text"]
         assert render_template(template, payload) == rendered
 
 

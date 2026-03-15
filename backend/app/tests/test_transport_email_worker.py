@@ -146,7 +146,14 @@ def test_alert_email_delivery_resolves_project_owner_and_alert_sender(tmp_path, 
         project_id="p-alert",
         kind="email",
         event_type="incident.block",
-        payload={"project_id": "p-alert", "provider": "openai", "reason": "req_cap_breach", "sent_at": "2026-03-15T10:00:00Z"},
+        payload={
+            "project_id": "p-alert",
+            "provider": "openai",
+            "reason": "req_cap_breach",
+            "blocked_until": "2026-03-15T10:01:00Z",
+            "retry_after_seconds": 60,
+            "sent_at": "2026-03-15T10:00:00Z",
+        },
         dedupe_key="incident-block-email-delivery",
         template="incident_block",
     )
@@ -172,7 +179,7 @@ def test_alert_email_delivery_resolves_project_owner_and_alert_sender(tmp_path, 
     assert payload["from"] == "Rheonic Alerts <alerts@mail.rheonic.dev>"
     assert payload["to"] == ["owner@example.com"]
     assert payload["reply_to"] == ["contact@rheonic.dev"]
-    assert payload["subject"] == "[Rheonic] incident.block req_cap_breach (p-alert)"
+    assert payload["subject"] == "[Rheonic] Blocked: Request cap exceeded (p-alert)"
 
 
 def test_alert_email_delivery_is_skipped_when_project_email_alerts_are_disabled(tmp_path, monkeypatch) -> None:

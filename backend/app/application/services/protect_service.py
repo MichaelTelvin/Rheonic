@@ -466,6 +466,8 @@ class ProtectService:
             tokens_60s=tokens_60s,
             max_req=max_req,
             max_tok=max_tok,
+            blocked_until=blocked_until,
+            retry_after_seconds=retry_after_seconds,
         )
         return ProtectDecision(
             decision="block",
@@ -499,6 +501,8 @@ class ProtectService:
         tokens_60s: int,
         max_req: int | None,
         max_tok: int | None,
+        blocked_until: str | None,
+        retry_after_seconds: int | None,
     ) -> None:
         now = self._now_provider()
         payload = {
@@ -511,6 +515,8 @@ class ProtectService:
             "tokens_60s": tokens_60s,
             "req_cap": max_req,
             "tok_cap": max_tok,
+            "blocked_until": blocked_until,
+            "retry_after_seconds": retry_after_seconds,
             "sent_at": now.isoformat(),
         }
         if self._webhook_dispatcher is not None:

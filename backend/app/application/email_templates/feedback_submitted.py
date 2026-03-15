@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.application.email_templates.base_layout import render_base_email
+from app.application.email_templates.base_layout import format_timestamp, render_base_email
 
 
 def render_feedback_submitted(payload: dict[str, object]) -> dict[str, str]:
@@ -11,11 +11,12 @@ def render_feedback_submitted(payload: dict[str, object]) -> dict[str, str]:
     project_id = str(payload.get("project_id") or "").strip() or "-"
     page = str(payload.get("page") or "").strip() or "-"
     mode = str(payload.get("mode") or "").strip() or "-"
-    timestamp = str(payload.get("timestamp") or "").strip() or "-"
+    timestamp = format_timestamp(payload.get("timestamp"))
     app_version = str(payload.get("app_version") or "").strip() or "-"
 
     subject = "Rheonic beta feedback"
     rendered = render_base_email(
+        eyebrow="System",
         title="Rheonic beta feedback",
         subtitle="New feedback submission received.",
         fields=[
