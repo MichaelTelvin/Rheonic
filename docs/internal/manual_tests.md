@@ -67,13 +67,16 @@ Expected:
 - Decision response `warn` with matching reason.
 - Provider stub is still called.
 - Webhook event `decision.warn` is dispatched in protect mode.
+- No customer email is sent for `decision.warn` alone.
 
 ### 6) Incident lifecycle
 1. Trigger an incident type in observe or protect mode.
 2. Resolve manually from `/api/v1/incidents/{incident_id}/resolve` or wait for auto-close cooldown.
 3. Expected:
 - Incident status transitions `open` -> `resolved` or `auto_resolved`.
-- Resolution webhook event is emitted only in protect mode when webhook is configured.
+- Resolution transport notifications are emitted only in protect mode:
+  - webhook when webhook is configured
+  - email when email alerts are enabled
 
 ### 7) Protect cooldown after block
 1. Run protect demo with `RHEONIC_SCENARIO=cooldown`.

@@ -10,6 +10,7 @@ from app.application.interfaces.event_repository import EventRepository
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.ingest_key_service import IngestKeyService
+from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 from app.config import Settings, app_config
 from app.domain.detectors.contracts import DetectionContext
 from app.domain.detectors.loop_suspect_detector import LoopSuspectDetector
@@ -59,6 +60,7 @@ class ProtectService:
         protect_block_cooldown_seconds: int,
         event_repository: EventRepository | None = None,
         webhook_dispatcher: WebhookDispatcher | None = None,
+        transport_service: TransportService | None = None,
         now_provider: Callable[[], datetime] | None = None,
         protect_decision_timeout_ms: int | None = None,
     ) -> None:
@@ -68,6 +70,7 @@ class ProtectService:
         self._protect_action_store = protect_action_store
         self._protect_block_cooldown_seconds = protect_block_cooldown_seconds
         self._webhook_dispatcher = webhook_dispatcher
+        self._transport_service = transport_service
         self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
         self._protect_decision_timeout_ms = int(
             protect_decision_timeout_ms
@@ -455,7 +458,7 @@ class ProtectService:
             blocked_until_ms=blocked_until_ms,
             cooldown_seconds=cooldown_seconds,
         )
-        self._enqueue_block_webhook(
+        self._enqueue_block_notifications(
             project_id=project_id,
             provider=provider,
             reason=reason,
@@ -486,7 +489,7 @@ class ProtectService:
             apply_clamp_enabled=apply_clamp_enabled,
         )
 
-    def _enqueue_block_webhook(
+    def _enqueue_block_notifications(
         self,
         *,
         project_id: str,
@@ -497,8 +500,6 @@ class ProtectService:
         max_req: int | None,
         max_tok: int | None,
     ) -> None:
-        if self._webhook_dispatcher is None:
-            return
         now = self._now_provider()
         payload = {
             "event": "incident.block",
@@ -512,16 +513,41 @@ class ProtectService:
             "tok_cap": max_tok,
             "sent_at": now.isoformat(),
         }
+        if self._webhook_dispatcher is not None:
+            try:
+                self._webhook_dispatcher.enqueue(
+                    project_id=project_id,
+                    event_type="incident.block",
+                    payload=payload,
+                )
+            except Exception:
+                # Decision path must never fail because webhook dispatch fails.
+                logger.exception(
+                    "Failed to enqueue protect block webhook",
+                    extra={"project_id": project_id, "provider": provider, "reason": reason},
+                )
+        if self._transport_service is None:
+            return
         try:
-            self._webhook_dispatcher.enqueue(
+            dedupe_key = build_transport_dedupe_key(
                 project_id=project_id,
+                kind="email",
                 event_type="incident.block",
                 payload=payload,
+                seed=reason,
+            )
+            self._transport_service.enqueue(
+                project_id=project_id,
+                kind="email",
+                event_type="incident.block",
+                payload=payload,
+                dedupe_key=dedupe_key,
+                template="incident_block",
+                provider=provider,
             )
         except Exception:
-            # Decision path must never fail because webhook dispatch fails.
             logger.exception(
-                "Failed to enqueue protect block webhook",
+                "Failed to enqueue protect block email",
                 extra={"project_id": project_id, "provider": provider, "reason": reason},
             )
 

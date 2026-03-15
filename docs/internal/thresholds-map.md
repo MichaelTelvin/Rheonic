@@ -90,6 +90,15 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - Mode independent:
   - `webhook.test`
 
+## Email Triggers
+- Protect mode only:
+  - `incident.warn`
+  - `incident.block`
+  - `incident.resolved`
+  - `webhook.delivery_failed` when webhook delivery reaches terminal failure and project email alerts are enabled
+- Mode independent:
+  - `feedback.submitted` to the internal feedback destination
+
 ## Transport Delivery and Retries
 - Shared outbox: `transport_outbox` stores webhook/email deliveries and status transitions.
 - Webhook retry knobs:

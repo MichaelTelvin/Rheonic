@@ -98,6 +98,15 @@ For protect preflight, a live `near_cap` warn also upserts a visible `near_cap` 
   - RQ transport worker sends webhook HTTP requests asynchronously
   - retries/backoff and terminal failure state are tracked in outbox rows
 
+## Emails
+- Protect mode customer emails use the same core lifecycle alert set:
+  - `incident.warn`
+  - `incident.block`
+  - `incident.resolved`
+  - `webhook.delivery_failed` when webhook delivery reaches terminal failure
+- Email does not mirror `decision.warn` or `policy_gap.detected`.
+- Feedback remains a separate internal/system email workflow.
+
 ## Metrics
 - Realtime: `GET /api/v1/metrics/realtime?project_id=...&provider?`
 - Protect counters: `GET /api/v1/metrics/protect?project_id=...&provider?`

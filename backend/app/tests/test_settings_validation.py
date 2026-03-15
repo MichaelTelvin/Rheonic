@@ -70,3 +70,40 @@ def test_settings_prod_cookie_names_use_valid_secure_prefixes(monkeypatch: pytes
     settings = Settings()
     assert settings.auth_access_cookie_name == "__Host-rheonic_access"
     assert settings.auth_refresh_cookie_name == "__Secure-rheonic_refresh"
+
+
+def test_settings_email_delivery_requires_sender_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    _base_required_env(monkeypatch)
+    monkeypatch.setenv("EMAIL_PROVIDER", "resend")
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    monkeypatch.delenv("EMAIL_FROM_ALERTS", raising=False)
+    monkeypatch.setenv("EMAIL_FROM_SYSTEM", "Rheonic System <system@mail.rheonic.dev>")
+    monkeypatch.setenv("EMAIL_REPLY_TO", "contact@rheonic.dev")
+
+    with pytest.raises(ValueError, match="EMAIL_FROM_ALERTS"):
+        Settings()
+
+
+def test_settings_email_delivery_requires_reply_to(monkeypatch: pytest.MonkeyPatch) -> None:
+    _base_required_env(monkeypatch)
+    monkeypatch.setenv("EMAIL_PROVIDER", "resend")
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    monkeypatch.setenv("EMAIL_FROM_ALERTS", "Rheonic Alerts <alerts@mail.rheonic.dev>")
+    monkeypatch.setenv("EMAIL_FROM_SYSTEM", "Rheonic System <system@mail.rheonic.dev>")
+    monkeypatch.delenv("EMAIL_REPLY_TO", raising=False)
+
+    with pytest.raises(ValueError, match="EMAIL_REPLY_TO"):
+        Settings()
+
+
+def test_settings_email_delivery_allows_resend_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    _base_required_env(monkeypatch)
+    monkeypatch.setenv("EMAIL_PROVIDER", "resend")
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    monkeypatch.setenv("EMAIL_FROM_ALERTS", "Rheonic Alerts <alerts@mail.rheonic.dev>")
+    monkeypatch.setenv("EMAIL_FROM_SYSTEM", "Rheonic System <system@mail.rheonic.dev>")
+    monkeypatch.setenv("EMAIL_REPLY_TO", "contact@rheonic.dev")
+
+    settings = Settings()
+    assert settings.resolved_email_provider == "resend"
+    assert settings.resolved_email_provider_enabled is True

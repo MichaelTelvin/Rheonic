@@ -114,6 +114,11 @@ class Settings(BaseSettings):
     webhook_allow_private_hosts: bool = False
     webhook_secret_encryption_key: str = ""
     email_provider_enabled: bool = False
+    email_provider: str = ""
+    resend_api_key: str = ""
+    email_from_alerts: str = ""
+    email_from_system: str = ""
+    email_reply_to: str = ""
     public_contact_email: str = "contact@rheonic.dev"
     feedback_report_email: str = "feedback@rheonic.dev"
     rq_queue_name: str = "rheonic"
@@ -148,6 +153,22 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in (self.cors_origins or "").split(",") if origin.strip()]
+
+    @property
+    def resolved_email_provider(self) -> str:
+        provider = (self.email_provider or "").strip().lower()
+        if provider:
+            return provider
+        if (self.resend_api_key or "").strip():
+            return "resend"
+        return ""
+
+    @property
+    def resolved_email_provider_enabled(self) -> bool:
+        if self.email_provider_enabled:
+            return True
+        provider = self.resolved_email_provider
+        return provider == "resend" and bool((self.resend_api_key or "").strip())
 
     @model_validator(mode="after")
     def _apply_url_defaults(self) -> "Settings":
@@ -194,6 +215,25 @@ class Settings(BaseSettings):
             webhook_key = (self.webhook_secret_encryption_key or "").strip()
             if len(webhook_key) < 32:
                 raise ValueError("WEBHOOK_SECRET_ENCRYPTION_KEY must be at least 32 characters in staging/production")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_email_configuration(self) -> "Settings":
+        provider = self.resolved_email_provider
+        if provider and provider not in {"resend"}:
+            raise ValueError("EMAIL_PROVIDER must be 'resend' when configured")
+        if not self.resolved_email_provider_enabled:
+            return self
+        if provider != "resend":
+            raise ValueError("RESEND_API_KEY is required when email delivery is enabled")
+        if not (self.resend_api_key or "").strip():
+            raise ValueError("RESEND_API_KEY is required when email delivery is enabled")
+        if not (self.email_from_alerts or "").strip():
+            raise ValueError("EMAIL_FROM_ALERTS is required when email delivery is enabled")
+        if not (self.email_from_system or "").strip():
+            raise ValueError("EMAIL_FROM_SYSTEM is required when email delivery is enabled")
+        if not (self.email_reply_to or "").strip():
+            raise ValueError("EMAIL_REPLY_TO is required when email delivery is enabled")
         return self
 
     @property

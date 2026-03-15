@@ -90,6 +90,15 @@ class FakeWebhookDispatcher:
         self.calls.append((project_id, payload, event_type))
 
 
+class FakeTransportService:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def enqueue(self, **kwargs) -> str:
+        self.calls.append(kwargs)
+        return "outbox-1"
+
+
 def _setup_db(tmp_path) -> DatabaseSessionFactory:
     db_url = f"sqlite:///{tmp_path}/incident_auto_close.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
@@ -233,6 +242,7 @@ def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
     now = datetime.now(timezone.utc)
     old_seen = now - timedelta(minutes=20)
     dispatcher = FakeWebhookDispatcher()
+    transport = FakeTransportService()
 
     with session_factory.create_session() as session:
         session.add(
@@ -266,6 +276,7 @@ def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
         incident_repository=IncidentRepositoryImpl(session_factory=session_factory),
         cooldown_seconds=300,
         webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
+        transport_service=transport,  # type: ignore[arg-type]
         project_repository=ProjectRepositoryImpl(session_factory=session_factory),
     )
     resolved_count = service.auto_close(now=now)
@@ -276,3 +287,6 @@ def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
     assert payload["event"] == "incident.resolved"
     assert payload["resolved_by"] == "auto"
     assert payload["incident_id"] == "inc-old-webhook"
+    assert len(transport.calls) == 1
+    assert transport.calls[0]["event_type"] == "incident.resolved"
+    assert transport.calls[0]["template"] == "incident_resolved"

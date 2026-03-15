@@ -5,6 +5,7 @@ from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.incident_repository import IncidentRepository
 from app.application.interfaces.project_repository import ProjectRepository
 from app.application.provider_scope import scoped_project_provider_id
+from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.domain.models.incident import Incident
 from app.logger import get_logger
@@ -20,12 +21,14 @@ class DetectIncidentsService:
         incident_repository: IncidentRepository,
         realtime_counters: RealtimeCounterStore,
         webhook_dispatcher: WebhookDispatcher | None = None,
+        transport_service: TransportService | None = None,
         project_repository: ProjectRepository | None = None,
     ) -> None:
         # Initialize dependencies.
         self._incident_repository = incident_repository
         self._realtime_counters = realtime_counters
         self._webhook_dispatcher = webhook_dispatcher
+        self._transport_service = transport_service
         self._project_repository = project_repository
 
     def list_incidents(
@@ -66,16 +69,15 @@ class DetectIncidentsService:
                 project_id=scoped_project_provider_id(incident.project_id, incident.provider),
                 incident_type=incident.incident_type,
             )
-            self._enqueue_incident_resolved_webhook(incident=incident, resolved_by="manual")
+            self._enqueue_incident_resolved_notifications(incident=incident, resolved_by="manual")
             return incident
         except Exception:
             logger.exception("Resolve incident service failed", extra={"incident_id": incident_id})
             raise
 
-    def _enqueue_incident_resolved_webhook(self, *, incident: Incident, resolved_by: str) -> None:
-        # Enqueue webhook for incident resolution state changes.
-        if self._webhook_dispatcher is None:
-            return
+    def _enqueue_incident_resolved_notifications(self, *, incident: Incident, resolved_by: str) -> None:
+        # Protect-mode incident resolution alerts are lifecycle notifications:
+        # webhook for routed integrations and email for direct operator visibility.
         if not self._is_protect_mode_enabled(incident.project_id):
             return
         provider, model, environment = _incident_dimensions(incident)
@@ -94,14 +96,37 @@ class DetectIncidentsService:
             "environment": environment,
             "sent_at": datetime.now(timezone.utc).isoformat(),
         }
+        if self._webhook_dispatcher is not None:
+            try:
+                self._webhook_dispatcher.enqueue(
+                    project_id=incident.project_id,
+                    payload=payload,
+                    event_type="incident.resolved",
+                )
+            except Exception:
+                logger.exception("Failed to enqueue manual incident resolved webhook", extra={"incident_id": incident.id})
+        if self._transport_service is None:
+            return
         try:
-            self._webhook_dispatcher.enqueue(
+            dedupe_key = build_transport_dedupe_key(
                 project_id=incident.project_id,
-                payload=payload,
+                kind="email",
                 event_type="incident.resolved",
+                payload=payload,
+                seed=incident.id,
+            )
+            self._transport_service.enqueue(
+                project_id=incident.project_id,
+                kind="email",
+                event_type="incident.resolved",
+                payload=payload,
+                dedupe_key=dedupe_key,
+                template="incident_resolved",
+                provider=provider,
+                environment=environment,
             )
         except Exception:
-            logger.exception("Failed to enqueue manual incident resolved webhook", extra={"incident_id": incident.id})
+            logger.exception("Failed to enqueue manual incident resolved email", extra={"incident_id": incident.id})
 
     def _is_protect_mode_enabled(self, project_id: str) -> bool:
         if self._project_repository is None:

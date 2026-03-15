@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 from app.application.interfaces.incident_repository import IncidentRepository
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.domain.detectors.contracts import Signal
@@ -19,10 +20,12 @@ class IncidentManager:
         incident_repository: IncidentRepository,
         incident_dedup_window_seconds: int,
         webhook_dispatcher: WebhookDispatcher | None = None,
+        transport_service: TransportService | None = None,
     ) -> None:
         self._incident_repository = incident_repository
         self._incident_dedup_window_seconds = incident_dedup_window_seconds
         self._webhook_dispatcher = webhook_dispatcher
+        self._transport_service = transport_service
 
     def process_signals(
         self,
@@ -93,15 +96,13 @@ class IncidentManager:
             last_seen_at=now,
         )
         self._incident_repository.create_incident(incident=incident)
-        self._enqueue_detection_webhook(incident=incident, mode=mode)
+        self._enqueue_detection_notifications(incident=incident, mode=mode)
 
-    def _enqueue_detection_webhook(self, *, incident: Incident, mode: str) -> None:
-        if self._webhook_dispatcher is None:
-            return
+    def _enqueue_detection_notifications(self, *, incident: Incident, mode: str) -> None:
         if mode != "protect":
             return
         incident_type = incident.incident_type
-        # cap_breach block and near_cap warn webhooks are emitted by protect decision path.
+        # cap_breach block and near_cap warn alerts are emitted by protect decision paths.
         if incident_type in {"cap_breach", "near_cap"}:
             return
         event_type = "incident.warn"
@@ -116,14 +117,36 @@ class IncidentManager:
             "sent_at": datetime.now(timezone.utc).isoformat(),
             "evidence": incident.evidence,
         }
-        try:
-            self._webhook_dispatcher.enqueue(
-                project_id=incident.project_id,
-                payload=payload,
-                event_type=event_type,
-            )
-        except Exception:
-            logger.exception("Failed to enqueue incident webhook", extra={"incident_id": incident.id})
+        if self._webhook_dispatcher is not None:
+            try:
+                self._webhook_dispatcher.enqueue(
+                    project_id=incident.project_id,
+                    payload=payload,
+                    event_type=event_type,
+                )
+            except Exception:
+                logger.exception("Failed to enqueue incident webhook", extra={"incident_id": incident.id})
+        if self._transport_service is not None:
+            try:
+                dedupe_key = build_transport_dedupe_key(
+                    project_id=incident.project_id,
+                    kind="email",
+                    event_type=event_type,
+                    payload=payload,
+                    seed=incident.id,
+                )
+                self._transport_service.enqueue(
+                    project_id=incident.project_id,
+                    kind="email",
+                    event_type=event_type,
+                    payload=payload,
+                    dedupe_key=dedupe_key,
+                    template="incident_warn",
+                    provider=incident.provider,
+                    environment=_string_or_none(incident.evidence.get("environment")),
+                )
+            except Exception:
+                logger.exception("Failed to enqueue incident email", extra={"incident_id": incident.id})
 
 
 def _int_value(value: object) -> int:
@@ -131,3 +154,10 @@ def _int_value(value: object) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def _string_or_none(value: object) -> str | None:
+    if isinstance(value, str):
+        normalized = value.strip()
+        return normalized or None
+    return None

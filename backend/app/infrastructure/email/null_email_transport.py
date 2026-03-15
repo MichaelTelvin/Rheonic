@@ -10,7 +10,16 @@ class EmailProviderNotConfiguredError(RuntimeError):
 
 
 class NullEmailTransport:
-    def send(self, *, to: str, subject: str, html: str, text: str | None = None) -> None:
-        _ = html, text
+    def send(
+        self,
+        *,
+        to: str,
+        subject: str,
+        html: str,
+        text: str | None = None,
+        from_email: str,
+        reply_to: str | None = None,
+    ) -> None:
+        _ = html, text, from_email, reply_to
         logger.info("Null email transport invoked", extra={"to": to, "subject": subject})
         raise EmailProviderNotConfiguredError("email provider not configured")

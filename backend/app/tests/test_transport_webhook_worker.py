@@ -153,3 +153,49 @@ def test_process_outbox_delivery_webhook_failure_retries_then_dead_letters(tmp_p
         assert row.last_error_message == "HTTP 404"
 
     assert fake_queue.calls[:2] == [5, 20]
+
+
+def test_terminal_webhook_failure_enqueues_delivery_failure_email(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_webhook_dead_email.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    _seed_project(session_factory, "p3")
+
+    with session_factory.create_session() as session:
+        record = session.query(ProjectRecord).filter(ProjectRecord.id == "p3").first()
+        assert record is not None
+        record.email_enabled = True
+        session.add(record)
+        session.commit()
+
+    outbox_id = _enqueue_webhook_outbox(session_factory, "p3")
+
+    settings = transport_job.Settings(database_url=db_url, redis_url="redis://localhost:6379/15")
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeErrorClient())
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    with session_factory.create_session() as session:
+        row = session.query(TransportOutboxRecord).filter(TransportOutboxRecord.id == outbox_id).first()
+        assert row is not None
+        row.max_attempts = 1
+        session.add(row)
+        session.commit()
+
+    transport_job.process_outbox_delivery(outbox_id)
+
+    with session_factory.create_session() as session:
+        rows = (
+            session.query(TransportOutboxRecord)
+            .filter(TransportOutboxRecord.project_id == "p3")
+            .order_by(TransportOutboxRecord.created_at.asc())
+            .all()
+        )
+        assert len(rows) == 2
+        failure_email = rows[1]
+        assert failure_email.kind == "email"
+        assert failure_email.event_type == "webhook.delivery_failed"
+        assert failure_email.template == "webhook_delivery_failed"
+        assert failure_email.payload["status"] == "dead"
+        assert failure_email.payload["last_error_code"] == "webhook_http_error"

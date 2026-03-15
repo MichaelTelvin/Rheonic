@@ -106,7 +106,14 @@ Webhook event types:
 - `policy_gap.detected` (protect mode only)
 - `webhook.test` (mode independent)
 
+Protect email event types:
+- `incident.warn`
+- `incident.block`
+- `incident.resolved`
+- `webhook.delivery_failed` (terminal webhook failure escalation when project email alerts are enabled)
+
 ## Feedback API
 - `POST /api/v1/feedback`
 - Behavior: validates payload, enqueues `kind=email` + `event_type=feedback.submitted`, returns `202`.
-- No SMTP path; email delivery is processed asynchronously by transport worker.
+- Email delivery is processed asynchronously by the transport worker.
+- Provider transport is Resend-backed when configured.

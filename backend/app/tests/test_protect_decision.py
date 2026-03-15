@@ -144,6 +144,15 @@ class FakeWebhookDispatcher:
         self.calls.append((project_id, event_type, payload))
 
 
+class FakeTransportService:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def enqueue(self, **kwargs) -> str:
+        self.calls.append(kwargs)
+        return "outbox-1"
+
+
 def _cleanup_overrides() -> None:
     app.dependency_overrides.clear()
 
@@ -160,6 +169,7 @@ def _make_client(
     *,
     cooldown_seconds: int = 60,
     webhook_dispatcher: FakeWebhookDispatcher | None = None,
+    transport_service: FakeTransportService | None = None,
     event_repository: FakeEventRepository | None = None,
 ) -> tuple[TestClient, RollingWindow, FakeEventRepository]:
     db_url = f"sqlite:///{tmp_path}/protect_decision.db"
@@ -183,6 +193,7 @@ def _make_client(
         protect_action_store=protect_action_store,
         protect_block_cooldown_seconds=cooldown_seconds,
         webhook_dispatcher=webhook_dispatcher,  # type: ignore[arg-type]
+        transport_service=transport_service,  # type: ignore[arg-type]
     )
     metrics_service = MetricsService(
         realtime_counters=rolling_window,
@@ -313,6 +324,21 @@ def test_caps_breach_blocks_with_cap_reason(tmp_path) -> None:
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "block"
     assert decision["reason"] == "req_cap_breach"
+    _cleanup_overrides()
+
+
+def test_caps_breach_enqueues_incident_block_email(tmp_path) -> None:
+    transport = FakeTransportService()
+    client, rolling_window, _ = _make_client(tmp_path, transport_service=transport)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Caps Email")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_req_per_min=2, protect_max_tok_per_min=1000)
+    for _ in range(2):
+        rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
+    decision = _decision(client, ingest_key)
+    assert decision["decision"] == "block"
+    assert len(transport.calls) == 1
+    assert transport.calls[0]["event_type"] == "incident.block"
+    assert transport.calls[0]["template"] == "incident_block"
     _cleanup_overrides()
 
 

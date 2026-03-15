@@ -9,6 +9,7 @@ from app.application.interfaces.project_repository import ProjectRepository
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.incident_manager import IncidentManager
+from app.application.services.transport_service import TransportService
 from app.config import app_config
 from app.domain.detectors.contracts import DetectionContext, Signal
 from app.domain.detectors.loop_suspect_detector import LoopSuspectDetector
@@ -32,6 +33,7 @@ class IngestEventService:
         incident_repository: IncidentRepository,
         incident_dedup_window_seconds: int,
         webhook_dispatcher: WebhookDispatcher | None = None,
+        transport_service: TransportService | None = None,
         project_repository: ProjectRepository | None = None,
         now_provider: Callable[[], datetime] | None = None,
         retry_storm_window_seconds: int = app_config.retry_storm_window_seconds,
@@ -65,6 +67,7 @@ class IngestEventService:
             incident_repository=incident_repository,
             incident_dedup_window_seconds=incident_dedup_window_seconds,
             webhook_dispatcher=webhook_dispatcher,
+            transport_service=transport_service,
         )
         self._webhook_dispatcher = webhook_dispatcher
 

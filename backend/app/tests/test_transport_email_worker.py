@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from app.application.services.transport_service import TransportService
 from app.infrastructure.db.base import DatabaseSessionFactory
-from app.infrastructure.db.models import Base, TransportOutboxRecord
+from app.infrastructure.db.models import Base, ProjectRecord, TransportOutboxRecord, UserRecord
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.infrastructure.jobs import transport_job
 
@@ -11,6 +11,29 @@ class _FakeQueue:
     def enqueue_in(self, delay, func, kwargs):
         _ = delay, func, kwargs
         return None
+
+
+class _FakeEmailResponse:
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, str]:
+        return {"id": "email_123"}
+
+
+class _FakeEmailClient:
+    def __init__(self, sent: list[dict[str, object]]) -> None:
+        self.sent = sent
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        _ = exc_type, exc, tb
+
+    def post(self, url: str, json: dict[str, object], headers: dict[str, str]):
+        self.sent.append({"url": url, "json": json, "headers": headers})
+        return _FakeEmailResponse()
 
 
 def test_email_outbox_delivery_marks_failed_when_provider_not_configured(tmp_path, monkeypatch) -> None:
@@ -46,3 +69,174 @@ def test_email_outbox_delivery_marks_failed_when_provider_not_configured(tmp_pat
         assert row.status == "dead"
         assert row.attempts == 1
         assert row.last_error_code == "email_provider_not_configured"
+
+
+def test_feedback_email_delivery_uses_system_sender_and_reply_to(tmp_path, monkeypatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_email_feedback_delivery.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: None,
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+    outbox_id = service.enqueue(
+        project_id="p1",
+        kind="email",
+        event_type="feedback.submitted",
+        payload={"message": "test", "timestamp": "2026-03-15T10:00:00Z"},
+        dedupe_key="feedback-email-delivery",
+        template="feedback_submitted",
+    )
+
+    sent: list[dict[str, object]] = []
+    settings = transport_job.Settings(
+        database_url=db_url,
+        redis_url="redis://localhost:6379/15",
+        resend_api_key="re_test",
+        email_from_alerts="Rheonic Alerts <alerts@mail.rheonic.dev>",
+        email_from_system="Rheonic System <system@mail.rheonic.dev>",
+        email_reply_to="contact@rheonic.dev",
+        feedback_report_email="ops@rheonic.dev",
+    )
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeEmailClient(sent))
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id)
+
+    assert len(sent) == 1
+    payload = sent[0]["json"]
+    assert sent[0]["url"] == "https://api.resend.com/emails"
+    assert payload["from"] == "Rheonic System <system@mail.rheonic.dev>"
+    assert payload["to"] == ["ops@rheonic.dev"]
+    assert payload["reply_to"] == ["contact@rheonic.dev"]
+    assert payload["subject"] == "Rheonic beta feedback"
+
+
+def test_alert_email_delivery_resolves_project_owner_and_alert_sender(tmp_path, monkeypatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_email_alert_delivery.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    now = datetime.now(timezone.utc)
+    with session_factory.create_session() as session:
+        session.add(UserRecord(id="u1", email="owner@example.com", password_hash="hashed", created_at=now))
+        session.add(
+            ProjectRecord(
+                id="p-alert",
+                name="Alert",
+                user_id="u1",
+                protect_enabled=True,
+                protect_fail_mode="open",
+                email_enabled=True,
+                created_at=now,
+            )
+        )
+        session.commit()
+
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: None,
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+    outbox_id = service.enqueue(
+        project_id="p-alert",
+        kind="email",
+        event_type="incident.block",
+        payload={"project_id": "p-alert", "provider": "openai", "reason": "req_cap_breach", "sent_at": "2026-03-15T10:00:00Z"},
+        dedupe_key="incident-block-email-delivery",
+        template="incident_block",
+    )
+
+    sent: list[dict[str, object]] = []
+    settings = transport_job.Settings(
+        database_url=db_url,
+        redis_url="redis://localhost:6379/15",
+        resend_api_key="re_test",
+        email_from_alerts="Rheonic Alerts <alerts@mail.rheonic.dev>",
+        email_from_system="Rheonic System <system@mail.rheonic.dev>",
+        email_reply_to="contact@rheonic.dev",
+    )
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeEmailClient(sent))
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id)
+
+    assert len(sent) == 1
+    payload = sent[0]["json"]
+    assert payload["from"] == "Rheonic Alerts <alerts@mail.rheonic.dev>"
+    assert payload["to"] == ["owner@example.com"]
+    assert payload["reply_to"] == ["contact@rheonic.dev"]
+    assert payload["subject"] == "[Rheonic] incident.block req_cap_breach (p-alert)"
+
+
+def test_alert_email_delivery_is_skipped_when_project_email_alerts_are_disabled(tmp_path, monkeypatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_email_alert_skipped.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    now = datetime.now(timezone.utc)
+    with session_factory.create_session() as session:
+        session.add(UserRecord(id="u1", email="owner@example.com", password_hash="hashed", created_at=now))
+        session.add(
+            ProjectRecord(
+                id="p-skip",
+                name="Skip",
+                user_id="u1",
+                protect_enabled=True,
+                protect_fail_mode="open",
+                email_enabled=False,
+                created_at=now,
+            )
+        )
+        session.commit()
+
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: None,
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+    outbox_id = service.enqueue(
+        project_id="p-skip",
+        kind="email",
+        event_type="incident.warn",
+        payload={
+            "project_id": "p-skip",
+            "incident_id": "i1",
+            "incident_type": "retry_storm",
+            "provider": "openai",
+            "created_at": "2026-03-15T10:00:00Z",
+            "last_seen_at": "2026-03-15T10:00:00Z",
+            "sent_at": "2026-03-15T10:00:00Z",
+            "evidence": {},
+        },
+        dedupe_key="incident-warn-email-skipped",
+        template="incident_warn",
+    )
+
+    sent: list[dict[str, object]] = []
+    settings = transport_job.Settings(
+        database_url=db_url,
+        redis_url="redis://localhost:6379/15",
+        resend_api_key="re_test",
+        email_from_alerts="Rheonic Alerts <alerts@mail.rheonic.dev>",
+        email_from_system="Rheonic System <system@mail.rheonic.dev>",
+        email_reply_to="contact@rheonic.dev",
+    )
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeEmailClient(sent))
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id)
+
+    assert sent == []
+    with session_factory.create_session() as session:
+        row = session.query(TransportOutboxRecord).filter(TransportOutboxRecord.id == outbox_id).first()
+        assert row is not None
+        assert row.status == "delivered"

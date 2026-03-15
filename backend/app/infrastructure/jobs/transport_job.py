@@ -14,11 +14,17 @@ from app.config import Settings, app_config
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
+from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
 from app.infrastructure.email.null_email_transport import EmailProviderNotConfiguredError, NullEmailTransport
+from app.infrastructure.email.resend_email_transport import ResendEmailTransport, ResendEmailTransportError
 from app.logger import get_logger
 from app.security.webhook_urls import ensure_webhook_url_is_safe
+from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 
 logger = get_logger(__name__)
+
+_SYSTEM_EMAIL_EVENTS = {"feedback.submitted"}
+_ALERT_EMAIL_EVENTS = {"incident.warn", "incident.block", "incident.resolved", "webhook.delivery_failed"}
 
 
 def enqueue_outbox_delivery(outbox_id: str) -> None:
@@ -111,6 +117,16 @@ def process_outbox_delivery(outbox_id: str) -> None:
                 "retry_delay_seconds": delay_seconds,
             },
         )
+        if outbox.kind == "webhook" and dead:
+            try:
+                failed_outbox = repository.get_by_id(outbox.id)
+                if failed_outbox is not None:
+                    _enqueue_webhook_failure_email(outbox=failed_outbox, settings=settings)
+            except Exception:
+                logger.exception(
+                    "Failed to enqueue webhook terminal failure email",
+                    extra={"outbox_id": outbox.id, "project_id": outbox.project_id, "event_type": outbox.event_type},
+                )
         if not dead and next_attempt_at is not None:
             queue = Queue(settings.rq_queue_name, connection=Redis.from_url(settings.redis_url))
             queue.enqueue_in(timedelta(seconds=delay_seconds), process_outbox_delivery, kwargs={"outbox_id": outbox.id})
@@ -181,10 +197,30 @@ def _deliver_webhook(*, outbox_id: str) -> None:
 
 def _deliver_email(*, outbox_id: str, settings: Settings) -> None:
     outbox_repository = TransportOutboxRepositoryImpl(session_factory=DatabaseSessionFactory())
+    project_repository = ProjectRepositoryImpl(session_factory=DatabaseSessionFactory())
+    user_repository = UserRepositoryImpl(session_factory=DatabaseSessionFactory())
     outbox = outbox_repository.get_by_id(outbox_id)
     if outbox is None:
         return
-    destination = (outbox.destination or settings.feedback_report_email or "").strip()
+    project = project_repository.get_project(outbox.project_id)
+
+    # Feedback is an internal workflow. Project alerts resolve to the owning user
+    # and respect the project's protect/email switches at delivery time.
+    destination = _resolve_email_destination(
+        outbox=outbox,
+        project=project,
+        settings=settings,
+        user_repository=user_repository,
+    )
+    if destination is None:
+        logger.info(
+            "Email delivery skipped [outbox_id=%s event_type=%s project_id=%s]",
+            outbox.id,
+            outbox.event_type,
+            outbox.project_id,
+            extra={"outbox_id": outbox.id, "event_type": outbox.event_type, "project_id": outbox.project_id},
+        )
+        return
     if not destination:
         raise ValueError("email destination is missing")
     if not outbox.template:
@@ -195,21 +231,27 @@ def _deliver_email(*, outbox_id: str, settings: Settings) -> None:
     if not subject:
         raise ValueError("email subject is required")
 
-    if not settings.email_provider_enabled:
+    if not settings.resolved_email_provider_enabled:
         raise EmailProviderNotConfiguredError("email provider not configured")
 
-    transport = NullEmailTransport()
+    sender = _resolve_email_sender(settings=settings, event_type=outbox.event_type)
+    reply_to = (settings.email_reply_to or "").strip() or None
+    transport = _build_email_transport(settings=settings)
     transport.send(
         to=destination,
         subject=subject,
         html=rendered.get("html") or "",
         text=rendered.get("text"),
+        from_email=sender,
+        reply_to=reply_to,
     )
 
 
 def _error_details(exc: Exception) -> tuple[str, str]:
     if isinstance(exc, EmailProviderNotConfiguredError):
         return "email_provider_not_configured", "email provider not configured"
+    if isinstance(exc, ResendEmailTransportError):
+        return exc.code, str(exc)[: app_config.webhook_max_error_chars]
     if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None:
         return "webhook_http_error", f"HTTP {exc.response.status_code}"[: app_config.webhook_max_error_chars]
     message = str(exc).splitlines()[0][: app_config.webhook_max_error_chars]
@@ -227,3 +269,80 @@ def _retry_delay_seconds(*, kind: str, attempt_number: int) -> int | None:
         return None
     idx = min(max(attempt_number - 1, 0), len(intervals) - 1)
     return int(intervals[idx])
+
+
+def _resolve_email_destination(*, outbox, project, settings: Settings, user_repository: UserRepositoryImpl) -> str | None:
+    explicit_destination = (outbox.destination or "").strip()
+    if explicit_destination:
+        return explicit_destination
+    if outbox.event_type == "feedback.submitted":
+        return (settings.feedback_report_email or "").strip()
+    if project is None:
+        return None
+    if not project.protect_enabled or not project.email_enabled:
+        return None
+    if not project.user_id:
+        raise ValueError("project owner is missing for alert email delivery")
+    user = user_repository.get_by_id(project.user_id)
+    if user is None or not (user.email or "").strip():
+        raise ValueError("project owner email is missing for alert email delivery")
+    return user.email.strip()
+
+
+def _resolve_email_sender(*, settings: Settings, event_type: str) -> str:
+    if event_type in _SYSTEM_EMAIL_EVENTS:
+        sender = (settings.email_from_system or "").strip()
+    elif event_type in _ALERT_EMAIL_EVENTS:
+        sender = (settings.email_from_alerts or "").strip()
+    else:
+        raise ValueError(f"unsupported email event type: {event_type}")
+    if not sender:
+        raise ValueError(f"sender is missing for email event type: {event_type}")
+    return sender
+
+
+def _build_email_transport(*, settings: Settings):
+    provider = settings.resolved_email_provider
+    if provider == "resend":
+        return ResendEmailTransport(api_key=settings.resend_api_key)
+    if provider:
+        raise ValueError(f"unsupported email provider: {provider}")
+    return NullEmailTransport()
+
+
+def _enqueue_webhook_failure_email(*, outbox, settings: Settings) -> None:
+    project_repository = ProjectRepositoryImpl(session_factory=DatabaseSessionFactory())
+    project = project_repository.get_project(outbox.project_id)
+    if project is None or not project.protect_enabled or not project.webhook_enabled or not project.email_enabled:
+        return
+
+    payload = {
+        "project_id": outbox.project_id,
+        "event_type": outbox.event_type,
+        "destination": outbox.destination or project.webhook_url,
+        "status": outbox.status,
+        "attempts": int(outbox.attempts),
+        "max_attempts": int(outbox.max_attempts),
+        "last_error_code": outbox.last_error_code,
+        "last_error_message": outbox.last_error_message,
+        "updated_at": outbox.updated_at.isoformat() if outbox.updated_at is not None else None,
+    }
+    transport_service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=DatabaseSessionFactory()),
+        enqueue_job=enqueue_outbox_delivery,
+    )
+    dedupe_key = build_transport_dedupe_key(
+        project_id=outbox.project_id,
+        kind="email",
+        event_type="webhook.delivery_failed",
+        payload=payload,
+        seed=outbox.id,
+    )
+    transport_service.enqueue(
+        project_id=outbox.project_id,
+        kind="email",
+        event_type="webhook.delivery_failed",
+        payload=payload,
+        dedupe_key=dedupe_key,
+        template="webhook_delivery_failed",
+    )

@@ -7,7 +7,10 @@ from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
+from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
+from app.infrastructure.jobs.transport_job import enqueue_outbox_delivery
 from app.logger import get_logger
+from app.application.services.transport_service import TransportService
 
 logger = get_logger(__name__)
 
@@ -22,6 +25,10 @@ def auto_close_incidents() -> int:
             incident_repository=repository,
             cooldown_seconds=settings.incident_auto_close_seconds,
             webhook_dispatcher=RQWebhookDispatcher(redis_url=settings.redis_url),
+            transport_service=TransportService(
+                outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+                enqueue_job=enqueue_outbox_delivery,
+            ),
             project_repository=ProjectRepositoryImpl(session_factory=session_factory),
         )
         return service.auto_close()

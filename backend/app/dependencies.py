@@ -133,6 +133,7 @@ def get_ingest_event_service() -> IngestEventService:
             token_explosion_ratio=get_settings().token_explosion_ratio,
             token_explosion_abs=get_settings().token_explosion_abs,
             webhook_dispatcher=get_webhook_dispatcher(),
+            transport_service=get_transport_service(),
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )
         logger.debug("Ingest event service provided")
@@ -165,6 +166,7 @@ def get_detect_incidents_service() -> DetectIncidentsService:
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
             webhook_dispatcher=get_webhook_dispatcher(),
+            transport_service=get_transport_service(),
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )
         logger.debug("Detect incidents service provided")
@@ -181,6 +183,7 @@ def get_incident_manager() -> IncidentManager:
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
             incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
             webhook_dispatcher=get_webhook_dispatcher(),
+            transport_service=get_transport_service(),
         )
     except Exception:
         logger.exception("Failed to construct incident manager")
@@ -224,6 +227,7 @@ def get_protect_service() -> ProtectService:
             protect_action_store=get_protect_action_store(),
             protect_block_cooldown_seconds=get_settings().protect_block_cooldown_seconds,
             webhook_dispatcher=get_webhook_dispatcher(),
+            transport_service=get_transport_service(),
         )
     except Exception:
         logger.exception("Failed to construct protect service")

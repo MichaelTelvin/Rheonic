@@ -2,23 +2,19 @@ from __future__ import annotations
 
 from typing import Callable
 
-from app.application.email_templates.decision_warn import render_decision_warn
 from app.application.email_templates.feedback_submitted import render_feedback_submitted
 from app.application.email_templates.incident_block import render_incident_block
 from app.application.email_templates.incident_resolved import render_incident_resolved
 from app.application.email_templates.incident_warn import render_incident_warn
-from app.application.email_templates.policy_gap_detected import render_policy_gap_detected
 from app.application.email_templates.webhook_delivery_failed import render_webhook_delivery_failed
 
 TemplateRenderer = Callable[[dict[str, object]], dict[str, str]]
 
 _TEMPLATE_REGISTRY: dict[str, TemplateRenderer] = {
     "feedback_submitted": render_feedback_submitted,
-    "decision_warn": render_decision_warn,
     "incident_warn": render_incident_warn,
     "incident_block": render_incident_block,
     "incident_resolved": render_incident_resolved,
-    "policy_gap_detected": render_policy_gap_detected,
     "webhook_delivery_failed": render_webhook_delivery_failed,
 }
 

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   useProjectContext: vi.fn(),
+  useAuthContext: vi.fn(),
   listKeys: vi.fn(),
   fetchProjectWebhook: vi.fn(),
   fetchProjectProtect: vi.fn(),
@@ -10,6 +11,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../context/ProjectContext", () => ({
   useProjectContext: () => mocks.useProjectContext(),
+}));
+
+vi.mock("../context/AuthContext", () => ({
+  useAuthContext: () => mocks.useAuthContext(),
 }));
 
 vi.mock("../api/client", async () => {
@@ -38,8 +43,15 @@ describe("Form column layout", () => {
       reloadProjects: vi.fn(),
     });
     mocks.listKeys.mockResolvedValue([]);
+    mocks.useAuthContext.mockReturnValue({
+      isAuthenticated: true,
+      sessionResolved: true,
+      user: { id: "u1", email: "user@example.com", created_at: new Date().toISOString() },
+      signOut: vi.fn(),
+    });
     mocks.fetchProjectWebhook.mockResolvedValue({
       enabled: false,
+      email_enabled: false,
       url: null,
       has_secret: false,
       last_status: null,

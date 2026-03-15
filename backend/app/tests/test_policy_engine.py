@@ -86,6 +86,15 @@ class FakeWebhookDispatcher:
         self.calls.append((project_id, payload, event_type))
 
 
+class FakeTransportService:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def enqueue(self, **kwargs) -> str:
+        self.calls.append(kwargs)
+        return "outbox-1"
+
+
 class FakeProjectService:
     # Minimal ownership verifier for resolve endpoint tests.
     def ensure_project_owned_by_user(self, project_id: str, user_id: str) -> Project:
@@ -119,10 +128,12 @@ def test_resolve_endpoint_marks_resolved_and_deletes_lock() -> None:
     repo = FakeIncidentRepository()
     realtime = FakeRealtimeStore()
     dispatcher = FakeWebhookDispatcher()
+    transport = FakeTransportService()
     service = DetectIncidentsService(
         incident_repository=repo,  # type: ignore[arg-type]
         realtime_counters=realtime,  # type: ignore[arg-type]
         webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
+        transport_service=transport,  # type: ignore[arg-type]
         project_repository=FakeProjectRepository(),  # type: ignore[arg-type]
     )
 
@@ -147,5 +158,8 @@ def test_resolve_endpoint_marks_resolved_and_deletes_lock() -> None:
     assert payload["event"] == "incident.resolved"
     assert payload["resolved_by"] == "manual"
     assert payload["incident_id"] == "inc-1"
+    assert len(transport.calls) == 1
+    assert transport.calls[0]["event_type"] == "incident.resolved"
+    assert transport.calls[0]["template"] == "incident_resolved"
 
     app.dependency_overrides.clear()

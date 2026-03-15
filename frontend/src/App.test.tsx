@@ -199,7 +199,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(mockLogout).toHaveBeenCalled();
     });
-    expect(screen.getByRole("button", { name: "Mock Login" })).toBeDefined();
+    expect(await screen.findByRole("button", { name: "Mock Login" })).toBeDefined();
   });
 
   it("registers and cleans unauthorized handler", () => {

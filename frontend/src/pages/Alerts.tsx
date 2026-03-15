@@ -240,13 +240,13 @@ export function Alerts(): JSX.Element {
       <div className="dashboard-content page-stack alerts-page-stack">
         <section>
           <h1 className="page-title">Alerts</h1>
-          <p className="page-subtitle">Configure notification routes for incidents and enforcement events</p>
+          <p className="page-subtitle">Configure protect lifecycle alert routes for email and webhook delivery</p>
         </section>
 
         <div className="alerts-cards-row">
           <Card className="form-card card--form alerts-card">
             <h2 className="section-title">Email</h2>
-            <p className="alerts-helper">Send notifications to your account email</p>
+            <p className="alerts-helper">Send protect lifecycle alerts to your account email</p>
             <FormColumn>
               <div className="alerts-grid">
                 <div className="form-field alerts-enabled">
@@ -287,7 +287,7 @@ export function Alerts(): JSX.Element {
             <h2 className="section-title">Webhook</h2>
             <p className="alerts-helper">
               {protectEnabled
-                ? "Deliver notifications to your webhook endpoint"
+                ? "Deliver the same protect lifecycle alerts to your webhook endpoint"
                 : "Configure now. Delivery starts when Protect is enabled"}
             </p>
             <FormColumn testId="alerts-form-column">
@@ -309,7 +309,7 @@ export function Alerts(): JSX.Element {
                   </label>
                 </div>
                 {!protectEnabled && webhookEnabledInput ? (
-                  <p className="alerts-pending-status">Configured — will start delivering when you enable Protect</p>
+                  <p className="alerts-pending-status">Configured - will start delivering when you enable Protect</p>
                 ) : null}
                 <div className="form-field alerts-url alerts-webhook-field">
                   <label htmlFor="webhook-url" title="HTTPS endpoint that receives RHEONIC webhook events.">
