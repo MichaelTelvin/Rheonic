@@ -49,6 +49,8 @@ _load_rheonic_env_from_dotenv()
 BACKEND_BASE_URL = os.getenv("RHEONIC_BACKEND_URL", "http://localhost:8000")
 PROVIDER_STUB_URL = os.getenv("RHEONIC_PROVIDER_URL", "http://localhost:8099")
 _LAST_PROVIDER_CALL: dict[str, Any] | None = None
+_LOCAL_PROVIDER_CALL_COUNT = 0
+_PROVIDER_STUB_AVAILABLE: bool | None = None
 
 
 class LoggingHttpClient:
@@ -100,25 +102,39 @@ class LoggingHttpClient:
         self._client.close()
 
 
-def _provider_reset() -> None:
+def _set_provider_stub_available(value: bool) -> None:
+    global _PROVIDER_STUB_AVAILABLE
+    _PROVIDER_STUB_AVAILABLE = value
+
+
+def _provider_stub_request(method: str, path: str, **kwargs: Any) -> httpx.Response | None:
+    global _PROVIDER_STUB_AVAILABLE
     try:
-        httpx.post(f"{PROVIDER_STUB_URL}/reset", timeout=3.0).raise_for_status()
-    except Exception as exc:
-        raise RuntimeError(
-            f"Provider stub is unavailable at {PROVIDER_STUB_URL}. Start tests/e2e/provider_stub.py first."
-        ) from exc
+        response = httpx.request(method, f"{PROVIDER_STUB_URL}{path}", timeout=3.0, **kwargs)
+        response.raise_for_status()
+    except Exception:
+        if _PROVIDER_STUB_AVAILABLE is not False:
+            print(f"[PROVIDER] stub unavailable at {PROVIDER_STUB_URL}; using in-process call tracking")
+        _set_provider_stub_available(False)
+        return None
+    _set_provider_stub_available(True)
+    return response
+
+
+def _provider_reset() -> None:
+    global _LAST_PROVIDER_CALL, _LOCAL_PROVIDER_CALL_COUNT
+    _LAST_PROVIDER_CALL = None
+    _LOCAL_PROVIDER_CALL_COUNT = 0
+    _provider_stub_request("POST", "/reset")
 
 
 def _provider_count() -> int:
-    try:
-        response = httpx.get(f"{PROVIDER_STUB_URL}/count", timeout=3.0)
-        response.raise_for_status()
-        payload = response.json()
-        return int(payload.get("count", 0)) if isinstance(payload, dict) else 0
-    except Exception as exc:
-        raise RuntimeError(
-            f"Provider stub is unavailable at {PROVIDER_STUB_URL}. Start tests/e2e/provider_stub.py first."
-        ) from exc
+    if _PROVIDER_STUB_AVAILABLE is not False:
+        response = _provider_stub_request("GET", "/count")
+        if response is not None:
+            payload = response.json()
+            return int(payload.get("count", 0)) if isinstance(payload, dict) else 0
+    return _LOCAL_PROVIDER_CALL_COUNT
 
 
 def _provider_last_call() -> dict[str, Any] | None:
@@ -126,8 +142,15 @@ def _provider_last_call() -> dict[str, Any] | None:
 
 
 def _record_provider_call(payload: dict[str, Any]) -> None:
-    global _LAST_PROVIDER_CALL
+    global _LAST_PROVIDER_CALL, _LOCAL_PROVIDER_CALL_COUNT
     _LAST_PROVIDER_CALL = payload.copy()
+    _LOCAL_PROVIDER_CALL_COUNT += 1
+
+
+def _notify_provider_call(payload: dict[str, Any]) -> None:
+    _record_provider_call(payload)
+    if _PROVIDER_STUB_AVAILABLE is not False:
+        _provider_stub_request("POST", "/call", json=payload)
 
 
 def _extract_used_max_tokens(payload: dict[str, Any] | None) -> int | None:
@@ -154,8 +177,7 @@ def _make_openai_stub() -> Any:
     class Completions:
         @staticmethod
         def create(**kwargs: Any) -> Any:
-            _record_provider_call(kwargs)
-            httpx.post(f"{PROVIDER_STUB_URL}/call", json=kwargs, timeout=3.0).raise_for_status()
+            _notify_provider_call(kwargs)
             usage = type("Usage", (), {"total_tokens": 10})()
             return type("Response", (), {"model": kwargs.get("model"), "usage": usage})()
 
@@ -172,8 +194,7 @@ def _make_anthropic_stub() -> Any:
     class Messages:
         @staticmethod
         def create(**kwargs: Any) -> Any:
-            _record_provider_call(kwargs)
-            httpx.post(f"{PROVIDER_STUB_URL}/call", json=kwargs, timeout=3.0).raise_for_status()
+            _notify_provider_call(kwargs)
             usage = type("Usage", (), {"input_tokens": 6, "output_tokens": 4})()
             return type("Response", (), {"model": kwargs.get("model"), "usage": usage})()
 
@@ -196,8 +217,7 @@ def _make_google_stub() -> Any:
         @staticmethod
         def generate_content(prompt: str) -> Any:
             payload = {"prompt": prompt}
-            _record_provider_call(payload)
-            httpx.post(f"{PROVIDER_STUB_URL}/call", json=payload, timeout=3.0).raise_for_status()
+            _notify_provider_call(payload)
             return GoogleResponse()
 
     return GoogleModelStub()
@@ -283,6 +303,25 @@ def _print_incidents(dashboard_session: DashboardSession | None, project_id: str
         print(f"[INCIDENTS] open={len(incidents)} types={compact} near_cap_types={near_compact}")
         return
     print(f"[INCIDENTS] open={len(incidents)} types={compact}")
+
+
+def _get_project_req_cap(
+    dashboard_session: DashboardSession | None,
+    project_id: str,
+    auth_email: str,
+) -> int | None:
+    if dashboard_session is None or not project_id:
+        return None
+    try:
+        payload = dashboard_session.request(f"/api/v1/projects/{project_id}/protect")
+    except httpx.HTTPError as exc:
+        status_code = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None else None
+        if status_code in {401, 403}:
+            print(f"[PROTECT] req cap lookup skipped ({status_code} auth error; update dashboard cookie credentials for {auth_email})")
+            return None
+        raise
+    value = payload.get("protect_max_req_per_min") if isinstance(payload, dict) else None
+    return value if isinstance(value, int) and value > 0 else None
 
 
 def _run_provider_call(provider: str, model: str, max_tokens: int, openai: Any, anthropic: Any, google: Any) -> bool:
@@ -390,6 +429,10 @@ def main() -> None:
             print("\n[STEP] Seed req cap breach then expect block")
             count = int(os.getenv("RHEONIC_REQ_CAP_BREACH_COUNT", "6"))
             req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
+            req_cap = _get_project_req_cap(dashboard_session, project_id, auth_email)
+            if isinstance(req_cap, int):
+                count = max(count, req_cap + 1)
+            print(f"[STEP] req_cap_breach target events={count} req_cap={req_cap if req_cap is not None else 'unknown'}")
             for i in range(count):
                 _send_ingest_event(
                     transport,
@@ -401,6 +444,7 @@ def main() -> None:
                     environment=env,
                 )
                 time.sleep(pause_ms / 1000)
+            print(f"[STEP] req_cap_breach ingest events sent={count} (provider_calls_delta tracks provider calls only)")
         elif scenario == "retry_storm":
             print("\n[STEP] Seed retry storm then expect warn")
             count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "6"))

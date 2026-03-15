@@ -32,6 +32,8 @@ loadRheonicEnvFromDotenv();
 const backendBaseUrl = process.env.RHEONIC_BACKEND_URL ?? "http://localhost:8000";
 const providerStubUrl = process.env.RHEONIC_PROVIDER_URL ?? "http://localhost:8099";
 let lastProviderCall = null;
+let localProviderCallCount = 0;
+let providerStubAvailable = null;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -45,27 +47,49 @@ function envInt(name, fallback) {
 }
 
 async function providerCount() {
-  const res = await fetch(`${providerStubUrl}/count`);
-  if (!res.ok) throw new Error(`provider_stub_count_failed:${res.status}`);
-  const payload = await res.json();
-  return Number(payload.count ?? 0);
+  if (providerStubAvailable !== false) {
+    const res = await providerStubRequest("/count");
+    if (res) {
+      const payload = await res.json();
+      return Number(payload.count ?? 0);
+    }
+  }
+  return localProviderCallCount;
 }
 
 async function resetProvider() {
-  const res = await fetch(`${providerStubUrl}/reset`, { method: "POST" });
-  if (!res.ok) throw new Error(`provider_stub_reset_failed:${res.status}`);
+  lastProviderCall = null;
+  localProviderCallCount = 0;
+  await providerStubRequest("/reset", { method: "POST" });
+}
+
+async function providerStubRequest(path, init) {
+  try {
+    const res = await fetch(`${providerStubUrl}${path}`, init);
+    if (!res.ok) throw new Error(`provider_stub_request_failed:${res.status}`);
+    providerStubAvailable = true;
+    return res;
+  } catch {
+    if (providerStubAvailable !== false) {
+      console.log(`[PROVIDER] stub unavailable at ${providerStubUrl}; using in-process call tracking`);
+    }
+    providerStubAvailable = false;
+    return null;
+  }
 }
 
 async function callProviderStub(payload) {
   if (payload && typeof payload === "object") {
     lastProviderCall = payload;
   }
-  const res = await fetch(`${providerStubUrl}/call`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error(`provider_stub_call_failed:${res.status}`);
+  localProviderCallCount += 1;
+  if (providerStubAvailable !== false) {
+    await providerStubRequest("/call", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  }
 }
 
 function providerLastCall() {
