@@ -2986,13 +2986,13 @@ pre {
 }
 
 .alerts-webhook-card {
-  padding-bottom: 14px;
+  padding-bottom: 5px;
 }
 
 .alerts-webhook-body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 24px;
   align-items: start;
 }
 
@@ -3040,7 +3040,7 @@ pre {
 }
 
 .alerts-webhook-card .alerts-save-row {
-  margin-top: 24px;
+  margin-top: 30px;
 }
 
 .alerts-error-slot {
