@@ -473,7 +473,7 @@ export function Alerts(): JSX.Element {
                   <textarea
                     id="payload-editor"
                     className="text-input alerts-template-textarea alerts-template-textarea--compact"
-                    rows={7}
+                    rows={5}
                     value={payloadEditorInput}
                     onChange={(event) => setPayloadEditorInput(event.target.value)}
                     disabled={controlsDisabled || webhookTesting}
