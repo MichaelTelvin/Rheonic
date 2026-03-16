@@ -88,7 +88,7 @@ describe("Alerts payload editor", () => {
     const toggle = await screen.findByRole("switch", { name: "Use custom payload" });
     expect((toggle as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("Message text") as HTMLTextAreaElement).value).toBe("{{event}}");
-    expect(screen.getByText(/Protected Rheonic metadata is attached automatically/i)).toBeDefined();
+    expect(screen.getByText(/Rheonic adds its own metadata automatically/i)).toBeDefined();
   });
 
   it("blocks save when payload template json is invalid", async () => {
@@ -144,15 +144,15 @@ describe("Alerts payload editor", () => {
     if (!(toggle as HTMLInputElement).checked) {
       fireEvent.click(toggle);
     }
-    await screen.findByLabelText("Compact preview");
+    await screen.findByLabelText("Example body");
     fireEvent.change(screen.getByLabelText("Message text"), {
       target: { value: "{{event}} {{incident_type}}" },
     });
     fireEvent.change(screen.getByLabelText("Preview event"), { target: { value: "incident.block" } });
 
     await waitFor(() => {
-      expect((screen.getByLabelText("Compact preview") as HTMLTextAreaElement).value).toContain("incident.block cap_breach");
-      expect((screen.getByLabelText("Compact preview") as HTMLTextAreaElement).value).toContain("\"rheonic\": \"{ protected Rheonic metadata added automatically }\"");
+      expect((screen.getByLabelText("Example body") as HTMLTextAreaElement).value).toContain("incident.block cap_breach");
+      expect((screen.getByLabelText("Example body") as HTMLTextAreaElement).value).not.toContain("\"rheonic\"");
     });
   });
 });
