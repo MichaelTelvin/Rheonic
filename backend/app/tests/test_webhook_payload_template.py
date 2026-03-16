@@ -36,5 +36,28 @@ def test_render_payload_template_interpolates_nested_values() -> None:
     )
     assert rendered == {
         "meta": {"missing": "", "provider": "openai"},
+        "rheonic": {
+            "attempts": "",
+            "destination": "",
+            "environment": "",
+            "event": "incident.warn",
+            "incident_id": "",
+            "incident_type": "retry_storm",
+            "last_error_code": "",
+            "last_error_message": "",
+            "max_attempts": "",
+            "model": "",
+            "project_id": "",
+            "provider": "openai",
+            "reason": "",
+            "req_cap": "",
+            "requests_60s": "",
+            "resolved_at": "",
+            "resolved_by": "",
+            "sent_at": "",
+            "status": "",
+            "tok_cap": "",
+            "tokens_60s": "",
+        },
         "text": "incident.warn retry_storm",
     }

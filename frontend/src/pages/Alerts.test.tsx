@@ -87,17 +87,18 @@ describe("Alerts payload editor", () => {
     render(<Alerts />);
     const toggle = await screen.findByRole("switch", { name: "Use custom payload" });
     expect((toggle as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText("Payload template") as HTMLTextAreaElement).value).toContain("\"text\": \"{{event}}\"");
+    expect((screen.getByLabelText("Message text") as HTMLTextAreaElement).value).toBe("{{event}}");
+    expect((screen.getByLabelText("Locked Rheonic metadata") as HTMLTextAreaElement).value).toContain("\"event\": \"incident.warn\"");
   });
 
   it("blocks save when payload template json is invalid", async () => {
     render(<Alerts />);
-    const input = await screen.findByLabelText("Payload template");
-    fireEvent.change(input, { target: { value: "{\"text\":" } });
+    const input = await screen.findByLabelText("Custom properties (JSON object)");
+    fireEvent.change(input, { target: { value: "{\"chat_id\":" } });
     fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
 
     expect(mocks.updateProjectWebhook).not.toHaveBeenCalled();
-    expect(await screen.findByText("Payload template must be valid JSON.")).toBeDefined();
+    expect(await screen.findByText("Custom properties must be valid JSON object fields.")).toBeDefined();
   });
 
   it("sends the draft payload template on webhook test", async () => {
@@ -124,26 +125,33 @@ describe("Alerts payload editor", () => {
       });
 
     render(<Alerts />);
-    const input = await screen.findByLabelText("Payload template");
-    fireEvent.change(input, { target: { value: "{\"message\":\"draft {{event}} {{project_id}}\"}" } });
+    const messageInput = await screen.findByLabelText("Message text");
+    const customInput = screen.getByLabelText("Custom properties (JSON object)");
+    fireEvent.change(messageInput, { target: { value: "draft {{event}} {{project_id}}" } });
+    fireEvent.change(customInput, { target: { value: "{\"chat_id\":\"123\"}" } });
     fireEvent.click(screen.getByRole("button", { name: "Test webhook" }));
 
     await waitFor(() => expect(mocks.testProjectWebhook).toHaveBeenCalled());
-    expect(mocks.testProjectWebhook.mock.calls[0][1]).toEqual({
-      payload_template_json: "{\"message\":\"draft {{event}} {{project_id}}\"}",
-    });
+    const payload = mocks.testProjectWebhook.mock.calls[0][1].payload_template_json as string;
+    expect(payload).toContain("\"text\":\"draft {{event}} {{project_id}}\"");
+    expect(payload).toContain("\"chat_id\":\"123\"");
+    expect(payload).toContain("\"rheonic\"");
   });
 
   it("updates preview when preview event changes", async () => {
     render(<Alerts />);
-    await screen.findByLabelText("Payload preview");
-    fireEvent.change(screen.getByLabelText("Payload template"), {
-      target: { value: "{\"message\":\"{{event}} {{incident_type}}\"}" },
+    const toggle = await screen.findByRole("switch", { name: "Use custom payload" });
+    if (!(toggle as HTMLInputElement).checked) {
+      fireEvent.click(toggle);
+    }
+    await screen.findByLabelText("Final payload preview");
+    fireEvent.change(screen.getByLabelText("Message text"), {
+      target: { value: "{{event}} {{incident_type}}" },
     });
     fireEvent.change(screen.getByLabelText("Preview event"), { target: { value: "incident.block" } });
 
     await waitFor(() => {
-      expect((screen.getByLabelText("Payload preview") as HTMLTextAreaElement).value).toContain("incident.block cap_breach");
+      expect((screen.getByLabelText("Final payload preview") as HTMLTextAreaElement).value).toContain("incident.block cap_breach");
     });
   });
 });

@@ -8,6 +8,30 @@ from typing import Any
 _PLACEHOLDER_PATTERN = re.compile(r"\{\{\s*([A-Za-z0-9_]+)\s*\}\}")
 _FORBIDDEN_KEYS = {"__proto__", "constructor", "prototype"}
 _MAX_TEMPLATE_LENGTH = 8192
+_LOCKED_METADATA_KEY = "rheonic"
+_LOCKED_METADATA_TEMPLATE = {
+    "event": "{{event}}",
+    "project_id": "{{project_id}}",
+    "incident_id": "{{incident_id}}",
+    "incident_type": "{{incident_type}}",
+    "provider": "{{provider}}",
+    "model": "{{model}}",
+    "environment": "{{environment}}",
+    "sent_at": "{{sent_at}}",
+    "resolved_at": "{{resolved_at}}",
+    "resolved_by": "{{resolved_by}}",
+    "reason": "{{reason}}",
+    "requests_60s": "{{requests_60s}}",
+    "tokens_60s": "{{tokens_60s}}",
+    "req_cap": "{{req_cap}}",
+    "tok_cap": "{{tok_cap}}",
+    "destination": "{{destination}}",
+    "status": "{{status}}",
+    "attempts": "{{attempts}}",
+    "max_attempts": "{{max_attempts}}",
+    "last_error_code": "{{last_error_code}}",
+    "last_error_message": "{{last_error_message}}",
+}
 
 
 def normalize_payload_template_json(raw: str | None) -> str | None:
@@ -23,7 +47,9 @@ def normalize_payload_template_json(raw: str | None) -> str | None:
     _validate_template_node(parsed)
     if not isinstance(parsed, dict):
         raise ValueError("payload template root must be an object")
-    return json.dumps(parsed, ensure_ascii=False, sort_keys=True)
+    normalized = dict(parsed)
+    normalized[_LOCKED_METADATA_KEY] = dict(_LOCKED_METADATA_TEMPLATE)
+    return json.dumps(normalized, ensure_ascii=False, sort_keys=True)
 
 
 def parse_payload_template_json(raw: str | None) -> dict[str, Any] | None:

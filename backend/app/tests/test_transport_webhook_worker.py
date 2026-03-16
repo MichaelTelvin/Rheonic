@@ -160,10 +160,12 @@ def test_process_outbox_delivery_renders_project_payload_template(tmp_path, monk
     transport_job.process_outbox_delivery(outbox_id)
 
     assert len(captured) == 1
-    assert json.loads(captured[0]["content"].decode("utf-8")) == {
-        "project": "p1",
-        "text": "incident.warn retry_storm",
-    }
+    rendered = json.loads(captured[0]["content"].decode("utf-8"))
+    assert rendered["project"] == "p1"
+    assert rendered["text"] == "incident.warn retry_storm"
+    assert rendered["rheonic"]["event"] == "incident.warn"
+    assert rendered["rheonic"]["incident_type"] == "retry_storm"
+    assert rendered["rheonic"]["project_id"] == "p1"
 
 
 def test_process_outbox_delivery_uses_override_payload_template_for_test_send(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -205,7 +207,10 @@ def test_process_outbox_delivery_uses_override_payload_template_for_test_send(tm
     transport_job.process_outbox_delivery(outbox_id)
 
     assert len(captured) == 1
-    assert json.loads(captured[0]["content"].decode("utf-8")) == {"message": "override webhook.test p1"}
+    rendered = json.loads(captured[0]["content"].decode("utf-8"))
+    assert rendered["message"] == "override webhook.test p1"
+    assert rendered["rheonic"]["event"] == "webhook.test"
+    assert rendered["rheonic"]["project_id"] == "p1"
 
 
 def test_process_outbox_delivery_webhook_failure_retries_then_dead_letters(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:

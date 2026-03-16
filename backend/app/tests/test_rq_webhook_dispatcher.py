@@ -32,7 +32,7 @@ def test_webhook_dispatcher_enqueues_outbox_row_and_dispatch_job(tmp_path, monke
         assert row.kind == "webhook"
         assert row.event_type == "webhook.test"
         assert row.destination == "https://example.test/hook"
-        assert row.payload["__transport_meta"]["override_payload_template_json"] == "{\"text\":\"{{event}}\"}"
+        assert "\"text\":\"{{event}}\"" in row.payload["__transport_meta"]["override_payload_template_json"]
 
     assert len(captured_outbox_ids) == 1
     assert captured_outbox_ids[0] == rows[0].id

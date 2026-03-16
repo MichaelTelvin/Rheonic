@@ -2870,23 +2870,28 @@ pre {
   gap: 24px;
 }
 
-.alerts-cards-row {
+.alerts-overview-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(280px, 0.7fr) minmax(0, 1.2fr);
   gap: 18px;
-  align-items: stretch;
+  align-items: start;
 }
 
-.alerts-card {
+.alerts-summary-card,
+.alerts-routing-card,
+.alerts-editor-card {
   max-width: none;
-  height: 100%;
 }
 
-.alerts-cards-row .alerts-card .section-title {
+.alerts-summary-card .section-title,
+.alerts-routing-card .section-title,
+.alerts-editor-card .section-title {
   margin-bottom: 8px;
 }
 
-.alerts-cards-row .alerts-card .alerts-helper {
+.alerts-summary-card .alerts-helper,
+.alerts-routing-card .alerts-helper,
+.alerts-editor-card .alerts-helper {
   margin-bottom: 14px;
 }
 
@@ -2898,6 +2903,40 @@ pre {
 
 .alerts-webhook-field {
   width: min(100%, 340px);
+}
+
+.alerts-routing-card .alerts-webhook-field,
+.alerts-routing-card .alerts-url {
+  width: min(100%, 460px);
+}
+
+.alerts-editor-card {
+  width: 100%;
+}
+
+.alerts-editor-header {
+  margin-bottom: 16px;
+}
+
+.alerts-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 22px;
+}
+
+.alerts-editor-column {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.alerts-template-textarea {
+  width: 100%;
+  min-height: 120px;
+  font-family: "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  resize: vertical;
 }
 
 .alerts-webhook-input:focus {
@@ -3732,7 +3771,8 @@ pre {
     justify-content: space-between;
   }
 
-  .alerts-cards-row {
+  .alerts-overview-grid,
+  .alerts-editor-grid {
     grid-template-columns: 1fr;
   }
 
