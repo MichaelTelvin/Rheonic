@@ -3007,7 +3007,6 @@ pre {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
   color: rgba(229, 231, 235, 0.74);
   font-size: 0.88rem;
   line-height: 1.35;
@@ -3022,7 +3021,7 @@ pre {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 30px;
 }
 
 .alerts-actions-row--inline {
@@ -3053,8 +3052,8 @@ pre {
 }
 
 .alerts-template-textarea--compact {
-  min-height: 170px;
-  height: 177px;
+  min-height: 175px;
+  height: 180px;
   overflow-y: hidden;
 }
 
