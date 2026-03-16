@@ -2841,7 +2841,7 @@ pre {
 
 .alerts-cards-grid {
   display: grid;
-  grid-template-columns: minmax(320px, 0.72fr) minmax(480px, 1.28fr);
+  grid-template-columns: 1fr;
   gap: 24px;
   align-items: start;
 }
