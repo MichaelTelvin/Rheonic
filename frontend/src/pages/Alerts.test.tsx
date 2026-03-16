@@ -88,14 +88,14 @@ describe("Alerts payload editor", () => {
     const toggle = await screen.findByRole("switch", { name: "Use custom payload" });
     expect((toggle as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("Message text") as HTMLTextAreaElement).value).toBe("{{event}}");
-    expect((screen.getByLabelText("Locked Rheonic metadata") as HTMLTextAreaElement).value).toContain("\"event\": \"incident.warn\"");
+    expect(screen.getByText(/Protected Rheonic metadata is attached automatically/i)).toBeDefined();
   });
 
   it("blocks save when payload template json is invalid", async () => {
     render(<Alerts />);
-    const input = await screen.findByLabelText("Custom properties (JSON object)");
+    const input = await screen.findByLabelText("Extra fields (JSON object)");
     fireEvent.change(input, { target: { value: "{\"chat_id\":" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(mocks.updateProjectWebhook).not.toHaveBeenCalled();
     expect(await screen.findByText("Custom properties must be valid JSON object fields.")).toBeDefined();
@@ -126,7 +126,7 @@ describe("Alerts payload editor", () => {
 
     render(<Alerts />);
     const messageInput = await screen.findByLabelText("Message text");
-    const customInput = screen.getByLabelText("Custom properties (JSON object)");
+    const customInput = screen.getByLabelText("Extra fields (JSON object)");
     fireEvent.change(messageInput, { target: { value: "draft {{event}} {{project_id}}" } });
     fireEvent.change(customInput, { target: { value: "{\"chat_id\":\"123\"}" } });
     fireEvent.click(screen.getByRole("button", { name: "Test webhook" }));
@@ -144,14 +144,15 @@ describe("Alerts payload editor", () => {
     if (!(toggle as HTMLInputElement).checked) {
       fireEvent.click(toggle);
     }
-    await screen.findByLabelText("Final payload preview");
+    await screen.findByLabelText("Compact preview");
     fireEvent.change(screen.getByLabelText("Message text"), {
       target: { value: "{{event}} {{incident_type}}" },
     });
     fireEvent.change(screen.getByLabelText("Preview event"), { target: { value: "incident.block" } });
 
     await waitFor(() => {
-      expect((screen.getByLabelText("Final payload preview") as HTMLTextAreaElement).value).toContain("incident.block cap_breach");
+      expect((screen.getByLabelText("Compact preview") as HTMLTextAreaElement).value).toContain("incident.block cap_breach");
+      expect((screen.getByLabelText("Compact preview") as HTMLTextAreaElement).value).toContain("\"rheonic\": \"{ protected Rheonic metadata added automatically }\"");
     });
   });
 });

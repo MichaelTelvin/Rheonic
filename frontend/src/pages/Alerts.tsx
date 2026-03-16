@@ -126,7 +126,7 @@ function buildPayloadTemplateJson(messageText: string, customPropertiesText: str
   return JSON.stringify(template);
 }
 
-function renderFinalPayloadPreview(
+function renderCompactPayloadPreview(
   messageText: string,
   customPropertiesText: string,
   eventType: typeof PREVIEW_EVENTS[number],
@@ -134,7 +134,19 @@ function renderFinalPayloadPreview(
   const template = JSON.parse(buildPayloadTemplateJson(messageText, customPropertiesText)) as Record<string, unknown>;
   const context = sampleWebhookContext(eventType);
   const rendered = renderTemplateNode(template, context);
-  return JSON.stringify(rendered, null, 2);
+  const record = rendered as Record<string, unknown>;
+  const compactPreview: Record<string, unknown> = {};
+  if (typeof record.text === "string" && record.text.trim()) {
+    compactPreview.text = record.text;
+  }
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "text" || key === LOCKED_METADATA_KEY) {
+      continue;
+    }
+    compactPreview[key] = value;
+  }
+  compactPreview[LOCKED_METADATA_KEY] = "{ protected Rheonic metadata added automatically }";
+  return JSON.stringify(compactPreview, null, 2);
 }
 
 function sampleWebhookContext(eventType: typeof PREVIEW_EVENTS[number]): Record<string, string> {
@@ -351,7 +363,7 @@ export function Alerts(): JSX.Element {
       return "";
     }
     try {
-      return renderFinalPayloadPreview(payloadMessageTextInput, payloadCustomPropertiesInput, payloadPreviewEvent);
+      return renderCompactPayloadPreview(payloadMessageTextInput, payloadCustomPropertiesInput, payloadPreviewEvent);
     } catch {
       return "";
     }
@@ -362,11 +374,6 @@ export function Alerts(): JSX.Element {
     payloadCustomPropertiesInput,
     payloadPreviewEvent,
   ]);
-
-  const lockedMetadataPreview = useMemo(
-    () => JSON.stringify(renderTemplateNode(buildLockedMetadataTemplate(), sampleWebhookContext(payloadPreviewEvent)), null, 2),
-    [payloadPreviewEvent],
-  );
 
   const discardUnsavedChanges = (): void => {
     if (!webhookSettings) {
@@ -520,202 +527,191 @@ export function Alerts(): JSX.Element {
           <p className="page-subtitle">Configure protect lifecycle alert routes for email and webhook delivery</p>
         </section>
 
-        <div className="alerts-overview-grid">
-          <Card className="form-card alerts-summary-card">
-            <h2 className="section-title">Email</h2>
-            <p className="alerts-helper">Send protect lifecycle alerts to your account email</p>
-            <FormColumn>
-              <div className="alerts-grid">
-                <div className="form-field alerts-enabled">
-                  <label htmlFor="alerts-email-enabled-toggle" className="alerts-toggle-row">
-                    <span className="toggle-switch">
-                      <input
-                        id="alerts-email-enabled-toggle"
-                        type="checkbox"
-                        checked={emailEnabledInput}
-                        disabled={controlsDisabled}
-                        onChange={(event) => setEmailEnabledInput(event.target.checked)}
-                        role="switch"
-                      />
-                      <span className="toggle-switch-track" aria-hidden="true" />
-                    </span>
-                    <span>{emailEnabledInput ? "On" : "Off"}</span>
-                  </label>
-                </div>
-                <p className="alerts-destination">
-                  <span className="alerts-destination-label">To:</span>{" "}
-                  <span className="alerts-destination-email">{accountEmail}</span>
-                </p>
-                <div className="modal-actions form-actions">
-                  <button
-                    type="button"
-                    className="modal-button modal-primary action-btn"
-                    onClick={() => void onSaveWebhookSettings()}
-                    disabled={controlsDisabled}
-                  >
-                    {webhookSaving ? "Saving..." : "Save"}
-                  </button>
-                </div>
+        <Card className="form-card alerts-main-card">
+          <div className="alerts-main-grid">
+            <section className="alerts-section alerts-section-email">
+              <div className="alerts-section-head">
+                <h2 className="section-title">Email</h2>
+                <p className="alerts-helper">Send protect lifecycle alerts to your account email.</p>
               </div>
-            </FormColumn>
-          </Card>
-
-          <Card className="form-card alerts-routing-card">
-            <h2 className="section-title">Webhook</h2>
-            <p className="alerts-helper">
-              {protectEnabled
-                ? "Deliver the same protect lifecycle alerts to your webhook endpoint"
-                : "Configure now. Delivery starts when Protect is enabled"}
-            </p>
-            <FormColumn testId="alerts-form-column">
-              <div className={`alerts-grid ${controlsDisabled ? "is-disabled" : ""}`}>
-                <div className="form-field alerts-enabled">
-                  <label htmlFor="alerts-enabled-toggle" className="alerts-toggle-row">
-                    <span className="toggle-switch">
-                      <input
-                        id="alerts-enabled-toggle"
-                        type="checkbox"
-                        checked={webhookEnabledInput}
-                        disabled={controlsDisabled}
-                        onChange={(event) => setWebhookEnabledInput(event.target.checked)}
-                        role="switch"
-                      />
-                      <span className="toggle-switch-track" aria-hidden="true" />
-                    </span>
-                    <span>{webhookEnabledInput ? "On" : "Off"}</span>
-                  </label>
-                </div>
-                {!protectEnabled && webhookEnabledInput ? (
-                  <p className="alerts-pending-status">Configured - will start delivering when you enable Protect</p>
-                ) : null}
-                <div className="form-field alerts-url alerts-webhook-field">
-                  <label htmlFor="webhook-url" title="HTTPS endpoint that receives RHEONIC webhook events.">
-                    <span className="alerts-label-inline">
-                      <span>Webhook URL</span>
-                      {webhookTesting ? <span className="alerts-inline-spinner" aria-label="Testing webhook" /> : null}
-                    </span>
-                  </label>
-                  <input
-                    id="webhook-url"
-                    className={`text-input alerts-webhook-input ${webhookError ? "input-error" : ""}`}
-                    type="url"
-                    placeholder="https://..."
-                    value={webhookUrlInput}
-                    onChange={(event) => setWebhookUrlInput(event.target.value)}
-                    disabled={controlsDisabled || webhookTesting}
-                    title={webhookUrlInput || undefined}
-                  />
-                </div>
-                <div className="form-field alerts-webhook-field">
-                  <label htmlFor="webhook-secret" title="Optional secret used by your receiver for signature verification.">
-                    Secret (optional)
-                  </label>
-                  <input
-                    id="webhook-secret"
-                    className="text-input alerts-webhook-input"
-                    type="password"
-                    placeholder={webhookSettings?.has_secret ? "•••••••• (leave blank to keep)" : "optional"}
-                    value={webhookSecretInput}
-                    onChange={(event) => setWebhookSecretInput(event.target.value)}
-                    disabled={controlsDisabled || webhookTesting}
-                  />
-                </div>
-                <div className="form-field alerts-webhook-field">
-                  <label htmlFor="alerts-custom-payload-toggle" className="alerts-toggle-row">
-                    <span className="toggle-switch">
-                      <input
-                        id="alerts-custom-payload-toggle"
-                        type="checkbox"
-                        checked={payloadTemplateEnabledInput}
-                        disabled={controlsDisabled || webhookTesting}
-                        onChange={(event) => setPayloadTemplateEnabledInput(event.target.checked)}
-                        role="switch"
-                      />
-                      <span className="toggle-switch-track" aria-hidden="true" />
-                    </span>
-                    <span>Use custom payload</span>
-                  </label>
-                </div>
-                {payloadTemplateEnabledInput ? (
-                  <p className="alerts-helper">
-                    Payload builder appears below. Custom fields go in the editable JSON object, while locked Rheonic
-                    metadata is always injected under <code>rheonic</code>.
+              <FormColumn>
+                <div className="alerts-grid">
+                  <div className="form-field alerts-enabled">
+                    <label htmlFor="alerts-email-enabled-toggle" className="alerts-toggle-row">
+                      <span className="toggle-switch">
+                        <input
+                          id="alerts-email-enabled-toggle"
+                          type="checkbox"
+                          checked={emailEnabledInput}
+                          disabled={controlsDisabled}
+                          onChange={(event) => setEmailEnabledInput(event.target.checked)}
+                          role="switch"
+                        />
+                        <span className="toggle-switch-track" aria-hidden="true" />
+                      </span>
+                      <span>{emailEnabledInput ? "On" : "Off"}</span>
+                    </label>
+                  </div>
+                  <p className="alerts-destination">
+                    <span className="alerts-destination-label">Recipient</span>
+                    <span className="alerts-destination-email">{accountEmail}</span>
                   </p>
-                ) : null}
-                <p className="form-error-slot alerts-error-slot">{webhookError ?? payloadTemplateError ?? "\u00A0"}</p>
-                <p className="alerts-status">
-                  Last delivery:
-                  {" "}
-                  <span className={webhookSettings?.last_status === "failed" ? "alerts-failed" : "alerts-success"}>
-                    {webhookSettings?.last_status ? webhookSettings.last_status : "—"}
-                  </span>
-                  {" "}
-                  <span>{formatDateTime(webhookSettings?.last_at ?? null)}</span>
+                </div>
+              </FormColumn>
+            </section>
+
+            <section className="alerts-section alerts-section-webhook">
+              <div className="alerts-section-head">
+                <h2 className="section-title">Webhook</h2>
+                <p className="alerts-helper">
+                  {protectEnabled
+                    ? "Deliver the same protect lifecycle alerts to your webhook endpoint."
+                    : "Configure now. Delivery starts when Protect is enabled."}
                 </p>
-                <div className="modal-actions form-actions">
-                  <button
-                    type="button"
-                    className="modal-button action-btn"
-                    onClick={() => void onTestWebhook()}
-                    disabled={!canTestWebhook}
-                  >
-                    {webhookTesting ? "Testing..." : "Test webhook"}
-                  </button>
-                  <button
-                    type="button"
-                    className="modal-button modal-primary action-btn"
-                    onClick={() => void onSaveWebhookSettings()}
-                    disabled={controlsDisabled}
-                  >
-                    {webhookSaving ? "Saving..." : "Save"}
-                  </button>
+              </div>
+              <FormColumn testId="alerts-form-column">
+                <div className={`alerts-grid ${controlsDisabled ? "is-disabled" : ""}`}>
+                  <div className="form-field alerts-enabled">
+                    <label htmlFor="alerts-enabled-toggle" className="alerts-toggle-row">
+                      <span className="toggle-switch">
+                        <input
+                          id="alerts-enabled-toggle"
+                          type="checkbox"
+                          checked={webhookEnabledInput}
+                          disabled={controlsDisabled}
+                          onChange={(event) => setWebhookEnabledInput(event.target.checked)}
+                          role="switch"
+                        />
+                        <span className="toggle-switch-track" aria-hidden="true" />
+                      </span>
+                      <span>{webhookEnabledInput ? "On" : "Off"}</span>
+                    </label>
+                  </div>
+                  {!protectEnabled && webhookEnabledInput ? (
+                    <p className="alerts-pending-status">Configured - will start delivering when you enable Protect</p>
+                  ) : null}
+                  <div className="form-field alerts-url alerts-webhook-field">
+                    <label htmlFor="webhook-url" title="HTTPS endpoint that receives RHEONIC webhook events.">
+                      <span className="alerts-label-inline">
+                        <span>Webhook URL</span>
+                        {webhookTesting ? <span className="alerts-inline-spinner" aria-label="Testing webhook" /> : null}
+                      </span>
+                    </label>
+                    <input
+                      id="webhook-url"
+                      className={`text-input alerts-webhook-input ${webhookError ? "input-error" : ""}`}
+                      type="url"
+                      placeholder="https://..."
+                      value={webhookUrlInput}
+                      onChange={(event) => setWebhookUrlInput(event.target.value)}
+                      disabled={controlsDisabled || webhookTesting}
+                      title={webhookUrlInput || undefined}
+                    />
+                  </div>
+                  <div className="form-field alerts-webhook-field">
+                    <label htmlFor="webhook-secret" title="Optional secret used by your receiver for signature verification.">
+                      Secret (optional)
+                    </label>
+                    <input
+                      id="webhook-secret"
+                      className="text-input alerts-webhook-input"
+                      type="password"
+                      placeholder={webhookSettings?.has_secret ? "•••••••• (leave blank to keep)" : "optional"}
+                      value={webhookSecretInput}
+                      onChange={(event) => setWebhookSecretInput(event.target.value)}
+                      disabled={controlsDisabled || webhookTesting}
+                    />
+                  </div>
+                  <div className="form-field alerts-webhook-field">
+                    <label htmlFor="alerts-custom-payload-toggle" className="alerts-toggle-row">
+                      <span className="toggle-switch">
+                        <input
+                          id="alerts-custom-payload-toggle"
+                          type="checkbox"
+                          checked={payloadTemplateEnabledInput}
+                          disabled={controlsDisabled || webhookTesting}
+                          onChange={(event) => setPayloadTemplateEnabledInput(event.target.checked)}
+                          role="switch"
+                        />
+                        <span className="toggle-switch-track" aria-hidden="true" />
+                      </span>
+                      <span>Use custom payload</span>
+                    </label>
+                  </div>
+                  <p className="form-error-slot alerts-error-slot">{webhookError ?? payloadTemplateError ?? "\u00A0"}</p>
+                  <p className="alerts-status">
+                    Last delivery:
+                    {" "}
+                    <span className={webhookSettings?.last_status === "failed" ? "alerts-failed" : "alerts-success"}>
+                      {webhookSettings?.last_status ? webhookSettings.last_status : "—"}
+                    </span>
+                    {" "}
+                    <span>{formatDateTime(webhookSettings?.last_at ?? null)}</span>
+                  </p>
+                  <div className="modal-actions form-actions">
+                    <button
+                      type="button"
+                      className="modal-button action-btn"
+                      onClick={() => void onTestWebhook()}
+                      disabled={!canTestWebhook}
+                    >
+                      {webhookTesting ? "Testing..." : "Test webhook"}
+                    </button>
+                    <button
+                      type="button"
+                      className="modal-button modal-primary action-btn"
+                      onClick={() => void onSaveWebhookSettings()}
+                      disabled={controlsDisabled}
+                    >
+                      {webhookSaving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
+                </div>
+              </FormColumn>
+            </section>
+          </div>
+
+          {payloadTemplateEnabledInput ? (
+            <section className="alerts-inline-builder">
+              <div className="alerts-editor-header">
+                <div>
+                  <h2 className="section-title">Custom Payload</h2>
+                  <p className="alerts-helper">
+                    Add your own text and top-level provider fields. Protected Rheonic metadata is attached automatically.
+                  </p>
                 </div>
               </div>
-            </FormColumn>
-          </Card>
-        </div>
-        {payloadTemplateEnabledInput ? (
-          <Card className="form-card card--form alerts-editor-card">
-            <div className="alerts-editor-header">
-              <div>
-                <h2 className="section-title">Webhook Payload Builder</h2>
-                <p className="alerts-helper">
-                  Build the outgoing webhook body from two editable parts: a message text and custom top-level
-                  properties. Required Rheonic metadata is preserved automatically.
-                </p>
-              </div>
-            </div>
-            <div className={`alerts-editor-grid ${controlsDisabled ? "is-disabled" : ""}`}>
-              <div className="alerts-editor-column">
+              <div className={`alerts-editor-grid ${controlsDisabled ? "is-disabled" : ""}`}>
+                <div className="alerts-editor-column">
                 <div className="form-field">
                   <label htmlFor="payload-message-text">Message text</label>
                   <textarea
                     id="payload-message-text"
                     className="text-input alerts-template-textarea"
-                    rows={5}
+                    rows={4}
                     value={payloadMessageTextInput}
                     onChange={(event) => setPayloadMessageTextInput(event.target.value)}
                     disabled={controlsDisabled || webhookTesting}
+                    placeholder="Rheonic {{event}} for {{project_id}}: {{incident_type}}"
                   />
                   <p className="alerts-helper">
-                    Use placeholders like <code>{"{{incident_type}}"}</code> or <code>{"{{provider}}"}</code> inside
-                    the message text.
+                    Optional. Use placeholders like <code>{"{{incident_type}}"}</code> or <code>{"{{provider}}"}</code>.
                   </p>
                 </div>
                 <div className="form-field">
-                  <label htmlFor="payload-custom-properties">Custom properties (JSON object)</label>
+                  <label htmlFor="payload-custom-properties">Extra fields (JSON object)</label>
                   <textarea
                     id="payload-custom-properties"
                     className={`text-input alerts-template-textarea ${payloadTemplateError ? "input-error" : ""}`}
-                    rows={10}
+                    rows={8}
                     value={payloadCustomPropertiesInput}
                     onChange={(event) => setPayloadCustomPropertiesInput(event.target.value)}
                     disabled={controlsDisabled || webhookTesting}
+                    placeholder={"{\n  \"chat_id\": \"123456789\",\n  \"parse_mode\": \"Markdown\"\n}"}
                   />
                   <p className="alerts-helper">
-                    Add provider-specific top-level properties here, for example <code>chat_id</code>,{" "}
-                    <code>thread_id</code>, or <code>parse_mode</code>. Do not include <code>text</code> or{" "}
-                    <code>rheonic</code> here.
+                    Put provider-specific top-level fields here, for example <code>chat_id</code>, <code>thread_id</code>,
+                    or <code>parse_mode</code>.
                   </p>
                 </div>
               </div>
@@ -737,35 +733,26 @@ export function Alerts(): JSX.Element {
                   </select>
                 </div>
                 <div className="form-field">
-                  <label htmlFor="payload-locked-metadata">Locked Rheonic metadata</label>
-                  <textarea
-                    id="payload-locked-metadata"
-                    className="text-input alerts-template-textarea"
-                    rows={11}
-                    value={lockedMetadataPreview}
-                    readOnly
-                  />
-                  <p className="alerts-helper">
-                    These fields are always included under the immutable <code>rheonic</code> object.
-                  </p>
-                </div>
-                <div className="form-field">
-                  <label htmlFor="payload-preview">Final payload preview</label>
+                  <label htmlFor="payload-preview">Compact preview</label>
                   <textarea
                     id="payload-preview"
                     className="text-input alerts-template-textarea"
-                    rows={11}
+                    rows={12}
                     value={payloadTemplatePreview}
                     readOnly
                   />
+                  <p className="alerts-helper">
+                    Your custom fields are shown directly. The protected <code>rheonic</code> object is attached automatically at send time.
+                  </p>
                 </div>
                 <div className="form-field">
                   <p className="alerts-helper">Available placeholders: {TEMPLATE_PLACEHOLDERS.join(", ")}</p>
                 </div>
               </div>
-            </div>
-          </Card>
-        ) : null}
+              </div>
+            </section>
+          ) : null}
+        </Card>
         <UnsavedChangesToast
           open={showUnsavedPrompt}
           busy={webhookSaving}
