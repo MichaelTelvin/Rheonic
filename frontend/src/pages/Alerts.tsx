@@ -363,7 +363,7 @@ export function Alerts(): JSX.Element {
                   </div>
                 </div>
                 <div className="alerts-recipient-block">
-                  <span className="alerts-recipient-label">Recipient</span>
+                  <span className="alerts-recipient-label">Recipient:</span>
                   <span className="alerts-recipient-value">{accountEmail}</span>
                 </div>
               </section>
@@ -466,7 +466,7 @@ export function Alerts(): JSX.Element {
 
         <Card className="form-card card--form alerts-payload-card">
           <h2 className="section-title">Custom Payload</h2>
-          <p className="alerts-intro">Add provider-specific top-level fields such as channel IDs, message text, or formatting flags. Rheonic metadata is added automatically on delivery.</p>
+          <p className="alerts-intro">Add your own JSON object. Rheonic metadata is added automatically on delivery.</p>
           <div className={`alerts-payload-editor alerts-payload-editor-single ${controlsDisabled ? "is-disabled" : ""}`}>
             <div className="form-field">
               <label htmlFor="payload-editor">Webhook body</label>
@@ -479,7 +479,6 @@ export function Alerts(): JSX.Element {
                 disabled={controlsDisabled || webhookTesting}
                 placeholder={CUSTOM_PAYLOAD_PLACEHOLDER}
               />
-              <p className="alerts-note">JSON object only. Example: {"{"}"channel_id":653661315,"text":"agent behavior anomaly detected","parse_mode":"HTML"{"}"}</p>
             </div>
           </div>
         </Card>
