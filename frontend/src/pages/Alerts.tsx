@@ -16,7 +16,7 @@ import { useAuthContext } from "../context/AuthContext";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 
-const CUSTOM_PAYLOAD_PLACEHOLDER = '{\n  "channel_id": 653661315,\n  "text": "agent behavior anomaly detected",\n  "parse_mode": "HTML"\n}';
+const CUSTOM_PAYLOAD_PLACEHOLDER = '{\n  "channel_id": 653661315,\n  "text": "agent anomaly detected",\n  "parse_mode": "HTML"\n}';
 
 function parsePayloadTemplateForEditor(value: string | null): string {
   if (!value) {
@@ -473,7 +473,7 @@ export function Alerts(): JSX.Element {
                   <textarea
                     id="payload-editor"
                     className="text-input alerts-template-textarea alerts-template-textarea--compact"
-                    rows={12}
+                    rows={7}
                     value={payloadEditorInput}
                     onChange={(event) => setPayloadEditorInput(event.target.value)}
                     disabled={controlsDisabled || webhookTesting}
