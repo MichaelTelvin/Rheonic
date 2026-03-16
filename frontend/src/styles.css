@@ -2818,7 +2818,7 @@ pre {
 }
 
 .alerts-intro {
-  margin: 0;
+  margin: -10px 0 0;
   color: rgba(229, 231, 235, 0.74);
   font-size: 0.9rem;
   line-height: 1.42;
@@ -2841,10 +2841,15 @@ pre {
 }
 
 .alerts-route-section--plain {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.alerts-route-section--plain > legend {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--text);
+  padding: 0 6px;
 }
 
 .alerts-cards-grid {
@@ -2855,26 +2860,7 @@ pre {
 }
 
 .alerts-route-section+.alerts-route-section {
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(148, 163, 184, 0.14);
-}
-
-.alerts-route-copy {
-  display: grid;
-  gap: 14px;
-  max-width: 46rem;
-}
-
-.alerts-route-head {
-  display: block;
-}
-
-.alerts-route-heading {
-  margin: 0;
-  font-size: 1.12rem;
-  font-weight: 700;
-  color: var(--text);
+  margin-top: 10px;
 }
 
 .alerts-route-description {
@@ -3000,6 +2986,11 @@ pre {
   min-width: 0;
   display: grid;
   gap: 20px;
+  order: 2;
+}
+
+.alerts-webhook-side {
+  order: 1;
 }
 
 .alerts-webhook-fields {
@@ -3062,8 +3053,8 @@ pre {
 }
 
 .alerts-template-textarea--compact {
-  min-height: 160px;
-  height: 170px;
+  min-height: 170px;
+  height: 177px;
   overflow-y: hidden;
 }
 
@@ -3182,7 +3173,10 @@ pre {
   padding: 6px 8px;
   font-size: 0.76rem;
   color: rgba(229, 231, 235, 0.92);
-  white-space: nowrap;
+  width: max-content;
+  max-width: 260px;
+  white-space: normal;
+  line-height: 1.35;
   box-shadow: 0 8px 18px rgba(2, 6, 23, 0.42);
 }
 

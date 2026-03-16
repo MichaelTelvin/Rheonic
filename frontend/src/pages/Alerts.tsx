@@ -10,6 +10,7 @@ import {
 } from "../api/client";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
+import { InfoTooltip } from "../components/InfoTooltip";
 import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
 import { showAppToast } from "../components/AppToastHost";
 import { useAuthContext } from "../context/AuthContext";
@@ -335,24 +336,23 @@ export function Alerts(): JSX.Element {
       <div className="dashboard-content page-stack alerts-page-stack">
         <section>
           <h1 className="page-title">Alerts</h1>
-          <p className="page-subtitle">Configure protect lifecycle alert routes for email and webhook delivery</p>
+          <p className="page-subtitle">Configure lifecycle alert routes for email and webhook delivery</p>
         </section>
 
         <div className="alerts-cards-grid">
           <Card className="form-card card--form alerts-webhook-card">
             <FormColumn testId="alerts-form-column">
               <div className={`alerts-routes-form ${controlsDisabled ? "is-disabled" : ""}`}>
-                <section className="alerts-route-section alerts-route-section--plain">
-                  <div className="alerts-route-copy">
-                    <h3 className="alerts-route-heading">Email</h3>
-                  </div>
+                <fieldset className={`protect-fail-mode alerts-route-section alerts-route-section--plain ${!protectEnabled ? "is-disabled" : ""}`}>
+                  <legend>Email</legend>
+                  <p className="alerts-intro">Protect mode only. Sends lifecycle alerts to your account email.</p>
                   <label htmlFor="alerts-email-enabled-toggle" className="alerts-toggle-row">
                     <span className="toggle-switch">
                       <input
                         id="alerts-email-enabled-toggle"
                         type="checkbox"
                         checked={emailEnabledInput}
-                        disabled={controlsDisabled}
+                        disabled={controlsDisabled || !protectEnabled}
                         onChange={(event) => setEmailEnabledInput(event.target.checked)}
                         role="switch"
                       />
@@ -364,12 +364,11 @@ export function Alerts(): JSX.Element {
                     <span className="alerts-recipient-label">Recipient:</span>
                     <span className="alerts-recipient-value">{accountEmail}</span>
                   </div>
-                </section>
+                </fieldset>
 
-                <section className={`alerts-route-section alerts-route-section--plain ${controlsDisabled ? "is-disabled" : ""}`}>
-                  <div className="alerts-route-copy">
-                    <h3 className="alerts-route-heading">Webhook</h3>
-                  </div>
+                <fieldset className={`protect-fail-mode alerts-route-section alerts-route-section--plain ${controlsDisabled ? "is-disabled" : ""}`}>
+                  <legend>Webhook</legend>
+                  <p className="alerts-intro">Observe and Protect modes. Delivers lifecycle alerts to your endpoint.</p>
                   <label htmlFor="alerts-enabled-toggle" className="alerts-toggle-row">
                     <span className="toggle-switch">
                       <input
@@ -410,8 +409,11 @@ export function Alerts(): JSX.Element {
                       </div>
 
                       <div className="form-field">
-                        <label htmlFor="webhook-secret" title="Optional secret used by your receiver for signature verification.">
-                          Secret (optional)
+                        <label htmlFor="webhook-secret">
+                          <span className="label-with-tooltip tooltip-label-unified tooltip-label-inline">
+                            <span>Secret</span>
+                            <InfoTooltip text={<>Optional secret<br />for webhook verification.</>} />
+                          </span>
                         </label>
                         <input
                           id="webhook-secret"
@@ -447,7 +449,12 @@ export function Alerts(): JSX.Element {
 
                     <div className="alerts-webhook-side">
                       <div className="form-field">
-                        <label htmlFor="payload-editor">Custom payload (optional)</label>
+                        <label htmlFor="payload-editor">
+                          <span className="label-with-tooltip tooltip-label-unified tooltip-label-inline">
+                            <span>Custom payload</span>
+                            <InfoTooltip text={<>Optional top-level fields<br />merged into the webhook body.</>} />
+                          </span>
+                        </label>
                         <textarea
                           id="payload-editor"
                           className="text-input alerts-template-textarea alerts-template-textarea--compact"
@@ -460,18 +467,18 @@ export function Alerts(): JSX.Element {
                       </div>
                     </div>
                   </div>
+                </fieldset>
 
-                  <div className="modal-actions form-actions alerts-route-buttons alerts-route-buttons--left alerts-save-row">
-                    <button
-                      type="button"
-                      className="modal-button modal-primary action-btn"
-                      onClick={() => void onSaveWebhookSettings()}
-                      disabled={controlsDisabled}
-                    >
-                      {webhookSaving ? "Saving..." : "Save alerts"}
-                    </button>
-                  </div>
-                </section>
+                <div className="modal-actions form-actions alerts-route-buttons alerts-route-buttons--left alerts-save-row">
+                  <button
+                    type="button"
+                    className="modal-button modal-primary action-btn"
+                    onClick={() => void onSaveWebhookSettings()}
+                    disabled={controlsDisabled}
+                  >
+                    {webhookSaving ? "Saving..." : "Save alerts"}
+                  </button>
+                </div>
               </div>
               <p className="form-error-slot alerts-error-slot">{webhookError ?? payloadTemplateError ?? "\u00A0"}</p>
           </FormColumn>

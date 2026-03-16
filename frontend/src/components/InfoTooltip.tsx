@@ -1,7 +1,7 @@
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 
 interface InfoTooltipProps {
-  text: string;
+  text: ReactNode;
 }
 
 export function InfoTooltip({ text }: InfoTooltipProps): JSX.Element {
