@@ -2845,7 +2845,7 @@ pre {
   margin-bottom: 10px;
 }
 
-.alerts-route-section--plain > legend {
+.alerts-route-section--plain>legend {
   font-size: 1.12rem;
   font-weight: 700;
   color: var(--text);
@@ -2885,7 +2885,7 @@ pre {
   line-height: 1;
 }
 
-.alerts-route-section:last-child .alerts-toggle-row {
+.alerts-route-section .alerts-toggle-row {
   margin-bottom: 8px;
 }
 
@@ -2977,8 +2977,8 @@ pre {
 
 .alerts-webhook-body {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 22px;
   align-items: start;
 }
 
@@ -3031,7 +3031,7 @@ pre {
 }
 
 .alerts-webhook-card .alerts-save-row {
-  margin-top: 30px;
+  margin-top: 24px;
 }
 
 .alerts-error-slot {
