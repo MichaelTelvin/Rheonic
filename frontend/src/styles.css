@@ -2987,6 +2987,10 @@ pre {
   min-width: 104px;
 }
 
+.alerts-webhook-card {
+  padding-bottom: 26px;
+}
+
 .alerts-webhook-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 0.78fr);
@@ -3054,7 +3058,7 @@ pre {
 }
 
 .alerts-template-textarea--compact {
-  min-height: 168px;
+  min-height: 128px;
 }
 
 .alerts-template-textarea::placeholder {
