@@ -2991,7 +2991,7 @@ pre {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 0.78fr);
   gap: 24px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .alerts-webhook-main {
@@ -3015,6 +3015,9 @@ pre {
 
 .alerts-payload-pane {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .alerts-status {
@@ -3051,7 +3054,7 @@ pre {
 }
 
 .alerts-template-textarea--compact {
-  min-height: 196px;
+  min-height: 168px;
 }
 
 .alerts-template-textarea::placeholder {
