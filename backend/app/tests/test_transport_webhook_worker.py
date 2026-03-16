@@ -135,7 +135,7 @@ def test_process_outbox_delivery_renders_project_payload_template(tmp_path, monk
     _seed_project(
         session_factory,
         "p1",
-        webhook_payload_template_json="{\"text\":\"{{event}} {{incident_type}}\",\"project\":\"{{project_id}}\"}",
+        webhook_payload_template_json="{\"text\":\"agent behavior anomaly detected\",\"project\":\"p1\",\"chat_id\":\"123456\"}",
     )
     service = TransportService(
         outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
@@ -162,7 +162,8 @@ def test_process_outbox_delivery_renders_project_payload_template(tmp_path, monk
     assert len(captured) == 1
     rendered = json.loads(captured[0]["content"].decode("utf-8"))
     assert rendered["project"] == "p1"
-    assert rendered["text"] == "incident.warn retry_storm"
+    assert rendered["text"] == "agent behavior anomaly detected"
+    assert rendered["chat_id"] == "123456"
     assert rendered["rheonic"]["event"] == "incident.warn"
     assert rendered["rheonic"]["incident_type"] == "retry_storm"
     assert rendered["rheonic"]["project_id"] == "p1"
@@ -208,7 +209,7 @@ def test_process_outbox_delivery_uses_override_payload_template_for_test_send(tm
 
     assert len(captured) == 1
     rendered = json.loads(captured[0]["content"].decode("utf-8"))
-    assert rendered["message"] == "override webhook.test p1"
+    assert rendered["message"] == "override {{event}} {{project_id}}"
     assert rendered["rheonic"]["event"] == "webhook.test"
     assert rendered["rheonic"]["project_id"] == "p1"
 

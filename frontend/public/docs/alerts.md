@@ -16,7 +16,7 @@ Rheonic can notify you when protect events occur. Alerts are configured per proj
 - set the destination URL,
 - set or rotate the signing secret,
 - send a test event before relying on production delivery,
-- optionally use a custom JSON payload template with locked Rheonic placeholders.
+- optionally provide one custom JSON object for provider-specific fields.
 
 ## Event Types
 - Core protect lifecycle alerts:
@@ -34,6 +34,8 @@ Protect emails are incident-centric and use the same core lifecycle set as prote
 
 ## Testing Webhooks
 Use the `Test webhook` action from the dashboard. Rheonic queues a test payload and updates the last delivery status after the worker attempts delivery.
+
+If you define a custom webhook body, Rheonic appends its own protected `rheonic` metadata object automatically at delivery time.
 
 ## Delivery Behavior
 - API and runtime paths enqueue deliveries asynchronously.

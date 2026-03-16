@@ -76,36 +76,11 @@ This catalog reflects the implemented notification contract.
 Current implementation:
 - Each project can store one optional `webhook_payload_template_json`.
 - The Alerts page exposes:
-  - a `Use custom payload` toggle
-  - a JSON payload editor
-  - a preview selector for representative event types
-  - a rendered preview panel
-- `webhook.test` uses the current draft-or-saved template path so users can validate payload shape before rollout.
-- When no template is configured, the canonical Rheonic payload is sent unchanged.
-- When a template is configured, the worker renders the final request body from the canonical payload and signs the rendered JSON body.
-
-Locked placeholders:
-- `event`
-- `project_id`
-- `incident_id`
-- `incident_type`
-- `provider`
-- `model`
-- `environment`
-- `sent_at`
-- `resolved_at`
-- `resolved_by`
-- `reason`
-- `requests_60s`
-- `tokens_60s`
-- `req_cap`
-- `tok_cap`
-- `destination`
-- `status`
-- `attempts`
-- `max_attempts`
-- `last_error_code`
-- `last_error_message`
+  - one always-visible JSON editor for provider-specific fields only
+- `webhook.test` uses the current draft-or-saved JSON path so users can validate provider compatibility before rollout.
+- When no custom JSON is configured, the canonical Rheonic payload is sent unchanged.
+- When custom JSON is configured, the worker sends the user JSON object and silently appends a protected `rheonic` metadata object at delivery time.
+- Rheonic metadata is not editable in the UI and is not stored inside the user JSON blob.
 
 Still out of scope:
 - per-event templates

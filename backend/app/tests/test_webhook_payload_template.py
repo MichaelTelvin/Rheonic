@@ -24,10 +24,16 @@ def test_normalize_payload_template_json_rejects_forbidden_keys() -> None:
     with pytest.raises(ValueError, match="forbidden key"):
         normalize_payload_template_json("{\"__proto__\": {\"x\": 1}}")
 
+    with pytest.raises(ValueError, match="forbidden key"):
+        normalize_payload_template_json("{\"rheonic\": {\"event\": \"incident.warn\"}}")
 
-def test_render_payload_template_interpolates_nested_values() -> None:
+    with pytest.raises(ValueError, match="forbidden key"):
+        normalize_payload_template_json("{\"outer\": {\"constructor\": {\"x\": 1}}}")
+
+
+def test_render_payload_template_appends_silent_rheonic_metadata() -> None:
     template = parse_payload_template_json(
-        "{\"text\":\"{{event}} {{incident_type}}\",\"meta\":{\"provider\":\"{{provider}}\",\"missing\":\"{{missing}}\"}}"
+        "{\"text\":\"agent behavior anomaly detected\",\"meta\":{\"provider\":\"openai\"}}"
     )
     assert template is not None
     rendered = render_payload_template(
@@ -35,29 +41,25 @@ def test_render_payload_template_interpolates_nested_values() -> None:
         context={"event": "incident.warn", "incident_type": "retry_storm", "provider": "openai"},
     )
     assert rendered == {
-        "meta": {"missing": "", "provider": "openai"},
+        "meta": {"provider": "openai"},
         "rheonic": {
-            "attempts": "",
-            "destination": "",
-            "environment": "",
             "event": "incident.warn",
-            "incident_id": "",
             "incident_type": "retry_storm",
-            "last_error_code": "",
-            "last_error_message": "",
-            "max_attempts": "",
-            "model": "",
-            "project_id": "",
             "provider": "openai",
-            "reason": "",
-            "req_cap": "",
-            "requests_60s": "",
-            "resolved_at": "",
-            "resolved_by": "",
-            "sent_at": "",
-            "status": "",
-            "tok_cap": "",
-            "tokens_60s": "",
         },
-        "text": "incident.warn retry_storm",
+        "text": "agent behavior anomaly detected",
     }
+
+
+def test_render_payload_template_keeps_script_like_strings_literal() -> None:
+    template = parse_payload_template_json(
+        "{\"text\":\"<script>alert('xss')</script>\",\"parse_mode\":\"HTML\"}"
+    )
+    assert template is not None
+    rendered = render_payload_template(
+        template=template,
+        context={"event": "incident.warn", "project_id": "p1"},
+    )
+    assert rendered["text"] == "<script>alert('xss')</script>"
+    assert rendered["parse_mode"] == "HTML"
+    assert rendered["rheonic"]["event"] == "incident.warn"

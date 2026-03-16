@@ -16,58 +16,7 @@ import { useAuthContext } from "../context/AuthContext";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 
-const TEMPLATE_PLACEHOLDERS = [
-  "event",
-  "project_id",
-  "incident_id",
-  "incident_type",
-  "provider",
-  "model",
-  "environment",
-  "sent_at",
-  "resolved_at",
-  "resolved_by",
-  "reason",
-  "requests_60s",
-  "tokens_60s",
-  "req_cap",
-  "tok_cap",
-  "destination",
-  "status",
-  "attempts",
-  "max_attempts",
-  "last_error_code",
-  "last_error_message",
-] as const;
-
-const LOCKED_METADATA_KEY = "rheonic";
-const DEFAULT_CUSTOM_PAYLOAD = '{\n  "text": "Rheonic {{event}} for {{project_id}}: {{incident_type}}"\n}';
-
-const PREVIEW_EVENTS = [
-  "incident.warn",
-  "incident.block",
-  "incident.resolved",
-  "policy_gap.detected",
-  "webhook.delivery_failed",
-  "webhook.test",
-] as const;
-
-const PLACEHOLDER_PATTERN = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
-
-function renderTemplateNode(node: unknown, context: Record<string, string>): unknown {
-  if (Array.isArray(node)) {
-    return node.map((item) => renderTemplateNode(item, context));
-  }
-  if (node && typeof node === "object") {
-    return Object.fromEntries(
-      Object.entries(node as Record<string, unknown>).map(([key, value]) => [key, renderTemplateNode(value, context)]),
-    );
-  }
-  if (typeof node === "string") {
-    return node.replace(PLACEHOLDER_PATTERN, (_, token: string) => context[token] ?? "");
-  }
-  return node;
-}
+const DEFAULT_CUSTOM_PAYLOAD = '{\n  "channel_id": 653661315,\n  "text": "agent behavior anomaly detected",\n  "parse_mode": "HTML"\n}';
 
 function parsePayloadTemplateForEditor(value: string | null): string {
   if (!value) {
@@ -75,16 +24,10 @@ function parsePayloadTemplateForEditor(value: string | null): string {
   }
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
-    const editable = { ...parsed };
-    delete editable[LOCKED_METADATA_KEY];
-    return Object.keys(editable).length > 0 ? JSON.stringify(editable, null, 2) : DEFAULT_CUSTOM_PAYLOAD;
+    return Object.keys(parsed).length > 0 ? JSON.stringify(parsed, null, 2) : DEFAULT_CUSTOM_PAYLOAD;
   } catch {
     return DEFAULT_CUSTOM_PAYLOAD;
   }
-}
-
-function buildLockedMetadataTemplate(): Record<string, string> {
-  return Object.fromEntries(TEMPLATE_PLACEHOLDERS.map((field) => [field, `{{${field}}}`]));
 }
 
 function parseCustomPayload(source: string): Record<string, unknown> {
@@ -96,81 +39,11 @@ function parseCustomPayload(source: string): Record<string, unknown> {
   if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
     throw new Error("Custom payload must be a JSON object.");
   }
-  const record = { ...(parsed as Record<string, unknown>) };
-  delete record[LOCKED_METADATA_KEY];
-  return record;
+  return { ...(parsed as Record<string, unknown>) };
 }
 
 function buildPayloadTemplateJson(customPayloadText: string): string {
-  const customProperties = parseCustomPayload(customPayloadText);
-  const template: Record<string, unknown> = {
-    ...customProperties,
-    [LOCKED_METADATA_KEY]: buildLockedMetadataTemplate(),
-  };
-  return JSON.stringify(template);
-}
-
-function renderCompactPayloadPreview(
-  customPayloadText: string,
-  eventType: typeof PREVIEW_EVENTS[number],
-): string {
-  const template = JSON.parse(buildPayloadTemplateJson(customPayloadText)) as Record<string, unknown>;
-  const context = sampleWebhookContext(eventType);
-  const rendered = renderTemplateNode(template, context);
-  const record = rendered as Record<string, unknown>;
-  const compactPreview: Record<string, unknown> = {};
-  if (typeof record.text === "string" && record.text.trim()) {
-    compactPreview.text = record.text;
-  }
-  for (const [key, value] of Object.entries(record)) {
-    if (key === "text" || key === LOCKED_METADATA_KEY) {
-      continue;
-    }
-    compactPreview[key] = value;
-  }
-  return JSON.stringify(compactPreview, null, 2);
-}
-
-function sampleWebhookContext(eventType: typeof PREVIEW_EVENTS[number]): Record<string, string> {
-  const base = {
-    event: eventType,
-    project_id: "proj_123",
-    incident_id: "inc_456",
-    incident_type: "retry_storm",
-    provider: "openai",
-    model: "gpt-4o-mini",
-    environment: "staging",
-    sent_at: "Mar 16, 2026 12:30 UTC",
-    resolved_at: "Mar 16, 2026 12:37 UTC",
-    resolved_by: "user@example.com",
-    reason: "retry_storm",
-    requests_60s: "5",
-    tokens_60s: "250",
-    req_cap: "400",
-    tok_cap: "1700",
-    destination: "https://hooks.example.test/rheonic",
-    status: "dead",
-    attempts: "3",
-    max_attempts: "3",
-    last_error_code: "webhook_http_error",
-    last_error_message: "HTTP 404",
-  };
-  if (eventType === "incident.block") {
-    return { ...base, incident_type: "cap_breach", reason: "tok_cap_breach", tokens_60s: "4000" };
-  }
-  if (eventType === "incident.resolved") {
-    return { ...base, incident_type: "cap_breach", reason: "cap_breach" };
-  }
-  if (eventType === "policy_gap.detected") {
-    return { ...base, incident_id: "", incident_type: "", reason: "", model: "claude-3-5-sonnet" };
-  }
-  if (eventType === "webhook.delivery_failed") {
-    return { ...base, incident_id: "", incident_type: "", provider: "", model: "", environment: "" };
-  }
-  if (eventType === "webhook.test") {
-    return { ...base, incident_id: "", incident_type: "", reason: "", provider: "", model: "" };
-  }
-  return base;
+  return JSON.stringify(parseCustomPayload(customPayloadText));
 }
 
 function formatDateTime(iso: string | null): string {
@@ -201,9 +74,7 @@ export function Alerts(): JSX.Element {
   const [emailEnabledInput, setEmailEnabledInput] = useState<boolean>(false);
   const [webhookUrlInput, setWebhookUrlInput] = useState<string>("");
   const [webhookSecretInput, setWebhookSecretInput] = useState<string>("");
-  const [payloadTemplateEnabledInput, setPayloadTemplateEnabledInput] = useState<boolean>(false);
   const [payloadEditorInput, setPayloadEditorInput] = useState<string>(DEFAULT_CUSTOM_PAYLOAD);
-  const [payloadPreviewEvent, setPayloadPreviewEvent] = useState<typeof PREVIEW_EVENTS[number]>("incident.warn");
   const [webhookSaving, setWebhookSaving] = useState<boolean>(false);
   const [webhookTesting, setWebhookTesting] = useState<boolean>(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
@@ -225,7 +96,6 @@ export function Alerts(): JSX.Element {
         setEmailEnabledInput(Boolean(settings.email_enabled));
         setWebhookUrlInput(settings.url ?? "");
         setWebhookSecretInput("");
-        setPayloadTemplateEnabledInput(Boolean(settings.payload_template_json));
         setPayloadEditorInput(parsePayloadTemplateForEditor(settings.payload_template_json));
       }
     } finally {
@@ -259,7 +129,6 @@ export function Alerts(): JSX.Element {
         setEmailEnabledInput(Boolean(settings.email_enabled));
         setWebhookUrlInput(settings.url ?? "");
         setWebhookSecretInput("");
-        setPayloadTemplateEnabledInput(Boolean(settings.payload_template_json));
         setPayloadEditorInput(parsePayloadTemplateForEditor(settings.payload_template_json));
         setWebhookError(null);
       } catch (error) {
@@ -302,8 +171,7 @@ export function Alerts(): JSX.Element {
       || emailEnabledInput !== Boolean(webhookSettings.email_enabled)
       || currentUrl !== savedUrl
       || webhookSecretInput.trim().length > 0
-      || payloadTemplateEnabledInput !== Boolean(webhookSettings.payload_template_json)
-      || (payloadTemplateEnabledInput && payloadEditorInput !== savedTemplate)
+      || payloadEditorInput !== savedTemplate
     );
   }, [
     webhookSettings,
@@ -311,35 +179,17 @@ export function Alerts(): JSX.Element {
     emailEnabledInput,
     webhookUrlInput,
     webhookSecretInput,
-    payloadTemplateEnabledInput,
     payloadEditorInput,
   ]);
 
   const payloadTemplateError = useMemo(() => {
-    if (!payloadTemplateEnabledInput) {
-      return null;
-    }
     try {
       parseCustomPayload(payloadEditorInput);
       return null;
     } catch {
       return "Custom payload must be a valid JSON object.";
     }
-  }, [payloadTemplateEnabledInput, payloadEditorInput]);
-
-  const payloadTemplatePreview = useMemo(() => {
-    if (!payloadTemplateEnabledInput) {
-      return "";
-    }
-    if (payloadTemplateError) {
-      return "";
-    }
-    try {
-      return renderCompactPayloadPreview(payloadEditorInput, payloadPreviewEvent);
-    } catch {
-      return "";
-    }
-  }, [payloadTemplateEnabledInput, payloadTemplateError, payloadEditorInput, payloadPreviewEvent]);
+  }, [payloadEditorInput]);
 
   const discardUnsavedChanges = (): void => {
     if (!webhookSettings) {
@@ -349,7 +199,6 @@ export function Alerts(): JSX.Element {
     setEmailEnabledInput(Boolean(webhookSettings.email_enabled));
     setWebhookUrlInput(webhookSettings.url ?? "");
     setWebhookSecretInput("");
-    setPayloadTemplateEnabledInput(Boolean(webhookSettings.payload_template_json));
     setPayloadEditorInput(parsePayloadTemplateForEditor(webhookSettings.payload_template_json));
     setWebhookError(null);
   };
@@ -373,9 +222,7 @@ export function Alerts(): JSX.Element {
         email_enabled: emailEnabledInput,
         url: webhookUrlInput.trim() || null,
         secret: webhookSecretInput.trim() || null,
-        payload_template_json: payloadTemplateEnabledInput
-          ? buildPayloadTemplateJson(payloadEditorInput)
-          : null,
+        payload_template_json: buildPayloadTemplateJson(payloadEditorInput),
       });
       await reloadWebhookSettings();
       if (emitToast) {
@@ -424,9 +271,7 @@ export function Alerts(): JSX.Element {
       const baseline = webhookSettings;
       await saveWebhookSettings(false);
       await testProjectWebhook(projectId, {
-        payload_template_json: payloadTemplateEnabledInput
-          ? buildPayloadTemplateJson(payloadEditorInput)
-          : null,
+        payload_template_json: buildPayloadTemplateJson(payloadEditorInput),
       });
       let latest: ProjectWebhookSettings | null = null;
       for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -495,11 +340,11 @@ export function Alerts(): JSX.Element {
           <FormColumn testId="alerts-form-column">
             <div className={`alerts-routes-form ${controlsDisabled ? "is-disabled" : ""}`}>
               <section className="alerts-route-section">
-                <div className="alerts-route-copy">
-                  <h3 className="alerts-route-heading">Email</h3>
-                  <p className="alerts-route-description">Send protect lifecycle alerts to your account email.</p>
-                </div>
-                <div className="alerts-route-inline">
+                <div className="alerts-route-head">
+                  <div className="alerts-route-copy">
+                    <h3 className="alerts-route-heading">Email</h3>
+                    <p className="alerts-route-description">Send protect lifecycle alerts to your account email.</p>
+                  </div>
                   <label htmlFor="alerts-email-enabled-toggle" className="alerts-toggle-row">
                     <span className="toggle-switch">
                       <input
@@ -522,15 +367,15 @@ export function Alerts(): JSX.Element {
               </section>
 
               <section className="alerts-route-section">
-                <div className="alerts-route-copy">
-                  <h3 className="alerts-route-heading">Webhook</h3>
-                  <p className="alerts-route-description">
-                    {protectEnabled
-                      ? "Deliver the same protect lifecycle alerts to your webhook endpoint."
-                      : "Configure now. Delivery starts when Protect is enabled."}
-                  </p>
-                </div>
-                <div className="alerts-route-inline">
+                <div className="alerts-route-head">
+                  <div className="alerts-route-copy">
+                    <h3 className="alerts-route-heading">Webhook</h3>
+                    <p className="alerts-route-description">
+                      {protectEnabled
+                        ? "Deliver the same protect lifecycle alerts to your webhook endpoint."
+                        : "Configure now. Delivery starts when Protect is enabled."}
+                    </p>
+                  </div>
                   <label htmlFor="alerts-enabled-toggle" className="alerts-toggle-row">
                     <span className="toggle-switch">
                       <input
@@ -576,28 +421,12 @@ export function Alerts(): JSX.Element {
                       id="webhook-secret"
                       className="text-input alerts-webhook-input"
                       type="password"
-                      placeholder={webhookSettings?.has_secret ? "•••••••• (leave blank to keep)" : "optional"}
+                      placeholder={webhookSettings?.has_secret ? "8f4a9c2e17b6d4fa (leave blank to keep)" : "8f4a9c2e17b6d4fa"}
                       value={webhookSecretInput}
                       onChange={(event) => setWebhookSecretInput(event.target.value)}
                       disabled={controlsDisabled || webhookTesting}
                     />
                   </div>
-                </div>
-                <div className="alerts-route-inline">
-                  <label htmlFor="alerts-custom-payload-toggle" className="alerts-toggle-row">
-                    <span className="toggle-switch">
-                      <input
-                        id="alerts-custom-payload-toggle"
-                        type="checkbox"
-                        checked={payloadTemplateEnabledInput}
-                        disabled={controlsDisabled || webhookTesting}
-                        onChange={(event) => setPayloadTemplateEnabledInput(event.target.checked)}
-                        role="switch"
-                      />
-                      <span className="toggle-switch-track" aria-hidden="true" />
-                    </span>
-                    <span className="alerts-toggle-state">Use custom payload</span>
-                  </label>
                 </div>
               </section>
 
@@ -633,59 +462,25 @@ export function Alerts(): JSX.Element {
           </FormColumn>
         </Card>
 
-        {payloadTemplateEnabledInput ? (
-          <Card className="form-card card--form alerts-payload-card">
-            <h2 className="section-title">Custom Payload</h2>
-            <p className="alerts-intro">Write the JSON body you want to send. Rheonic metadata is appended automatically on delivery.</p>
-            <div className={`alerts-payload-grid ${controlsDisabled ? "is-disabled" : ""}`}>
-              <div className="alerts-payload-column">
-                <div className="form-field">
-                  <label htmlFor="payload-editor">Custom payload (JSON object)</label>
-                  <textarea
-                    id="payload-editor"
-                    className="text-input alerts-template-textarea"
-                    rows={12}
-                    value={payloadEditorInput}
-                    onChange={(event) => setPayloadEditorInput(event.target.value)}
-                    disabled={controlsDisabled || webhookTesting}
-                    placeholder={DEFAULT_CUSTOM_PAYLOAD}
-                  />
-                </div>
-                <p className="alerts-note">Supported placeholders: {`{{incident_type}}`}, {`{{provider}}`}, {`{{project_id}}`}.</p>
-              </div>
-
-              <div className="alerts-payload-column">
-                <div className="form-field">
-                  <label htmlFor="payload-preview-event">Preview event</label>
-                  <select
-                    id="payload-preview-event"
-                    className="text-input alerts-webhook-input"
-                    value={payloadPreviewEvent}
-                    onChange={(event) => setPayloadPreviewEvent(event.target.value as typeof PREVIEW_EVENTS[number])}
-                    disabled={controlsDisabled || webhookTesting}
-                  >
-                    {PREVIEW_EVENTS.map((eventName) => (
-                      <option key={eventName} value={eventName}>
-                        {eventName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-field">
-                  <label htmlFor="payload-preview">Example body</label>
-                  <textarea
-                    id="payload-preview"
-                    className="text-input alerts-template-textarea"
-                    rows={12}
-                    value={payloadTemplatePreview}
-                    readOnly
-                  />
-                </div>
-                <p className="alerts-note">Preview of your JSON before Rheonic metadata is appended.</p>
-              </div>
+        <Card className="form-card card--form alerts-payload-card">
+          <h2 className="section-title">Custom Payload</h2>
+          <p className="alerts-intro">Write only the provider-specific JSON body you want to send. Rheonic attaches its own metadata silently on delivery.</p>
+          <div className={`alerts-payload-editor alerts-payload-editor-single ${controlsDisabled ? "is-disabled" : ""}`}>
+            <div className="form-field">
+              <label htmlFor="payload-editor">Webhook body</label>
+              <textarea
+                id="payload-editor"
+                className="text-input alerts-template-textarea"
+                rows={16}
+                value={payloadEditorInput}
+                onChange={(event) => setPayloadEditorInput(event.target.value)}
+                disabled={controlsDisabled || webhookTesting}
+                placeholder={DEFAULT_CUSTOM_PAYLOAD}
+              />
+              <p className="alerts-note">JSON object only. Use this field for your own provider-specific properties such as channel IDs, message text, and formatting flags.</p>
             </div>
-          </Card>
-        ) : null}
+          </div>
+        </Card>
         <UnsavedChangesToast
           open={showUnsavedPrompt}
           busy={webhookSaving}

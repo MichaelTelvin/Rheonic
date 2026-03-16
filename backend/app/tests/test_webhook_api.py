@@ -96,14 +96,14 @@ def test_project_webhook_owner_get_put_and_test(tmp_path) -> None:
     assert put_response.json()["enabled"] is True
     assert put_response.json()["has_secret"] is True
     assert "\"text\": \"{{event}} {{project_id}}\"" in put_response.json()["payload_template_json"]
-    assert "\"rheonic\"" in put_response.json()["payload_template_json"]
+    assert "\"rheonic\"" not in put_response.json()["payload_template_json"]
 
     get_response = client.get(f"/api/v1/projects/{project_id}/webhook")
     assert get_response.status_code == 200
     assert get_response.json()["url"] == "https://example.test/hook"
     assert get_response.json()["has_secret"] is True
     assert "\"text\": \"{{event}} {{project_id}}\"" in get_response.json()["payload_template_json"]
-    assert "\"rheonic\"" in get_response.json()["payload_template_json"]
+    assert "\"rheonic\"" not in get_response.json()["payload_template_json"]
 
     test_response = client.post(
         f"/api/v1/projects/{project_id}/webhook/test",
@@ -116,7 +116,7 @@ def test_project_webhook_owner_get_put_and_test(tmp_path) -> None:
     assert dispatcher.calls[0][3] == "https://example.test/hook"
     assert dispatcher.calls[0][5] is not None
     assert "\"message\": \"{{event}}\"" in dispatcher.calls[0][5]
-    assert "\"rheonic\"" in dispatcher.calls[0][5]
+    assert "\"rheonic\"" not in dispatcher.calls[0][5]
     assert dispatcher.calls[0][6] is True
 
     _cleanup_overrides()
@@ -170,10 +170,15 @@ def test_project_webhook_validation_errors(tmp_path) -> None:
         f"/api/v1/projects/{project_id}/webhook",
         json={"enabled": False, "url": None, "secret": None, "payload_template_json": "{\"text\":"},
     )
+    reserved_key_template = client.put(
+        f"/api/v1/projects/{project_id}/webhook",
+        json={"enabled": False, "url": None, "secret": None, "payload_template_json": "{\"rheonic\": {\"event\": \"incident.warn\"}}"},
+    )
     assert invalid_url.status_code == 422
     assert missing_url.status_code == 422
     assert invalid_template.status_code == 422
     assert malformed_template.status_code == 422
+    assert reserved_key_template.status_code == 422
     _cleanup_overrides()
 
 
@@ -220,7 +225,7 @@ def test_project_webhook_test_is_available_in_observe_mode(tmp_path) -> None:
     assert dispatcher.calls[0][4] == "draft-secret"
     assert dispatcher.calls[0][5] is not None
     assert "\"text\": \"draft {{event}}\"" in dispatcher.calls[0][5]
-    assert "\"rheonic\"" in dispatcher.calls[0][5]
+    assert "\"rheonic\"" not in dispatcher.calls[0][5]
 
     _cleanup_overrides()
 
@@ -262,6 +267,6 @@ def test_project_webhook_secret_is_not_stored_plaintext(tmp_path) -> None:
         assert record.webhook_secret != "secret-plain"
         assert record.webhook_payload_template_json is not None
         assert "\"text\": \"{{event}}\"" in record.webhook_payload_template_json
-        assert "\"rheonic\"" in record.webhook_payload_template_json
+        assert "\"rheonic\"" not in record.webhook_payload_template_json
 
     _cleanup_overrides()

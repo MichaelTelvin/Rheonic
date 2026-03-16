@@ -85,15 +85,14 @@ describe("Alerts payload editor", () => {
 
   it("loads saved payload template into the editor", async () => {
     render(<Alerts />);
-    const toggle = await screen.findByRole("switch", { name: "Use custom payload" });
-    expect((toggle as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByLabelText("Custom payload (JSON object)") as HTMLTextAreaElement).value).toContain("\"text\": \"{{event}}\"");
-    expect(screen.getByText(/Write the JSON body you want to send\./i)).toBeDefined();
+    const payloadInput = await screen.findByLabelText("Webhook body");
+    expect((payloadInput as HTMLTextAreaElement).value).toContain("\"text\": \"{{event}}\"");
+    expect(await screen.findByText(/Rheonic attaches its own metadata silently on delivery\./i)).toBeDefined();
   });
 
   it("blocks save when payload template json is invalid", async () => {
     render(<Alerts />);
-    const input = await screen.findByLabelText("Custom payload (JSON object)");
+    const input = await screen.findByLabelText("Webhook body");
     fireEvent.change(input, { target: { value: "{\"chat_id\":" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -125,32 +124,14 @@ describe("Alerts payload editor", () => {
       });
 
     render(<Alerts />);
-    const payloadInput = await screen.findByLabelText("Custom payload (JSON object)");
-    fireEvent.change(payloadInput, { target: { value: "{\n  \"text\": \"draft {{event}} {{project_id}}\",\n  \"chat_id\": \"123\"\n}" } });
+    const payloadInput = await screen.findByLabelText("Webhook body");
+    fireEvent.change(payloadInput, { target: { value: "{\n  \"text\": \"agent behavior anomaly detected\",\n  \"chat_id\": \"123\"\n}" } });
     fireEvent.click(screen.getByRole("button", { name: "Test webhook" }));
 
     await waitFor(() => expect(mocks.testProjectWebhook).toHaveBeenCalled());
     const payload = mocks.testProjectWebhook.mock.calls[0][1].payload_template_json as string;
-    expect(payload).toContain("\"text\":\"draft {{event}} {{project_id}}\"");
+    expect(payload).toContain("\"text\":\"agent behavior anomaly detected\"");
     expect(payload).toContain("\"chat_id\":\"123\"");
-    expect(payload).toContain("\"rheonic\"");
-  });
-
-  it("updates preview when preview event changes", async () => {
-    render(<Alerts />);
-    const toggle = await screen.findByRole("switch", { name: "Use custom payload" });
-    if (!(toggle as HTMLInputElement).checked) {
-      fireEvent.click(toggle);
-    }
-    await screen.findByLabelText("Example body");
-    fireEvent.change(screen.getByLabelText("Custom payload (JSON object)"), {
-      target: { value: "{\n  \"text\": \"{{event}} {{incident_type}}\"\n}" },
-    });
-    fireEvent.change(screen.getByLabelText("Preview event"), { target: { value: "incident.block" } });
-
-    await waitFor(() => {
-      expect((screen.getByLabelText("Example body") as HTMLTextAreaElement).value).toContain("incident.block cap_breach");
-      expect((screen.getByLabelText("Example body") as HTMLTextAreaElement).value).not.toContain("\"rheonic\"");
-    });
+    expect(payload).not.toContain("\"rheonic\"");
   });
 });
