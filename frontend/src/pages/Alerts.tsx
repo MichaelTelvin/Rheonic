@@ -495,7 +495,7 @@ export function Alerts(): JSX.Element {
 
   if (!projectId) {
     return (
-      <main className="dashboard">
+      <main className="dashboard alerts-dashboard">
         <div className="dashboard-content page-stack">
           <h1 className="page-title">Alerts</h1>
           <section className="empty">Select a project to configure webhook alerts.</section>
@@ -506,7 +506,7 @@ export function Alerts(): JSX.Element {
 
   if (loadingSettings && webhookSettings === null) {
     return (
-      <main className="dashboard">
+      <main className="dashboard alerts-dashboard">
         <div className="dashboard-content page-stack alerts-page-stack">
           <section>
             <h1 className="page-title">Alerts</h1>
@@ -519,7 +519,7 @@ export function Alerts(): JSX.Element {
   }
 
   return (
-    <main className="dashboard">
+    <main className="dashboard alerts-dashboard">
       <div className="dashboard-content page-stack alerts-page-stack">
         <section>
           <h1 className="page-title">Alerts</h1>
@@ -673,14 +673,12 @@ export function Alerts(): JSX.Element {
               <div className="alerts-editor-header">
                 <div>
                   <h2 className="section-title">Custom Payload</h2>
-                  <p className="alerts-helper">
-                    Edit your message and any extra provider fields. Rheonic adds its own metadata automatically.
-                  </p>
+                  <p className="alerts-helper">Edit the message and any extra top-level provider fields.</p>
                 </div>
               </div>
               <div className={`alerts-editor-grid ${controlsDisabled ? "is-disabled" : ""}`}>
                 <div className="alerts-editor-column">
-                <div className="form-field">
+                  <div className="form-field">
                   <label htmlFor="payload-message-text">Message text</label>
                   <textarea
                     id="payload-message-text"
@@ -692,7 +690,7 @@ export function Alerts(): JSX.Element {
                     placeholder="Rheonic {{event}} for {{project_id}}: {{incident_type}}"
                   />
                   <p className="alerts-helper">
-                    Optional. Supports placeholders like <code>{"{{incident_type}}"}</code>, <code>{"{{provider}}"}</code>, and <code>{"{{project_id}}"}</code>.
+                    Optional. Placeholders like <code>{"{{incident_type}}"}</code>, <code>{"{{provider}}"}</code>, and <code>{"{{project_id}}"}</code> are supported.
                   </p>
                 </div>
                 <div className="form-field">
@@ -707,7 +705,7 @@ export function Alerts(): JSX.Element {
                     placeholder={"{\n  \"chat_id\": \"123456789\",\n  \"parse_mode\": \"Markdown\"\n}"}
                   />
                   <p className="alerts-helper">
-                    Add provider-specific top-level fields here, for example <code>chat_id</code>, <code>thread_id</code>, or <code>parse_mode</code>.
+                    Add provider-specific top-level fields such as <code>chat_id</code>, <code>thread_id</code>, or <code>parse_mode</code>.
                   </p>
                 </div>
               </div>
@@ -738,7 +736,7 @@ export function Alerts(): JSX.Element {
                     readOnly
                   />
                   <p className="alerts-helper">
-                    This preview shows the parts you control. Protected Rheonic metadata is appended at send time.
+                    Preview of the fields you control. Rheonic metadata is appended automatically at send time.
                   </p>
                 </div>
               </div>

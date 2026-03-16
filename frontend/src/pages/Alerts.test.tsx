@@ -88,7 +88,7 @@ describe("Alerts payload editor", () => {
     const toggle = await screen.findByRole("switch", { name: "Use custom payload" });
     expect((toggle as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("Message text") as HTMLTextAreaElement).value).toBe("{{event}}");
-    expect(screen.getByText(/Rheonic adds its own metadata automatically/i)).toBeDefined();
+    expect(screen.getByText(/Edit the message and any extra top-level provider fields/i)).toBeDefined();
   });
 
   it("blocks save when payload template json is invalid", async () => {
