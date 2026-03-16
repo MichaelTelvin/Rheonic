@@ -16,6 +16,124 @@ import { useAuthContext } from "../context/AuthContext";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 
+const TEMPLATE_PLACEHOLDERS = [
+  "event",
+  "project_id",
+  "incident_id",
+  "incident_type",
+  "provider",
+  "model",
+  "environment",
+  "sent_at",
+  "resolved_at",
+  "resolved_by",
+  "reason",
+  "requests_60s",
+  "tokens_60s",
+  "req_cap",
+  "tok_cap",
+  "destination",
+  "status",
+  "attempts",
+  "max_attempts",
+  "last_error_code",
+  "last_error_message",
+] as const;
+
+const DEFAULT_TEMPLATE = `{
+  "text": "Rheonic {{event}} for {{project_id}}: {{incident_type}}",
+  "metadata": {
+    "provider": "{{provider}}",
+    "environment": "{{environment}}"
+  }
+}`;
+
+const PREVIEW_EVENTS = [
+  "incident.warn",
+  "incident.block",
+  "incident.resolved",
+  "policy_gap.detected",
+  "webhook.delivery_failed",
+  "webhook.test",
+] as const;
+
+const PLACEHOLDER_PATTERN = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
+
+function normalizeTemplateForEditor(value: string | null): string {
+  if (!value) {
+    return DEFAULT_TEMPLATE;
+  }
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
+function renderTemplatePreview(source: string, eventType: typeof PREVIEW_EVENTS[number]): string {
+  const parsed = JSON.parse(source) as Record<string, unknown>;
+  const context = sampleWebhookContext(eventType);
+  const rendered = renderTemplateNode(parsed, context);
+  return JSON.stringify(rendered, null, 2);
+}
+
+function renderTemplateNode(node: unknown, context: Record<string, string>): unknown {
+  if (Array.isArray(node)) {
+    return node.map((item) => renderTemplateNode(item, context));
+  }
+  if (node && typeof node === "object") {
+    return Object.fromEntries(
+      Object.entries(node as Record<string, unknown>).map(([key, value]) => [key, renderTemplateNode(value, context)]),
+    );
+  }
+  if (typeof node === "string") {
+    return node.replace(PLACEHOLDER_PATTERN, (_, token: string) => context[token] ?? "");
+  }
+  return node;
+}
+
+function sampleWebhookContext(eventType: typeof PREVIEW_EVENTS[number]): Record<string, string> {
+  const base = {
+    event: eventType,
+    project_id: "proj_123",
+    incident_id: "inc_456",
+    incident_type: "retry_storm",
+    provider: "openai",
+    model: "gpt-4o-mini",
+    environment: "staging",
+    sent_at: "Mar 16, 2026 12:30 UTC",
+    resolved_at: "Mar 16, 2026 12:37 UTC",
+    resolved_by: "user@example.com",
+    reason: "retry_storm",
+    requests_60s: "5",
+    tokens_60s: "250",
+    req_cap: "400",
+    tok_cap: "1700",
+    destination: "https://hooks.example.test/rheonic",
+    status: "dead",
+    attempts: "3",
+    max_attempts: "3",
+    last_error_code: "webhook_http_error",
+    last_error_message: "HTTP 404",
+  };
+  if (eventType === "incident.block") {
+    return { ...base, incident_type: "cap_breach", reason: "tok_cap_breach", tokens_60s: "4000" };
+  }
+  if (eventType === "incident.resolved") {
+    return { ...base, incident_type: "cap_breach", reason: "cap_breach" };
+  }
+  if (eventType === "policy_gap.detected") {
+    return { ...base, incident_id: "", incident_type: "", reason: "", model: "claude-3-5-sonnet" };
+  }
+  if (eventType === "webhook.delivery_failed") {
+    return { ...base, incident_id: "", incident_type: "", provider: "", model: "", environment: "" };
+  }
+  if (eventType === "webhook.test") {
+    return { ...base, incident_id: "", incident_type: "", reason: "", provider: "", model: "" };
+  }
+  return base;
+}
+
 function formatDateTime(iso: string | null): string {
   if (!iso) {
     return "—";
@@ -44,6 +162,9 @@ export function Alerts(): JSX.Element {
   const [emailEnabledInput, setEmailEnabledInput] = useState<boolean>(false);
   const [webhookUrlInput, setWebhookUrlInput] = useState<string>("");
   const [webhookSecretInput, setWebhookSecretInput] = useState<string>("");
+  const [payloadTemplateEnabledInput, setPayloadTemplateEnabledInput] = useState<boolean>(false);
+  const [payloadTemplateInput, setPayloadTemplateInput] = useState<string>(DEFAULT_TEMPLATE);
+  const [payloadPreviewEvent, setPayloadPreviewEvent] = useState<typeof PREVIEW_EVENTS[number]>("incident.warn");
   const [webhookSaving, setWebhookSaving] = useState<boolean>(false);
   const [webhookTesting, setWebhookTesting] = useState<boolean>(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
@@ -65,6 +186,8 @@ export function Alerts(): JSX.Element {
         setEmailEnabledInput(Boolean(settings.email_enabled));
         setWebhookUrlInput(settings.url ?? "");
         setWebhookSecretInput("");
+        setPayloadTemplateEnabledInput(Boolean(settings.payload_template_json));
+        setPayloadTemplateInput(normalizeTemplateForEditor(settings.payload_template_json));
       }
     } finally {
       setLoadingSettings(false);
@@ -97,6 +220,8 @@ export function Alerts(): JSX.Element {
         setEmailEnabledInput(Boolean(settings.email_enabled));
         setWebhookUrlInput(settings.url ?? "");
         setWebhookSecretInput("");
+        setPayloadTemplateEnabledInput(Boolean(settings.payload_template_json));
+        setPayloadTemplateInput(normalizeTemplateForEditor(settings.payload_template_json));
         setWebhookError(null);
       } catch (error) {
         if (!cancelled) {
@@ -132,13 +257,53 @@ export function Alerts(): JSX.Element {
     }
     const savedUrl = (webhookSettings.url ?? "").trim();
     const currentUrl = webhookUrlInput.trim();
+    const savedTemplate = normalizeTemplateForEditor(webhookSettings.payload_template_json);
     return (
       webhookEnabledInput !== webhookSettings.enabled
       || emailEnabledInput !== Boolean(webhookSettings.email_enabled)
       || currentUrl !== savedUrl
       || webhookSecretInput.trim().length > 0
+      || payloadTemplateEnabledInput !== Boolean(webhookSettings.payload_template_json)
+      || (payloadTemplateEnabledInput && payloadTemplateInput !== savedTemplate)
     );
-  }, [webhookSettings, webhookEnabledInput, emailEnabledInput, webhookUrlInput, webhookSecretInput]);
+  }, [
+    webhookSettings,
+    webhookEnabledInput,
+    emailEnabledInput,
+    webhookUrlInput,
+    webhookSecretInput,
+    payloadTemplateEnabledInput,
+    payloadTemplateInput,
+  ]);
+
+  const payloadTemplateError = useMemo(() => {
+    if (!payloadTemplateEnabledInput) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(payloadTemplateInput) as unknown;
+      if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+        return "Payload template must be a JSON object.";
+      }
+      return null;
+    } catch {
+      return "Payload template must be valid JSON.";
+    }
+  }, [payloadTemplateEnabledInput, payloadTemplateInput]);
+
+  const payloadTemplatePreview = useMemo(() => {
+    if (!payloadTemplateEnabledInput) {
+      return "";
+    }
+    if (payloadTemplateError) {
+      return "";
+    }
+    try {
+      return renderTemplatePreview(payloadTemplateInput, payloadPreviewEvent);
+    } catch {
+      return "";
+    }
+  }, [payloadTemplateEnabledInput, payloadTemplateError, payloadTemplateInput, payloadPreviewEvent]);
 
   const discardUnsavedChanges = (): void => {
     if (!webhookSettings) {
@@ -148,6 +313,8 @@ export function Alerts(): JSX.Element {
     setEmailEnabledInput(Boolean(webhookSettings.email_enabled));
     setWebhookUrlInput(webhookSettings.url ?? "");
     setWebhookSecretInput("");
+    setPayloadTemplateEnabledInput(Boolean(webhookSettings.payload_template_json));
+    setPayloadTemplateInput(normalizeTemplateForEditor(webhookSettings.payload_template_json));
     setWebhookError(null);
   };
 
@@ -158,11 +325,19 @@ export function Alerts(): JSX.Element {
     setWebhookSaving(true);
     setWebhookError(null);
     try {
+      if (payloadTemplateError) {
+        setWebhookError(payloadTemplateError);
+        if (emitToast) {
+          showAppToast("Action failed. Try again");
+        }
+        return;
+      }
       await updateProjectWebhook(projectId, {
         enabled: webhookEnabledInput,
         email_enabled: emailEnabledInput,
         url: webhookUrlInput.trim() || null,
         secret: webhookSecretInput.trim() || null,
+        payload_template_json: payloadTemplateEnabledInput ? payloadTemplateInput : null,
       });
       await reloadWebhookSettings();
       if (emitToast) {
@@ -200,12 +375,19 @@ export function Alerts(): JSX.Element {
     setWebhookTesting(true);
     setWebhookError(null);
     try {
+      if (payloadTemplateError) {
+        setWebhookError(payloadTemplateError);
+        showAppToast("Webhook test failed");
+        return;
+      }
       if (webhookTestMarkerKey) {
         window.localStorage.setItem(webhookTestMarkerKey, String(Date.now()));
       }
       const baseline = webhookSettings;
       await saveWebhookSettings(false);
-      await testProjectWebhook(projectId);
+      await testProjectWebhook(projectId, {
+        payload_template_json: payloadTemplateEnabledInput ? payloadTemplateInput : null,
+      });
       let latest: ProjectWebhookSettings | null = null;
       for (let attempt = 0; attempt < 10; attempt += 1) {
         await new Promise((resolve) => {
@@ -369,7 +551,67 @@ export function Alerts(): JSX.Element {
                     disabled={controlsDisabled || webhookTesting}
                   />
                 </div>
-                <p className="form-error-slot alerts-error-slot">{webhookError ?? "\u00A0"}</p>
+                <div className="form-field alerts-webhook-field">
+                  <label htmlFor="alerts-custom-payload-toggle" className="alerts-toggle-row">
+                    <span className="toggle-switch">
+                      <input
+                        id="alerts-custom-payload-toggle"
+                        type="checkbox"
+                        checked={payloadTemplateEnabledInput}
+                        disabled={controlsDisabled || webhookTesting}
+                        onChange={(event) => setPayloadTemplateEnabledInput(event.target.checked)}
+                        role="switch"
+                      />
+                      <span className="toggle-switch-track" aria-hidden="true" />
+                    </span>
+                    <span>Use custom payload</span>
+                  </label>
+                </div>
+                {payloadTemplateEnabledInput ? (
+                  <>
+                    <div className="form-field alerts-webhook-field">
+                      <label htmlFor="payload-template">Payload template</label>
+                      <textarea
+                        id="payload-template"
+                        className={`text-input alerts-webhook-input ${payloadTemplateError ? "input-error" : ""}`}
+                        rows={10}
+                        value={payloadTemplateInput}
+                        onChange={(event) => setPayloadTemplateInput(event.target.value)}
+                        disabled={controlsDisabled || webhookTesting}
+                      />
+                    </div>
+                    <div className="form-field alerts-webhook-field">
+                      <label htmlFor="payload-preview-event">Preview event</label>
+                      <select
+                        id="payload-preview-event"
+                        className="text-input alerts-webhook-input"
+                        value={payloadPreviewEvent}
+                        onChange={(event) => setPayloadPreviewEvent(event.target.value as typeof PREVIEW_EVENTS[number])}
+                        disabled={controlsDisabled || webhookTesting}
+                      >
+                        {PREVIEW_EVENTS.map((eventName) => (
+                          <option key={eventName} value={eventName}>
+                            {eventName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-field alerts-webhook-field">
+                      <label htmlFor="payload-preview">Payload preview</label>
+                      <textarea
+                        id="payload-preview"
+                        className="text-input alerts-webhook-input"
+                        rows={10}
+                        value={payloadTemplatePreview}
+                        readOnly
+                      />
+                    </div>
+                    <div className="form-field alerts-webhook-field">
+                      <p className="alerts-helper">Available fields: {TEMPLATE_PLACEHOLDERS.join(", ")}</p>
+                    </div>
+                  </>
+                ) : null}
+                <p className="form-error-slot alerts-error-slot">{webhookError ?? payloadTemplateError ?? "\u00A0"}</p>
                 <p className="alerts-status">
                   Last delivery:
                   {" "}

@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -30,6 +31,9 @@ class _FakeErrorClient:
 
 
 class _FakeOkClient:
+    def __init__(self, capture: list[dict[str, object]] | None = None) -> None:
+        self.capture = capture if capture is not None else []
+
     def __enter__(self):
         return self
 
@@ -37,7 +41,7 @@ class _FakeOkClient:
         _ = exc_type, exc, tb
 
     def post(self, url: str, content: bytes, headers: dict[str, str]):
-        _ = url, content, headers
+        self.capture.append({"url": url, "content": content, "headers": headers})
         return _FakeOkResponse()
 
 
@@ -51,7 +55,12 @@ class _FakeQueue:
         return None
 
 
-def _seed_project(session_factory: DatabaseSessionFactory, project_id: str = "p1") -> None:
+def _seed_project(
+    session_factory: DatabaseSessionFactory,
+    project_id: str = "p1",
+    *,
+    webhook_payload_template_json: str | None = None,
+) -> None:
     with session_factory.create_session() as session:
         session.add(
             ProjectRecord(
@@ -65,6 +74,7 @@ def _seed_project(session_factory: DatabaseSessionFactory, project_id: str = "p1
                 webhook_enabled=True,
                 webhook_url="https://example.test/hook",
                 webhook_secret="abc123",
+                webhook_payload_template_json=webhook_payload_template_json,
                 created_at=datetime.now(timezone.utc),
             )
         )
@@ -116,6 +126,86 @@ def test_process_outbox_delivery_webhook_success_marks_delivered(tmp_path, monke
         assert row.status == "delivered"
         assert row.attempts == 1
         assert row.delivered_at is not None
+
+
+def test_process_outbox_delivery_renders_project_payload_template(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_webhook_template_project.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    _seed_project(
+        session_factory,
+        "p1",
+        webhook_payload_template_json="{\"text\":\"{{event}} {{incident_type}}\",\"project\":\"{{project_id}}\"}",
+    )
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: None,
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+    outbox_id = service.enqueue(
+        project_id="p1",
+        kind="webhook",
+        event_type="incident.warn",
+        payload={"body": {"event": "incident.warn", "project_id": "p1", "incident_type": "retry_storm"}},
+        dedupe_key="render-project-template",
+    )
+
+    captured: list[dict[str, object]] = []
+    settings = transport_job.Settings(database_url=db_url, redis_url="redis://localhost:6379/15")
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient(captured))
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id)
+
+    assert len(captured) == 1
+    assert json.loads(captured[0]["content"].decode("utf-8")) == {
+        "project": "p1",
+        "text": "incident.warn retry_storm",
+    }
+
+
+def test_process_outbox_delivery_uses_override_payload_template_for_test_send(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_webhook_template_override.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    _seed_project(
+        session_factory,
+        "p1",
+        webhook_payload_template_json="{\"text\":\"project template {{event}}\"}",
+    )
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: None,
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+    outbox_id = service.enqueue(
+        project_id="p1",
+        kind="webhook",
+        event_type="webhook.test",
+        payload={
+            "body": {"event": "webhook.test", "project_id": "p1"},
+            "__transport_meta": {
+                "force_send": True,
+                "override_payload_template_json": "{\"message\":\"override {{event}} {{project_id}}\"}",
+            },
+        },
+        dedupe_key="render-override-template",
+        destination="https://example.test/hook",
+    )
+
+    captured: list[dict[str, object]] = []
+    settings = transport_job.Settings(database_url=db_url, redis_url="redis://localhost:6379/15")
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient(captured))
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id)
+
+    assert len(captured) == 1
+    assert json.loads(captured[0]["content"].decode("utf-8")) == {"message": "override webhook.test p1"}
 
 
 def test_process_outbox_delivery_webhook_failure_retries_then_dead_letters(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:

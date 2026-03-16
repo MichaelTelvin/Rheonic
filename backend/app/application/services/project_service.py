@@ -102,6 +102,7 @@ class ProjectService:
         email_enabled: bool,
         webhook_url: str | None,
         webhook_secret: str | None,
+        webhook_payload_template_json: str | None,
     ) -> Project:
         # Update webhook configuration for owned project.
         _ = self.get_project_webhook_settings(project_id=project_id, user_id=user_id)
@@ -111,6 +112,7 @@ class ProjectService:
             email_enabled=email_enabled,
             webhook_url=webhook_url,
             webhook_secret=webhook_secret,
+            webhook_payload_template_json=webhook_payload_template_json,
         )
         if updated is None:
             raise HTTPException(status_code=404, detail="project not found")

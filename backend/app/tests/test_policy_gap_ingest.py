@@ -55,7 +55,18 @@ class FakeWebhookDispatcher:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, object], str]] = []
 
-    def enqueue(self, project_id: str, payload: dict[str, object], event_type: str) -> None:
+    def enqueue(
+        self,
+        project_id: str,
+        payload: dict[str, object],
+        event_type: str,
+        *,
+        override_url: str | None = None,
+        override_secret: str | None = None,
+        override_payload_template_json: str | None = None,
+        force_send: bool = False,
+    ) -> None:
+        _ = (override_url, override_secret, override_payload_template_json, force_send)
         self.calls.append((project_id, payload, event_type))
 
 

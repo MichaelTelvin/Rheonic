@@ -54,6 +54,7 @@ describe("Form column layout", () => {
       email_enabled: false,
       url: null,
       has_secret: false,
+      payload_template_json: null,
       last_status: null,
       last_at: null,
       last_error: null,

@@ -1,7 +1,7 @@
 # Database model placeholders.
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -85,6 +85,7 @@ class ProjectRecord(Base):
     email_enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
     webhook_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     webhook_secret: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    webhook_payload_template_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

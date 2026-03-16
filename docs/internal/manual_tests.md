@@ -100,6 +100,32 @@ Expected:
 - Dashboard does not show the webhook delivery issues banner because test sends are excluded.
 - No `webhook.delivery_failed` customer email is sent for the test failure alone.
 
+### 5b) Webhook transport matrix
+Run these protect scenarios with webhook enabled and inspect the receiver output:
+- `RHEONIC_SCENARIO=near_cap`
+- `RHEONIC_SCENARIO=retry_storm`
+- `RHEONIC_SCENARIO=loop_suspect`
+- `RHEONIC_SCENARIO=token_explosion`
+- `RHEONIC_SCENARIO=cap_breach`
+
+Expected:
+- `near_cap` -> `decision.warn`
+- `retry_storm` -> `incident.warn`
+- `loop_suspect` -> `incident.warn`
+- `token_explosion` -> `incident.warn`
+- `cap_breach` -> `incident.block`
+
+Then resolve the open incident.
+
+Expected:
+- `incident.resolved` is delivered over webhook.
+
+Policy-gap check:
+1. Trigger a first-seen `(project, provider, model)` tuple in protect mode.
+2. Expected:
+- `policy_gap.detected` is delivered over webhook.
+- no dedicated in-app notification is expected.
+
 ### 6) Incident lifecycle
 1. Trigger an incident type in observe or protect mode.
 2. Resolve manually from `/api/v1/incidents/{incident_id}/resolve` or wait for auto-close cooldown.

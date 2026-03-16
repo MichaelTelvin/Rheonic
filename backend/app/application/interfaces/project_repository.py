@@ -59,6 +59,7 @@ class ProjectRepository(ABC):
         email_enabled: bool,
         webhook_url: str | None,
         webhook_secret: str | None,
+        webhook_payload_template_json: str | None,
     ) -> Project | None:
         # Update and return project webhook configuration.
         raise NotImplementedError

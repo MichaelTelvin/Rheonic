@@ -52,6 +52,7 @@ def test_alembic_upgrade_head_creates_current_schema_on_fresh_database() -> None
             project_columns = {column["name"] for column in inspector.get_columns("projects")}
             incident_columns = {column["name"] for column in inspector.get_columns("incidents")}
             assert "apply_clamp" in project_columns
+            assert "webhook_payload_template_json" in project_columns
             assert "provider" in incident_columns
         finally:
             target_engine.dispose()

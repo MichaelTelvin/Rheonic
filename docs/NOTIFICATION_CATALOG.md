@@ -50,7 +50,7 @@ This catalog reflects the implemented notification contract.
 | Event / Condition | Observe dashboard state | Observe in-app | Observe webhook | Observe email | Protect dashboard state | Protect in-app | Protect webhook | Protect email | Notes |
 |---|---|---|---|---|---|---|---|---|---|
 | `feedback.submitted` | No | No | No | Internal only | No | No | No | Internal only | Product/admin workflow, not customer-facing alerting |
-| `policy_gap.detected` | Not represented in incident counters | Yes | No by default | No | Not represented in incident counters | Yes | Yes | No | Distinct operator signal; low urgency, no email |
+| `policy_gap.detected` | Not represented in incident counters | No | No by default | No | Not represented in incident counters | No | Yes | No | No dedicated in-app surface; webhook-only for now |
 | `decision.warn` | No dedicated notification surface | No | No | No | Reflected indirectly via protect behavior; not a standalone dashboard notification | No | No by default | No | Keep out of the default alert set; verbose webhook stream may be added later as an explicit opt-in |
 | `incident.warn` | Represented in dashboard incidents/counters | No | No by default | No | Represented in dashboard incidents/counters | No | Yes | Yes | Core protect lifecycle alert for non-`near_cap` ingest opens |
 | `incident.block` | Represented in dashboard incidents/counters | No | No by default | No | Represented in dashboard incidents/counters | No | Yes | Yes | Core protect lifecycle alert; include block reason/action when deterministic |
@@ -67,13 +67,51 @@ This catalog reflects the implemented notification contract.
   - ingest-origin warning incidents should not overclaim a protect action if the system cannot prove one
 - If action context is ambiguous, omit it or mark it as best-effort/latest context rather than asserting a false causal mapping.
 
-## Deferred Scope
+## Webhook Payload Editor
 
-- Webhook body editor: approved as a follow-up after the notification engine is operationally complete.
-- The editor should be constrained:
-  - immutable system fields remain locked
-  - users may shape the surrounding payload/envelope
-  - preview/test delivery should be required
+- Policy-gap does not have a separate in-app notification surface.
+- Current runtime transport for `policy_gap.detected` remains webhook-only.
+- If a future customer-facing policy-gap route is added, prefer email over another dashboard banner/toast.
+
+Current implementation:
+- Each project can store one optional `webhook_payload_template_json`.
+- The Alerts page exposes:
+  - a `Use custom payload` toggle
+  - a JSON payload editor
+  - a preview selector for representative event types
+  - a rendered preview panel
+- `webhook.test` uses the current draft-or-saved template path so users can validate payload shape before rollout.
+- When no template is configured, the canonical Rheonic payload is sent unchanged.
+- When a template is configured, the worker renders the final request body from the canonical payload and signs the rendered JSON body.
+
+Locked placeholders:
+- `event`
+- `project_id`
+- `incident_id`
+- `incident_type`
+- `provider`
+- `model`
+- `environment`
+- `sent_at`
+- `resolved_at`
+- `resolved_by`
+- `reason`
+- `requests_60s`
+- `tokens_60s`
+- `req_cap`
+- `tok_cap`
+- `destination`
+- `status`
+- `attempts`
+- `max_attempts`
+- `last_error_code`
+- `last_error_message`
+
+Still out of scope:
+- per-event templates
+- custom request headers beyond the signing secret
+- custom HTTP methods
+- provider-specific turnkey presets
 
 ## Email Template Catalog
 

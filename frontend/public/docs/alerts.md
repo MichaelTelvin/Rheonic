@@ -15,7 +15,8 @@ Rheonic can notify you when protect events occur. Alerts are configured per proj
 - enable or disable the webhook,
 - set the destination URL,
 - set or rotate the signing secret,
-- send a test event before relying on production delivery.
+- send a test event before relying on production delivery,
+- optionally use a custom JSON payload template with locked Rheonic placeholders.
 
 ## Event Types
 - Core protect lifecycle alerts:
@@ -29,7 +30,7 @@ Rheonic can notify you when protect events occur. Alerts are configured per proj
 - Explicit test event:
   - `webhook.test`
 
-Protect emails are incident-centric and use the same core lifecycle set as protect webhooks. `decision.warn` remains a webhook stream event rather than a standalone email alert. `webhook.test` is available regardless of mode.
+Protect emails are incident-centric and use the same core lifecycle set as protect webhooks. `decision.warn` remains a webhook stream event rather than a standalone email alert. `policy_gap.detected` is webhook-only today. `webhook.test` is available regardless of mode.
 
 ## Testing Webhooks
 Use the `Test webhook` action from the dashboard. Rheonic queues a test payload and updates the last delivery status after the worker attempts delivery.

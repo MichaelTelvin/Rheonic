@@ -19,3 +19,4 @@ class Project:
     email_enabled: bool = False
     webhook_url: str | None = None
     webhook_secret: str | None = None
+    webhook_payload_template_json: str | None = None
