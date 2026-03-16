@@ -16,17 +16,17 @@ import { useAuthContext } from "../context/AuthContext";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 
-const DEFAULT_CUSTOM_PAYLOAD = '{\n  "channel_id": 653661315,\n  "text": "agent behavior anomaly detected",\n  "parse_mode": "HTML"\n}';
+const CUSTOM_PAYLOAD_PLACEHOLDER = '{\n  "channel_id": 653661315,\n  "text": "agent behavior anomaly detected",\n  "parse_mode": "HTML"\n}';
 
 function parsePayloadTemplateForEditor(value: string | null): string {
   if (!value) {
-    return DEFAULT_CUSTOM_PAYLOAD;
+    return "";
   }
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
-    return Object.keys(parsed).length > 0 ? JSON.stringify(parsed, null, 2) : DEFAULT_CUSTOM_PAYLOAD;
+    return Object.keys(parsed).length > 0 ? JSON.stringify(parsed, null, 2) : "";
   } catch {
-    return DEFAULT_CUSTOM_PAYLOAD;
+    return "";
   }
 }
 
@@ -42,8 +42,9 @@ function parseCustomPayload(source: string): Record<string, unknown> {
   return { ...(parsed as Record<string, unknown>) };
 }
 
-function buildPayloadTemplateJson(customPayloadText: string): string {
-  return JSON.stringify(parseCustomPayload(customPayloadText));
+function buildPayloadTemplateJson(customPayloadText: string): string | null {
+  const payload = parseCustomPayload(customPayloadText);
+  return Object.keys(payload).length > 0 ? JSON.stringify(payload) : null;
 }
 
 function formatDateTime(iso: string | null): string {
@@ -74,7 +75,7 @@ export function Alerts(): JSX.Element {
   const [emailEnabledInput, setEmailEnabledInput] = useState<boolean>(false);
   const [webhookUrlInput, setWebhookUrlInput] = useState<string>("");
   const [webhookSecretInput, setWebhookSecretInput] = useState<string>("");
-  const [payloadEditorInput, setPayloadEditorInput] = useState<string>(DEFAULT_CUSTOM_PAYLOAD);
+  const [payloadEditorInput, setPayloadEditorInput] = useState<string>("");
   const [webhookSaving, setWebhookSaving] = useState<boolean>(false);
   const [webhookTesting, setWebhookTesting] = useState<boolean>(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
@@ -269,8 +270,9 @@ export function Alerts(): JSX.Element {
         window.localStorage.setItem(webhookTestMarkerKey, String(Date.now()));
       }
       const baseline = webhookSettings;
-      await saveWebhookSettings(false);
       await testProjectWebhook(projectId, {
+        url: webhookUrlInput.trim() || undefined,
+        secret: webhookSecretInput.trim() || undefined,
         payload_template_json: buildPayloadTemplateJson(payloadEditorInput),
       });
       let latest: ProjectWebhookSettings | null = null;
@@ -344,21 +346,21 @@ export function Alerts(): JSX.Element {
                   <div className="alerts-route-copy">
                     <h3 className="alerts-route-heading">Email</h3>
                     <p className="alerts-route-description">Send protect lifecycle alerts to your account email.</p>
+                    <label htmlFor="alerts-email-enabled-toggle" className="alerts-toggle-row">
+                      <span className="toggle-switch">
+                        <input
+                          id="alerts-email-enabled-toggle"
+                          type="checkbox"
+                          checked={emailEnabledInput}
+                          disabled={controlsDisabled}
+                          onChange={(event) => setEmailEnabledInput(event.target.checked)}
+                          role="switch"
+                        />
+                        <span className="toggle-switch-track" aria-hidden="true" />
+                      </span>
+                      <span className="alerts-toggle-state">{emailEnabledInput ? "On" : "Off"}</span>
+                    </label>
                   </div>
-                  <label htmlFor="alerts-email-enabled-toggle" className="alerts-toggle-row">
-                    <span className="toggle-switch">
-                      <input
-                        id="alerts-email-enabled-toggle"
-                        type="checkbox"
-                        checked={emailEnabledInput}
-                        disabled={controlsDisabled}
-                        onChange={(event) => setEmailEnabledInput(event.target.checked)}
-                        role="switch"
-                      />
-                      <span className="toggle-switch-track" aria-hidden="true" />
-                    </span>
-                    <span className="alerts-toggle-state">{emailEnabledInput ? "On" : "Off"}</span>
-                  </label>
                 </div>
                 <div className="alerts-recipient-block">
                   <span className="alerts-recipient-label">Recipient</span>
@@ -372,24 +374,24 @@ export function Alerts(): JSX.Element {
                     <h3 className="alerts-route-heading">Webhook</h3>
                     <p className="alerts-route-description">
                       {protectEnabled
-                        ? "Deliver the same protect lifecycle alerts to your webhook endpoint."
+                        ? "Deliver protect lifecycle alerts to your webhook endpoint."
                         : "Configure now. Delivery starts when Protect is enabled."}
                     </p>
+                    <label htmlFor="alerts-enabled-toggle" className="alerts-toggle-row">
+                      <span className="toggle-switch">
+                        <input
+                          id="alerts-enabled-toggle"
+                          type="checkbox"
+                          checked={webhookEnabledInput}
+                          disabled={controlsDisabled}
+                          onChange={(event) => setWebhookEnabledInput(event.target.checked)}
+                          role="switch"
+                        />
+                        <span className="toggle-switch-track" aria-hidden="true" />
+                      </span>
+                      <span className="alerts-toggle-state">{webhookEnabledInput ? "On" : "Off"}</span>
+                    </label>
                   </div>
-                  <label htmlFor="alerts-enabled-toggle" className="alerts-toggle-row">
-                    <span className="toggle-switch">
-                      <input
-                        id="alerts-enabled-toggle"
-                        type="checkbox"
-                        checked={webhookEnabledInput}
-                        disabled={controlsDisabled}
-                        onChange={(event) => setWebhookEnabledInput(event.target.checked)}
-                        role="switch"
-                      />
-                      <span className="toggle-switch-track" aria-hidden="true" />
-                    </span>
-                    <span className="alerts-toggle-state">{webhookEnabledInput ? "On" : "Off"}</span>
-                  </label>
                 </div>
                 {!protectEnabled && webhookEnabledInput ? (
                   <p className="alerts-pending-status">Configured. Delivery starts when Protect is enabled.</p>
@@ -464,7 +466,7 @@ export function Alerts(): JSX.Element {
 
         <Card className="form-card card--form alerts-payload-card">
           <h2 className="section-title">Custom Payload</h2>
-          <p className="alerts-intro">Write only the provider-specific JSON body you want to send. Rheonic attaches its own metadata silently on delivery.</p>
+          <p className="alerts-intro">Add provider-specific top-level fields such as channel IDs, message text, or formatting flags. Rheonic metadata is added automatically on delivery.</p>
           <div className={`alerts-payload-editor alerts-payload-editor-single ${controlsDisabled ? "is-disabled" : ""}`}>
             <div className="form-field">
               <label htmlFor="payload-editor">Webhook body</label>
@@ -475,9 +477,9 @@ export function Alerts(): JSX.Element {
                 value={payloadEditorInput}
                 onChange={(event) => setPayloadEditorInput(event.target.value)}
                 disabled={controlsDisabled || webhookTesting}
-                placeholder={DEFAULT_CUSTOM_PAYLOAD}
+                placeholder={CUSTOM_PAYLOAD_PLACEHOLDER}
               />
-              <p className="alerts-note">JSON object only. Use this field for your own provider-specific properties such as channel IDs, message text, and formatting flags.</p>
+              <p className="alerts-note">JSON object only. Example: {"{"}"channel_id":653661315,"text":"agent behavior anomaly detected","parse_mode":"HTML"{"}"}</p>
             </div>
           </div>
         </Card>

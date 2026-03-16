@@ -87,7 +87,7 @@ describe("Alerts payload editor", () => {
     render(<Alerts />);
     const payloadInput = await screen.findByLabelText("Webhook body");
     expect((payloadInput as HTMLTextAreaElement).value).toContain("\"text\": \"{{event}}\"");
-    expect(await screen.findByText(/Rheonic attaches its own metadata silently on delivery\./i)).toBeDefined();
+    expect(await screen.findByText(/Rheonic metadata is added automatically on delivery\./i)).toBeDefined();
   });
 
   it("blocks save when payload template json is invalid", async () => {
@@ -133,5 +133,6 @@ describe("Alerts payload editor", () => {
     expect(payload).toContain("\"text\":\"agent behavior anomaly detected\"");
     expect(payload).toContain("\"chat_id\":\"123\"");
     expect(payload).not.toContain("\"rheonic\"");
+    expect(mocks.updateProjectWebhook).not.toHaveBeenCalled();
   });
 });

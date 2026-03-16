@@ -79,7 +79,7 @@ Current implementation:
   - one always-visible JSON editor for provider-specific fields only
 - `webhook.test` uses the current draft-or-saved JSON path so users can validate provider compatibility before rollout.
 - When no custom JSON is configured, the canonical Rheonic payload is sent unchanged.
-- When custom JSON is configured, the worker sends the user JSON object and silently appends a protected `rheonic` metadata object at delivery time.
+- When custom JSON is configured, the worker sends the user JSON object and appends a protected `rheonic` metadata object at delivery time.
 - Rheonic metadata is not editable in the UI and is not stored inside the user JSON blob.
 
 Still out of scope:

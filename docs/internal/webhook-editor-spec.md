@@ -8,7 +8,7 @@ Keep webhook customization simple:
 - no preview builder
 - no editable Rheonic metadata
 
-Rheonic attaches its own metadata automatically at delivery time under a protected `rheonic` object.
+Rheonic adds its own metadata automatically at delivery time under a protected `rheonic` object.
 
 ## Product Rules
 
