@@ -223,7 +223,7 @@ export function Incidents(): JSX.Element {
           <section className="incidents-list-shell">
             <section className="incidents-scroll-panel">
               {loading && sortedIncidents.length === 0 ? <p className="subtle">Loading incidents...</p> : null}
-              {!loading && sortedIncidents.length === 0 ? <section className="empty">No incidents for current filters.</section> : null}
+              {sortedIncidents.length === 0 ? <section className="empty">No incidents for current filters.</section> : null}
               <div className="list">
                 {sortedIncidents.map((incident) => (
                   <IncidentRow key={incident.id} incident={incident} resolving={resolvingIds.has(incident.id)} onResolve={onResolve} />

@@ -36,6 +36,14 @@ vi.mock("../api/client", async () => {
 
 import { Alerts } from "./Alerts";
 
+function getPayloadEditor(): HTMLTextAreaElement {
+  const node = document.getElementById("payload-editor");
+  if (!(node instanceof HTMLTextAreaElement)) {
+    throw new Error("payload-editor textarea not found");
+  }
+  return node;
+}
+
 describe("Alerts payload editor", () => {
   beforeEach(() => {
     mocks.useProjectContext.mockReturnValue({
@@ -85,14 +93,14 @@ describe("Alerts payload editor", () => {
 
   it("loads saved payload template into the editor", async () => {
     render(<Alerts />);
-    const payloadInput = await screen.findByLabelText("Custom payload (optional)");
-    expect((payloadInput as HTMLTextAreaElement).value).toContain("\"text\": \"{{event}}\"");
+    await screen.findByText("Save alerts");
+    expect(getPayloadEditor().value).toContain("\"text\": \"{{event}}\"");
   });
 
   it("blocks save when payload template json is invalid", async () => {
     render(<Alerts />);
-    const input = await screen.findByLabelText("Custom payload (optional)");
-    fireEvent.change(input, { target: { value: "{\"chat_id\":" } });
+    await screen.findByText("Save alerts");
+    fireEvent.change(getPayloadEditor(), { target: { value: "{\"chat_id\":" } });
     fireEvent.click(screen.getByRole("button", { name: "Save alerts" }));
 
     expect(mocks.updateProjectWebhook).not.toHaveBeenCalled();
@@ -123,8 +131,8 @@ describe("Alerts payload editor", () => {
       });
 
     render(<Alerts />);
-    const payloadInput = await screen.findByLabelText("Custom payload (optional)");
-    fireEvent.change(payloadInput, { target: { value: "{\n  \"text\": \"agent behavior anomaly detected\",\n  \"chat_id\": \"123\"\n}" } });
+    await screen.findByText("Save alerts");
+    fireEvent.change(getPayloadEditor(), { target: { value: "{\n  \"text\": \"agent behavior anomaly detected\",\n  \"chat_id\": \"123\"\n}" } });
     fireEvent.click(screen.getByRole("button", { name: "Test webhook" }));
 
     await waitFor(() => expect(mocks.testProjectWebhook).toHaveBeenCalled());

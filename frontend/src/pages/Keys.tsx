@@ -231,46 +231,44 @@ export function Keys(): JSX.Element {
         <Card className="card--table">
           <h2 className="section-title">Existing keys</h2>
           {loadingKeys ? <p className="subtle">Loading keys...</p> : null}
-          {!loadingKeys ? (
-            <div className="keys-list">
-              <div className="key-row key-row-header">
-                <span className="subtle">Label</span>
-                <span className="subtle">Status</span>
-                <span className="subtle">Last 4</span>
-                <span className="subtle">Created</span>
-                <span className="subtle key-actions-col table-actions-header">Actions</span>
-              </div>
-              {activeKeys.length === 0 ? <p className="subtle">No keys yet.</p> : null}
-              {activeKeys.map((key) => (
-                <div className="key-row key-row-data" key={key.id}>
-                  <span className="key-name">{key.name}</span>
-                  <span className={`badge ${key.status === "active" ? "low" : "high"}`}>{key.status}</span>
-                  <span className="subtle mono">{key.last4 ?? "----"}</span>
-                  <span className="subtle" title={key.created_at}>
-                    {formatRelative(key.created_at)}
-                  </span>
-                  <div className="key-actions">
-                    <button
-                      type="button"
-                      className="modal-button key-action-btn action-btn"
-                      onClick={() => void onRotateKey(key.id)}
-                      disabled={processingKeyId === key.id}
-                    >
-                      Rotate
-                    </button>
-                    <button
-                      type="button"
-                      className="modal-button key-action-btn action-btn key-action-danger"
-                      onClick={() => void onRevokeKey(key.id)}
-                      disabled={processingKeyId === key.id}
-                    >
-                      Revoke
-                    </button>
-                  </div>
-                </div>
-              ))}
+          <div className="keys-list">
+            <div className="key-row key-row-header">
+              <span className="subtle">Label</span>
+              <span className="subtle">Status</span>
+              <span className="subtle">Last 4</span>
+              <span className="subtle">Created</span>
+              <span className="subtle key-actions-col table-actions-header">Actions</span>
             </div>
-          ) : null}
+            {activeKeys.length === 0 ? <p className="subtle">No keys yet.</p> : null}
+            {activeKeys.map((key) => (
+              <div className="key-row key-row-data" key={key.id}>
+                <span className="key-name">{key.name}</span>
+                <span className={`badge ${key.status === "active" ? "low" : "high"}`}>{key.status}</span>
+                <span className="subtle mono">{key.last4 ?? "----"}</span>
+                <span className="subtle" title={key.created_at}>
+                  {formatRelative(key.created_at)}
+                </span>
+                <div className="key-actions">
+                  <button
+                    type="button"
+                    className="modal-button key-action-btn action-btn"
+                    onClick={() => void onRotateKey(key.id)}
+                    disabled={processingKeyId === key.id}
+                  >
+                    Rotate
+                  </button>
+                  <button
+                    type="button"
+                    className="modal-button key-action-btn action-btn key-action-danger"
+                    onClick={() => void onRevokeKey(key.id)}
+                    disabled={processingKeyId === key.id}
+                  >
+                    Revoke
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
       </div>
     </main>

@@ -84,11 +84,13 @@ export function Alerts(): JSX.Element {
   const [loadingSettings, setLoadingSettings] = useState<boolean>(true);
   const accountEmail = user?.email ?? "your account email";
 
-  const reloadWebhookSettings = async (preserveInputs = false): Promise<void> => {
+  const reloadWebhookSettings = async (preserveInputs = false, showLoading = true): Promise<void> => {
     if (!projectId) {
       return;
     }
-    setLoadingSettings(true);
+    if (showLoading) {
+      setLoadingSettings(true);
+    }
     try {
       const [settings, protectSettings] = await Promise.all([fetchProjectWebhook(projectId), fetchProjectProtect(projectId)]);
       setWebhookSettings(settings);
@@ -101,7 +103,9 @@ export function Alerts(): JSX.Element {
         setPayloadEditorInput(parsePayloadTemplateForEditor(settings.payload_template_json));
       }
     } finally {
-      setLoadingSettings(false);
+      if (showLoading) {
+        setLoadingSettings(false);
+      }
     }
   };
 
@@ -160,7 +164,8 @@ export function Alerts(): JSX.Element {
       && !webhookSaving,
     [projectId, webhookEnabledInput, webhookUrlInput, webhookTesting, webhookSaving],
   );
-  const controlsDisabled = !projectId || webhookSaving;
+  const controlsDisabled = !projectId;
+  const saveControlsDisabled = !projectId || webhookSaving;
   const hasUnsavedChanges = useMemo(() => {
     if (!webhookSettings) {
       return false;
@@ -226,7 +231,7 @@ export function Alerts(): JSX.Element {
         secret: webhookSecretInput.trim() || null,
         payload_template_json: buildPayloadTemplateJson(payloadEditorInput),
       });
-      await reloadWebhookSettings();
+      await reloadWebhookSettings(false, false);
       if (emitToast) {
         showAppToast("Saved");
       }
@@ -352,7 +357,7 @@ export function Alerts(): JSX.Element {
                         id="alerts-email-enabled-toggle"
                         type="checkbox"
                         checked={emailEnabledInput}
-                        disabled={controlsDisabled || !protectEnabled}
+                        disabled={saveControlsDisabled || !protectEnabled}
                         onChange={(event) => setEmailEnabledInput(event.target.checked)}
                         role="switch"
                       />
@@ -375,7 +380,7 @@ export function Alerts(): JSX.Element {
                         id="alerts-enabled-toggle"
                         type="checkbox"
                         checked={webhookEnabledInput}
-                        disabled={controlsDisabled}
+                        disabled={saveControlsDisabled}
                         onChange={(event) => setWebhookEnabledInput(event.target.checked)}
                         role="switch"
                       />
@@ -403,7 +408,7 @@ export function Alerts(): JSX.Element {
                           placeholder="https://..."
                           value={webhookUrlInput}
                           onChange={(event) => setWebhookUrlInput(event.target.value)}
-                          disabled={controlsDisabled || webhookTesting}
+                          disabled={saveControlsDisabled || webhookTesting}
                           title={webhookUrlInput || undefined}
                         />
                       </div>
@@ -422,7 +427,7 @@ export function Alerts(): JSX.Element {
                           placeholder={webhookSettings?.has_secret ? "8f4a9c2e17b6d4fa (leave blank to keep)" : "8f4a9c2e17b6d4fa"}
                           value={webhookSecretInput}
                           onChange={(event) => setWebhookSecretInput(event.target.value)}
-                          disabled={controlsDisabled || webhookTesting}
+                          disabled={saveControlsDisabled || webhookTesting}
                         />
                       </div>
 
@@ -461,7 +466,7 @@ export function Alerts(): JSX.Element {
                           rows={5}
                           value={payloadEditorInput}
                           onChange={(event) => setPayloadEditorInput(event.target.value)}
-                          disabled={controlsDisabled || webhookTesting}
+                          disabled={saveControlsDisabled || webhookTesting}
                           placeholder={CUSTOM_PAYLOAD_PLACEHOLDER}
                         />
                       </div>
@@ -474,7 +479,7 @@ export function Alerts(): JSX.Element {
                     type="button"
                     className="modal-button modal-primary action-btn"
                     onClick={() => void onSaveWebhookSettings()}
-                    disabled={controlsDisabled}
+                    disabled={saveControlsDisabled}
                   >
                     {webhookSaving ? "Saving..." : "Save alerts"}
                   </button>

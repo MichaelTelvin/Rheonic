@@ -41,6 +41,7 @@ export function Protect(): JSX.Element {
   const [muteFor24h, setMuteFor24h] = useState<boolean>(false);
   const [pendingWarningsCount, setPendingWarningsCount] = useState<number | null>(null);
   const [showPostEnableToast, setShowPostEnableToast] = useState<boolean>(false);
+  const [loadingProtectSettings, setLoadingProtectSettings] = useState<boolean>(true);
 
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [deletingProject, setDeletingProject] = useState<boolean>(false);
@@ -137,11 +138,13 @@ export function Protect(): JSX.Element {
     if (!projectId) {
       setProtectSettings(null);
       setProtectError(null);
+      setLoadingProtectSettings(false);
       return;
     }
 
     let cancelled = false;
     const loadSettings = async (): Promise<void> => {
+      setLoadingProtectSettings(true);
       try {
         const settings = await fetchProjectProtect(projectId);
         if (cancelled) {
@@ -154,6 +157,10 @@ export function Protect(): JSX.Element {
         if (!cancelled) {
           setProtectSettings(null);
           setProtectError(error instanceof Error ? error.message : "Failed to load protect settings.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingProtectSettings(false);
         }
       }
     };
@@ -300,6 +307,20 @@ export function Protect(): JSX.Element {
         <div className="dashboard-content page-stack">
           <h1 className="page-title">Project settings</h1>
           <section className="empty">Select a project to configure protection rules.</section>
+        </div>
+      </main>
+    );
+  }
+
+  if (loadingProtectSettings && protectSettings === null) {
+    return (
+      <main className="dashboard">
+        <div className="dashboard-content page-stack">
+          <section>
+            <h1 className="page-title">Project settings</h1>
+            <p className="page-subtitle">Configure limits and protection behavior</p>
+          </section>
+          <section className="empty">Loading project settings...</section>
         </div>
       </main>
     );
