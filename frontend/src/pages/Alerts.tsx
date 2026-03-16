@@ -526,46 +526,49 @@ export function Alerts(): JSX.Element {
           <p className="page-subtitle">Configure protect lifecycle alert routes for email and webhook delivery</p>
         </section>
 
-        <Card className="form-card alerts-main-card">
-          <FormColumn testId="alerts-form-column">
-            <div className={`alerts-routes-stack ${controlsDisabled ? "is-disabled" : ""}`}>
-              <section className="alerts-route-block">
-                <div className="alerts-route-head">
-                  <div>
-                    <h2 className="section-title">Email</h2>
-                    <p className="alerts-helper">Send protect lifecycle alerts to your account email.</p>
-                  </div>
-                  <label htmlFor="alerts-email-enabled-toggle" className="alerts-toggle-row">
-                    <span className="toggle-switch">
-                      <input
-                        id="alerts-email-enabled-toggle"
-                        type="checkbox"
-                        checked={emailEnabledInput}
-                        disabled={controlsDisabled}
-                        onChange={(event) => setEmailEnabledInput(event.target.checked)}
-                        role="switch"
-                      />
-                      <span className="toggle-switch-track" aria-hidden="true" />
-                    </span>
-                    <span>{emailEnabledInput ? "On" : "Off"}</span>
-                  </label>
-                </div>
-                <p className="alerts-destination">
-                  <span className="alerts-destination-label">Recipient</span>
-                  <span className="alerts-destination-email">{accountEmail}</span>
-                </p>
-              </section>
+        <section className="alerts-top-grid">
+          <Card className="form-card card--form alerts-route-card">
+            <h2 className="section-title">Email</h2>
+            <p className="alerts-intro">Send protect lifecycle alerts to your account email.</p>
+            <FormColumn>
+              <div className="form-field alerts-toggle-field">
+                <label htmlFor="alerts-email-enabled-toggle" className="alerts-toggle-row">
+                  <span className="toggle-switch">
+                    <input
+                      id="alerts-email-enabled-toggle"
+                      type="checkbox"
+                      checked={emailEnabledInput}
+                      disabled={controlsDisabled}
+                      onChange={(event) => setEmailEnabledInput(event.target.checked)}
+                      role="switch"
+                    />
+                    <span className="toggle-switch-track" aria-hidden="true" />
+                  </span>
+                  <span>{emailEnabledInput ? "On" : "Off"}</span>
+                </label>
+              </div>
+              <div className="form-field">
+                <label htmlFor="alerts-email-recipient">Recipient</label>
+                <input
+                  id="alerts-email-recipient"
+                  className="text-input alerts-static-input"
+                  readOnly
+                  value={accountEmail}
+                />
+              </div>
+            </FormColumn>
+          </Card>
 
-              <section className="alerts-route-block">
-                <div className="alerts-route-head">
-                  <div>
-                    <h2 className="section-title">Webhook</h2>
-                    <p className="alerts-helper">
-                      {protectEnabled
-                        ? "Deliver the same protect lifecycle alerts to your webhook endpoint."
-                        : "Configure now. Delivery starts when Protect is enabled."}
-                    </p>
-                  </div>
+          <Card className="form-card card--form alerts-route-card">
+            <h2 className="section-title">Webhook</h2>
+            <p className="alerts-intro">
+              {protectEnabled
+                ? "Deliver the same protect lifecycle alerts to your webhook endpoint."
+                : "Configure now. Delivery starts when Protect is enabled."}
+            </p>
+            <FormColumn testId="alerts-form-column">
+              <div className={`alerts-route-form ${controlsDisabled ? "is-disabled" : ""}`}>
+                <div className="form-field alerts-toggle-field">
                   <label htmlFor="alerts-enabled-toggle" className="alerts-toggle-row">
                     <span className="toggle-switch">
                       <input
@@ -582,10 +585,10 @@ export function Alerts(): JSX.Element {
                   </label>
                 </div>
                 {!protectEnabled && webhookEnabledInput ? (
-                  <p className="alerts-pending-status">Configured - will start delivering when you enable Protect</p>
+                  <p className="alerts-pending-status">Configured. Delivery starts when Protect is enabled.</p>
                 ) : null}
-                <div className="alerts-route-fields">
-                  <div className="form-field alerts-url alerts-webhook-field">
+                <div className="alerts-route-grid">
+                  <div className="form-field">
                     <label htmlFor="webhook-url" title="HTTPS endpoint that receives RHEONIC webhook events.">
                       <span className="alerts-label-inline">
                         <span>Webhook URL</span>
@@ -603,7 +606,7 @@ export function Alerts(): JSX.Element {
                       title={webhookUrlInput || undefined}
                     />
                   </div>
-                  <div className="form-field alerts-webhook-field">
+                  <div className="form-field">
                     <label htmlFor="webhook-secret" title="Optional secret used by your receiver for signature verification.">
                       Secret (optional)
                     </label>
@@ -617,24 +620,24 @@ export function Alerts(): JSX.Element {
                       disabled={controlsDisabled || webhookTesting}
                     />
                   </div>
-                  <div className="form-field alerts-webhook-inline-toggle">
-                    <label htmlFor="alerts-custom-payload-toggle" className="alerts-toggle-row">
-                      <span className="toggle-switch">
-                        <input
-                          id="alerts-custom-payload-toggle"
-                          type="checkbox"
-                          checked={payloadTemplateEnabledInput}
-                          disabled={controlsDisabled || webhookTesting}
-                          onChange={(event) => setPayloadTemplateEnabledInput(event.target.checked)}
-                          role="switch"
-                        />
-                        <span className="toggle-switch-track" aria-hidden="true" />
-                      </span>
-                      <span>Use custom payload</span>
-                    </label>
-                  </div>
                 </div>
-                <div className="alerts-route-footer">
+                <div className="form-field alerts-toggle-field">
+                  <label htmlFor="alerts-custom-payload-toggle" className="alerts-toggle-row">
+                    <span className="toggle-switch">
+                      <input
+                        id="alerts-custom-payload-toggle"
+                        type="checkbox"
+                        checked={payloadTemplateEnabledInput}
+                        disabled={controlsDisabled || webhookTesting}
+                        onChange={(event) => setPayloadTemplateEnabledInput(event.target.checked)}
+                        role="switch"
+                      />
+                      <span className="toggle-switch-track" aria-hidden="true" />
+                    </span>
+                    <span>Use custom payload</span>
+                  </label>
+                </div>
+                <div className="alerts-route-actions">
                   <p className="alerts-status">
                     Last delivery:
                     {" "}
@@ -664,21 +667,18 @@ export function Alerts(): JSX.Element {
                   </div>
                 </div>
                 <p className="form-error-slot alerts-error-slot">{webhookError ?? payloadTemplateError ?? "\u00A0"}</p>
-              </section>
-            </div>
-          </FormColumn>
-
-          {payloadTemplateEnabledInput ? (
-            <section className="alerts-inline-builder">
-              <div className="alerts-editor-header">
-                <div>
-                  <h2 className="section-title">Custom Payload</h2>
-                  <p className="alerts-helper">Edit the message and any extra top-level provider fields.</p>
-                </div>
               </div>
-              <div className={`alerts-editor-grid ${controlsDisabled ? "is-disabled" : ""}`}>
-                <div className="alerts-editor-column">
-                  <div className="form-field">
+            </FormColumn>
+          </Card>
+        </section>
+
+        {payloadTemplateEnabledInput ? (
+          <Card className="form-card card--form alerts-payload-card">
+            <h2 className="section-title">Custom Payload</h2>
+            <p className="alerts-intro">Edit the message and any extra top-level provider fields.</p>
+            <div className={`alerts-payload-grid ${controlsDisabled ? "is-disabled" : ""}`}>
+              <div className="alerts-payload-column">
+                <div className="form-field">
                   <label htmlFor="payload-message-text">Message text</label>
                   <textarea
                     id="payload-message-text"
@@ -689,10 +689,8 @@ export function Alerts(): JSX.Element {
                     disabled={controlsDisabled || webhookTesting}
                     placeholder="Rheonic {{event}} for {{project_id}}: {{incident_type}}"
                   />
-                  <p className="alerts-helper">
-                    Optional. Placeholders like <code>{"{{incident_type}}"}</code>, <code>{"{{provider}}"}</code>, and <code>{"{{project_id}}"}</code> are supported.
-                  </p>
                 </div>
+                <p className="alerts-note">Supports placeholders like {`{{incident_type}}`}, {`{{provider}}`}, and {`{{project_id}}`}.</p>
                 <div className="form-field">
                   <label htmlFor="payload-custom-properties">Extra fields (JSON object)</label>
                   <textarea
@@ -704,12 +702,11 @@ export function Alerts(): JSX.Element {
                     disabled={controlsDisabled || webhookTesting}
                     placeholder={"{\n  \"chat_id\": \"123456789\",\n  \"parse_mode\": \"Markdown\"\n}"}
                   />
-                  <p className="alerts-helper">
-                    Add provider-specific top-level fields such as <code>chat_id</code>, <code>thread_id</code>, or <code>parse_mode</code>.
-                  </p>
                 </div>
+                <p className="alerts-note">Use for provider-specific top-level keys like <code>chat_id</code>, <code>thread_id</code>, or <code>parse_mode</code>.</p>
               </div>
-              <div className="alerts-editor-column">
+
+              <div className="alerts-payload-column">
                 <div className="form-field">
                   <label htmlFor="payload-preview-event">Preview event</label>
                   <select
@@ -735,15 +732,12 @@ export function Alerts(): JSX.Element {
                     value={payloadTemplatePreview}
                     readOnly
                   />
-                  <p className="alerts-helper">
-                    Preview of the fields you control. Rheonic metadata is appended automatically at send time.
-                  </p>
                 </div>
+                <p className="alerts-note">This preview shows the fields you control. Rheonic metadata is added automatically when the webhook is sent.</p>
               </div>
-              </div>
-            </section>
-          ) : null}
-        </Card>
+            </div>
+          </Card>
+        ) : null}
         <UnsavedChangesToast
           open={showUnsavedPrompt}
           busy={webhookSaving}
