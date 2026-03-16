@@ -2874,16 +2874,8 @@ pre {
 .alerts-route-inline {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.alerts-field-caption {
-  color: rgba(229, 231, 235, 0.7);
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  justify-content: flex-start;
+  gap: 12px;
 }
 
 .alerts-route-grid {
@@ -2897,12 +2889,12 @@ pre {
 .alerts-toggle-row {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: fit-content;
   margin: 0;
   white-space: nowrap;
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   line-height: 1;
 }
@@ -2912,17 +2904,28 @@ pre {
   align-items: center;
 }
 
-.alerts-field-span,
-.alerts-static-input,
+.alerts-recipient-block {
+  display: grid;
+  gap: 4px;
+}
+
+.alerts-recipient-label {
+  color: rgba(229, 231, 235, 0.68);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.alerts-recipient-value {
+  color: rgba(229, 231, 235, 0.96);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
 .alerts-webhook-input,
 .alerts-payload-card .text-input,
 .alerts-payload-card select {
   width: 100%;
   max-width: none;
-}
-
-.alerts-static-input {
-  color: rgba(229, 231, 235, 0.96);
 }
 
 .alerts-webhook-input:focus {
@@ -3026,7 +3029,7 @@ pre {
   color: rgba(229, 231, 235, 0.66);
   font-size: 0.8rem;
   line-height: 1.42;
-  max-width: 28rem;
+  max-width: 34rem;
 }
 
 @keyframes alerts-spin {
