@@ -2839,13 +2839,23 @@ pre {
   opacity: 0.72;
 }
 
+.alerts-cards-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.72fr) minmax(480px, 1.28fr);
+  gap: 24px;
+  align-items: start;
+}
+
 .alerts-route-section {
   display: grid;
   gap: 16px;
-  padding: 18px 20px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.01);
+}
+
+.alerts-route-section--plain {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .alerts-route-section + .alerts-route-section {
@@ -2876,13 +2886,6 @@ pre {
   color: rgba(229, 231, 235, 0.72);
   font-size: 0.94rem;
   line-height: 1.46;
-}
-
-.alerts-route-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  align-items: start;
 }
 
 .form-field label.alerts-toggle-row,
@@ -2916,15 +2919,15 @@ pre {
 
 .alerts-recipient-label {
   color: rgba(229, 231, 235, 0.72);
-  font-size: 0.94rem;
-  font-weight: 600;
-  line-height: 1.35;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.3;
   font-family: inherit;
   white-space: nowrap;
 }
 
 .alerts-recipient-value {
-  color: rgba(229, 231, 235, 0.76);
+  color: rgba(229, 231, 235, 0.84);
   font-size: 0.94rem;
   font-weight: 500;
   line-height: 1.35;
@@ -2935,7 +2938,8 @@ pre {
 
 .alerts-webhook-input,
 .alerts-payload-card .text-input,
-.alerts-payload-card select {
+.alerts-payload-card select,
+.alerts-webhook-card .text-input {
   width: 100%;
   max-width: none;
 }
@@ -2983,6 +2987,36 @@ pre {
   min-width: 104px;
 }
 
+.alerts-webhook-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.78fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.alerts-webhook-main {
+  min-width: 0;
+}
+
+.alerts-webhook-fields {
+  display: grid;
+  gap: 18px;
+}
+
+.alerts-route-footer--stacked {
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-direction: column;
+}
+
+.alerts-route-buttons--left {
+  justify-content: flex-start;
+}
+
+.alerts-payload-pane {
+  min-width: 0;
+}
+
 .alerts-status {
   margin: 0;
   display: flex;
@@ -3002,21 +3036,6 @@ pre {
   margin-top: 8px;
 }
 
-.alerts-payload-card {
-  display: grid;
-  gap: 0;
-}
-
-.alerts-payload-editor {
-  display: grid;
-  gap: 0;
-  margin-top: 24px;
-}
-
-.alerts-payload-editor-single {
-  max-width: none;
-}
-
 .alerts-template-textarea {
   width: 100%;
   min-height: 220px;
@@ -3029,6 +3048,10 @@ pre {
   background: linear-gradient(180deg, rgba(40, 48, 66, 0.95), rgba(30, 37, 53, 0.98));
   border: 1px solid rgba(148, 163, 184, 0.16);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.alerts-template-textarea--compact {
+  min-height: 196px;
 }
 
 .alerts-template-textarea::placeholder {
@@ -4014,8 +4037,8 @@ pre {
     max-width: 100%;
   }
 
-  .alerts-route-grid,
-  .alerts-payload-editor {
+  .alerts-cards-grid,
+  .alerts-webhook-layout {
     grid-template-columns: 1fr;
   }
 
@@ -4030,20 +4053,13 @@ pre {
     align-items: flex-start;
   }
 
-  .alerts-route-buttons {
+  .alerts-route-buttons,
+  .alerts-route-buttons--left {
     width: 100%;
   }
 
   .alerts-route-buttons .action-btn {
     flex: 1 1 0;
-  }
-
-  .alerts-note {
-    max-width: 100%;
-  }
-
-  .alerts-payload-editor-single {
-    max-width: none;
   }
 }
 

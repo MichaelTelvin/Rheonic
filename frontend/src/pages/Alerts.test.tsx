@@ -85,14 +85,13 @@ describe("Alerts payload editor", () => {
 
   it("loads saved payload template into the editor", async () => {
     render(<Alerts />);
-    const payloadInput = await screen.findByLabelText("Webhook body");
+    const payloadInput = await screen.findByLabelText("Custom payload (optional)");
     expect((payloadInput as HTMLTextAreaElement).value).toContain("\"text\": \"{{event}}\"");
-    expect(await screen.findByText(/Rheonic metadata is added automatically on delivery\./i)).toBeDefined();
   });
 
   it("blocks save when payload template json is invalid", async () => {
     render(<Alerts />);
-    const input = await screen.findByLabelText("Webhook body");
+    const input = await screen.findByLabelText("Custom payload (optional)");
     fireEvent.change(input, { target: { value: "{\"chat_id\":" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -124,7 +123,7 @@ describe("Alerts payload editor", () => {
       });
 
     render(<Alerts />);
-    const payloadInput = await screen.findByLabelText("Webhook body");
+    const payloadInput = await screen.findByLabelText("Custom payload (optional)");
     fireEvent.change(payloadInput, { target: { value: "{\n  \"text\": \"agent behavior anomaly detected\",\n  \"chat_id\": \"123\"\n}" } });
     fireEvent.click(screen.getByRole("button", { name: "Test webhook" }));
 
