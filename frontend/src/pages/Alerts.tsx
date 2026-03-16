@@ -362,6 +362,16 @@ export function Alerts(): JSX.Element {
                         <span className="alerts-toggle-state">{emailEnabledInput ? "On" : "Off"}</span>
                       </label>
                     </div>
+                    <div className="alerts-card-save">
+                      <button
+                        type="button"
+                        className="modal-button modal-primary action-btn"
+                        onClick={() => void onSaveWebhookSettings()}
+                        disabled={controlsDisabled}
+                      >
+                        {webhookSaving ? "Saving..." : "Save alerts"}
+                      </button>
+                    </div>
                   </div>
                   <div className="alerts-recipient-block">
                     <span className="alerts-recipient-label">Recipient:</span>
@@ -438,13 +448,6 @@ export function Alerts(): JSX.Element {
                     </div>
                   </div>
                   <div className="alerts-route-footer alerts-route-footer--stacked">
-                    <p className="alerts-status">
-                      <span className="alerts-status-label">Last webhook delivery</span>
-                      <span className={webhookSettings?.last_status === "failed" ? "alerts-failed" : "alerts-success"}>
-                        {webhookSettings?.last_status ? webhookSettings.last_status : "—"}
-                      </span>
-                      <span>{formatDateTime(webhookSettings?.last_at ?? null)}</span>
-                    </p>
                     <div className="modal-actions form-actions alerts-route-buttons alerts-route-buttons--left">
                       <button
                         type="button"
@@ -454,15 +457,14 @@ export function Alerts(): JSX.Element {
                       >
                         {webhookTesting ? "Testing..." : "Test webhook"}
                       </button>
-                      <button
-                        type="button"
-                        className="modal-button modal-primary action-btn"
-                        onClick={() => void onSaveWebhookSettings()}
-                        disabled={controlsDisabled}
-                      >
-                        {webhookSaving ? "Saving..." : "Save"}
-                      </button>
                     </div>
+                    <p className="alerts-status">
+                      <span className="alerts-status-label">Last webhook delivery</span>
+                      <span className={webhookSettings?.last_status === "failed" ? "alerts-failed" : "alerts-success"}>
+                        {webhookSettings?.last_status ? webhookSettings.last_status : "—"}
+                      </span>
+                      <span>{formatDateTime(webhookSettings?.last_at ?? null)}</span>
+                    </p>
                   </div>
                 </section>
               </div>

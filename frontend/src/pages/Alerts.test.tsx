@@ -93,7 +93,7 @@ describe("Alerts payload editor", () => {
     render(<Alerts />);
     const input = await screen.findByLabelText("Custom payload (optional)");
     fireEvent.change(input, { target: { value: "{\"chat_id\":" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save alerts" }));
 
     expect(mocks.updateProjectWebhook).not.toHaveBeenCalled();
     expect(await screen.findByText("Custom payload must be a valid JSON object.")).toBeDefined();

@@ -2869,8 +2869,10 @@ pre {
 }
 
 .alerts-route-head {
-  display: grid;
-  gap: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .alerts-route-heading {
@@ -2987,8 +2989,17 @@ pre {
   min-width: 104px;
 }
 
+.alerts-card-save {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.alerts-card-save .action-btn {
+  min-width: 132px;
+}
+
 .alerts-webhook-card {
-  padding-bottom: 26px;
+  padding-bottom: 20px;
 }
 
 .alerts-webhook-layout {
@@ -3022,7 +3033,7 @@ pre {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  padding-top: 114px;
+  padding-top: 117px;
 }
 
 .alerts-status {
@@ -4059,6 +4070,11 @@ pre {
   .alerts-route-footer,
   .alerts-route-head {
     align-items: flex-start;
+  }
+
+  .alerts-route-head {
+    flex-direction: column;
+    gap: 12px;
   }
 
   .alerts-route-buttons,
