@@ -88,7 +88,7 @@ describe("Alerts payload editor", () => {
     const toggle = await screen.findByRole("switch", { name: "Use custom payload" });
     expect((toggle as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("Message text") as HTMLTextAreaElement).value).toBe("{{event}}");
-    expect(screen.getByText(/Edit the message and any extra top-level provider fields/i)).toBeDefined();
+    expect(screen.getByText(/Optional\. Customize the outgoing text and add provider-specific top-level fields\./i)).toBeDefined();
   });
 
   it("blocks save when payload template json is invalid", async () => {
