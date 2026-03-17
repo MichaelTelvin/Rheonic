@@ -1,11 +1,18 @@
 name: rheonic_local
 
+x-runtime-env: &runtime-env
+  APP_ENV: ${APP_ENV}
+  DATABASE_URL: ${DATABASE_URL}
+  REDIS_URL: ${REDIS_URL}
+  JWT_SECRET: ${JWT_SECRET}
+  CORS_ORIGINS: ${CORS_ORIGINS}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: rheonic-postgres
-    env_file:
-      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -23,8 +30,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: rheonic-redis
-    env_file:
-      - .env
     ports:
       - "${REDIS_PORT}:6379"
     volumes:
@@ -42,15 +47,8 @@ services:
       args:
         INSTALL_DEV: "true"
     container_name: rheonic-backend
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      APP_ENV: ${APP_ENV}
-      JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGINS: ${CORS_ORIGINS}
-      RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
+      <<: *runtime-env
     ports:
       - "${BACKEND_PORT}:8000"
     depends_on:
@@ -71,13 +69,8 @@ services:
       args:
         INSTALL_DEV: "true"
     container_name: rheonic-worker
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      APP_ENV: ${APP_ENV}
-      RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
+      <<: *runtime-env
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,13 +89,9 @@ services:
       args:
         INSTALL_DEV: "true"
     container_name: rheonic-scheduler
-    env_file:
-      - .env
     environment:
-      REDIS_URL: ${REDIS_URL}
-      APP_ENV: ${APP_ENV}
+      <<: *runtime-env
       AUTO_CLOSE_RUN_INTERVAL_SECONDS: ${AUTO_CLOSE_RUN_INTERVAL_SECONDS:-60}
-      RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
       RQ_SCHEDULER_INTERVAL_SECONDS: ${RQ_SCHEDULER_INTERVAL_SECONDS:-15}
     depends_on:
       postgres:
@@ -120,8 +109,6 @@ services:
   frontend:
     build: ./frontend
     container_name: rheonic-frontend
-    env_file:
-      - .env
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL}
     ports:
@@ -140,15 +127,8 @@ services:
       args:
         INSTALL_DEV: "true"
     container_name: rheonic-db-init
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      APP_ENV: ${APP_ENV}
-      JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGINS: ${CORS_ORIGINS}
-      RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
+      <<: *runtime-env
     depends_on:
       postgres:
         condition: service_healthy

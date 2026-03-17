@@ -4,9 +4,8 @@
 
 ### Local
 ```bash
-cp .env.local.example .env
-docker compose up -d --build
-docker compose down
+bash deploy/local_doppler.sh up -d --build
+bash deploy/local_doppler.sh down
 ```
 
 ### Staging

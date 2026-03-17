@@ -16,13 +16,13 @@ DEMO_STG_USAGE = make demo-stg-python RHEONIC_PROVIDER=google RHEONIC_MODEL=gemi
 PROTECT_STG_USAGE = make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cooldown
 
 up-deps:
-	@docker compose up -d postgres redis
+	@bash deploy/local_doppler.sh up -d postgres redis
 
 up-dev:
-	@docker compose up -d --build
+	@bash deploy/local_doppler.sh up -d --build
 
 down-dev:
-	@docker compose down
+	@bash deploy/local_doppler.sh down
 
 up-test:
 	@docker compose -p rheonic_test -f docker-compose.test.yml up -d --build

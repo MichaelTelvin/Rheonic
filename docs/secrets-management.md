@@ -1,11 +1,7 @@
 # Secrets Management
 
 ## Recommended model
-- Local development:
-  - use `.env.local` or `.env` that is never committed,
-  - keep placeholders in `.env.example`,
-  - rotate local secrets when shared accidentally.
-- Staging and production:
+- Local, staging, and production:
   - do not treat `.env` as the source of truth,
   - use a secret manager as the source of truth,
   - inject secrets into environment variables only at deploy or process start.
@@ -27,7 +23,7 @@ This repo is already environment-driven, so integration should happen outside ap
 1. Store staging or production secrets in the secret manager.
 2. Authenticate the deploy host, CI runner, or entrypoint process to that manager.
 3. Start Compose through the secret manager so the required values are present in the process environment.
-4. Keep `.env.example` only as a shape/template for local workflows, not as a deployed secret file.
+4. Keep `.env.example` only as a shape/template, not as a deployed secret file.
 
 ## Practical options
 
@@ -54,9 +50,8 @@ This repo is already environment-driven, so integration should happen outside ap
   - start Compose or the backend process with those values available.
 
 ## Recommended rollout for Rheonic
-- Step 1: keep local development on `.env.local`.
-- Step 2: move staging to Doppler or 1Password first because the repo is already Compose-based.
-- Step 3: keep production on the same tool if operationally sufficient, or move to Vault if you need dynamic DB credentials, stricter separation, or broader infrastructure policy.
+- Step 1: run local and staging through Doppler.
+- Step 2: keep production on the same tool if operationally sufficient, or move to Vault if you need dynamic DB credentials, stricter separation, or broader infrastructure policy.
 
 ## What not to do
 - Do not commit real `.env` files.
@@ -70,3 +65,9 @@ bash deploy/staging_doppler.sh up -d --build
 ```
 
 The only host-level bootstrap secret in that flow is the secret-manager token itself.
+
+## Local workflow
+```bash
+bash deploy/local_doppler.sh up -d --build
+bash deploy/local_doppler.sh down
+```
