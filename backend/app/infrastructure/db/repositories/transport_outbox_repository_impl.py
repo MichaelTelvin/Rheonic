@@ -167,6 +167,7 @@ class TransportOutboxRepositoryImpl(TransportOutboxRepository):
         project_id: str,
         kind: Literal["webhook", "email"],
         exclude_event_types: tuple[str, ...] = (),
+        since: datetime | None = None,
     ) -> TransportOutbox | None:
         try:
             with self._session_factory.create_session() as session:
@@ -178,6 +179,8 @@ class TransportOutboxRepositoryImpl(TransportOutboxRepository):
                 )
                 if exclude_event_types:
                     query = query.filter(~TransportOutboxRecord.event_type.in_(exclude_event_types))
+                if since is not None:
+                    query = query.filter(TransportOutboxRecord.updated_at >= since)
                 record = query.order_by(TransportOutboxRecord.updated_at.desc()).first()
                 if record is None:
                     return None
@@ -195,6 +198,7 @@ class TransportOutboxRepositoryImpl(TransportOutboxRepository):
         project_id: str,
         kind: Literal["webhook", "email"],
         exclude_event_types: tuple[str, ...] = (),
+        since: datetime | None = None,
     ) -> int:
         try:
             with self._session_factory.create_session() as session:
@@ -206,6 +210,8 @@ class TransportOutboxRepositoryImpl(TransportOutboxRepository):
                 )
                 if exclude_event_types:
                     query = query.filter(~TransportOutboxRecord.event_type.in_(exclude_event_types))
+                if since is not None:
+                    query = query.filter(TransportOutboxRecord.updated_at >= since)
                 return int(query.count())
         except Exception:
             logger.exception(

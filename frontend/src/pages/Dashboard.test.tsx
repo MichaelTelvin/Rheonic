@@ -236,9 +236,9 @@ describe("Dashboard", () => {
       </TestRouter>,
     );
 
-    expect(await screen.findByText("Webhook delivery issues")).toBeDefined();
+    expect(await screen.findByText("Webhook delivery issues in the last 24 hours")).toBeDefined();
     expect(screen.getByRole("button", { name: "Check URL" })).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-    await waitFor(() => expect(screen.queryByText("Webhook delivery issues")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Webhook delivery issues in the last 24 hours")).toBeNull());
   });
 });

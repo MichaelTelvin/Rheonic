@@ -57,6 +57,7 @@ class TransportOutboxRepository(ABC):
         project_id: str,
         kind: Literal["webhook", "email"],
         exclude_event_types: tuple[str, ...] = (),
+        since: datetime | None = None,
     ) -> TransportOutbox | None:
         raise NotImplementedError
 
@@ -67,5 +68,6 @@ class TransportOutboxRepository(ABC):
         project_id: str,
         kind: Literal["webhook", "email"],
         exclude_event_types: tuple[str, ...] = (),
+        since: datetime | None = None,
     ) -> int:
         raise NotImplementedError

@@ -691,7 +691,7 @@ export function Dashboard(): JSX.Element {
 
         {showWebhookIssueBanner ? (
           <Card className="dashboard-alert-card">
-            <h2 className="card-title">Webhook delivery issues</h2>
+            <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
             <p className="subtle">
               {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
               {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
