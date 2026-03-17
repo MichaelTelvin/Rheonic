@@ -44,9 +44,8 @@ class AutoCloseIncidentsService:
         return len(resolved_incidents)
 
     def _enqueue_incident_resolved_notifications(self, *, incident: Incident, resolved_by: str) -> None:
-        # Auto-resolve uses the same protect lifecycle transport fan-out as manual resolve.
-        if not self._is_protect_mode_enabled(incident.project_id):
-            return
+        # Auto-resolve uses the same lifecycle webhook fan-out as manual resolve.
+        # Email remains protect-only.
         provider, model, environment = _incident_dimensions(incident)
         resolved_at = incident.resolved_at or datetime.now(timezone.utc)
         payload = {
@@ -72,6 +71,8 @@ class AutoCloseIncidentsService:
                 )
             except Exception:
                 logger.exception("Failed to enqueue auto incident resolved webhook", extra={"incident_id": incident.id})
+        if not self._is_protect_mode_enabled(incident.project_id):
+            return
         if self._transport_service is None:
             return
         try:

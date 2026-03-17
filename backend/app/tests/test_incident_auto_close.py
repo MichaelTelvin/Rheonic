@@ -291,3 +291,56 @@ def test_auto_close_enqueues_incident_resolved_webhook(tmp_path) -> None:
     assert len(transport.calls) == 1
     assert transport.calls[0]["event_type"] == "incident.resolved"
     assert transport.calls[0]["template"] == "incident_resolved"
+
+
+def test_auto_close_in_observe_mode_emits_webhook_but_not_email(tmp_path) -> None:
+    session_factory = _setup_db(tmp_path)
+    now = datetime.now(timezone.utc)
+    old_seen = now - timedelta(minutes=20)
+    dispatcher = FakeWebhookDispatcher()
+    transport = FakeTransportService()
+
+    with session_factory.create_session() as session:
+        session.add(
+            ProjectRecord(
+                id="p1",
+                name="AutoCloseObserve",
+                user_id="u1",
+                protect_enabled=False,
+                protect_fail_mode="open",
+                protect_max_req_per_min=None,
+                protect_max_tok_per_min=None,
+                created_at=now,
+            )
+        )
+        session.add(
+            IncidentRecord(
+                id="inc-old-observe",
+                project_id="p1",
+                provider="openai",
+                type="retry_storm",
+                status="open",
+                evidence={"provider": "openai", "model": "gpt-4o-mini", "environment": "prod"},
+                created_at=old_seen,
+                last_seen_at=old_seen,
+                resolved_at=None,
+            )
+        )
+        session.commit()
+
+    service = AutoCloseIncidentsService(
+        incident_repository=IncidentRepositoryImpl(session_factory=session_factory),
+        cooldown_seconds=300,
+        webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
+        transport_service=transport,  # type: ignore[arg-type]
+        project_repository=ProjectRepositoryImpl(session_factory=session_factory),
+    )
+    resolved_count = service.auto_close(now=now)
+    assert resolved_count == 1
+    assert len(dispatcher.calls) == 1
+    _, payload, event_type = dispatcher.calls[0]
+    assert event_type == "incident.resolved"
+    assert payload["event"] == "incident.resolved"
+    assert payload["resolved_by"] == "auto"
+    assert payload["incident_id"] == "inc-old-observe"
+    assert transport.calls == []

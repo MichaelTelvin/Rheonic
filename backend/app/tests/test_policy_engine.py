@@ -112,6 +112,9 @@ class FakeProjectService:
 
 class FakeProjectRepository:
     # Minimal project repository view for protect-mode webhook gating.
+    def __init__(self, *, protect_enabled: bool = True) -> None:
+        self._protect_enabled = protect_enabled
+
     def get_project(self, project_id: str) -> Project | None:
         if project_id != "p1":
             return None
@@ -120,7 +123,7 @@ class FakeProjectRepository:
             name="Demo",
             user_id="u1",
             created_at=datetime.now(timezone.utc),
-            protect_enabled=True,
+            protect_enabled=self._protect_enabled,
         )
 
 
@@ -162,5 +165,42 @@ def test_resolve_endpoint_marks_resolved_and_deletes_lock() -> None:
     assert len(transport.calls) == 1
     assert transport.calls[0]["event_type"] == "incident.resolved"
     assert transport.calls[0]["template"] == "incident_resolved"
+
+    app.dependency_overrides.clear()
+
+
+def test_resolve_endpoint_in_observe_mode_still_emits_webhook_but_not_email() -> None:
+    repo = FakeIncidentRepository()
+    realtime = FakeRealtimeStore()
+    dispatcher = FakeWebhookDispatcher()
+    transport = FakeTransportService()
+    service = DetectIncidentsService(
+        incident_repository=repo,  # type: ignore[arg-type]
+        realtime_counters=realtime,  # type: ignore[arg-type]
+        webhook_dispatcher=dispatcher,  # type: ignore[arg-type]
+        transport_service=transport,  # type: ignore[arg-type]
+        project_repository=FakeProjectRepository(protect_enabled=False),  # type: ignore[arg-type]
+    )
+
+    app.dependency_overrides[get_detect_incidents_service] = lambda: service
+    app.dependency_overrides[get_project_service] = lambda: FakeProjectService()
+    app.dependency_overrides[get_current_user] = lambda: User(
+        id="u1",
+        email="u1@example.com",
+        password_hash="hashed",
+        created_at=datetime.now(timezone.utc),
+    )
+    client = TestClient(app)
+
+    response = client.post("/api/v1/incidents/inc-1/resolve")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "resolved"}
+    assert len(dispatcher.calls) == 1
+    _, payload, event_type = dispatcher.calls[0]
+    assert event_type == "incident.resolved"
+    assert payload["event"] == "incident.resolved"
+    assert payload["resolved_by"] == "manual"
+    assert transport.calls == []
 
     app.dependency_overrides.clear()

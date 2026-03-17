@@ -76,10 +76,8 @@ class DetectIncidentsService:
             raise
 
     def _enqueue_incident_resolved_notifications(self, *, incident: Incident, resolved_by: str) -> None:
-        # Protect-mode incident resolution alerts are lifecycle notifications:
-        # webhook for routed integrations and email for direct operator visibility.
-        if not self._is_protect_mode_enabled(incident.project_id):
-            return
+        # Resolution webhooks are part of the raw incident lifecycle in both modes.
+        # Email remains protect-only.
         provider, model, environment = _incident_dimensions(incident)
         resolved_at = incident.resolved_at or datetime.now(timezone.utc)
         payload = {
@@ -105,6 +103,8 @@ class DetectIncidentsService:
                 )
             except Exception:
                 logger.exception("Failed to enqueue manual incident resolved webhook", extra={"incident_id": incident.id})
+        if not self._is_protect_mode_enabled(incident.project_id):
+            return
         if self._transport_service is None:
             return
         try:
