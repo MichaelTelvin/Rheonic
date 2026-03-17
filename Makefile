@@ -19,7 +19,7 @@ up-deps:
 	@bash deploy/local_doppler.sh up -d postgres redis
 
 up-dev:
-	@bash deploy/local_doppler.sh up -d --build
+	@bash deploy/local_doppler.sh up -d --build postgres redis db_init backend worker scheduler frontend
 
 down-dev:
 	@bash deploy/local_doppler.sh down
