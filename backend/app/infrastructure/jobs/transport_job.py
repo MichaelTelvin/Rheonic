@@ -165,7 +165,7 @@ def _deliver_webhook(*, outbox_id: str) -> None:
     body_payload = payload.get("body") if isinstance(payload.get("body"), dict) else payload
     force_send = bool(transport_meta.get("force_send", False))
 
-    if not force_send and (not project.protect_enabled or not project.webhook_enabled or not project.webhook_url):
+    if not force_send and (not project.webhook_enabled or not project.webhook_url):
         return
 
     target_url = outbox.destination or project.webhook_url

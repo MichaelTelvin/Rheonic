@@ -59,6 +59,7 @@ def _seed_project(
     session_factory: DatabaseSessionFactory,
     project_id: str = "p1",
     *,
+    protect_enabled: bool = True,
     webhook_payload_template_json: str | None = None,
 ) -> None:
     with session_factory.create_session() as session:
@@ -67,7 +68,7 @@ def _seed_project(
                 id=project_id,
                 name="P1",
                 user_id="u1",
-                protect_enabled=True,
+                protect_enabled=protect_enabled,
                 protect_fail_mode="open",
                 protect_max_req_per_min=None,
                 protect_max_tok_per_min=None,
@@ -126,6 +127,31 @@ def test_process_outbox_delivery_webhook_success_marks_delivered(tmp_path, monke
         assert row.status == "delivered"
         assert row.attempts == 1
         assert row.delivered_at is not None
+
+
+def test_process_outbox_delivery_webhook_sends_in_observe_mode_when_webhook_is_enabled(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_webhook_observe_success.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    _seed_project(session_factory, "p-observe", protect_enabled=False)
+    outbox_id = _enqueue_webhook_outbox(session_factory, "p-observe")
+
+    captured: list[dict[str, object]] = []
+    settings = transport_job.Settings(database_url=db_url, redis_url="redis://localhost:6379/15")
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient(captured))
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id)
+
+    assert len(captured) == 1
+    assert captured[0]["url"] == "https://example.test/hook"
+
+    with session_factory.create_session() as session:
+        row = session.query(TransportOutboxRecord).filter(TransportOutboxRecord.id == outbox_id).first()
+        assert row is not None
+        assert row.status == "delivered"
 
 
 def test_process_outbox_delivery_renders_project_payload_template(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:

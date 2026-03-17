@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
@@ -6,7 +6,7 @@ from app.application.services.project_service import ProjectService
 from app.dependencies import get_current_user, get_project_service, get_transport_outbox_repository, get_webhook_dispatcher
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
-from app.infrastructure.db.models import Base, ProjectRecord
+from app.infrastructure.db.models import Base, ProjectRecord, TransportOutboxRecord
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.main import app
@@ -268,5 +268,83 @@ def test_project_webhook_secret_is_not_stored_plaintext(tmp_path) -> None:
         assert record.webhook_payload_template_json is not None
         assert "\"text\": \"{{event}}\"" in record.webhook_payload_template_json
         assert "\"rheonic\"" not in record.webhook_payload_template_json
+
+    _cleanup_overrides()
+
+
+def test_project_webhook_last_status_ignores_webhook_tests(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/webhook_last_status_ignore_tests.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    service = ProjectService(project_repository=ProjectRepositoryImpl(session_factory=session_factory))
+    dispatcher = FakeWebhookDispatcher()
+    current_user = User(
+        id="u1",
+        email="u1@example.com",
+        password_hash="hashed",
+        created_at=datetime.now(timezone.utc),
+    )
+    app.dependency_overrides[get_project_service] = lambda: service
+    app.dependency_overrides[get_webhook_dispatcher] = lambda: dispatcher
+    app.dependency_overrides[get_transport_outbox_repository] = lambda: TransportOutboxRepositoryImpl(session_factory=session_factory)
+    app.dependency_overrides[get_current_user] = lambda: current_user
+    client = TestClient(app)
+
+    project_id = client.post("/api/v1/projects", json={"name": "Webhook Last Status"}).json()["id"]
+    base_now = datetime(2026, 3, 17, 6, 45, tzinfo=timezone.utc)
+
+    with session_factory.create_session() as session:
+        session.add_all(
+            [
+                TransportOutboxRecord(
+                    id="outbox-real-failure",
+                    project_id=project_id,
+                    kind="webhook",
+                    event_type="incident.warn",
+                    destination="https://example.test/hook",
+                    subject=None,
+                    template=None,
+                    payload={"event": "incident.warn"},
+                    dedupe_key="incident-warn-failure",
+                    status="dead",
+                    attempts=1,
+                    max_attempts=1,
+                    next_attempt_at=base_now,
+                    last_error_code="webhook_http_error",
+                    last_error_message="HTTP 500",
+                    created_at=base_now,
+                    updated_at=base_now,
+                    sent_at=base_now,
+                    delivered_at=None,
+                ),
+                TransportOutboxRecord(
+                    id="outbox-test-success",
+                    project_id=project_id,
+                    kind="webhook",
+                    event_type="webhook.test",
+                    destination="https://example.test/hook",
+                    subject=None,
+                    template=None,
+                    payload={"event": "webhook.test"},
+                    dedupe_key="webhook-test-success",
+                    status="delivered",
+                    attempts=1,
+                    max_attempts=1,
+                    next_attempt_at=base_now + timedelta(minutes=1),
+                    last_error_code=None,
+                    last_error_message=None,
+                    created_at=base_now + timedelta(minutes=1),
+                    updated_at=base_now + timedelta(minutes=1),
+                    sent_at=base_now + timedelta(minutes=1),
+                    delivered_at=base_now + timedelta(minutes=1),
+                ),
+            ]
+        )
+        session.commit()
+
+    response = client.get(f"/api/v1/projects/{project_id}/webhook")
+    assert response.status_code == 200
+    assert response.json()["last_status"] == "failed"
+    assert response.json()["last_error"] == "HTTP 500"
 
     _cleanup_overrides()

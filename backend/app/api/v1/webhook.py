@@ -22,6 +22,7 @@ from app.security.webhook_urls import ensure_webhook_url_is_safe, normalize_webh
 
 logger = get_logger(__name__)
 router = APIRouter()
+WEBHOOK_STATUS_EXCLUDED_EVENT_TYPES = ("webhook.test",)
 
 
 class ProjectWebhookOut(BaseModel):
@@ -186,7 +187,11 @@ def test_project_webhook(
 
 
 def _latest_terminal(project_id: str, outbox_repository: TransportOutboxRepository):
-    return outbox_repository.get_latest_terminal_by_project_kind(project_id=project_id, kind="webhook")
+    return outbox_repository.get_latest_terminal_by_project_kind(
+        project_id=project_id,
+        kind="webhook",
+        exclude_event_types=WEBHOOK_STATUS_EXCLUDED_EVENT_TYPES,
+    )
 
 
 def _last_status_from_outbox(*, project_id: str, outbox_repository: TransportOutboxRepository) -> str | None:

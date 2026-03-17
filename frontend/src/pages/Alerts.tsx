@@ -438,13 +438,18 @@ export function Alerts(): JSX.Element {
                             {webhookTesting ? "Testing..." : "Test webhook"}
                           </button>
                         </div>
-                        <p className="alerts-status">
-                          <span className="alerts-status-label">Last webhook delivery</span>
-                          <span className={webhookSettings?.last_status === "failed" ? "alerts-failed" : "alerts-success"}>
-                            {webhookSettings?.last_status ? webhookSettings.last_status : "—"}
-                          </span>
-                          <span>{formatDateTime(webhookSettings?.last_at ?? null)}</span>
-                        </p>
+                        <div className="alerts-status">
+                          <div className="alerts-status-row">
+                            <span className="alerts-status-label">Last live webhook delivery:</span>
+                            <span className={webhookSettings?.last_status === "failed" ? "alerts-failed" : "alerts-success"}>
+                              {webhookSettings?.last_status ? webhookSettings.last_status : "—"}
+                            </span>
+                          </div>
+                          <div className="alerts-status-row">
+                            <span className="alerts-status-label">Dispatch time:</span>
+                            <span>{formatDateTime(webhookSettings?.last_at ?? null)}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
