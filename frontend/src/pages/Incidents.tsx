@@ -25,7 +25,7 @@ export function Incidents(): JSX.Element {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [warning, setWarning] = useState<string | null>(null);
   const providerRequestSeq = useRef<number>(0);
 
@@ -35,7 +35,6 @@ export function Incidents(): JSX.Element {
   );
 
   useEffect(() => {
-    setIncidents([]);
     setWarning(null);
     setSelectedType("all");
     setSelectedStatus("open");
@@ -70,6 +69,8 @@ export function Incidents(): JSX.Element {
 
   useEffect(() => {
     if (!projectId) {
+      setIncidents([]);
+      setLoading(false);
       return;
     }
     let cancelled = false;

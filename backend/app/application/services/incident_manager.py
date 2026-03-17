@@ -99,8 +99,6 @@ class IncidentManager:
         self._enqueue_detection_notifications(incident=incident, mode=mode)
 
     def _enqueue_detection_notifications(self, *, incident: Incident, mode: str) -> None:
-        if mode != "protect":
-            return
         incident_type = incident.incident_type
         # cap_breach block and near_cap warn alerts are emitted by protect decision paths.
         if incident_type in {"cap_breach", "near_cap"}:
@@ -126,7 +124,7 @@ class IncidentManager:
                 )
             except Exception:
                 logger.exception("Failed to enqueue incident webhook", extra={"incident_id": incident.id})
-        if self._transport_service is not None:
+        if mode == "protect" and self._transport_service is not None:
             try:
                 dedupe_key = build_transport_dedupe_key(
                     project_id=incident.project_id,

@@ -388,10 +388,6 @@ export function Alerts(): JSX.Element {
                     </span>
                     <span className="alerts-toggle-state">{webhookEnabledInput ? "On" : "Off"}</span>
                   </label>
-                  {!protectEnabled && webhookEnabledInput ? (
-                    <p className="alerts-pending-status">Configured. Delivery starts when Protect is enabled.</p>
-                  ) : null}
-
                   <div className="alerts-webhook-body">
                     <div className="alerts-webhook-main">
                       <div className="form-field">

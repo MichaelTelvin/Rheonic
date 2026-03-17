@@ -336,7 +336,7 @@ def test_retry_storm_opens_incident_and_updates_dedup_count() -> None:
     assert transport.calls[0]["template"] == "incident_warn"
 
 
-def test_loop_suspect_opens_incident_in_observe_without_warn_webhook() -> None:
+def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_but_no_email() -> None:
     service, incidents, webhook, transport = _service(protect_enabled=False, loop_count=3)
     service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=0))
     service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=1))
@@ -344,7 +344,7 @@ def test_loop_suspect_opens_incident_in_observe_without_warn_webhook() -> None:
 
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "loop_suspect"
-    assert all(event_type not in {"incident.warn", "incident.block"} for _, event_type, _ in webhook.calls)
+    assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
     assert transport.calls == []
 
 

@@ -15,7 +15,7 @@ export function Keys(): JSX.Element {
   const { projectId } = useProjectContext();
 
   const [keys, setKeys] = useState<IngestKeyItem[]>([]);
-  const [loadingKeys, setLoadingKeys] = useState<boolean>(false);
+  const [loadingKeys, setLoadingKeys] = useState<boolean>(true);
   const [keysError, setKeysError] = useState<string | null>(null);
   const [newKeyName, setNewKeyName] = useState<string>("");
   const [creatingKey, setCreatingKey] = useState<boolean>(false);
