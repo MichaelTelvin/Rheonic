@@ -67,26 +67,49 @@ This catalog reflects the implemented notification contract.
   - ingest-origin warning incidents should not overclaim a protect action if the system cannot prove one
 - If action context is ambiguous, omit it or mark it as best-effort/latest context rather than asserting a false causal mapping.
 
-## Webhook Payload Editor
+## Raw Webhook Scope (MVP)
 
 - Policy-gap does not have a separate in-app notification surface.
 - Current runtime transport for `policy_gap.detected` remains webhook-only.
 - If a future customer-facing policy-gap route is added, prefer email over another dashboard banner/toast.
 
 Current implementation:
-- Each project can store one optional `webhook_payload_template_json`.
-- The Alerts page exposes:
-  - one always-visible JSON editor for provider-specific fields only
-- `webhook.test` uses the current draft-or-saved JSON path so users can validate provider compatibility before rollout.
-- When no custom JSON is configured, the canonical Rheonic payload is sent unchanged.
-- When custom JSON is configured, the worker sends the user JSON object and appends a protected `rheonic` metadata object at delivery time.
-- Rheonic metadata is not editable in the UI and is not stored inside the user JSON blob.
+- The raw project webhook is machine-readable and sends the canonical Rheonic payload.
+- The Alerts page shows a sample raw webhook payload for inspection and copying, but does not expose a payload editor.
+- `webhook.test` validates URL/reachability only; it does not use a custom body editor.
+- Any legacy stored `webhook_payload_template_json` is ignored for live raw webhook delivery.
 
-Still out of scope:
+Sample raw webhook payload (`incident.warn`):
+
+```json
+{
+  "event": "incident.warn",
+  "project_id": "proj_123",
+  "incident_id": "inc_456",
+  "incident_type": "retry_storm",
+  "provider": "openai",
+  "created_at": "2026-03-17T06:21:00Z",
+  "last_seen_at": "2026-03-17T06:23:14Z",
+  "sent_at": "2026-03-17T06:23:20Z",
+  "evidence": {
+    "failure_count": 5,
+    "threshold_count": 5,
+    "requests_60s": 12,
+    "tokens_60s": 640,
+    "environment": "staging",
+    "model": "gpt-4o-mini"
+  }
+}
+```
+
+Deferred to V2:
+- Telegram integration
+- Slack integration
+- provider-specific message templates
+- webhook-backed adapter presets
 - per-event templates
 - custom request headers beyond the signing secret
 - custom HTTP methods
-- provider-specific turnkey presets
 
 ## Email Template Catalog
 

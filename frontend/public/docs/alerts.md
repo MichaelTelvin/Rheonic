@@ -14,9 +14,7 @@ Rheonic can notify you when protect events occur. Alerts are configured per proj
 ### Webhook
 - enable or disable the webhook,
 - set the destination URL,
-- set or rotate the signing secret,
-- send a test event before relying on production delivery,
-- optionally provide one custom JSON object for provider-specific fields.
+- send a test event before relying on production delivery.
 
 ## Event Types
 - Core protect lifecycle alerts:
@@ -35,7 +33,41 @@ Protect emails are incident-centric and use the same core lifecycle set as prote
 ## Testing Webhooks
 Use the `Test webhook` action from the dashboard. Rheonic queues a test payload and updates the last delivery status after the worker attempts delivery.
 
-If you define a custom webhook body, Rheonic appends its own protected `rheonic` metadata object automatically at delivery time.
+Raw webhooks always send the canonical Rheonic payload in MVP. Human-facing provider formatting such as Telegram or Slack is planned as a V2 integration layer rather than a raw webhook editor.
+
+Sample payload for `incident.warn`:
+
+```json
+{
+  "event": "incident.warn",
+  "project_id": "proj_123",
+  "incident_id": "inc_456",
+  "incident_type": "retry_storm",
+  "provider": "openai",
+  "created_at": "2026-03-17T06:21:00Z",
+  "last_seen_at": "2026-03-17T06:23:14Z",
+  "sent_at": "2026-03-17T06:23:20Z",
+  "evidence": {
+    "failure_count": 5,
+    "threshold_count": 5,
+    "requests_60s": 12,
+    "tokens_60s": 640,
+    "environment": "staging",
+    "model": "gpt-4o-mini"
+  }
+}
+```
+
+Field notes:
+- `event`: webhook event type
+- `project_id`: Rheonic project identifier
+- `incident_id`: incident record identifier
+- `incident_type`: incident classification such as `retry_storm`
+- `provider`: provider associated with the incident
+- `created_at`: when the incident was first opened
+- `last_seen_at`: when matching evidence was most recently observed
+- `sent_at`: when Rheonic queued the webhook payload
+- `evidence`: event-specific context captured for the incident
 
 ## Delivery Behavior
 - API and runtime paths enqueue deliveries asynchronously.

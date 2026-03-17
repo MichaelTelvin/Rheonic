@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import AnyHttpUrl, BaseModel, field_validator
 
-from app.application.webhooks.payload_template import normalize_payload_template_json
 from app.application.interfaces.transport_outbox_repository import TransportOutboxRepository
 from app.application.services.project_service import ProjectService
 from app.config import Settings
@@ -31,7 +30,6 @@ class ProjectWebhookOut(BaseModel):
     email_enabled: bool
     url: str | None
     has_secret: bool
-    payload_template_json: str | None
     last_status: str | None
     last_at: datetime | None
     last_error: str | None
@@ -43,7 +41,6 @@ class ProjectWebhookIn(BaseModel):
     email_enabled: bool = False
     url: AnyHttpUrl | None = None
     secret: str | None = None
-    payload_template_json: str | None = None
 
     @field_validator("secret")
     @classmethod
@@ -52,18 +49,11 @@ class ProjectWebhookIn(BaseModel):
             return None
         normalized = value.strip()
         return normalized or None
-
-    @field_validator("payload_template_json")
-    @classmethod
-    def normalize_payload_template(cls, value: str | None) -> str | None:
-        return normalize_payload_template_json(value)
-
 
 class ProjectWebhookTestIn(BaseModel):
     # Optional draft values for webhook test sends.
     url: AnyHttpUrl | None = None
     secret: str | None = None
-    payload_template_json: str | None = None
 
     @field_validator("secret")
     @classmethod
@@ -72,12 +62,6 @@ class ProjectWebhookTestIn(BaseModel):
             return None
         normalized = value.strip()
         return normalized or None
-
-    @field_validator("payload_template_json")
-    @classmethod
-    def normalize_payload_template(cls, value: str | None) -> str | None:
-        return normalize_payload_template_json(value)
-
 
 @router.get("/projects/{project_id}/webhook", response_model=ProjectWebhookOut)
 def get_project_webhook(
@@ -94,7 +78,6 @@ def get_project_webhook(
             email_enabled=project.email_enabled,
             url=project.webhook_url,
             has_secret=bool(project.webhook_secret),
-            payload_template_json=project.webhook_payload_template_json,
             last_status=_last_status_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
             last_at=_last_at_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
             last_error=_last_error_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
@@ -117,26 +100,27 @@ def update_project_webhook(
 ) -> ProjectWebhookOut:
     # Update webhook configuration for an owned project.
     try:
+        current = project_service.get_project_webhook_settings(project_id=project_id, user_id=current_user.id)
         normalized_url = normalize_webhook_url(str(payload.url) if payload.url is not None else None)
         if normalized_url is not None:
             ensure_webhook_url_is_safe(normalized_url, settings=settings)
         if payload.enabled and not normalized_url:
             raise HTTPException(status_code=422, detail="url is required when webhook is enabled")
+        next_secret = payload.secret if "secret" in payload.model_fields_set else current.webhook_secret
         updated = project_service.update_project_webhook_settings(
             project_id=project_id,
             user_id=current_user.id,
             webhook_enabled=payload.enabled,
             email_enabled=payload.email_enabled,
             webhook_url=normalized_url,
-            webhook_secret=payload.secret,
-            webhook_payload_template_json=payload.payload_template_json,
+            webhook_secret=next_secret,
+            webhook_payload_template_json=None,
         )
         return ProjectWebhookOut(
             enabled=updated.webhook_enabled,
             email_enabled=updated.email_enabled,
             url=updated.webhook_url,
             has_secret=bool(updated.webhook_secret),
-            payload_template_json=updated.webhook_payload_template_json,
             last_status=_last_status_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
             last_at=_last_at_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
             last_error=_last_error_from_outbox(project_id=project_id, outbox_repository=transport_outbox_repository),
@@ -174,8 +158,7 @@ def test_project_webhook(
                 "sent_at": datetime.now(timezone.utc).isoformat(),
             },
             override_url=target_url,
-            override_secret=payload.secret if payload is not None else None,
-            override_payload_template_json=payload.payload_template_json if payload is not None else None,
+            override_secret=payload.secret if payload is not None and "secret" in payload.model_fields_set else None,
             force_send=True,
         )
         return {"status": "queued"}

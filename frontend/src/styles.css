@@ -2967,8 +2967,11 @@ pre {
   flex-shrink: 0;
 }
 
+.alerts-route-buttons .modal-button,
 .alerts-route-buttons .action-btn {
   min-width: 104px;
+  color: rgba(229, 231, 235, 0.74);
+  border-color: var(--control-border);
 }
 
 .alerts-webhook-card {
@@ -2976,21 +2979,19 @@ pre {
 }
 
 .alerts-webhook-body {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 22px;
-  align-items: start;
+  display: block;
 }
 
 .alerts-webhook-main {
   min-width: 0;
   display: grid;
-  gap: 20px;
-  order: 2;
+  gap: 16px;
+  width: min(50%, 560px);
+  max-width: 100%;
 }
 
 .alerts-webhook-side {
-  order: 1;
+  display: none;
 }
 
 .alerts-webhook-fields {
@@ -3036,6 +3037,14 @@ pre {
   justify-content: flex-start;
 }
 
+.alerts-actions-row--webhook-controls {
+  margin-top: 2px;
+}
+
+.alerts-actions-row--status-only {
+  margin-top: 12px;
+}
+
 .alerts-webhook-card .alerts-save-row {
   margin-top: 24px;
 }
@@ -3062,6 +3071,41 @@ pre {
   min-height: 175px;
   height: 180px;
   overflow-y: hidden;
+}
+
+.alerts-payload-modal {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.alerts-payload-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.alerts-payload-code {
+  margin: 20px 0 0;
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(40, 48, 66, 0.95), rgba(30, 37, 53, 0.98));
+  font-family: "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.93rem;
+  line-height: 1.6;
+  color: rgba(229, 231, 235, 0.92);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.alerts-payload-code code {
+  font: inherit;
+  color: inherit;
+}
+
+.alerts-payload-modal-actions {
+  margin-top: 18px;
+  justify-content: flex-start;
 }
 
 .alerts-optional-config {

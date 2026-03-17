@@ -63,7 +63,6 @@ export interface ProjectWebhookSettings {
   email_enabled: boolean;
   url: string | null;
   has_secret: boolean;
-  payload_template_json: string | null;
   last_status: "success" | "failed" | string | null;
   last_at: string | null;
   last_error: string | null;
@@ -73,14 +72,12 @@ export interface UpdateProjectWebhookInput {
   enabled: boolean;
   email_enabled: boolean;
   url: string | null;
-  secret: string | null;
-  payload_template_json: string | null;
+  secret?: string | null;
 }
 
 export interface TestProjectWebhookInput {
   url?: string;
   secret?: string;
-  payload_template_json?: string | null;
 }
 
 export interface UpdateProjectProtectInput {

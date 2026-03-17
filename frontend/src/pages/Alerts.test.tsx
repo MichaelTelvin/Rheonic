@@ -36,15 +36,7 @@ vi.mock("../api/client", async () => {
 
 import { Alerts } from "./Alerts";
 
-function getPayloadEditor(): HTMLTextAreaElement {
-  const node = document.getElementById("payload-editor");
-  if (!(node instanceof HTMLTextAreaElement)) {
-    throw new Error("payload-editor textarea not found");
-  }
-  return node;
-}
-
-describe("Alerts payload editor", () => {
+describe("Alerts webhook settings", () => {
   beforeEach(() => {
     mocks.useProjectContext.mockReturnValue({
       projectId: "p1",
@@ -65,7 +57,6 @@ describe("Alerts payload editor", () => {
       email_enabled: true,
       url: "https://hooks.example.test/rheonic",
       has_secret: true,
-      payload_template_json: "{\"text\": \"{{event}}\"}",
       last_status: null,
       last_at: null,
       last_error: null,
@@ -82,7 +73,6 @@ describe("Alerts payload editor", () => {
       email_enabled: true,
       url: "https://hooks.example.test/rheonic",
       has_secret: true,
-      payload_template_json: "{\"text\": \"{{event}}\"}",
       last_status: null,
       last_at: null,
       last_error: null,
@@ -91,30 +81,37 @@ describe("Alerts payload editor", () => {
     mocks.showAppToast.mockReset();
   });
 
-  it("loads saved payload template into the editor", async () => {
+  it("does not render a custom payload editor", async () => {
     render(<Alerts />);
-    await screen.findByText("Save alerts");
-    expect(getPayloadEditor().value).toContain("\"text\": \"{{event}}\"");
+    await screen.findByRole("button", { name: "Save alerts" });
+
+    expect(screen.queryByLabelText("Custom payload")).toBeNull();
+    expect(document.getElementById("payload-editor")).toBeNull();
+    expect(screen.queryByLabelText("Secret")).toBeNull();
+    expect(screen.getByRole("button", { name: "View payload" })).toBeTruthy();
   });
 
-  it("blocks save when payload template json is invalid", async () => {
+  it("saves webhook settings without payload template json", async () => {
     render(<Alerts />);
-    await screen.findByText("Save alerts");
-    fireEvent.change(getPayloadEditor(), { target: { value: "{\"chat_id\":" } });
+    await screen.findByRole("button", { name: "Save alerts" });
+
     fireEvent.click(screen.getByRole("button", { name: "Save alerts" }));
 
-    expect(mocks.updateProjectWebhook).not.toHaveBeenCalled();
-    expect(await screen.findByText("Custom payload must be a valid JSON object.")).toBeDefined();
+    await waitFor(() => expect(mocks.updateProjectWebhook).toHaveBeenCalled());
+    expect(mocks.updateProjectWebhook.mock.calls[0][1]).toEqual({
+      enabled: true,
+      email_enabled: true,
+      url: "https://hooks.example.test/rheonic",
+    });
   });
 
-  it("sends the draft payload template on webhook test", async () => {
+  it("tests webhook without payload template json", async () => {
     mocks.fetchProjectWebhook
       .mockResolvedValueOnce({
         enabled: true,
         email_enabled: true,
         url: "https://hooks.example.test/rheonic",
         has_secret: true,
-        payload_template_json: "{\"text\": \"{{event}}\"}",
         last_status: null,
         last_at: null,
         last_error: null,
@@ -124,22 +121,33 @@ describe("Alerts payload editor", () => {
         email_enabled: true,
         url: "https://hooks.example.test/rheonic",
         has_secret: true,
-        payload_template_json: "{\"text\": \"{{event}}\"}",
         last_status: "success",
         last_at: new Date().toISOString(),
         last_error: null,
       });
 
     render(<Alerts />);
-    await screen.findByText("Save alerts");
-    fireEvent.change(getPayloadEditor(), { target: { value: "{\n  \"text\": \"agent behavior anomaly detected\",\n  \"chat_id\": \"123\"\n}" } });
+    await screen.findByRole("button", { name: "Save alerts" });
     fireEvent.click(screen.getByRole("button", { name: "Test webhook" }));
 
     await waitFor(() => expect(mocks.testProjectWebhook).toHaveBeenCalled());
-    const payload = mocks.testProjectWebhook.mock.calls[0][1].payload_template_json as string;
-    expect(payload).toContain("\"text\":\"agent behavior anomaly detected\"");
-    expect(payload).toContain("\"chat_id\":\"123\"");
-    expect(payload).not.toContain("\"rheonic\"");
+    expect(mocks.testProjectWebhook.mock.calls[0][1]).toEqual({
+      url: "https://hooks.example.test/rheonic",
+    });
     expect(mocks.updateProjectWebhook).not.toHaveBeenCalled();
+  });
+
+  it("opens sample payload modal and copies json", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    render(<Alerts />);
+    await screen.findByRole("button", { name: "Save alerts" });
+
+    fireEvent.click(screen.getByRole("button", { name: "View payload" }));
+    expect(screen.getByRole("heading", { name: "Sample payload for warn event" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy JSON" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
   });
 });

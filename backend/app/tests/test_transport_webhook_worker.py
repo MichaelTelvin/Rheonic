@@ -154,8 +154,8 @@ def test_process_outbox_delivery_webhook_sends_in_observe_mode_when_webhook_is_e
         assert row.status == "delivered"
 
 
-def test_process_outbox_delivery_renders_project_payload_template(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
-    db_url = f"sqlite:///{tmp_path}/transport_webhook_template_project.db"
+def test_process_outbox_delivery_ignores_stored_project_payload_template_for_live_webhooks(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_webhook_template_project_ignored.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)
     _seed_project(
@@ -187,12 +187,12 @@ def test_process_outbox_delivery_renders_project_payload_template(tmp_path, monk
 
     assert len(captured) == 1
     rendered = json.loads(captured[0]["content"].decode("utf-8"))
-    assert rendered["project"] == "p1"
-    assert rendered["text"] == "agent behavior anomaly detected"
-    assert rendered["chat_id"] == "123456"
-    assert rendered["rheonic"]["event"] == "incident.warn"
-    assert rendered["rheonic"]["incident_type"] == "retry_storm"
-    assert rendered["rheonic"]["project_id"] == "p1"
+    assert rendered["event"] == "incident.warn"
+    assert rendered["incident_type"] == "retry_storm"
+    assert rendered["project_id"] == "p1"
+    assert "rheonic" not in rendered
+    assert "chat_id" not in rendered
+    assert "text" not in rendered
 
 
 def test_process_outbox_delivery_uses_override_payload_template_for_test_send(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:

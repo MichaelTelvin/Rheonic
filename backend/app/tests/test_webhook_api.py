@@ -89,35 +89,54 @@ def test_project_webhook_owner_get_put_and_test(tmp_path) -> None:
             "enabled": True,
             "url": "https://example.test/hook",
             "secret": "secret-1",
-            "payload_template_json": "{\"text\":\"{{event}} {{project_id}}\"}",
         },
     )
     assert put_response.status_code == 200
     assert put_response.json()["enabled"] is True
     assert put_response.json()["has_secret"] is True
-    assert "\"text\": \"{{event}} {{project_id}}\"" in put_response.json()["payload_template_json"]
-    assert "\"rheonic\"" not in put_response.json()["payload_template_json"]
 
     get_response = client.get(f"/api/v1/projects/{project_id}/webhook")
     assert get_response.status_code == 200
     assert get_response.json()["url"] == "https://example.test/hook"
     assert get_response.json()["has_secret"] is True
-    assert "\"text\": \"{{event}} {{project_id}}\"" in get_response.json()["payload_template_json"]
-    assert "\"rheonic\"" not in get_response.json()["payload_template_json"]
 
-    test_response = client.post(
-        f"/api/v1/projects/{project_id}/webhook/test",
-        json={"payload_template_json": "{\"message\":\"{{event}}\"}"},
-    )
+    test_response = client.post(f"/api/v1/projects/{project_id}/webhook/test")
     assert test_response.status_code == 202
     assert test_response.json() == {"status": "queued"}
     assert len(dispatcher.calls) == 1
     assert dispatcher.calls[0][2] == "webhook.test"
     assert dispatcher.calls[0][3] == "https://example.test/hook"
-    assert dispatcher.calls[0][5] is not None
-    assert "\"message\": \"{{event}}\"" in dispatcher.calls[0][5]
-    assert "\"rheonic\"" not in dispatcher.calls[0][5]
+    assert dispatcher.calls[0][5] is None
     assert dispatcher.calls[0][6] is True
+
+    _cleanup_overrides()
+
+
+def test_project_webhook_save_without_secret_preserves_existing_secret(tmp_path) -> None:
+    client, _ = _make_client(tmp_path)
+    project_id = client.post("/api/v1/projects", json={"name": "Preserve Secret"}).json()["id"]
+
+    first_put = client.put(
+        f"/api/v1/projects/{project_id}/webhook",
+        json={
+            "enabled": True,
+            "url": "https://example.test/hook",
+            "secret": "secret-1",
+        },
+    )
+    assert first_put.status_code == 200
+    assert first_put.json()["has_secret"] is True
+
+    second_put = client.put(
+        f"/api/v1/projects/{project_id}/webhook",
+        json={
+            "enabled": True,
+            "email_enabled": False,
+            "url": "https://example.test/hook",
+        },
+    )
+    assert second_put.status_code == 200
+    assert second_put.json()["has_secret"] is True
 
     _cleanup_overrides()
 
@@ -162,23 +181,8 @@ def test_project_webhook_validation_errors(tmp_path) -> None:
         f"/api/v1/projects/{project_id}/webhook",
         json={"enabled": True, "url": None, "secret": None},
     )
-    invalid_template = client.put(
-        f"/api/v1/projects/{project_id}/webhook",
-        json={"enabled": False, "url": None, "secret": None, "payload_template_json": "[1,2,3]"},
-    )
-    malformed_template = client.put(
-        f"/api/v1/projects/{project_id}/webhook",
-        json={"enabled": False, "url": None, "secret": None, "payload_template_json": "{\"text\":"},
-    )
-    reserved_key_template = client.put(
-        f"/api/v1/projects/{project_id}/webhook",
-        json={"enabled": False, "url": None, "secret": None, "payload_template_json": "{\"rheonic\": {\"event\": \"incident.warn\"}}"},
-    )
     assert invalid_url.status_code == 422
     assert missing_url.status_code == 422
-    assert invalid_template.status_code == 422
-    assert malformed_template.status_code == 422
-    assert reserved_key_template.status_code == 422
     _cleanup_overrides()
 
 
@@ -216,16 +220,13 @@ def test_project_webhook_test_is_available_in_observe_mode(tmp_path) -> None:
         json={
             "url": "https://draft.test/hook",
             "secret": "draft-secret",
-            "payload_template_json": "{\"text\":\"draft {{event}}\"}",
         },
     )
     assert test_response.status_code == 202
     assert len(dispatcher.calls) == 1
     assert dispatcher.calls[0][3] == "https://draft.test/hook"
     assert dispatcher.calls[0][4] == "draft-secret"
-    assert dispatcher.calls[0][5] is not None
-    assert "\"text\": \"draft {{event}}\"" in dispatcher.calls[0][5]
-    assert "\"rheonic\"" not in dispatcher.calls[0][5]
+    assert dispatcher.calls[0][5] is None
 
     _cleanup_overrides()
 
@@ -255,7 +256,6 @@ def test_project_webhook_secret_is_not_stored_plaintext(tmp_path) -> None:
             "enabled": True,
             "url": "https://example.test/hook",
             "secret": "secret-plain",
-            "payload_template_json": "{\"text\":\"{{event}}\"}",
         },
     )
     assert response.status_code == 200
@@ -265,9 +265,7 @@ def test_project_webhook_secret_is_not_stored_plaintext(tmp_path) -> None:
         assert record is not None
         assert record.webhook_secret is not None
         assert record.webhook_secret != "secret-plain"
-        assert record.webhook_payload_template_json is not None
-        assert "\"text\": \"{{event}}\"" in record.webhook_payload_template_json
-        assert "\"rheonic\"" not in record.webhook_payload_template_json
+        assert record.webhook_payload_template_json is None
 
     _cleanup_overrides()
 

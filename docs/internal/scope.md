@@ -44,6 +44,7 @@ Protect mode
 Alerts (webhook)
 - Project webhook config + test API
 - Unified transport hub (shared outbox + RQ worker) for webhook + email delivery
+- Raw webhook contract visible in UI/docs via sample payload (warn-event example + field notes)
 - Webhook dispatch events:
 - protect decision warns (`decision.warn`)
 - warn incident opens in protect mode (`incident.warn`, non-breach ingest signals after ingest dominance suppression)
@@ -56,13 +57,17 @@ Alerts (webhook)
 Feedback email
 - `POST /api/v1/feedback` is enqueue-only (`202` response)
 - Email jobs are processed asynchronously by transport worker
-- Current email provider implementation is intentionally unconfigured/stubbed and records deterministic failure code `email_provider_not_configured`
+- Resend email delivery is implemented for lifecycle alerts and feedback workflows
 
 Frontend/docs
 - Control Center layout with auth-gated routes
 - Dashboard metrics + provider filter
 - Dedicated Incidents page with provider/type/status filters
 - Docs page + docs/chart viewer and flow charts
+- Alerts page exposes:
+  - Email (Protect-only)
+  - Raw webhook (Observe + Protect)
+  - sample raw webhook JSON via modal/copy, without a payload editor
 
 ========================================
 MVP Core Complete
@@ -102,6 +107,8 @@ Providers and policy actions
 - Additional provider wrappers beyond current set
 - Model downgrade actioning
 - Cached response/message strategies tied to policy outcomes
+- Webhook-backed integrations (Telegram, Slack)
+- Integration-specific message templates
 
 Cost and reconciliation
 - Authoritative cost reconciliation pipeline

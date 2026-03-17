@@ -173,11 +173,7 @@ def _deliver_webhook(*, outbox_id: str) -> None:
         return
 
     override_template_json = transport_meta.get("override_payload_template_json")
-    payload_template_json = (
-        str(override_template_json)
-        if isinstance(override_template_json, str)
-        else (project.webhook_payload_template_json or None)
-    )
+    payload_template_json = str(override_template_json) if isinstance(override_template_json, str) else None
     rendered_body = body_payload
     if payload_template_json:
         template = parse_payload_template_json(payload_template_json)
