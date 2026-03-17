@@ -44,6 +44,8 @@ Sample payload for `incident.warn`:
   "incident_id": "inc_456",
   "incident_type": "retry_storm",
   "provider": "openai",
+  "model": "gpt-4o-mini",
+  "environment": "staging",
   "created_at": "2026-03-17T06:21:00Z",
   "last_seen_at": "2026-03-17T06:23:14Z",
   "sent_at": "2026-03-17T06:23:20Z",
@@ -51,9 +53,7 @@ Sample payload for `incident.warn`:
     "failure_count": 5,
     "threshold_count": 5,
     "requests_60s": 12,
-    "tokens_60s": 640,
-    "environment": "staging",
-    "model": "gpt-4o-mini"
+    "tokens_60s": 640
   }
 }
 ```
@@ -64,10 +64,12 @@ Field notes:
 - `incident_id`: incident record identifier
 - `incident_type`: incident classification such as `retry_storm`
 - `provider`: provider associated with the incident
+- `model`: model associated with the incident when available
+- `environment`: environment associated with the incident when available
 - `created_at`: when the incident was first opened
 - `last_seen_at`: when matching evidence was most recently observed
 - `sent_at`: when Rheonic queued the webhook payload
-- `evidence`: event-specific context captured for the incident
+- `evidence`: event-specific detector context captured for the incident
 
 ## Delivery Behavior
 - API and runtime paths enqueue deliveries asynchronously.

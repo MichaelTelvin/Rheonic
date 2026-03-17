@@ -431,6 +431,7 @@ def test_near_cap_warn_dispatches_decision_warn_webhook(tmp_path) -> None:
         body={
             "provider": "openai",
             "model": "gpt-4o-mini",
+            "environment": "dev",
             "input_tokens_estimate": 10,
             "max_output_tokens": 64,
         },
@@ -440,6 +441,9 @@ def test_near_cap_warn_dispatches_decision_warn_webhook(tmp_path) -> None:
     assert len(warn_calls) == 1
     _, _, payload = warn_calls[0]
     assert payload["event"] == "decision.warn"
+    assert payload["provider"] == "openai"
+    assert payload["model"] == "gpt-4o-mini"
+    assert payload["environment"] == "dev"
     assert payload["reason"] == "near_cap"
     assert payload["apply_clamp_enabled"] is False
     assert isinstance(payload["clamp"], dict)

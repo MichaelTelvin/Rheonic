@@ -344,7 +344,25 @@ def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_but_no_email()
 
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "loop_suspect"
-    assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
+    warn_calls = [(project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"]
+    assert warn_calls
+    project_id, payload = warn_calls[0]
+    assert project_id == "p1"
+    assert payload["provider"] == "openai"
+    assert payload["model"] == "gpt-4o-mini"
+    assert payload["environment"] == "dev"
+    evidence = payload["evidence"]
+    assert isinstance(evidence, dict)
+    assert evidence["signature"] == "p1:openai:gpt-4o-mini:dev:/chat/completions:loop-fixed-signature"
+    assert evidence["window_seconds"] == 30
+    assert evidence["hit_count"] == 3
+    assert evidence["threshold_count"] == 3
+    assert evidence["count"] == 1
+    assert "provider" not in evidence
+    assert "model" not in evidence
+    assert "environment" not in evidence
+    assert "last_seen_at" not in evidence
+    assert "reason" not in evidence
     assert transport.calls == []
 
 
@@ -391,7 +409,23 @@ def test_cap_breach_logged_in_observe_mode() -> None:
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "cap_breach"
     assert incidents.rows[0].evidence.get("req_cap_breach") is True
-    assert all(event_type not in {"incident.warn", "incident.block"} for _, event_type, _ in webhook.calls)
+    warn_calls = [(project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"]
+    assert warn_calls
+    project_id, payload = warn_calls[0]
+    assert project_id == "p1"
+    assert payload["incident_type"] == "cap_breach"
+    assert payload["provider"] == "openai"
+    assert payload["model"] == "gpt-4o-mini"
+    assert payload["environment"] == "dev"
+    evidence = payload["evidence"]
+    assert isinstance(evidence, dict)
+    assert evidence["req_cap_breach"] is True
+    assert evidence["tok_cap_breach"] is False
+    assert "provider" not in evidence
+    assert "model" not in evidence
+    assert "environment" not in evidence
+    assert "last_seen_at" not in evidence
+    assert "reason" not in evidence
 
 
 def test_cap_breach_repeated_events_update_same_incident_within_dedup_window() -> None:
@@ -405,7 +439,7 @@ def test_cap_breach_repeated_events_update_same_incident_within_dedup_window() -
     assert int(cap_rows[0].evidence.get("count", 0)) == 2
 
 
-def test_near_cap_opens_incident_in_observe_without_webhook() -> None:
+def test_near_cap_opens_incident_in_observe_with_warn_webhook() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=False, req_cap=None, tok_cap=1000)
     service.ingest(_event("p1", total_tokens=900, offset_seconds=0))
 
@@ -415,7 +449,24 @@ def test_near_cap_opens_incident_in_observe_without_webhook() -> None:
     assert near_cap_rows[0].evidence.get("req_near_cap") is False
     assert near_cap_rows[0].evidence.get("tok_near_cap") is True
     assert near_cap_rows[0].fingerprint and near_cap_rows[0].fingerprint.endswith(":tok")
-    assert all(event_type not in {"incident.warn", "incident.block"} for _, event_type, _ in webhook.calls)
+    warn_calls = [(project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"]
+    assert warn_calls
+    project_id, payload = warn_calls[0]
+    assert project_id == "p1"
+    assert payload["incident_type"] == "near_cap"
+    assert payload["provider"] == "openai"
+    assert payload["model"] == "gpt-4o-mini"
+    assert payload["environment"] == "dev"
+    evidence = payload["evidence"]
+    assert isinstance(evidence, dict)
+    assert evidence["near_cap_type"] == "tok"
+    assert evidence["req_near_cap"] is False
+    assert evidence["tok_near_cap"] is True
+    assert "provider" not in evidence
+    assert "model" not in evidence
+    assert "environment" not in evidence
+    assert "last_seen_at" not in evidence
+    assert "reason" not in evidence
 
 
 def test_near_cap_in_protect_mode_does_not_emit_incident_warn_webhook() -> None:

@@ -100,20 +100,25 @@ class IncidentManager:
 
     def _enqueue_detection_notifications(self, *, incident: Incident, mode: str) -> None:
         incident_type = incident.incident_type
-        # cap_breach block and near_cap warn alerts are emitted by protect decision paths.
-        if incident_type in {"cap_breach", "near_cap"}:
+        # In protect mode, cap_breach and near_cap are emitted by preflight decision paths.
+        # In observe mode there is no preflight decision transport, so incident openings
+        # for those types should still surface through the raw webhook contract.
+        if mode == "protect" and incident_type in {"cap_breach", "near_cap"}:
             return
         event_type = "incident.warn"
+        evidence = _build_webhook_evidence(incident.evidence)
         payload = {
             "event": event_type,
             "project_id": incident.project_id,
             "incident_id": incident.id,
             "incident_type": incident.incident_type,
             "provider": incident.provider,
+            "model": _string_or_none(incident.evidence.get("model")),
+            "environment": _string_or_none(incident.evidence.get("environment")),
             "created_at": incident.created_at.isoformat(),
             "last_seen_at": incident.last_seen_at.isoformat() if incident.last_seen_at is not None else None,
             "sent_at": datetime.now(timezone.utc).isoformat(),
-            "evidence": incident.evidence,
+            "evidence": evidence,
         }
         if self._webhook_dispatcher is not None:
             try:
@@ -159,3 +164,11 @@ def _string_or_none(value: object) -> str | None:
         normalized = value.strip()
         return normalized or None
     return None
+
+
+def _build_webhook_evidence(evidence: dict[str, object]) -> dict[str, object]:
+    # Keep detailed detector context nested, but remove fields already promoted to the top level.
+    sanitized = dict(evidence)
+    for key in ("provider", "model", "environment", "last_seen_at", "reason"):
+        sanitized.pop(key, None)
+    return sanitized

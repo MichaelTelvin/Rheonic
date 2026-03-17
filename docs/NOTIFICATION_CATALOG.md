@@ -13,9 +13,9 @@ This catalog reflects the implemented notification contract.
 
 | Event type | Kind | Emitter(s) | Payload schema (current keys) | Intended recipient(s) | Mode gating |
 |---|---|---|---|---|---|
-| `decision.warn` | webhook | `ProtectService._enqueue_warn_webhook` | `event`, `project_id`, `provider`, `reason`, `requests_60s`, `tokens_60s`, `req_cap`, `tok_cap`, `estimated_next_tokens`, `apply_clamp_enabled`, `clamp`, `sent_at` | Project webhook URL (`projects.webhook_url`) | Protect only |
-| `incident.block` | webhook + email | `ProtectService._enqueue_block_notifications` | `event`, `project_id`, `provider`, `incident_type`, `reason`, `requests_60s`, `tokens_60s`, `req_cap`, `tok_cap`, `sent_at` | Project webhook URL + owning user account email | Protect only |
-| `incident.warn` | webhook + email | `IncidentManager._enqueue_detection_notifications` | `event`, `project_id`, `incident_id`, `incident_type`, `provider`, `created_at`, `last_seen_at`, `sent_at`, `evidence` | Project webhook URL + owning user account email | Protect only; only non-`cap_breach`, non-`near_cap` incident opens |
+| `decision.warn` | webhook | `ProtectService._enqueue_warn_webhook` | `event`, `project_id`, `provider`, `model`, `environment`, `reason`, `requests_60s`, `tokens_60s`, `req_cap`, `tok_cap`, `estimated_next_tokens`, `apply_clamp_enabled`, `clamp`, `sent_at` | Project webhook URL (`projects.webhook_url`) | Protect only |
+| `incident.block` | webhook + email | `ProtectService._enqueue_block_notifications` | `event`, `project_id`, `provider`, `model`, `environment`, `incident_type`, `reason`, `requests_60s`, `tokens_60s`, `req_cap`, `tok_cap`, `blocked_until`, `retry_after_seconds`, `sent_at` | Project webhook URL + owning user account email | Protect only |
+| `incident.warn` | webhook + email | `IncidentManager._enqueue_detection_notifications` | `event`, `project_id`, `incident_id`, `incident_type`, `provider`, `model`, `environment`, `created_at`, `last_seen_at`, `sent_at`, `evidence` | Project webhook URL + owning user account email | Protect: non-`cap_breach`, non-`near_cap` incident opens. Observe: all incident opens, including `cap_breach` and `near_cap`. |
 | `incident.resolved` | webhook + email | `DetectIncidentsService` and `AutoCloseIncidentsService` resolved enqueue paths | `event`, `project_id`, `incident_id`, `incident_type`, `resolved_by`, `resolved_at`, `created_at`, `last_seen_at`, `provider`, `model`, `environment`, `sent_at` | Project webhook URL + owning user account email | Protect only |
 | `policy_gap.detected` | webhook | `IngestEventService._detect_policy_gap_if_needed` | `event_type`, `project_id`, `provider`, `model`, `first_seen_at`, `sent_at` | Project webhook URL | Protect only; first-seen `(project, provider, model)` |
 | `webhook.delivery_failed` | email | transport worker terminal webhook failure hook | `project_id`, `event_type`, `destination`, `status`, `attempts`, `max_attempts`, `last_error_code`, `last_error_message`, `updated_at` | Owning user account email | Protect only; only when webhook is enabled and terminal failure is reached |
@@ -31,7 +31,8 @@ This catalog reflects the implemented notification contract.
 - Email is protect-only for customer-facing alerts and feedback/internal workflows.
 - Webhook may later gain an optional verbose event stream, but the default core alert set stays aligned with email.
 - Protect notification bodies should include action context when the emitter can assert it reliably; do not fabricate action data when the decision/incident relationship is ambiguous.
-- `near_cap` remains a visible incident in the dashboard, but its transport path is the protect `decision.warn` event rather than a separate `incident.warn` lifecycle alert.
+- In `Protect`, `near_cap` remains a visible incident in the dashboard, but its transport path is the preflight `decision.warn` event rather than a separate `incident.warn` lifecycle alert.
+- In `Observe`, `near_cap` and `cap_breach` incident opens emit the raw `incident.warn` webhook because there is no preflight decision transport.
 
 ### Core alert tiers
 - Core lifecycle alerts:
@@ -88,6 +89,8 @@ Sample raw webhook payload (`incident.warn`):
   "incident_id": "inc_456",
   "incident_type": "retry_storm",
   "provider": "openai",
+  "model": "gpt-4o-mini",
+  "environment": "staging",
   "created_at": "2026-03-17T06:21:00Z",
   "last_seen_at": "2026-03-17T06:23:14Z",
   "sent_at": "2026-03-17T06:23:20Z",
@@ -95,9 +98,7 @@ Sample raw webhook payload (`incident.warn`):
     "failure_count": 5,
     "threshold_count": 5,
     "requests_60s": 12,
-    "tokens_60s": 640,
-    "environment": "staging",
-    "model": "gpt-4o-mini"
+    "tokens_60s": 640
   }
 }
 ```
