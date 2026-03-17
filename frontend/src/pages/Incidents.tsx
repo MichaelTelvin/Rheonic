@@ -222,7 +222,6 @@ export function Incidents(): JSX.Element {
 
           <section className="incidents-list-shell">
             <section className="incidents-scroll-panel">
-              {loading && sortedIncidents.length === 0 ? <p className="subtle">Loading incidents...</p> : null}
               {sortedIncidents.length === 0 ? <section className="empty">No incidents for current filters.</section> : null}
               <div className="list">
                 {sortedIncidents.map((incident) => (

@@ -230,7 +230,6 @@ export function Keys(): JSX.Element {
 
         <Card className="card--table">
           <h2 className="section-title">Existing keys</h2>
-          {loadingKeys ? <p className="subtle">Loading keys...</p> : null}
           <div className="keys-list">
             <div className="key-row key-row-header">
               <span className="subtle">Label</span>
