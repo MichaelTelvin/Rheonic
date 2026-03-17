@@ -145,7 +145,9 @@ describe("Alerts webhook settings", () => {
     await screen.findByRole("button", { name: "Save alerts" });
 
     fireEvent.click(screen.getByRole("button", { name: "View payload" }));
-    expect(screen.getByRole("heading", { name: "Sample payload for warn event" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Sample payload for protection warn event" }),
+    ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Copy JSON" }));
     await waitFor(() => expect(writeText).toHaveBeenCalled());

@@ -195,51 +195,6 @@ def test_process_outbox_delivery_ignores_stored_project_payload_template_for_liv
     assert "text" not in rendered
 
 
-def test_process_outbox_delivery_uses_override_payload_template_for_test_send(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
-    db_url = f"sqlite:///{tmp_path}/transport_webhook_template_override.db"
-    session_factory = DatabaseSessionFactory(database_url=db_url)
-    Base.metadata.create_all(bind=session_factory.engine)
-    _seed_project(
-        session_factory,
-        "p1",
-        webhook_payload_template_json="{\"text\":\"project template {{event}}\"}",
-    )
-    service = TransportService(
-        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
-        enqueue_job=lambda outbox_id: None,
-        now_provider=lambda: datetime.now(timezone.utc),
-    )
-    outbox_id = service.enqueue(
-        project_id="p1",
-        kind="webhook",
-        event_type="webhook.test",
-        payload={
-            "body": {"event": "webhook.test", "project_id": "p1"},
-            "__transport_meta": {
-                "force_send": True,
-                "override_payload_template_json": "{\"message\":\"override {{event}} {{project_id}}\"}",
-            },
-        },
-        dedupe_key="render-override-template",
-        destination="https://example.test/hook",
-    )
-
-    captured: list[dict[str, object]] = []
-    settings = transport_job.Settings(database_url=db_url, redis_url="redis://localhost:6379/15")
-    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
-    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
-    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient(captured))
-    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
-
-    transport_job.process_outbox_delivery(outbox_id)
-
-    assert len(captured) == 1
-    rendered = json.loads(captured[0]["content"].decode("utf-8"))
-    assert rendered["message"] == "override {{event}} {{project_id}}"
-    assert rendered["rheonic"]["event"] == "webhook.test"
-    assert rendered["rheonic"]["project_id"] == "p1"
-
-
 def test_process_outbox_delivery_webhook_failure_retries_then_dead_letters(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     db_url = f"sqlite:///{tmp_path}/transport_webhook_failure.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)

@@ -18,7 +18,10 @@ Dashboard endpoints keep project totals and can optionally filter by provider.
 - Backend observe mode returns allow-only behavior (no runtime enforcement).
 - Provider call proceeds.
 - Ingest still records incidents.
-- No webhook events are dispatched from runtime detection/decision paths.
+- Webhook transport remains incident-oriented:
+  - `incident.warn`
+  - `incident.resolved`
+  - `policy_gap.detected`
 
 ### Protect
 - SDK calls `/api/v1/protect/decision` before provider call.
@@ -85,10 +88,17 @@ For ingest incident emission, near-cap uses observed counters after the current 
 For protect preflight, a live `near_cap` warn also upserts a visible `near_cap` incident from the decision snapshot so the warning stays explainable in the dashboard.
 
 ## Webhooks
+- Observe mode:
+  - `incident.warn` on incident open
+  - `incident.resolved` on manual/auto resolve
+  - `policy_gap.detected` once per first-seen `(project, provider, model)`
 - Protect mode:
-  - `decision.warn` for protect decision warn outcomes (including `near_cap`)
-  - `incident.warn` for non-breach incident opens from ingest (`retry_storm` / `loop_suspect` / `token_explosion`)
-  - `incident.block` for protect decision block outcomes (`req_cap_breach` / `tok_cap_breach` / `cooldown_active`)
+  - `protection.warn` on protect warn outcomes (`near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`)
+  - `protection.clamp_started` when clamp first begins affecting traffic
+  - `protection.block` when Protect prevents traffic:
+    - `reason=cap_breach`
+    - `reason=cooldown_active`
+    - `reason=fail_closed`
   - `incident.resolved` on manual/auto resolve
   - `policy_gap.detected` once per first-seen `(project, provider, model)`
 - Mode independent:
@@ -99,12 +109,14 @@ For protect preflight, a live `near_cap` warn also upserts a visible `near_cap` 
   - retries/backoff and terminal failure state are tracked in outbox rows
 
 ## Emails
-- Protect mode customer emails use the same core lifecycle alert set:
-  - `incident.warn`
-  - `incident.block`
+- Protect mode customer emails use the same core Protect reporting set as webhooks:
+  - `protection.warn`
+  - `protection.clamp_started`
+  - `protection.block`
   - `incident.resolved`
   - `webhook.delivery_failed` when webhook delivery reaches terminal failure
-- Email does not mirror `decision.warn` or `policy_gap.detected`.
+- Observe mode does not send customer email alerts.
+- Email does not mirror `policy_gap.detected`.
 - Feedback remains a separate internal/system email workflow.
 
 ## Metrics

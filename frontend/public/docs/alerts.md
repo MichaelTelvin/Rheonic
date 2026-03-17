@@ -1,6 +1,6 @@
 # Alerts
 
-Rheonic can notify you when protect events occur. Alerts are configured per project from the `Alerts` page.
+Rheonic can notify you about incident lifecycle and Protect reporting events. Alerts are configured per project from the `Alerts` page.
 
 ## Delivery Channels
 - Email to your account email address
@@ -10,66 +10,74 @@ Rheonic can notify you when protect events occur. Alerts are configured per proj
 ### Email
 - turn delivery on or off,
 - send notifications to the authenticated account email.
+- Email is used only in Protect mode.
 
 ### Webhook
 - enable or disable the webhook,
 - set the destination URL,
+- inspect a sample payload before wiring your consumer,
 - send a test event before relying on production delivery.
 
 ## Event Types
-- Core protect lifecycle alerts:
-  - `incident.warn`
-  - `incident.block`
-  - `incident.resolved`
-  - `webhook.delivery_failed` by email when webhook delivery reaches a terminal failure
-- Additional webhook-only signals:
-  - `decision.warn`
-  - `policy_gap.detected`
-- Explicit test event:
-  - `webhook.test`
+### Observe mode
+- `incident.warn`
+- `incident.resolved`
+- `policy_gap.detected` by webhook only
 
-Protect emails are incident-centric and use the same core lifecycle set as protect webhooks. `decision.warn` remains a webhook stream event rather than a standalone email alert. `policy_gap.detected` is webhook-only today. `webhook.test` is available regardless of mode.
+### Protect mode
+- `protection.warn`
+- `protection.clamp_started`
+- `protection.block`
+- `incident.resolved`
+- `policy_gap.detected` by webhook only
+- `webhook.delivery_failed` by email when webhook delivery reaches a terminal failure
+
+### Explicit test event
+- `webhook.test`
+
+Protect email and Protect webhook carry the same core reporting semantics. Webhook remains machine-readable; email is the operator-facing route.
 
 ## Testing Webhooks
-Use the `Test webhook` action from the dashboard. Rheonic queues a test payload and updates the last delivery status after the worker attempts delivery.
+Use the `Test webhook` action from the dashboard. Rheonic queues a test payload and shows the result as a toast. `Last live webhook delivery` reflects real runtime delivery only, not test sends.
 
 Raw webhooks always send the canonical Rheonic payload in MVP. Human-facing provider formatting such as Telegram or Slack is planned as a V2 integration layer rather than a raw webhook editor.
 
-Sample payload for `incident.warn`:
+Sample payload for `protection.warn`:
 
 ```json
 {
-  "event": "incident.warn",
+  "event": "protection.warn",
   "project_id": "proj_123",
-  "incident_id": "inc_456",
-  "incident_type": "retry_storm",
   "provider": "openai",
   "model": "gpt-4o-mini",
   "environment": "staging",
-  "created_at": "2026-03-17T06:21:00Z",
-  "last_seen_at": "2026-03-17T06:23:14Z",
+  "reason": "retry_storm",
+  "requests_60s": 12,
+  "tokens_60s": 640,
+  "req_cap": 400,
+  "tok_cap": 1700,
+  "estimated_next_tokens": 120,
+  "apply_clamp_enabled": false,
   "sent_at": "2026-03-17T06:23:20Z",
-  "evidence": {
-    "failure_count": 5,
-    "threshold_count": 5,
-    "requests_60s": 12,
-    "tokens_60s": 640
-  }
+  "clamp": null
 }
 ```
 
 Field notes:
 - `event`: webhook event type
 - `project_id`: Rheonic project identifier
-- `incident_id`: incident record identifier
-- `incident_type`: incident classification such as `retry_storm`
-- `provider`: provider associated with the incident
-- `model`: model associated with the incident when available
-- `environment`: environment associated with the incident when available
-- `created_at`: when the incident was first opened
-- `last_seen_at`: when matching evidence was most recently observed
+- `provider`: provider associated with the decision/report
+- `model`: model associated with the request when available
+- `environment`: environment associated with the request when available
+- `reason`: Protect reason such as `retry_storm` or `near_cap`
+- `requests_60s`: rolling request count for the scoped `(project, provider)`
+- `tokens_60s`: rolling token count for the scoped `(project, provider)`
+- `req_cap`: configured request cap when present
+- `tok_cap`: configured token cap when present
+- `estimated_next_tokens`: predictive token estimate used by the decision engine when available
+- `apply_clamp_enabled`: whether auto clamp is enabled for the project
+- `clamp`: clamp recommendation or applied clamp context when relevant
 - `sent_at`: when Rheonic queued the webhook payload
-- `evidence`: event-specific detector context captured for the incident
 
 ## Delivery Behavior
 - API and runtime paths enqueue deliveries asynchronously.
@@ -80,6 +88,7 @@ Field notes:
 ## Recommended Setup
 1. Enable email so someone on the team receives failures quickly.
 2. Configure a webhook for Slack, PagerDuty, or your own incident workflow.
-3. Treat email and webhook as equivalent core protect transports; the difference is routing, not missing safety information.
-4. Test both channels before enabling Protect mode on production traffic.
-5. Watch delivery failures in the dashboard after rollout.
+3. In Observe mode, webhook is the incident lifecycle stream.
+4. In Protect mode, email and webhook share the same core Protect reporting semantics.
+5. Test both channels before enabling Protect mode on production traffic.
+6. Watch delivery failures in the dashboard after rollout.

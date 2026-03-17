@@ -192,9 +192,9 @@ inputs -> ingest_note
 caps -> block: "block"
 caps -> warn_signals: "no block"
 warn_signals -> allow_warn: "warn / allow"
-warn_signals -> transport_outbox: "warn -> decision.warn"
+warn_signals -> transport_outbox: "warn -> protection.warn\nclamp -> protection.clamp_started"
 warn_signals -> incident_pipeline: "near_cap -> visible incident"
-block -> transport_outbox: "block -> incident.block"
+block -> transport_outbox: "block -> protection.block"
 allow_warn -> provider
 preflight -> finalizer: "live outcome"
 sdk_call -> fallback_report: "on timeout/unavailable"
@@ -205,7 +205,7 @@ transport_worker -> metrics
 ingest -> incident_pipeline
 ingest -> metrics
 finalizer -> metrics: "allow / warn / block counters\n+ last outcome"
-observe: "Observe mode result\nallow only\nno decision webhooks" {
+observe: "Observe mode result\nallow only\nincident.warn / incident.resolved\npolicy_gap.detected" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"

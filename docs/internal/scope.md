@@ -44,13 +44,14 @@ Protect mode
 Alerts (webhook)
 - Project webhook config + test API
 - Unified transport hub (shared outbox + RQ worker) for webhook + email delivery
-- Raw webhook contract visible in UI/docs via sample payload (warn-event example + field notes)
+- Raw webhook contract visible in UI/docs via sample payload (protect warning example + field notes)
 - Webhook dispatch events:
-- protect decision warns (`decision.warn`)
-- warn incident opens in protect mode (`incident.warn`, non-breach ingest signals after ingest dominance suppression)
-- protect decision blocks (`incident.block`)
-- incident resolved in protect mode (manual/auto)
-- policy-gap first-seen tuples in protect mode (`policy_gap.detected`)
+- observe incident opens (`incident.warn`)
+- protect warnings (`protection.warn`)
+- protect clamp activation (`protection.clamp_started`)
+- protect blocks (`protection.block`)
+- incident resolved in observe/protect (manual/auto)
+- policy-gap first-seen tuples in observe/protect (`policy_gap.detected`)
 - webhook test (`webhook.test`, mode-independent)
 - Delivery failures sourced from `transport_outbox` (`failed` / `dead`) via metrics endpoint
 

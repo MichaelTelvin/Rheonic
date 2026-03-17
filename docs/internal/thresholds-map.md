@@ -36,7 +36,7 @@ This map reflects the deterministic anomaly model now used by ingest and protect
   - `near_cap(req)` -> `req_near_cap=true`, `tok_near_cap=false`, `near_cap_type="req"`
   - `near_cap(both)` -> both booleans true, `near_cap_type="both"`
 - When it applies:
-  - Protect preflight: decision `warn` with webhook `decision.warn` and visible `near_cap` incident upsert.
+  - Protect preflight: decision `warn`, visible `near_cap` incident upsert, and Protect reporting event `protection.warn`.
 - Ingest (observe/protect): emits `near_cap` incident only when no `cap_breach` dominates that same event. If a later `cap_breach` is reached for the same provider, only recent open `near_cap` incidents inside the dedup window are resolved.
 
 ## Retry Storm Detector
@@ -78,13 +78,20 @@ This map reflects the deterministic anomaly model now used by ingest and protect
   - `cap_breach` dominates all
   - else `near_cap` dominates behavioral signals
   - else behavioral signals may coexist
-- No runtime detector/decision webhooks are sent in observe mode.
+- Observe webhook delivery is incident-oriented:
+  - `incident.warn`
+  - `incident.resolved`
+  - `policy_gap.detected`
 
 ## Webhook Triggers
-- Protect mode only:
-  - `decision.warn` for protect decision warn outcomes
-  - `incident.warn` for non-breach incident opens from ingest (`retry_storm`, `loop_suspect`, `token_explosion`)
-  - `incident.block` for protect decision block outcomes
+- Observe:
+  - `incident.warn` for any incident open
+  - `incident.resolved` for manual and auto resolve
+  - `policy_gap.detected` once per first-seen `(project_id, provider, model)`
+- Protect:
+  - `protection.warn` for protect warning outcomes
+  - `protection.clamp_started` when clamp first activates
+  - `protection.block` for protect block outcomes
   - `incident.resolved` for manual and auto resolve
   - `policy_gap.detected` once per first-seen `(project_id, provider, model)`
 - Mode independent:
@@ -92,8 +99,9 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 
 ## Email Triggers
 - Protect mode only:
-  - `incident.warn`
-  - `incident.block`
+  - `protection.warn`
+  - `protection.clamp_started`
+  - `protection.block`
   - `incident.resolved`
   - `webhook.delivery_failed` when webhook delivery reaches terminal failure and project email alerts are enabled
 - Mode independent:

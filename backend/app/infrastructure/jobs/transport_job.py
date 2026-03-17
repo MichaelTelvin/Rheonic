@@ -10,7 +10,6 @@ from redis import Redis
 from rq import Queue
 
 from app.application.email_templates.registry import render_template
-from app.application.webhooks.payload_template import parse_payload_template_json, render_payload_template
 from app.config import Settings, app_config
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
@@ -25,7 +24,13 @@ from app.application.services.transport_service import TransportService, build_t
 logger = get_logger(__name__)
 
 _SYSTEM_EMAIL_EVENTS = {"feedback.submitted"}
-_ALERT_EMAIL_EVENTS = {"incident.warn", "incident.block", "incident.resolved", "webhook.delivery_failed"}
+_ALERT_EMAIL_EVENTS = {
+    "protection.warn",
+    "protection.clamp_started",
+    "protection.block",
+    "incident.resolved",
+    "webhook.delivery_failed",
+}
 
 
 def enqueue_outbox_delivery(outbox_id: str) -> None:
@@ -172,13 +177,7 @@ def _deliver_webhook(*, outbox_id: str) -> None:
     if not target_url:
         return
 
-    override_template_json = transport_meta.get("override_payload_template_json")
-    payload_template_json = str(override_template_json) if isinstance(override_template_json, str) else None
     rendered_body = body_payload
-    if payload_template_json:
-        template = parse_payload_template_json(payload_template_json)
-        if template is not None:
-            rendered_body = render_payload_template(template=template, context=_build_webhook_template_context(body_payload))
 
     body_bytes = json.dumps(rendered_body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     headers = {
@@ -363,11 +362,3 @@ def _enqueue_webhook_failure_email(*, outbox, settings: Settings) -> None:
         dedupe_key=dedupe_key,
         template="webhook_delivery_failed",
     )
-
-
-def _build_webhook_template_context(payload: dict[str, object]) -> dict[str, object]:
-    context: dict[str, object] = {}
-    for key, value in payload.items():
-        if isinstance(key, str) and (isinstance(value, (str, int, float, bool)) or value is None):
-            context[key] = value
-    return context

@@ -58,6 +58,7 @@ class ProtectService:
         realtime_counters: RealtimeCounterStore,
         protect_action_store: ProtectActionStore,
         protect_block_cooldown_seconds: int,
+        incident_dedup_window_seconds: int | None = None,
         event_repository: EventRepository | None = None,
         webhook_dispatcher: WebhookDispatcher | None = None,
         transport_service: TransportService | None = None,
@@ -69,6 +70,11 @@ class ProtectService:
         self._realtime_counters = realtime_counters
         self._protect_action_store = protect_action_store
         self._protect_block_cooldown_seconds = protect_block_cooldown_seconds
+        self._incident_dedup_window_seconds = int(
+            incident_dedup_window_seconds
+            if incident_dedup_window_seconds is not None
+            else Settings().incident_dedup_window_seconds
+        )
         self._webhook_dispatcher = webhook_dispatcher
         self._transport_service = transport_service
         self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
@@ -136,13 +142,27 @@ class ProtectService:
         cooldown_until_ms = self._protect_action_store.get_block_cooldown_until_ms(project_id=scoped_id)
         if cooldown_until_ms is not None and now_ms < cooldown_until_ms:
             retry_after_seconds = max(0, ceil((cooldown_until_ms - now_ms) / 1000))
+            blocked_until = datetime.fromtimestamp(cooldown_until_ms / 1000, tz=timezone.utc).isoformat()
+            self._enqueue_cooldown_block_if_needed(
+                project_id=project_id,
+                scoped_id=scoped_id,
+                provider=provider,
+                model=ctx.model,
+                environment=ctx.environment,
+                requests_60s=requests_60s,
+                tokens_60s=tokens_60s,
+                max_req=max_req,
+                max_tok=max_tok,
+                blocked_until=blocked_until,
+                retry_after_seconds=retry_after_seconds,
+            )
             return project_id, ProtectDecision(
                 decision="block",
                 reason="cooldown_active",
                 fail_mode=fail_mode,
                 decision_timeout_ms=decision_timeout_ms,
                 retry_after_seconds=retry_after_seconds,
-                blocked_until=datetime.fromtimestamp(cooldown_until_ms / 1000, tz=timezone.utc).isoformat(),
+                blocked_until=blocked_until,
                 snapshot={
                     "requests_60s": requests_60s,
                     "tokens_60s": tokens_60s,
@@ -234,8 +254,9 @@ class ProtectService:
                 max_output_tokens=ctx.max_output_tokens,
                 estimated_next_tokens=estimated_next_tokens,
             )
-            self._enqueue_warn_webhook(
+            self._enqueue_warn_notifications(
                 project_id=project_id,
+                scoped_id=scoped_id,
                 provider=provider,
                 model=ctx.model,
                 environment=ctx.environment,
@@ -324,8 +345,9 @@ class ProtectService:
                 max_output_tokens=ctx.max_output_tokens,
                 estimated_next_tokens=estimated_next_tokens,
             )
-            self._enqueue_warn_webhook(
+            self._enqueue_warn_notifications(
                 project_id=project_id,
+                scoped_id=scoped_id,
                 provider=provider,
                 model=ctx.model,
                 environment=ctx.environment,
@@ -376,8 +398,9 @@ class ProtectService:
                 max_output_tokens=ctx.max_output_tokens,
                 estimated_next_tokens=estimated_next_tokens,
             )
-            self._enqueue_warn_webhook(
+            self._enqueue_warn_notifications(
                 project_id=project_id,
+                scoped_id=scoped_id,
                 provider=provider,
                 model=ctx.model,
                 environment=ctx.environment,
@@ -475,7 +498,7 @@ class ProtectService:
             provider=provider,
             model=model,
             environment=environment,
-            reason=reason,
+            detail_reason=reason,
             requests_60s=requests_60s,
             tokens_60s=tokens_60s,
             max_req=max_req,
@@ -512,43 +535,45 @@ class ProtectService:
         provider: str,
         model: str | None,
         environment: str | None,
-        reason: str,
+        detail_reason: str,
         requests_60s: int,
         tokens_60s: int,
         max_req: int | None,
         max_tok: int | None,
         blocked_until: str | None,
         retry_after_seconds: int | None,
+        source: str = "live",
     ) -> None:
         now = self._now_provider()
         payload = {
-            "event": "incident.block",
+            "event": "protection.block",
             "project_id": project_id,
             "provider": provider,
             "model": model,
             "environment": environment,
-            "incident_type": "cap_breach",
-            "reason": reason,
+            "reason": "cap_breach",
+            "detail_reason": detail_reason,
             "requests_60s": requests_60s,
             "tokens_60s": tokens_60s,
             "req_cap": max_req,
             "tok_cap": max_tok,
             "blocked_until": blocked_until,
             "retry_after_seconds": retry_after_seconds,
+            "source": source,
             "sent_at": now.isoformat(),
         }
         if self._webhook_dispatcher is not None:
             try:
                 self._webhook_dispatcher.enqueue(
                     project_id=project_id,
-                    event_type="incident.block",
+                    event_type="protection.block",
                     payload=payload,
                 )
             except Exception:
                 # Decision path must never fail because webhook dispatch fails.
                 logger.exception(
                     "Failed to enqueue protect block webhook",
-                    extra={"project_id": project_id, "provider": provider, "reason": reason},
+                    extra={"project_id": project_id, "provider": provider, "reason": detail_reason},
                 )
         if self._transport_service is None:
             return
@@ -556,29 +581,30 @@ class ProtectService:
             dedupe_key = build_transport_dedupe_key(
                 project_id=project_id,
                 kind="email",
-                event_type="incident.block",
+                event_type="protection.block",
                 payload=payload,
-                seed=reason,
+                seed=detail_reason,
             )
             self._transport_service.enqueue(
                 project_id=project_id,
                 kind="email",
-                event_type="incident.block",
+                event_type="protection.block",
                 payload=payload,
                 dedupe_key=dedupe_key,
-                template="incident_block",
+                template="protection_block",
                 provider=provider,
             )
         except Exception:
             logger.exception(
                 "Failed to enqueue protect block email",
-                extra={"project_id": project_id, "provider": provider, "reason": reason},
+                extra={"project_id": project_id, "provider": provider, "reason": detail_reason},
             )
 
-    def _enqueue_warn_webhook(
+    def _enqueue_warn_notifications(
         self,
         *,
         project_id: str,
+        scoped_id: str,
         provider: str,
         model: str | None,
         environment: str | None,
@@ -591,11 +617,9 @@ class ProtectService:
         apply_clamp_enabled: bool,
         clamp: dict[str, int | bool] | None,
     ) -> None:
-        if self._webhook_dispatcher is None:
-            return
         now = self._now_provider()
         payload = {
-            "event": "decision.warn",
+            "event": "protection.warn",
             "project_id": project_id,
             "provider": provider,
             "model": model,
@@ -610,17 +634,191 @@ class ProtectService:
             "clamp": clamp,
             "sent_at": now.isoformat(),
         }
-        try:
-            self._webhook_dispatcher.enqueue(
+        if self._protect_action_store.mark_report_sent(
+            project_id=scoped_id,
+            report_type="warn",
+            marker=reason,
+            ttl_seconds=self._incident_dedup_window_seconds,
+        ):
+            self._enqueue_protection_event(
+                event_type="protection.warn",
+                template="protection_warn",
                 project_id=project_id,
-                event_type="decision.warn",
+                provider=provider,
                 payload=payload,
+                dedupe_seed=reason,
+            )
+
+        clamp_started = bool(apply_clamp_enabled and isinstance(clamp, dict) and clamp.get("recommended_max_output_tokens"))
+        if clamp_started and self._protect_action_store.mark_report_sent(
+            project_id=scoped_id,
+            report_type="clamp_started",
+            marker=reason,
+            ttl_seconds=self._incident_dedup_window_seconds,
+        ):
+            clamp_payload = {
+                "event": "protection.clamp_started",
+                "project_id": project_id,
+                "provider": provider,
+                "model": model,
+                "environment": environment,
+                "reason": reason,
+                "requests_60s": requests_60s,
+                "tokens_60s": tokens_60s,
+                "req_cap": max_req,
+                "tok_cap": max_tok,
+                "estimated_next_tokens": estimated_next_tokens,
+                "clamp": clamp,
+                "sent_at": now.isoformat(),
+            }
+            self._enqueue_protection_event(
+                event_type="protection.clamp_started",
+                template="protection_clamp_started",
+                project_id=project_id,
+                provider=provider,
+                payload=clamp_payload,
+                dedupe_seed=f"{reason}:clamp",
+            )
+
+    def report_fail_closed_block(
+        self,
+        *,
+        project_id: str,
+        provider: str,
+        model: str | None,
+        environment: str | None,
+        detail_reason: str,
+        source: str,
+        request_id: str | None,
+    ) -> None:
+        scoped_id = scoped_project_provider_id(project_id, provider)
+        marker = request_id or detail_reason
+        if not self._protect_action_store.mark_report_sent(
+            project_id=scoped_id,
+            report_type="fail_closed",
+            marker=marker,
+            ttl_seconds=self._incident_dedup_window_seconds,
+        ):
+            return
+        payload = {
+            "event": "protection.block",
+            "project_id": project_id,
+            "provider": provider,
+            "model": model,
+            "environment": environment,
+            "reason": "fail_closed",
+            "detail_reason": detail_reason,
+            "requests_60s": None,
+            "tokens_60s": None,
+            "req_cap": None,
+            "tok_cap": None,
+            "blocked_until": None,
+            "retry_after_seconds": None,
+            "source": source,
+            "sent_at": self._now_provider().isoformat(),
+        }
+        self._enqueue_protection_event(
+            event_type="protection.block",
+            template="protection_block",
+            project_id=project_id,
+            provider=provider,
+            payload=payload,
+            dedupe_seed=f"fail_closed:{marker}",
+        )
+
+    def _enqueue_cooldown_block_if_needed(
+        self,
+        *,
+        project_id: str,
+        scoped_id: str,
+        provider: str,
+        model: str | None,
+        environment: str | None,
+        requests_60s: int,
+        tokens_60s: int,
+        max_req: int | None,
+        max_tok: int | None,
+        blocked_until: str,
+        retry_after_seconds: int,
+    ) -> None:
+        if not self._protect_action_store.mark_report_sent(
+            project_id=scoped_id,
+            report_type="cooldown_block",
+            marker=blocked_until,
+            ttl_seconds=max(retry_after_seconds, 1),
+        ):
+            return
+        payload = {
+            "event": "protection.block",
+            "project_id": project_id,
+            "provider": provider,
+            "model": model,
+            "environment": environment,
+            "reason": "cooldown_active",
+            "detail_reason": "cooldown_active",
+            "requests_60s": requests_60s,
+            "tokens_60s": tokens_60s,
+            "req_cap": max_req,
+            "tok_cap": max_tok,
+            "blocked_until": blocked_until,
+            "retry_after_seconds": retry_after_seconds,
+            "source": "live",
+            "sent_at": self._now_provider().isoformat(),
+        }
+        self._enqueue_protection_event(
+            event_type="protection.block",
+            template="protection_block",
+            project_id=project_id,
+            provider=provider,
+            payload=payload,
+            dedupe_seed=f"cooldown:{blocked_until}",
+        )
+
+    def _enqueue_protection_event(
+        self,
+        *,
+        event_type: str,
+        template: str,
+        project_id: str,
+        provider: str,
+        payload: dict[str, object],
+        dedupe_seed: str,
+    ) -> None:
+        if self._webhook_dispatcher is not None:
+            try:
+                self._webhook_dispatcher.enqueue(
+                    project_id=project_id,
+                    event_type=event_type,
+                    payload=payload,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to enqueue protection webhook",
+                    extra={"project_id": project_id, "provider": provider, "event_type": event_type},
+                )
+        if self._transport_service is None:
+            return
+        try:
+            dedupe_key = build_transport_dedupe_key(
+                project_id=project_id,
+                kind="email",
+                event_type=event_type,
+                payload=payload,
+                seed=dedupe_seed,
+            )
+            self._transport_service.enqueue(
+                project_id=project_id,
+                kind="email",
+                event_type=event_type,
+                payload=payload,
+                dedupe_key=dedupe_key,
+                template=template,
+                provider=provider,
             )
         except Exception:
-            # Decision path must never fail because webhook dispatch fails.
             logger.exception(
-                "Failed to enqueue protect warn webhook",
-                extra={"project_id": project_id, "provider": provider, "reason": reason},
+                "Failed to enqueue protection email",
+                extra={"project_id": project_id, "provider": provider, "event_type": event_type},
             )
 
     def _build_clamp(

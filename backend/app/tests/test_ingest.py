@@ -330,10 +330,8 @@ def test_retry_storm_opens_incident_and_updates_dedup_count() -> None:
     assert row.incident_type == "retry_storm"
     assert int(row.evidence.get("count", 0)) == 2
     assert row.status == "open"
-    assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
-    assert len(transport.calls) == 1
-    assert transport.calls[0]["event_type"] == "incident.warn"
-    assert transport.calls[0]["template"] == "incident_warn"
+    assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
+    assert transport.calls == []
 
 
 def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_but_no_email() -> None:
@@ -383,7 +381,7 @@ def test_loop_suspect_ignores_error_events_and_retry_storm_still_triggers() -> N
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "retry_storm"
     assert all(row.incident_type != "loop_suspect" for row in incidents.rows)
-    assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
+    assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
 
 
 def test_loop_signature_is_scoped_by_feature() -> None:
@@ -469,7 +467,7 @@ def test_near_cap_opens_incident_in_observe_with_warn_webhook() -> None:
     assert "reason" not in evidence
 
 
-def test_near_cap_in_protect_mode_does_not_emit_incident_warn_webhook() -> None:
+def test_near_cap_in_protect_mode_does_not_emit_observe_incident_warn_webhook() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=True, req_cap=None, tok_cap=1000)
     service.ingest(_event("p1", total_tokens=900, offset_seconds=0))
 
@@ -532,7 +530,7 @@ def test_token_explosion_incident_emits_warn_in_protect_mode() -> None:
 
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "token_explosion"
-    assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
+    assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
 
 
 def test_cap_breach_suppresses_token_explosion_for_same_event() -> None:
@@ -545,7 +543,7 @@ def test_cap_breach_suppresses_token_explosion_for_same_event() -> None:
     assert incident.incident_type == "cap_breach"
     assert incident.evidence.get("tok_cap_breach") is True
     assert all(row.incident_type != "token_explosion" for row in incidents.rows)
-    assert all(event_type != "incident.block" for _, event_type, _ in webhook.calls)
+    assert all(event_type != "protection.block" for _, event_type, _ in webhook.calls)
 
 
 def test_dominance_cap_breach_suppresses_retry_storm() -> None:
@@ -686,9 +684,9 @@ def test_policy_gap_first_seen_webhook_only_once_and_no_incident() -> None:
     assert incidents.rows == []
 
 
-def test_policy_gap_webhook_not_sent_in_observe_mode() -> None:
+def test_policy_gap_webhook_is_sent_in_observe_mode() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=False)
     service.ingest(_event("p1", provider="openai", model="gpt-4o-mini", total_tokens=10, offset_seconds=0))
 
-    assert all(event_type != "policy_gap.detected" for _, event_type, _ in webhook.calls)
+    assert any(event_type == "policy_gap.detected" for _, event_type, _ in webhook.calls)
     assert incidents.rows == []

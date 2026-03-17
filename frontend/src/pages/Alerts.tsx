@@ -36,21 +36,22 @@ function statusUpdated(previous: ProjectWebhookSettings | null, next: ProjectWeb
 
 const SAMPLE_WARN_PAYLOAD = JSON.stringify(
   {
-    event: "incident.warn",
+    event: "protection.warn",
     project_id: "proj_123",
-    incident_id: "inc_456",
-    incident_type: "retry_storm",
+    reason: "retry_storm",
     provider: "openai",
     model: "gpt-4o-mini",
     environment: "staging",
-    created_at: "2026-03-17T06:21:00Z",
-    last_seen_at: "2026-03-17T06:23:14Z",
     sent_at: "2026-03-17T06:23:20Z",
-    evidence: {
-      failure_count: 5,
-      threshold_count: 5,
-      requests_60s: 12,
-      tokens_60s: 640,
+    requests_60s: 12,
+    tokens_60s: 640,
+    req_cap: 400,
+    tok_cap: 1700,
+    estimated_next_tokens: 120,
+    apply_clamp_enabled: false,
+    clamp: {
+      recommended_max_output_tokens: 64,
+      applied: false,
     },
   },
   null,
@@ -434,7 +435,7 @@ export function Alerts(): JSX.Element {
             <div className="modal alerts-payload-modal">
               <div className="alerts-payload-modal-header">
                 <h2 id="alerts-payload-title" className="section-title">
-                  Sample payload for warn event
+                  Sample payload for protection warn event
                 </h2>
                 <button
                   type="button"

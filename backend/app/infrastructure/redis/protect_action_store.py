@@ -46,6 +46,10 @@ def _outcome_key(project_id: str, request_id: str) -> str:
     return f"pa:{project_id}:outcome:{request_id}"
 
 
+def _report_key(project_id: str, report_type: str, marker: str) -> str:
+    return f"pa:{project_id}:report:{report_type}:{marker}"
+
+
 class ProtectActionStore:
     # Stores protect decision counters and last decision snapshot in Redis.
 
@@ -170,6 +174,18 @@ class ProtectActionStore:
         except Exception:
             logger.warning("Failed reading protect cooldown", extra={"project_id": project_id})
             return None
+
+    def mark_report_sent(self, *, project_id: str, report_type: str, marker: str, ttl_seconds: int) -> bool:
+        # Return True only when this report marker is first observed inside the TTL window.
+        key = _report_key(project_id, report_type, marker)
+        try:
+            return bool(self._redis_client.set_nx_ex(key, "1", max(int(ttl_seconds), 1)))
+        except Exception:
+            logger.warning(
+                "Failed marking protect report",
+                extra={"project_id": project_id, "report_type": report_type, "marker": marker},
+            )
+            return False
 
     def get_health(self, project_id: str) -> dict[str, Any]:
         # Read 60-minute preflight latency percentiles and timeout counter.

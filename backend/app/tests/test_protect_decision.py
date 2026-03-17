@@ -48,6 +48,13 @@ class FakeRedisClient:
             self.ttls[key] = ex
         return True
 
+    def set_nx_ex(self, key: str, value: object, ttl_seconds: int) -> bool:
+        if key in self.values:
+            return False
+        self.values[key] = value
+        self.ttls[key] = ttl_seconds
+        return True
+
     def incr(self, key: str) -> int:
         current = self.values.get(key, 0)
         next_value = int(current) + 1
@@ -328,7 +335,7 @@ def test_caps_breach_blocks_with_cap_reason(tmp_path) -> None:
     _cleanup_overrides()
 
 
-def test_caps_breach_enqueues_incident_block_email(tmp_path) -> None:
+def test_caps_breach_enqueues_protection_block_email(tmp_path) -> None:
     transport = FakeTransportService()
     client, rolling_window, _ = _make_client(tmp_path, transport_service=transport)
     project_id, ingest_key = _create_project_and_key(client, "Protect Caps Email")
@@ -338,8 +345,8 @@ def test_caps_breach_enqueues_incident_block_email(tmp_path) -> None:
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "block"
     assert len(transport.calls) == 1
-    assert transport.calls[0]["event_type"] == "incident.block"
-    assert transport.calls[0]["template"] == "incident_block"
+    assert transport.calls[0]["event_type"] == "protection.block"
+    assert transport.calls[0]["template"] == "protection_block"
     _cleanup_overrides()
 
 
@@ -418,7 +425,7 @@ def test_near_cap_warn_includes_apply_clamp_flag_when_enabled(tmp_path) -> None:
     _cleanup_overrides()
 
 
-def test_near_cap_warn_dispatches_decision_warn_webhook(tmp_path) -> None:
+def test_near_cap_warn_dispatches_protection_warn_webhook(tmp_path) -> None:
     dispatcher = FakeWebhookDispatcher()
     client, rolling_window, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher)
     project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Webhook")
@@ -437,16 +444,41 @@ def test_near_cap_warn_dispatches_decision_warn_webhook(tmp_path) -> None:
         },
     )
     assert decision["decision"] == "warn"
-    warn_calls = [call for call in dispatcher.calls if call[1] == "decision.warn"]
+    warn_calls = [call for call in dispatcher.calls if call[1] == "protection.warn"]
     assert len(warn_calls) == 1
     _, _, payload = warn_calls[0]
-    assert payload["event"] == "decision.warn"
+    assert payload["event"] == "protection.warn"
     assert payload["provider"] == "openai"
     assert payload["model"] == "gpt-4o-mini"
     assert payload["environment"] == "dev"
     assert payload["reason"] == "near_cap"
     assert payload["apply_clamp_enabled"] is False
     assert isinstance(payload["clamp"], dict)
+    _cleanup_overrides()
+
+
+def test_near_cap_warn_dispatches_clamp_started_when_clamp_enabled(tmp_path) -> None:
+    dispatcher = FakeWebhookDispatcher()
+    client, rolling_window, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Clamp Webhook")
+    _set_protect(client, project_id, protect_enabled=True, apply_clamp=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=150)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "input_tokens_estimate": 10,
+            "max_output_tokens": 64,
+        },
+    )
+    assert decision["decision"] == "warn"
+    event_types = [event_type for _, event_type, _ in dispatcher.calls]
+    assert "protection.warn" in event_types
+    assert "protection.clamp_started" in event_types
     _cleanup_overrides()
 
 
@@ -712,6 +744,30 @@ def test_timeout_report_records_block_when_project_fail_mode_is_closed(tmp_path)
     _cleanup_overrides()
 
 
+def test_timeout_report_enqueues_fail_closed_protection_block_when_project_fail_mode_is_closed(tmp_path) -> None:
+    dispatcher = FakeWebhookDispatcher()
+    transport = FakeTransportService()
+    client, _, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher, transport_service=transport)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Timeout Closed Notify")
+    _set_protect(client, project_id, protect_enabled=True, protect_fail_mode="closed")
+
+    response = client.post(
+        "/api/v1/protect/decision-timeout",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={"environment": "dev", "provider": "openai"},
+    )
+
+    assert response.status_code == 202
+    assert len(dispatcher.calls) == 1
+    assert dispatcher.calls[0][1] == "protection.block"
+    assert dispatcher.calls[0][2]["reason"] == "fail_closed"
+    assert dispatcher.calls[0][2]["detail_reason"] == "decision_timeout"
+    assert len(transport.calls) == 1
+    assert transport.calls[0]["event_type"] == "protection.block"
+    assert transport.calls[0]["template"] == "protection_block"
+    _cleanup_overrides()
+
+
 def test_unavailable_report_records_allow_when_project_fail_mode_is_open(tmp_path) -> None:
     client, _, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Unavailable Open")
@@ -759,6 +815,30 @@ def test_unavailable_report_records_block_when_project_fail_mode_is_closed(tmp_p
         "source": "unavailable_fallback",
         "ts": metrics["last"]["ts"],
     }
+    _cleanup_overrides()
+
+
+def test_unavailable_report_enqueues_fail_closed_protection_block_when_project_fail_mode_is_closed(tmp_path) -> None:
+    dispatcher = FakeWebhookDispatcher()
+    transport = FakeTransportService()
+    client, _, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher, transport_service=transport)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Unavailable Closed Notify")
+    _set_protect(client, project_id, protect_enabled=True, protect_fail_mode="closed")
+
+    response = client.post(
+        "/api/v1/protect/decision-unavailable",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={"environment": "dev", "provider": "openai"},
+    )
+
+    assert response.status_code == 202
+    assert len(dispatcher.calls) == 1
+    assert dispatcher.calls[0][1] == "protection.block"
+    assert dispatcher.calls[0][2]["reason"] == "fail_closed"
+    assert dispatcher.calls[0][2]["detail_reason"] == "decision_unavailable"
+    assert len(transport.calls) == 1
+    assert transport.calls[0]["event_type"] == "protection.block"
+    assert transport.calls[0]["template"] == "protection_block"
     _cleanup_overrides()
 
 

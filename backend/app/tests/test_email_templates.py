@@ -49,38 +49,66 @@ def test_feedback_template_snapshot_is_deterministic() -> None:
 def test_operational_templates_snapshots_are_deterministic() -> None:
     cases = [
         (
-            "incident_warn",
+            "protection_warn",
             {
                 "project_id": "p1",
-                "incident_id": "inc-1",
-                "incident_type": "retry_storm",
                 "provider": "anthropic",
-                "created_at": "2026-03-05T10:00:00Z",
-                "last_seen_at": "2026-03-05T10:01:00Z",
+                "model": "claude-3.7-sonnet",
+                "environment": "prod",
+                "reason": "retry_storm",
+                "requests_60s": 22,
+                "tokens_60s": 900,
+                "req_cap": 400,
+                "tok_cap": 1700,
+                "estimated_next_tokens": 80,
                 "sent_at": "2026-03-05T10:01:10Z",
-                "evidence": {"count": 3, "window_seconds": 60},
+                "clamp": None,
             },
-            "[Rheonic] Warning: Retry storm (p1)",
-            "Incident warning opened",
+            "[Rheonic] Protect warning: Retry storm (p1)",
+            "Protect warning issued",
             "Action: Warn",
         ),
         (
-            "incident_block",
+            "protection_block",
             {
                 "project_id": "p2",
                 "provider": "google",
-                "reason": "tok_cap_breach",
+                "model": "gemini-1.5-pro",
+                "environment": "prod",
+                "reason": "cap_breach",
+                "detail_reason": "tok_cap_breach",
                 "requests_60s": 2,
                 "tokens_60s": 2000,
                 "req_cap": 100,
                 "tok_cap": 1500,
                 "blocked_until": "2026-03-05T10:01:00Z",
                 "retry_after_seconds": 60,
+                "source": "live",
                 "sent_at": "2026-03-05T10:00:00Z",
             },
-            "[Rheonic] Blocked: Token cap exceeded (p2)",
-            "Provider traffic blocked",
+            "[Rheonic] Protect blocked traffic: Token cap exceeded (p2)",
+            "Protect blocked traffic",
             "Action: Blocked",
+        ),
+        (
+            "protection_clamp_started",
+            {
+                "project_id": "p2",
+                "provider": "google",
+                "model": "gemini-1.5-pro",
+                "environment": "prod",
+                "reason": "near_cap",
+                "requests_60s": 95,
+                "tokens_60s": 1600,
+                "req_cap": 100,
+                "tok_cap": 1700,
+                "estimated_next_tokens": 120,
+                "clamp": {"recommended_max_output_tokens": 32},
+                "sent_at": "2026-03-05T10:00:00Z",
+            },
+            "[Rheonic] Clamp started: Near cap (p2)",
+            "Clamp started",
+            "Action: Clamp",
         ),
         (
             "incident_resolved",
@@ -131,40 +159,32 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
         assert render_template(template, payload) == rendered
 
     warn_rendered = render_template(
-        "incident_warn",
+        "protection_warn",
         {
             "project_id": "p1",
-            "incident_id": "inc-1",
-            "incident_type": "retry_storm",
             "provider": "openai",
-            "created_at": "2026-03-05T10:00:00Z",
-            "last_seen_at": "2026-03-05T10:01:00Z",
+            "model": "gpt-4o-mini",
+            "environment": "staging-test",
+            "reason": "retry_storm",
+            "requests_60s": 5,
+            "tokens_60s": 250,
+            "req_cap": 400,
+            "tok_cap": 1700,
+            "estimated_next_tokens": 50,
             "sent_at": "2026-03-05T10:01:10Z",
-            "evidence": {
-                "count": 1,
-                "environment": "staging-test",
-                "estimated_next_tokens": 50,
-                "failure_count": 5,
-                "last_seen_at": "2026-03-15T18:28:46.668971+00:00",
-                "model": "gpt-4o-mini",
-                "provider": "openai",
-                "reason": "retry_storm",
-                "req_cap": 400,
-                "requests_60s": 5,
-                "threshold_count": 5,
-                "tok_cap": 1700,
-                "tokens_60s": 250,
-                "window_seconds": 60,
-            },
+            "clamp": {"recommended_max_output_tokens": 40},
         },
     )
-    assert "Incident type: Retry storm" in warn_rendered["text"]
-    assert "Evidence: Reason: retry_storm" in warn_rendered["text"]
-    assert "Estimated Next Tokens: 50" in warn_rendered["text"]
-    assert "Last Seen At: Mar 15, 2026 18:28 UTC" in warn_rendered["text"]
+    assert "Reason: Retry storm" in warn_rendered["text"]
+    assert "Estimated next tokens: 50" in warn_rendered["text"]
+    assert "Clamp recommendation: Recommended max output tokens: 40" in warn_rendered["text"]
 
 
 def test_removed_templates_are_not_registered() -> None:
+    with pytest.raises(ValueError, match="unknown email template: incident_warn"):
+        render_template("incident_warn", {})
+    with pytest.raises(ValueError, match="unknown email template: incident_block"):
+        render_template("incident_block", {})
     with pytest.raises(ValueError, match="unknown email template: decision_warn"):
         render_template("decision_warn", {})
     with pytest.raises(ValueError, match="unknown email template: policy_gap_detected"):

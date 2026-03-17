@@ -183,7 +183,6 @@ def get_incident_manager() -> IncidentManager:
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
             incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
             webhook_dispatcher=get_webhook_dispatcher(),
-            transport_service=get_transport_service(),
         )
     except Exception:
         logger.exception("Failed to construct incident manager")

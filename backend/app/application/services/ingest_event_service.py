@@ -67,7 +67,6 @@ class IngestEventService:
             incident_repository=incident_repository,
             incident_dedup_window_seconds=incident_dedup_window_seconds,
             webhook_dispatcher=webhook_dispatcher,
-            transport_service=transport_service,
         )
         self._webhook_dispatcher = webhook_dispatcher
 
@@ -209,7 +208,7 @@ class IngestEventService:
             },
         )
         project = self._project_repository.get_project(event.project_id)
-        if self._webhook_dispatcher is not None and project is not None and bool(project.protect_enabled):
+        if self._webhook_dispatcher is not None and project is not None:
             try:
                 self._webhook_dispatcher.enqueue(
                     project_id=event.project_id,

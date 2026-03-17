@@ -171,6 +171,7 @@ def protect_decision_timeout(
     payload: DecisionTimeoutIn,
     ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
     protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
+    protect_service: ProtectService = Depends(get_protect_service),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
     request_id_header: str | None = Header(default=None, alias="X-Rheonic-Protect-Request-Id"),
 ) -> dict[str, str]:
@@ -182,13 +183,24 @@ def protect_decision_timeout(
         project = ingest_key_service.resolve_project(plaintext_key=ingest_key)
         if project is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
+        provider = payload.provider or "unknown"
         protect_action_store.finalize_outcome(
-            project_id=scoped_project_provider_id(project.id, payload.provider),
+            project_id=scoped_project_provider_id(project.id, provider),
             decision="block" if project.protect_fail_mode == "closed" else "allow",
             reason="decision_timeout",
             source=app_config.protect_outcome_source_timeout_fallback,
             request_id=request_id_header or payload.request_id,
         )
+        if project.protect_fail_mode == "closed":
+            protect_service.report_fail_closed_block(
+                project_id=project.id,
+                provider=provider,
+                model=None,
+                environment=payload.environment,
+                detail_reason="decision_timeout",
+                source=app_config.protect_outcome_source_timeout_fallback,
+                request_id=request_id_header or payload.request_id,
+            )
         return {"status": "accepted"}
     except HTTPException:
         raise
@@ -202,6 +214,7 @@ def protect_decision_unavailable(
     payload: DecisionUnavailableIn,
     ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
     protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
+    protect_service: ProtectService = Depends(get_protect_service),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
     request_id_header: str | None = Header(default=None, alias="X-Rheonic-Protect-Request-Id"),
 ) -> dict[str, str]:
@@ -213,13 +226,24 @@ def protect_decision_unavailable(
         project = ingest_key_service.resolve_project(plaintext_key=ingest_key)
         if project is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
+        provider = payload.provider or "unknown"
         protect_action_store.finalize_outcome(
-            project_id=scoped_project_provider_id(project.id, payload.provider),
+            project_id=scoped_project_provider_id(project.id, provider),
             decision="block" if project.protect_fail_mode == "closed" else "allow",
             reason="decision_unavailable",
             source=app_config.protect_outcome_source_unavailable_fallback,
             request_id=request_id_header or payload.request_id,
         )
+        if project.protect_fail_mode == "closed":
+            protect_service.report_fail_closed_block(
+                project_id=project.id,
+                provider=provider,
+                model=None,
+                environment=payload.environment,
+                detail_reason="decision_unavailable",
+                source=app_config.protect_outcome_source_unavailable_fallback,
+                request_id=request_id_header or payload.request_id,
+            )
         return {"status": "accepted"}
     except HTTPException:
         raise

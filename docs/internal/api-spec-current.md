@@ -99,16 +99,18 @@ Webhook delivery model:
 - Source of truth for delivery failures is outbox status (`failed`/`dead`), not project summary fields.
 
 Webhook event types:
-- `decision.warn` (protect mode only)
-- `incident.warn` (protect mode only; ingest non-breach opens)
-- `incident.block` (protect mode only)
-- `incident.resolved` (protect mode only)
-- `policy_gap.detected` (protect mode only)
+- `incident.warn` (observe mode only)
+- `protection.warn` (protect mode only)
+- `protection.clamp_started` (protect mode only)
+- `protection.block` (protect mode only)
+- `incident.resolved` (observe + protect)
+- `policy_gap.detected` (observe + protect)
 - `webhook.test` (mode independent)
 
 Protect email event types:
-- `incident.warn`
-- `incident.block`
+- `protection.warn`
+- `protection.clamp_started`
+- `protection.block`
 - `incident.resolved`
 - `webhook.delivery_failed` (terminal webhook failure escalation when project email alerts are enabled)
 

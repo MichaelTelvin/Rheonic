@@ -145,17 +145,21 @@ def test_alert_email_delivery_resolves_project_owner_and_alert_sender(tmp_path, 
     outbox_id = service.enqueue(
         project_id="p-alert",
         kind="email",
-        event_type="incident.block",
+        event_type="protection.block",
         payload={
             "project_id": "p-alert",
             "provider": "openai",
-            "reason": "req_cap_breach",
+            "model": "gpt-4o-mini",
+            "environment": "prod",
+            "reason": "cap_breach",
+            "detail_reason": "req_cap_breach",
             "blocked_until": "2026-03-15T10:01:00Z",
             "retry_after_seconds": 60,
+            "source": "live",
             "sent_at": "2026-03-15T10:00:00Z",
         },
         dedupe_key="incident-block-email-delivery",
-        template="incident_block",
+        template="protection_block",
     )
 
     sent: list[dict[str, object]] = []
@@ -179,7 +183,7 @@ def test_alert_email_delivery_resolves_project_owner_and_alert_sender(tmp_path, 
     assert payload["from"] == "Rheonic Alerts <alerts@mail.rheonic.dev>"
     assert payload["to"] == ["owner@example.com"]
     assert payload["reply_to"] == ["contact@rheonic.dev"]
-    assert payload["subject"] == "[Rheonic] Blocked: Request cap exceeded (p-alert)"
+    assert payload["subject"] == "[Rheonic] Protect blocked traffic: Request cap exceeded (p-alert)"
 
 
 def test_alert_email_delivery_is_skipped_when_project_email_alerts_are_disabled(tmp_path, monkeypatch) -> None:
@@ -211,19 +215,22 @@ def test_alert_email_delivery_is_skipped_when_project_email_alerts_are_disabled(
     outbox_id = service.enqueue(
         project_id="p-skip",
         kind="email",
-        event_type="incident.warn",
+        event_type="protection.warn",
         payload={
             "project_id": "p-skip",
-            "incident_id": "i1",
-            "incident_type": "retry_storm",
             "provider": "openai",
-            "created_at": "2026-03-15T10:00:00Z",
-            "last_seen_at": "2026-03-15T10:00:00Z",
+            "model": "gpt-4o-mini",
+            "environment": "prod",
+            "reason": "retry_storm",
+            "requests_60s": 12,
+            "tokens_60s": 600,
+            "req_cap": 400,
+            "tok_cap": 1700,
+            "estimated_next_tokens": 60,
             "sent_at": "2026-03-15T10:00:00Z",
-            "evidence": {},
         },
         dedupe_key="incident-warn-email-skipped",
-        template="incident_warn",
+        template="protection_warn",
     )
 
     sent: list[dict[str, object]] = []
