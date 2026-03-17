@@ -13,7 +13,6 @@
 Store these in Doppler `stg`:
 - `APP_ENV=staging`
 - `JWT_SECRET` (>=32 chars)
-- `WEBHOOK_SECRET_ENCRYPTION_KEY` (>=32 chars)
 - `CORS_ORIGINS` (staging frontend origin only; no localhost)
 - `DATABASE_URL`, `REDIS_URL`
 - `VITE_API_BASE_URL` (public staging API URL)

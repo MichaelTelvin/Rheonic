@@ -83,11 +83,10 @@ class FakeWebhookDispatcher:
         event_type: str,
         *,
         override_url: str | None = None,
-        override_secret: str | None = None,
         override_payload_template_json: str | None = None,
         force_send: bool = False,
     ) -> None:
-        _ = (override_url, override_secret, override_payload_template_json, force_send)
+        _ = (override_url, override_payload_template_json, force_send)
         self.calls.append((project_id, payload, event_type))
 
 

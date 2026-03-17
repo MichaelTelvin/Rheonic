@@ -41,7 +41,6 @@ cp .env.example .env
 2. Configure `.env` for production:
 - `APP_ENV=prod` (or `production`)
 - strong `JWT_SECRET`
-- strong `WEBHOOK_SECRET_ENCRYPTION_KEY`
 - production `CORS_ORIGINS`
 - production `DATABASE_URL` and `REDIS_URL`
 - `VITE_API_BASE_URL` production API URL

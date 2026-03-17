@@ -10,7 +10,6 @@ from app.domain.models.project import Project
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import EventRecord, IncidentRecord, IngestKeyRecord, ProjectModelRecord, ProjectRecord
 from app.logger import get_logger
-from app.security.webhook_secrets import decrypt_webhook_secret, encrypt_webhook_secret
 
 logger = get_logger(__name__)
 
@@ -142,7 +141,6 @@ class ProjectRepositoryImpl(ProjectRepository):
         webhook_enabled: bool,
         email_enabled: bool,
         webhook_url: str | None,
-        webhook_secret: str | None,
         webhook_payload_template_json: str | None,
     ) -> Project | None:
         # Update and return project webhook settings.
@@ -154,9 +152,6 @@ class ProjectRepositoryImpl(ProjectRepository):
                 record.webhook_enabled = webhook_enabled
                 record.email_enabled = email_enabled
                 record.webhook_url = webhook_url
-                record.webhook_secret = (
-                    encrypt_webhook_secret(webhook_secret, settings=self._settings) if webhook_secret is not None else None
-                )
                 record.webhook_payload_template_json = webhook_payload_template_json
                 session.add(record)
                 session.commit()
@@ -260,6 +255,5 @@ def _to_domain(record: ProjectRecord, settings: Settings | None = None) -> Proje
         webhook_enabled=bool(getattr(record, "webhook_enabled", False)),
         email_enabled=bool(getattr(record, "email_enabled", False)),
         webhook_url=getattr(record, "webhook_url", None),
-        webhook_secret=decrypt_webhook_secret(getattr(record, "webhook_secret", None), settings=resolved_settings),
         webhook_payload_template_json=getattr(record, "webhook_payload_template_json", None),
     )

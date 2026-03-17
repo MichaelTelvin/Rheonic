@@ -15,7 +15,6 @@ This repo is already environment-driven, so integration should happen outside ap
 - `REDIS_URL`
 - `POSTGRES_PASSWORD`
 - `JWT_SECRET`
-- `WEBHOOK_SECRET_ENCRYPTION_KEY`
 - `CORS_ORIGINS`
 - any future email/provider credentials
 

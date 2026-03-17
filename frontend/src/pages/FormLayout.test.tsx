@@ -53,7 +53,6 @@ describe("Form column layout", () => {
       enabled: false,
       email_enabled: false,
       url: null,
-      has_secret: false,
       last_status: null,
       last_at: null,
       last_error: null,

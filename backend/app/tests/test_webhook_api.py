@@ -6,7 +6,7 @@ from app.application.services.project_service import ProjectService
 from app.dependencies import get_current_user, get_project_service, get_transport_outbox_repository, get_webhook_dispatcher
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
-from app.infrastructure.db.models import Base, ProjectRecord, TransportOutboxRecord
+from app.infrastructure.db.models import Base, TransportOutboxRecord
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.main import app
@@ -14,7 +14,7 @@ from app.main import app
 
 class FakeWebhookDispatcher:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, dict[str, object], str, str | None, str | None, str | None, bool]] = []
+        self.calls: list[tuple[str, dict[str, object], str, str | None, str | None, bool]] = []
 
     def enqueue(
         self,
@@ -23,7 +23,6 @@ class FakeWebhookDispatcher:
         event_type: str,
         *,
         override_url: str | None = None,
-        override_secret: str | None = None,
         override_payload_template_json: str | None = None,
         force_send: bool = False,
     ) -> None:
@@ -33,7 +32,6 @@ class FakeWebhookDispatcher:
                 payload,
                 event_type,
                 override_url,
-                override_secret,
                 override_payload_template_json,
                 force_send,
             )
@@ -88,17 +86,14 @@ def test_project_webhook_owner_get_put_and_test(tmp_path) -> None:
         json={
             "enabled": True,
             "url": "https://example.test/hook",
-            "secret": "secret-1",
         },
     )
     assert put_response.status_code == 200
     assert put_response.json()["enabled"] is True
-    assert put_response.json()["has_secret"] is True
 
     get_response = client.get(f"/api/v1/projects/{project_id}/webhook")
     assert get_response.status_code == 200
     assert get_response.json()["url"] == "https://example.test/hook"
-    assert get_response.json()["has_secret"] is True
 
     test_response = client.post(f"/api/v1/projects/{project_id}/webhook/test")
     assert test_response.status_code == 202
@@ -106,37 +101,8 @@ def test_project_webhook_owner_get_put_and_test(tmp_path) -> None:
     assert len(dispatcher.calls) == 1
     assert dispatcher.calls[0][2] == "webhook.test"
     assert dispatcher.calls[0][3] == "https://example.test/hook"
-    assert dispatcher.calls[0][5] is None
-    assert dispatcher.calls[0][6] is True
-
-    _cleanup_overrides()
-
-
-def test_project_webhook_save_without_secret_preserves_existing_secret(tmp_path) -> None:
-    client, _ = _make_client(tmp_path)
-    project_id = client.post("/api/v1/projects", json={"name": "Preserve Secret"}).json()["id"]
-
-    first_put = client.put(
-        f"/api/v1/projects/{project_id}/webhook",
-        json={
-            "enabled": True,
-            "url": "https://example.test/hook",
-            "secret": "secret-1",
-        },
-    )
-    assert first_put.status_code == 200
-    assert first_put.json()["has_secret"] is True
-
-    second_put = client.put(
-        f"/api/v1/projects/{project_id}/webhook",
-        json={
-            "enabled": True,
-            "email_enabled": False,
-            "url": "https://example.test/hook",
-        },
-    )
-    assert second_put.status_code == 200
-    assert second_put.json()["has_secret"] is True
+    assert dispatcher.calls[0][4] is None
+    assert dispatcher.calls[0][5] is True
 
     _cleanup_overrides()
 
@@ -162,7 +128,7 @@ def test_project_webhook_non_owner_forbidden(tmp_path) -> None:
     get_response = client.get(f"/api/v1/projects/{project_id}/webhook")
     put_response = client.put(
         f"/api/v1/projects/{project_id}/webhook",
-        json={"enabled": True, "url": "https://example.test/hook", "secret": None},
+        json={"enabled": True, "url": "https://example.test/hook"},
     )
     assert get_response.status_code == 404
     assert put_response.status_code == 404
@@ -175,11 +141,11 @@ def test_project_webhook_validation_errors(tmp_path) -> None:
 
     invalid_url = client.put(
         f"/api/v1/projects/{project_id}/webhook",
-        json={"enabled": True, "url": "not-a-url", "secret": None},
+        json={"enabled": True, "url": "not-a-url"},
     )
     missing_url = client.put(
         f"/api/v1/projects/{project_id}/webhook",
-        json={"enabled": True, "url": None, "secret": None},
+        json={"enabled": True, "url": None},
     )
     assert invalid_url.status_code == 422
     assert missing_url.status_code == 422
@@ -193,7 +159,7 @@ def test_project_webhook_rejects_private_hosts(tmp_path) -> None:
 
     private_host = client.put(
         f"/api/v1/projects/{project_id}/webhook",
-        json={"enabled": True, "url": "https://127.0.0.1/hook", "secret": None},
+        json={"enabled": True, "url": "https://127.0.0.1/hook"},
     )
     localhost_test = client.post(
         f"/api/v1/projects/{project_id}/webhook/test",
@@ -210,7 +176,7 @@ def test_project_webhook_test_is_available_in_observe_mode(tmp_path) -> None:
 
     put_response = client.put(
         f"/api/v1/projects/{project_id}/webhook",
-        json={"enabled": False, "url": "https://saved.test/hook", "secret": "saved-secret"},
+        json={"enabled": False, "url": "https://saved.test/hook"},
     )
     assert put_response.status_code == 200
     assert put_response.json()["enabled"] is False
@@ -219,53 +185,12 @@ def test_project_webhook_test_is_available_in_observe_mode(tmp_path) -> None:
         f"/api/v1/projects/{project_id}/webhook/test",
         json={
             "url": "https://draft.test/hook",
-            "secret": "draft-secret",
         },
     )
     assert test_response.status_code == 202
     assert len(dispatcher.calls) == 1
     assert dispatcher.calls[0][3] == "https://draft.test/hook"
-    assert dispatcher.calls[0][4] == "draft-secret"
-    assert dispatcher.calls[0][5] is None
-
-    _cleanup_overrides()
-
-
-def test_project_webhook_secret_is_not_stored_plaintext(tmp_path) -> None:
-    db_url = f"sqlite:///{tmp_path}/webhook_secret_storage_test.db"
-    session_factory = DatabaseSessionFactory(database_url=db_url)
-    Base.metadata.create_all(bind=session_factory.engine)
-    service = ProjectService(project_repository=ProjectRepositoryImpl(session_factory=session_factory))
-    dispatcher = FakeWebhookDispatcher()
-    current_user = User(
-        id="u1",
-        email="u1@example.com",
-        password_hash="hashed",
-        created_at=datetime.now(timezone.utc),
-    )
-    app.dependency_overrides[get_project_service] = lambda: service
-    app.dependency_overrides[get_webhook_dispatcher] = lambda: dispatcher
-    app.dependency_overrides[get_transport_outbox_repository] = lambda: TransportOutboxRepositoryImpl(session_factory=session_factory)
-    app.dependency_overrides[get_current_user] = lambda: current_user
-    client = TestClient(app)
-
-    project_id = client.post("/api/v1/projects", json={"name": "Encrypted Secret"}).json()["id"]
-    response = client.put(
-        f"/api/v1/projects/{project_id}/webhook",
-        json={
-            "enabled": True,
-            "url": "https://example.test/hook",
-            "secret": "secret-plain",
-        },
-    )
-    assert response.status_code == 200
-
-    with session_factory.create_session() as session:
-        record = session.query(ProjectRecord).filter(ProjectRecord.id == project_id).first()
-        assert record is not None
-        assert record.webhook_secret is not None
-        assert record.webhook_secret != "secret-plain"
-        assert record.webhook_payload_template_json is None
+    assert dispatcher.calls[0][4] is None
 
     _cleanup_overrides()
 

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -184,12 +182,6 @@ def _deliver_webhook(*, outbox_id: str) -> None:
         "Content-Type": "application/json",
         "X-RHEONIC-Event-Type": outbox.event_type,
     }
-    override_secret = transport_meta.get("override_secret")
-    signing_secret = str(override_secret) if isinstance(override_secret, str) else project.webhook_secret
-    if signing_secret:
-        digest = hmac.new(signing_secret.encode("utf-8"), body_bytes, hashlib.sha256).hexdigest()
-        headers["X-RHEONIC-Signature"] = f"sha256={digest}"
-
     ensure_webhook_url_is_safe(target_url, settings=settings)
     timeout = httpx.Timeout(
         connect=app_config.webhook_timeout_connect_seconds,

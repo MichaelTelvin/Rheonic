@@ -84,7 +84,6 @@ class ProjectRecord(Base):
     webhook_enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
     email_enabled: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
     webhook_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
-    webhook_secret: Mapped[str | None] = mapped_column(String(512), nullable=True)
     webhook_payload_template_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -1,8 +1,8 @@
-"""initial schema snapshot from current ORM
+"""initial schema
 
-Revision ID: 20260226_01
+Revision ID: 20260317_01
 Revises: None
-Create Date: 2026-02-26
+Create Date: 2026-03-17
 """
 
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = "20260226_01"
+revision = "20260317_01"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -38,8 +38,9 @@ def upgrade() -> None:
         sa.Column("protect_max_req_per_min", sa.Integer(), nullable=True),
         sa.Column("protect_max_tok_per_min", sa.Integer(), nullable=True),
         sa.Column("webhook_enabled", sa.Boolean(), server_default=sa.text("false"), nullable=False),
+        sa.Column("email_enabled", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("webhook_url", sa.String(length=2048), nullable=True),
-        sa.Column("webhook_secret", sa.String(length=512), nullable=True),
+        sa.Column("webhook_payload_template_json", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
@@ -88,12 +89,7 @@ def upgrade() -> None:
     op.create_index("ix_incidents_project_id", "incidents", ["project_id"], unique=False)
     op.create_index("ix_incidents_status", "incidents", ["status"], unique=False)
     op.create_index("ix_incidents_fingerprint", "incidents", ["fingerprint"], unique=False)
-    op.create_index(
-        "ix_incidents_project_status_fingerprint",
-        "incidents",
-        ["project_id", "status", "fingerprint"],
-        unique=False,
-    )
+    op.create_index("ix_incidents_project_status_fingerprint", "incidents", ["project_id", "status", "fingerprint"], unique=False)
     op.create_index(
         "ix_incidents_project_provider_status_created_at",
         "incidents",
@@ -106,12 +102,7 @@ def upgrade() -> None:
         ["project_id", "provider", "last_seen_at"],
         unique=False,
     )
-    op.create_index(
-        "ix_incidents_project_status_created_at",
-        "incidents",
-        ["project_id", "status", "created_at"],
-        unique=False,
-    )
+    op.create_index("ix_incidents_project_status_created_at", "incidents", ["project_id", "status", "created_at"], unique=False)
 
     op.create_table(
         "project_models",
@@ -147,8 +138,39 @@ def upgrade() -> None:
     op.create_index("ix_ingest_keys_status", "ingest_keys", ["status"], unique=False)
     op.create_index("ix_ingest_keys_project_status", "ingest_keys", ["project_id", "status"], unique=False)
 
+    op.create_table(
+        "transport_outbox",
+        sa.Column("id", sa.String(length=64), nullable=False),
+        sa.Column("project_id", sa.String(length=64), nullable=False),
+        sa.Column("kind", sa.String(length=16), nullable=False),
+        sa.Column("event_type", sa.String(length=64), nullable=False),
+        sa.Column("destination", sa.String(length=2048), nullable=True),
+        sa.Column("subject", sa.String(length=255), nullable=True),
+        sa.Column("template", sa.String(length=128), nullable=True),
+        sa.Column("payload", sa.JSON(), nullable=False),
+        sa.Column("dedupe_key", sa.String(length=255), nullable=False),
+        sa.Column("status", sa.String(length=16), server_default="pending", nullable=False),
+        sa.Column("attempts", sa.Integer(), server_default="0", nullable=False),
+        sa.Column("max_attempts", sa.Integer(), server_default="1", nullable=False),
+        sa.Column("next_attempt_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("last_error_code", sa.String(length=64), nullable=True),
+        sa.Column("last_error_message", sa.String(length=512), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("sent_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("delivered_at", sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("project_id", "kind", "dedupe_key", name="uq_transport_outbox_project_kind_dedupe"),
+    )
+    op.create_index("ix_transport_outbox_project_kind_status", "transport_outbox", ["project_id", "kind", "status"], unique=False)
+    op.create_index("ix_transport_outbox_status_next_attempt_at", "transport_outbox", ["status", "next_attempt_at"], unique=False)
+
 
 def downgrade() -> None:
+    op.drop_index("ix_transport_outbox_status_next_attempt_at", table_name="transport_outbox")
+    op.drop_index("ix_transport_outbox_project_kind_status", table_name="transport_outbox")
+    op.drop_table("transport_outbox")
+
     op.drop_index("ix_ingest_keys_project_status", table_name="ingest_keys")
     op.drop_index("ix_ingest_keys_status", table_name="ingest_keys")
     op.drop_index("ix_ingest_keys_key_hash", table_name="ingest_keys")

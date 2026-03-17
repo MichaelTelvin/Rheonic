@@ -28,7 +28,6 @@
     - `APP_ENV` allowed set enforced
     - `JWT_SECRET` minimum length for staging/prod
     - `CORS_ORIGINS` required and localhost rejected for staging/prod
-    - `WEBHOOK_SECRET_ENCRYPTION_KEY` required for staging/prod
   - Added unified runtime settings:
     - `RQ_QUEUE_NAME`
     - `RQ_SCHEDULER_INTERVAL_SECONDS`

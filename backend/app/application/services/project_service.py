@@ -101,7 +101,6 @@ class ProjectService:
         webhook_enabled: bool,
         email_enabled: bool,
         webhook_url: str | None,
-        webhook_secret: str | None,
         webhook_payload_template_json: str | None,
     ) -> Project:
         # Update webhook configuration for owned project.
@@ -111,7 +110,6 @@ class ProjectService:
             webhook_enabled=webhook_enabled,
             email_enabled=email_enabled,
             webhook_url=webhook_url,
-            webhook_secret=webhook_secret,
             webhook_payload_template_json=webhook_payload_template_json,
         )
         if updated is None:

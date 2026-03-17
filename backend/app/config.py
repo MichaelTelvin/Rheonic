@@ -1,6 +1,5 @@
 # Application configuration objects.
 from dataclasses import dataclass
-import hashlib
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from pydantic import model_validator
@@ -39,7 +38,6 @@ class AppConfig:
     webhook_timeout_write_seconds: float = 5.0
     webhook_timeout_pool_seconds: float = 5.0
     webhook_max_error_chars: int = 240
-    webhook_secret_prefix: str = "enc:v1:"
     email_retry_max_attempts: int = 1
     email_retry_intervals_seconds: tuple[int, ...] = ()
     scheduler_default_result_ttl_seconds: int = 3600
@@ -112,7 +110,6 @@ class Settings(BaseSettings):
     protect_block_cooldown_seconds: int = 60
     protect_decision_timeout_ms: int = app_config.default_protect_decision_timeout_ms
     webhook_allow_private_hosts: bool = False
-    webhook_secret_encryption_key: str = ""
     email_provider_enabled: bool = False
     email_provider: str = ""
     resend_api_key: str = ""
@@ -212,9 +209,6 @@ class Settings(BaseSettings):
             lowered = ",".join(self.cors_origin_list).lower()
             if "localhost" in lowered or "127.0.0.1" in lowered:
                 raise ValueError("CORS_ORIGINS must not contain localhost in staging/production")
-            webhook_key = (self.webhook_secret_encryption_key or "").strip()
-            if len(webhook_key) < 32:
-                raise ValueError("WEBHOOK_SECRET_ENCRYPTION_KEY must be at least 32 characters in staging/production")
         return self
 
     @model_validator(mode="after")
@@ -235,10 +229,3 @@ class Settings(BaseSettings):
         if not (self.email_reply_to or "").strip():
             raise ValueError("EMAIL_REPLY_TO is required when email delivery is enabled")
         return self
-
-    @property
-    def webhook_secret_encryption_key_digest(self) -> str:
-        seed = (self.webhook_secret_encryption_key or self.jwt_secret or "").strip()
-        if not seed:
-            raise ValueError("WEBHOOK_SECRET_ENCRYPTION_KEY or JWT_SECRET is required for webhook secret encryption")
-        return hashlib.sha256(seed.encode("utf-8")).hexdigest()
