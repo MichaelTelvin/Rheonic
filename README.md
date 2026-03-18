@@ -8,15 +8,11 @@ Rheonic is a runtime safety layer for LLM applications with:
 - unified outbox-based transport hub for webhook + email delivery
 
 ## Local development
-1. Copy env template:
+1. Start local stack through Doppler:
 ```bash
-cp .env.local.example .env
+bash deploy/local_doppler.sh up -d --build
 ```
-2. Start local stack:
-```bash
-docker compose up -d --build
-```
-3. Verify:
+2. Verify:
 ```bash
 curl -fsS http://localhost:8000/health
 curl -fsS http://localhost:8000/ready

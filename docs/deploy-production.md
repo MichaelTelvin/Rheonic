@@ -17,10 +17,9 @@
 - Longer term, Postgres should move to a managed or separate database service before higher-volume production use.
 
 ## Secrets handling
-- The repo does not currently include a native Vault or cloud secret-manager integration.
-- Production secrets are expected to be injected by your platform or deployment pipeline into the environment consumed by `docker compose`.
+- Production secrets are expected to be injected through Doppler into the environment consumed by `docker compose`.
 - See [`docs/secrets-management.md`](/Users/mike/Projects/Rheonic/docs/secrets-management.md) for the recommended integration pattern for this repo.
-- Do not keep production `.env` files in the repo or on developer machines longer than necessary.
+- Do not keep production application `.env` files in the repo or on hosts.
 
 ## Domain/DNS assumptions
 - Frontend domain points to VPS.
@@ -34,27 +33,22 @@
   - backend container port `${BACKEND_PORT}` (default 8000)
 
 ## Deployment order (exact)
-1. Prepare env:
+1. Ensure the production Doppler token is available on the host, for example:
 ```bash
-cp .env.example .env
+printf 'DOPPLER_TOKEN=%s\n' '<service-token>' > /root/.config/rheonic/doppler.env
+chmod 600 /root/.config/rheonic/doppler.env
 ```
-2. Configure `.env` for production:
-- `APP_ENV=prod` (or `production`)
-- strong `JWT_SECRET`
-- production `CORS_ORIGINS`
-- production `DATABASE_URL` and `REDIS_URL`
-- `VITE_API_BASE_URL` production API URL
-3. Deploy:
+2. Deploy with Doppler-backed production config:
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml ps
+bash deploy/prod_doppler.sh up -d --build
+bash deploy/prod_doppler.sh ps
 ```
 
 ## Migration order
 - `db_init` runs before API/worker/scheduler by compose dependency.
 - Verify migration completion:
 ```bash
-docker compose -f docker-compose.prod.yml logs db_init
+bash deploy/prod_doppler.sh logs db_init
 ```
 
 ## Service restart order
@@ -67,8 +61,8 @@ For controlled restart:
 
 Example:
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build db_init
-docker compose -f docker-compose.prod.yml up -d --build backend worker scheduler frontend
+bash deploy/prod_doppler.sh up -d --build db_init
+bash deploy/prod_doppler.sh up -d --build backend worker scheduler frontend
 ```
 
 ## Smoke checklist
@@ -76,14 +70,14 @@ docker compose -f docker-compose.prod.yml up -d --build backend worker scheduler
 - `GET /ready` returns `ready`.
 - frontend home/dashboard loads.
 - authenticated API call succeeds.
-- `docker compose -f docker-compose.prod.yml ps` shows `backend`, `worker`, `scheduler`, and `frontend` as healthy or running.
+- `bash deploy/prod_doppler.sh ps` shows `backend`, `worker`, `scheduler`, and `frontend` as healthy or running.
 - worker queue is active:
 ```bash
-docker compose -f docker-compose.prod.yml exec redis redis-cli KEYS "rq:worker:*"
+bash deploy/prod_doppler.sh exec redis redis-cli KEYS "rq:worker:*"
 ```
 - scheduler running:
 ```bash
-docker compose -f docker-compose.prod.yml logs scheduler | tail -n 50
+bash deploy/prod_doppler.sh logs scheduler | tail -n 50
 ```
 - transport failures visible through metrics endpoint if induced.
 - email alerts are either intentionally disabled or backed by a real provider.
@@ -91,7 +85,7 @@ docker compose -f docker-compose.prod.yml logs scheduler | tail -n 50
 ## Recommended next production upgrades
 - external log aggregation so logs survive container replacement and host-level troubleshooting is easier,
 - managed or separate Postgres once load and customer reliance increase,
-- secret manager-backed deploys instead of host-managed `.env`,
+- stronger secret-governance around the host Doppler token,
 - backups and restore drills for Postgres and Redis persistence.
 
 ## Rollback

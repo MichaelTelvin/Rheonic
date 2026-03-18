@@ -119,6 +119,40 @@ services:
       provider_stub_test:
         condition: service_healthy
 
+  sdk_node_unit:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./sdk-node:/app
+    command: >
+      sh -c "npm install --silent --no-fund --no-audit --loglevel=error >/dev/null 2>&1
+      && npm run -s build >/dev/null 2>&1
+      && node --test --test-reporter=spec dist/protectEngine.test.js"
+
+  sdk_python_unit:
+    image: python:3.12-alpine
+    working_dir: /app
+    volumes:
+      - ./sdk-python:/app
+    command: >
+      sh -c "pip install -q -e '.[dev]' >/dev/null 2>&1
+      && pytest -v"
+
+  frontend_test:
+    image: node:20-alpine
+    working_dir: /app
+    environment:
+      VITE_API_BASE_URL: https://example.invalid/api
+      VITE_PUBLIC_CONTACT_EMAIL: contact@rheonic.dev
+      VITE_APP_VERSION: test
+    volumes:
+      - ./frontend:/app
+    command: >
+      sh -c "npm install --silent --no-fund --no-audit --loglevel=error >/dev/null 2>&1
+      && npm run -s test
+      && npm run -s build >/dev/null 2>&1
+      && echo 'frontend_build PASSED'"
+
 volumes:
   postgres-test-data:
   redis-test-data:

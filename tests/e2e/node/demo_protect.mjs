@@ -1,33 +1,5 @@
 import { createClient, instrumentAnthropic, instrumentGoogle, instrumentOpenAI, RHEONICBlockedError } from "../../../sdk-node/dist/index.js";
-import { readFileSync } from "node:fs";
 import { DashboardSession } from "./dashboard_session.mjs";
-
-function loadRheonicEnvFromDotenv() {
-  const explicitPath = (process.env.RHEONIC_ENV_FILE ?? "").trim();
-  if (!explicitPath) {
-    return;
-  }
-  let content = "";
-  try {
-    content = readFileSync(explicitPath, "utf8");
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`RHEONIC_ENV_FILE not found: ${explicitPath} (${message})`);
-  }
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#") || !line.includes("=")) continue;
-    const index = line.indexOf("=");
-    const key = line.slice(0, index).trim();
-    if (!key.startsWith("RHEONIC_")) continue;
-    const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
-    if (!(key in process.env)) {
-      process.env[key] = value;
-    }
-  }
-}
-
-loadRheonicEnvFromDotenv();
 
 const backendBaseUrl = process.env.RHEONIC_BACKEND_URL ?? "http://localhost:8000";
 const providerStubUrl = process.env.RHEONIC_PROVIDER_URL ?? "http://localhost:8099";

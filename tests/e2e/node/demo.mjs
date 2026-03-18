@@ -1,31 +1,5 @@
 import { buildEvent, createClient } from "../../../sdk-node/dist/index.js";
-import { readFileSync } from "node:fs";
 import { DashboardSession } from "./dashboard_session.mjs";
-
-function loadRheonicEnvFromDotenv() {
-  const explicitPath = (process.env.RHEONIC_ENV_FILE ?? "").trim();
-  if (!explicitPath) {
-    return;
-  }
-  let content = "";
-  try {
-    content = readFileSync(explicitPath, "utf8");
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`RHEONIC_ENV_FILE not found: ${explicitPath} (${message})`);
-  }
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#") || !line.includes("=")) continue;
-    const index = line.indexOf("=");
-    const key = line.slice(0, index).trim();
-    if (!key.startsWith("RHEONIC_")) continue;
-    const value = line.slice(index + 1).trim().replace(/^['"]|['"]$/g, "");
-    if (!(key in process.env)) {
-      process.env[key] = value;
-    }
-  }
-}
 
 function printConfigHint() {
   console.log("  Run: make demo-stg-node RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach");
@@ -121,7 +95,6 @@ async function sendEvent(client, provider, model, endpoint, totalTokens, feature
 }
 
 async function runDemo() {
-  loadRheonicEnvFromDotenv();
   const backendBaseUrl = (process.env.RHEONIC_BACKEND_URL ?? "http://localhost:8000").replace(/\/$/, "");
   const ingestKey = process.env.RHEONIC_INGEST_KEY;
   if (!ingestKey) {

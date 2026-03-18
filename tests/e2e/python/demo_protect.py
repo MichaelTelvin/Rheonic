@@ -24,28 +24,6 @@ from rheonic.providers.google_adapter import instrument_google
 from rheonic.providers.openai_adapter import instrument_openai
 from dashboard_session import DashboardSession
 
-
-def _load_rheonic_env_from_dotenv() -> None:
-    explicit_path = (os.getenv("RHEONIC_ENV_FILE") or "").strip()
-    if not explicit_path:
-        return
-    dotenv_path = Path(explicit_path)
-    if not dotenv_path.exists():
-        raise FileNotFoundError(f"RHEONIC_ENV_FILE not found: {dotenv_path}")
-    for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        if not key.startswith("RHEONIC_"):
-            continue
-        if key not in os.environ:
-            os.environ[key] = value.strip().strip('"').strip("'")
-
-
-_load_rheonic_env_from_dotenv()
-
 BACKEND_BASE_URL = os.getenv("RHEONIC_BACKEND_URL", "http://localhost:8000")
 PROVIDER_STUB_URL = os.getenv("RHEONIC_PROVIDER_URL", "http://localhost:8099")
 _LAST_PROVIDER_CALL: dict[str, Any] | None = None

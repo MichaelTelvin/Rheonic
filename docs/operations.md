@@ -16,17 +16,17 @@ bash deploy/staging_doppler.sh down
 
 ### Production
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml down
+bash deploy/prod_doppler.sh up -d --build
+bash deploy/prod_doppler.sh down
 ```
 
 ## Logs
 ```bash
-docker compose -f docker-compose.prod.yml logs -f backend
-docker compose -f docker-compose.prod.yml logs -f worker
-docker compose -f docker-compose.prod.yml logs -f scheduler
-docker compose -f docker-compose.prod.yml logs -f frontend
-docker compose -f docker-compose.prod.yml logs db_init
+bash deploy/prod_doppler.sh logs -f backend
+bash deploy/prod_doppler.sh logs -f worker
+bash deploy/prod_doppler.sh logs -f scheduler
+bash deploy/prod_doppler.sh logs -f frontend
+bash deploy/prod_doppler.sh logs db_init
 ```
 
 ## Health visibility
@@ -47,18 +47,18 @@ alembic -c alembic.ini upgrade head
 
 ## Queue and scheduler checks
 ```bash
-docker compose -f docker-compose.prod.yml exec redis redis-cli LLEN rq:queue:${RQ_QUEUE_NAME:-rheonic}
-docker compose -f docker-compose.prod.yml exec redis redis-cli KEYS "rq:worker:*"
-docker compose -f docker-compose.prod.yml logs scheduler | tail -n 100
+bash deploy/prod_doppler.sh exec redis redis-cli LLEN rq:queue:${RQ_QUEUE_NAME:-rheonic}
+bash deploy/prod_doppler.sh exec redis redis-cli KEYS "rq:worker:*"
+bash deploy/prod_doppler.sh logs scheduler | tail -n 100
 ```
 
 ## Rebuild and restart
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.prod.yml restart backend
-docker compose -f docker-compose.prod.yml restart worker
-docker compose -f docker-compose.prod.yml restart scheduler
-docker compose -f docker-compose.prod.yml restart frontend
+bash deploy/prod_doppler.sh up -d --build
+bash deploy/prod_doppler.sh restart backend
+bash deploy/prod_doppler.sh restart worker
+bash deploy/prod_doppler.sh restart scheduler
+bash deploy/prod_doppler.sh restart frontend
 ```
 
 ## Troubleshooting

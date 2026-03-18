@@ -56,7 +56,7 @@ app_config = AppConfig()
 
 class Settings(BaseSettings):
     # Runtime settings container for the backend service.
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(extra="ignore")
 
     app_name: str = "Rheonic API"
     api_prefix: str = "/api"

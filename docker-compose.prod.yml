@@ -9,8 +9,6 @@ x-default-logging: &default-logging
 services:
   postgres:
     image: postgres:16-alpine
-    env_file:
-      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -29,8 +27,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    env_file:
-      - .env
     command:
       [
         "sh",
@@ -58,8 +54,6 @@ services:
       context: ./backend
       args:
         INSTALL_DEV: "false"
-    env_file:
-      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
@@ -87,8 +81,6 @@ services:
       context: ./backend
       args:
         INSTALL_DEV: "false"
-    env_file:
-      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
@@ -122,8 +114,6 @@ services:
       context: ./backend
       args:
         INSTALL_DEV: "false"
-    env_file:
-      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
@@ -160,8 +150,6 @@ services:
       context: ./backend
       args:
         INSTALL_DEV: "false"
-    env_file:
-      - .env
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
