@@ -7,6 +7,7 @@ from typing import Callable, Literal
 
 from app.application.interfaces.transport_outbox_repository import TransportOutboxRepository
 from app.config import app_config
+from app.logger import generate_span_id, generate_trace_id, get_trace_id
 
 
 class TransportService:
@@ -29,6 +30,8 @@ class TransportService:
         event_type: str,
         payload: dict,
         dedupe_key: str,
+        trace_id: str | None = None,
+        span_id: str | None = None,
         destination: str | None = None,
         subject: str | None = None,
         template: str | None = None,
@@ -61,7 +64,12 @@ class TransportService:
             now=now,
         )
         if created:
-            self._enqueue_job(outbox.id)
+            resolved_trace_id = (trace_id or get_trace_id() or generate_trace_id()).strip()
+            resolved_span_id = (span_id or generate_span_id()).strip()
+            try:
+                self._enqueue_job(outbox.id, trace_id=resolved_trace_id, span_id=resolved_span_id)
+            except TypeError:
+                self._enqueue_job(outbox.id)
         return outbox.id
 
 

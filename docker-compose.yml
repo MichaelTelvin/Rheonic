@@ -26,6 +26,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -40,6 +41,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
 
   backend:
     build:
@@ -62,6 +64,7 @@ services:
       - ./backend:/app
     command: >
       sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    restart: unless-stopped
 
   worker:
     build:
@@ -82,6 +85,7 @@ services:
       - ./backend:/app
     command: >
       sh -c "rq worker --url \"$$REDIS_URL\" \"$${RQ_QUEUE_NAME:-rheonic}\""
+    restart: unless-stopped
 
   scheduler:
     build:
@@ -105,6 +109,7 @@ services:
     command: >
       sh -c "python -m app.workers.scheduler_bootstrap
       && python -m app.workers.scheduler"
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
@@ -120,6 +125,7 @@ services:
       sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     depends_on:
       - backend
+    restart: unless-stopped
 
   db_init:
     build:

@@ -43,6 +43,7 @@ class AppConfig:
     scheduler_default_result_ttl_seconds: int = 3600
     scheduler_default_failure_ttl_seconds: int = 86400
     purge_interval_seconds: int = 24 * 60 * 60
+    db_slow_query_threshold_ms: float = 250.0
     name_max_length: int = 80
     email_max_length: int = 320
     name_validation_pattern: str = r"^[A-Za-z0-9 _.-]+$"

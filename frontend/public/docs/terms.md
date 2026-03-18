@@ -1,6 +1,7 @@
 # Terms of Use
 
 Last updated: March 8, 2026.
+Rheonic is operated by Michael Telvin, an individual entrepreneur registered in Georgia.
 
 ## Beta service
 

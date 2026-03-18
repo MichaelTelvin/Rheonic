@@ -8,6 +8,7 @@ import { Sidebar } from "./components/Sidebar";
 import { AppToastHost } from "./components/AppToastHost";
 import { AuthContext } from "./context/AuthContext";
 import { ProjectProvider } from "./context/ProjectContext";
+import { emitFrontendLog } from "./lib/logger";
 import { Architecture } from "./pages/Architecture";
 import { Alerts } from "./pages/Alerts";
 import { Dashboard } from "./pages/Dashboard";
@@ -140,7 +141,12 @@ export function App(): JSX.Element {
           return;
         }
         if (!(error instanceof ApiError) || error.status !== 401) {
-          console.error("Failed to restore browser session", error);
+          emitFrontendLog({
+            level: "error",
+            event: "http_response",
+            message: "Failed to restore browser session",
+            metadata: { error },
+          });
         }
         setUser(null);
       } finally {
@@ -160,7 +166,12 @@ export function App(): JSX.Element {
     try {
       await logout();
     } catch (error) {
-      console.error("Logout request failed", error);
+      emitFrontendLog({
+        level: "error",
+        event: "http_response",
+        message: "Logout request failed",
+        metadata: { error },
+      });
     } finally {
       clearSession();
     }

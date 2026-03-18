@@ -1,6 +1,7 @@
 import { sdkNodeConfig } from "./config.js";
 import { randomUUID } from "node:crypto";
 import { requestJson } from "./httpTransport.js";
+import { bindTraceContext, generateSpanId, generateTraceId, getTraceId } from "./logger.js";
 
 export type ProtectDecision = "allow" | "warn" | "block";
 export type ProtectFailMode = "open" | "closed";
@@ -96,18 +97,22 @@ export class ProtectEngine {
     timeout.unref?.();
     const startedAt = Date.now();
     const requestId = randomUUID();
+    const traceId = generateTraceId();
+    const spanId = generateSpanId();
 
     try {
-      const response = await requestJson(`${this.baseUrl}/api/v1/protect/decision`, {
+      const response = await bindTraceContext(traceId, spanId, async () => await requestJson(`${this.baseUrl}/api/v1/protect/decision`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Project-Ingest-Key": this.ingestKey,
+          "X-Trace-ID": getTraceId(),
+          "X-Span-ID": spanId,
           "X-Rheonic-Protect-Request-Id": requestId,
         },
         body: JSON.stringify(context),
         signal: controller.signal,
-      });
+      }));
 
       clearTimeout(timeout);
       if (!response.ok) {
@@ -185,6 +190,7 @@ export class ProtectEngine {
         method: "GET",
         headers: {
           "X-Project-Ingest-Key": this.ingestKey,
+          "X-Trace-ID": generateTraceId(),
         },
       });
       if (!response.ok) {
@@ -214,6 +220,7 @@ export class ProtectEngine {
         headers: {
           "Content-Type": "application/json",
           "X-Project-Ingest-Key": this.ingestKey,
+          "X-Trace-ID": generateTraceId(),
           "X-Rheonic-Protect-Request-Id": requestId,
         },
         body: JSON.stringify({ environment: this.environment, provider, request_id: requestId }),
@@ -230,6 +237,7 @@ export class ProtectEngine {
         headers: {
           "Content-Type": "application/json",
           "X-Project-Ingest-Key": this.ingestKey,
+          "X-Trace-ID": generateTraceId(),
           "X-Rheonic-Protect-Request-Id": requestId,
         },
         body: JSON.stringify({ environment: this.environment, provider, request_id: requestId }),

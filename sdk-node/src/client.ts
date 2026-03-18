@@ -2,6 +2,7 @@ import type { EventPayload } from "./eventBuilder.js";
 import { sdkNodeConfig } from "./config.js";
 import { ProtectEngine, type ProtectContext, type ProtectEvaluation, type ProtectFailMode } from "./protectEngine.js";
 import { requestJson } from "./httpTransport.js";
+import { bindTraceContext, emitLog, generateSpanId, generateTraceId, getTraceId } from "./logger.js";
 import { prewarmTokenEstimator } from "./tokenEstimator.js";
 import { instrumentOpenAI as instrumentOpenAIProvider, type OpenAIInstrumentationOptions } from "./providers/openaiAdapter.js";
 import { instrumentAnthropic as instrumentAnthropicProvider, type AnthropicInstrumentationOptions } from "./providers/anthropicAdapter.js";
@@ -272,16 +273,20 @@ export class Client {
   private async sendEventOnce(event: EventPayload): Promise<{ ok: boolean; shouldRetry: boolean }> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
+    const traceId = generateTraceId();
+    const spanId = generateSpanId();
     try {
-      const response = await requestJson(`${this.baseUrl}/api/v1/events`, {
+      const response = await bindTraceContext(traceId, spanId, async () => await requestJson(`${this.baseUrl}/api/v1/events`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Project-Ingest-Key": this.ingestKey,
+          "X-Trace-ID": getTraceId(),
+          "X-Span-ID": spanId,
         },
         body: JSON.stringify(event),
         signal: controller.signal,
-      });
+      }));
       clearTimeout(timeout);
       if (response.ok) {
         return { ok: true, shouldRetry: false };
@@ -301,11 +306,13 @@ export class Client {
     if (!this.debug) {
       return;
     }
-    if (!meta || Object.keys(meta).length === 0) {
-      console.debug(`[rheonic] ${message}`);
-      return;
-    }
-    console.debug(`[rheonic] ${message} ${JSON.stringify(meta)}`);
+    emitLog({
+      level: "debug",
+      event: "sdk_debug",
+      message,
+      metadata: meta,
+      environment: this.environment,
+    });
   }
 }
 

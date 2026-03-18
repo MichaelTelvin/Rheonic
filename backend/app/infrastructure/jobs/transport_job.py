@@ -15,7 +15,16 @@ from app.infrastructure.db.repositories.transport_outbox_repository_impl import 
 from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
 from app.infrastructure.email.null_email_transport import EmailProviderNotConfiguredError, NullEmailTransport
 from app.infrastructure.email.resend_email_transport import ResendEmailTransport, ResendEmailTransportError
-from app.logger import get_logger
+from app.logger import (
+    bind_trace_context,
+    build_log_extra,
+    configure_logging,
+    generate_span_id,
+    generate_trace_id,
+    get_logger,
+    get_trace_id,
+    reset_trace_context,
+)
 from app.security.webhook_urls import ensure_webhook_url_is_safe
 from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 
@@ -31,37 +40,47 @@ _ALERT_EMAIL_EVENTS = {
 }
 
 
-def enqueue_outbox_delivery(outbox_id: str) -> None:
+def enqueue_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span_id: str | None = None) -> None:
     settings = Settings()
     queue = Queue(settings.rq_queue_name, connection=Redis.from_url(settings.redis_url))
-    queue.enqueue(process_outbox_delivery, kwargs={"outbox_id": outbox_id})
+    queue.enqueue(
+        process_outbox_delivery,
+        kwargs={
+            "outbox_id": outbox_id,
+            "trace_id": trace_id or generate_trace_id(),
+            "span_id": span_id or generate_span_id(),
+        },
+    )
 
 
-def process_outbox_delivery(outbox_id: str) -> None:
+def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span_id: str | None = None) -> None:
     settings = Settings()
+    configure_logging(service_name="worker", level=settings.log_level)
+    context_tokens = bind_trace_context(trace_id=trace_id, span_id=span_id)
     now = datetime.now(timezone.utc)
     repository = TransportOutboxRepositoryImpl(session_factory=DatabaseSessionFactory())
     outbox = repository.claim_for_send(outbox_id=outbox_id, now=now)
     if outbox is None:
-        logger.info("Outbox delivery skipped; row unavailable [outbox_id=%s]", outbox_id, extra={"outbox_id": outbox_id})
+        logger.info(
+            "Outbox delivery skipped; row unavailable",
+            extra=build_log_extra(event="outbox_skipped", metadata={"outbox_id": outbox_id}),
+        )
+        reset_trace_context(context_tokens)
         return
 
     logger.info(
-        "Outbox delivery claimed [outbox_id=%s kind=%s event_type=%s project_id=%s attempts=%s max_attempts=%s]",
-        outbox.id,
-        outbox.kind,
-        outbox.event_type,
-        outbox.project_id,
-        int(outbox.attempts),
-        int(outbox.max_attempts),
-        extra={
-            "outbox_id": outbox.id,
-            "kind": outbox.kind,
-            "event_type": outbox.event_type,
-            "project_id": outbox.project_id,
-            "attempts": int(outbox.attempts),
-            "max_attempts": int(outbox.max_attempts),
-        },
+        "Outbox delivery claimed",
+        extra=build_log_extra(
+            event="outbox_claimed",
+            metadata={
+                "outbox_id": outbox.id,
+                "kind": outbox.kind,
+                "event_type": outbox.event_type,
+                "project_id": outbox.project_id,
+                "attempts": int(outbox.attempts),
+                "max_attempts": int(outbox.max_attempts),
+            },
+        ),
     )
     try:
         if outbox.kind == "webhook":
@@ -72,17 +91,16 @@ def process_outbox_delivery(outbox_id: str) -> None:
             raise RuntimeError(f"unsupported transport kind: {outbox.kind}")
         repository.mark_delivered(outbox_id=outbox.id, now=datetime.now(timezone.utc))
         logger.info(
-            "Outbox delivery succeeded [outbox_id=%s kind=%s event_type=%s project_id=%s]",
-            outbox.id,
-            outbox.kind,
-            outbox.event_type,
-            outbox.project_id,
-            extra={
-                "outbox_id": outbox.id,
-                "kind": outbox.kind,
-                "event_type": outbox.event_type,
-                "project_id": outbox.project_id,
-            },
+            "Outbox delivery succeeded",
+            extra=build_log_extra(
+                event="outbox_delivered",
+                metadata={
+                    "outbox_id": outbox.id,
+                    "kind": outbox.kind,
+                    "event_type": outbox.event_type,
+                    "project_id": outbox.project_id,
+                },
+            ),
         )
     except Exception as exc:
         attempts = max(int(outbox.attempts), 1)
@@ -99,27 +117,22 @@ def process_outbox_delivery(outbox_id: str) -> None:
             dead=dead,
         )
         logger.warning(
-            "Outbox delivery failed [outbox_id=%s kind=%s event_type=%s project_id=%s attempts=%s max_attempts=%s error_code=%s dead=%s retry_delay_seconds=%s]",
-            outbox.id,
-            outbox.kind,
-            outbox.event_type,
-            outbox.project_id,
-            attempts,
-            int(outbox.max_attempts),
-            code,
-            dead,
-            delay_seconds,
-            extra={
-                "outbox_id": outbox.id,
-                "kind": outbox.kind,
-                "event_type": outbox.event_type,
-                "project_id": outbox.project_id,
-                "attempts": attempts,
-                "max_attempts": int(outbox.max_attempts),
-                "error_code": code,
-                "dead": dead,
-                "retry_delay_seconds": delay_seconds,
-            },
+            "Outbox delivery failed",
+            extra=build_log_extra(
+                event="webhook_failed" if outbox.kind == "webhook" else "email_failed",
+                metadata={
+                    "outbox_id": outbox.id,
+                    "kind": outbox.kind,
+                    "event_type": outbox.event_type,
+                    "project_id": outbox.project_id,
+                    "attempts": attempts,
+                    "max_attempts": int(outbox.max_attempts),
+                    "error_code": code,
+                    "error_message": message,
+                    "dead": dead,
+                    "retry_delay_seconds": delay_seconds,
+                },
+            ),
         )
         if outbox.kind == "webhook" and dead:
             try:
@@ -129,26 +142,37 @@ def process_outbox_delivery(outbox_id: str) -> None:
             except Exception:
                 logger.exception(
                     "Failed to enqueue webhook terminal failure email",
-                    extra={"outbox_id": outbox.id, "project_id": outbox.project_id, "event_type": outbox.event_type},
+                    extra=build_log_extra(
+                        event="error",
+                        metadata={
+                            "outbox_id": outbox.id,
+                            "project_id": outbox.project_id,
+                            "event_type": outbox.event_type,
+                        },
+                    ),
                 )
         if not dead and next_attempt_at is not None:
             queue = Queue(settings.rq_queue_name, connection=Redis.from_url(settings.redis_url))
-            queue.enqueue_in(timedelta(seconds=delay_seconds), process_outbox_delivery, kwargs={"outbox_id": outbox.id})
-            logger.info(
-                "Outbox delivery retry scheduled [outbox_id=%s kind=%s event_type=%s project_id=%s retry_delay_seconds=%s]",
-                outbox.id,
-                outbox.kind,
-                outbox.event_type,
-                outbox.project_id,
-                delay_seconds,
-                extra={
-                    "outbox_id": outbox.id,
-                    "kind": outbox.kind,
-                    "event_type": outbox.event_type,
-                    "project_id": outbox.project_id,
-                    "retry_delay_seconds": delay_seconds,
-                },
+            queue.enqueue_in(
+                timedelta(seconds=delay_seconds),
+                process_outbox_delivery,
+                kwargs={"outbox_id": outbox.id, "trace_id": trace_id or generate_trace_id(), "span_id": generate_span_id()},
             )
+            logger.info(
+                "Outbox delivery retry scheduled",
+                extra=build_log_extra(
+                    event="outbox_retry_scheduled",
+                    metadata={
+                        "outbox_id": outbox.id,
+                        "kind": outbox.kind,
+                        "event_type": outbox.event_type,
+                        "project_id": outbox.project_id,
+                        "retry_delay_seconds": delay_seconds,
+                    },
+                ),
+            )
+    finally:
+        reset_trace_context(context_tokens)
 
 
 def _deliver_webhook(*, outbox_id: str) -> None:
@@ -181,6 +205,8 @@ def _deliver_webhook(*, outbox_id: str) -> None:
     headers = {
         "Content-Type": "application/json",
         "X-RHEONIC-Event-Type": outbox.event_type,
+        "X-Trace-ID": get_trace_id() or generate_trace_id(),
+        "X-Span-ID": generate_span_id(),
     }
     ensure_webhook_url_is_safe(target_url, settings=settings)
     timeout = httpx.Timeout(
@@ -192,6 +218,19 @@ def _deliver_webhook(*, outbox_id: str) -> None:
     with httpx.Client(timeout=timeout) as client:
         response = client.post(target_url, content=body_bytes, headers=headers)
         response.raise_for_status()
+    logger.info(
+        "Webhook delivered",
+        extra=build_log_extra(
+            event="webhook_sent",
+            metadata={
+                "outbox_id": outbox.id,
+                "event_type": outbox.event_type,
+                "project_id": outbox.project_id,
+                "destination": target_url,
+                "status_code": getattr(response, "status_code", None),
+            },
+        ),
+    )
     _ = now
 
 
@@ -214,11 +253,11 @@ def _deliver_email(*, outbox_id: str, settings: Settings) -> None:
     )
     if destination is None:
         logger.info(
-            "Email delivery skipped [outbox_id=%s event_type=%s project_id=%s]",
-            outbox.id,
-            outbox.event_type,
-            outbox.project_id,
-            extra={"outbox_id": outbox.id, "event_type": outbox.event_type, "project_id": outbox.project_id},
+            "Email delivery skipped",
+            extra=build_log_extra(
+                event="email_skipped",
+                metadata={"outbox_id": outbox.id, "event_type": outbox.event_type, "project_id": outbox.project_id},
+            ),
         )
         return
     if not destination:

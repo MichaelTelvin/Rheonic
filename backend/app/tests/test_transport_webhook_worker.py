@@ -118,7 +118,7 @@ def test_process_outbox_delivery_webhook_success_marks_delivered(tmp_path, monke
     monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient())
     monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
 
-    transport_job.process_outbox_delivery(outbox_id)
+    transport_job.process_outbox_delivery(outbox_id, trace_id="trace-123", span_id="span-456")
 
     with session_factory.create_session() as session:
         row = session.query(TransportOutboxRecord).filter(TransportOutboxRecord.id == outbox_id).first()
@@ -142,10 +142,12 @@ def test_process_outbox_delivery_webhook_sends_in_observe_mode_when_webhook_is_e
     monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient(captured))
     monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
 
-    transport_job.process_outbox_delivery(outbox_id)
+    transport_job.process_outbox_delivery(outbox_id, trace_id="trace-observe", span_id="span-observe")
 
     assert len(captured) == 1
     assert captured[0]["url"] == "https://example.test/hook"
+    assert captured[0]["headers"]["X-Trace-ID"] == "trace-observe"
+    assert captured[0]["headers"]["X-Span-ID"]
 
     with session_factory.create_session() as session:
         row = session.query(TransportOutboxRecord).filter(TransportOutboxRecord.id == outbox_id).first()
@@ -167,7 +169,7 @@ def test_process_outbox_delivery_webhook_does_not_add_signature_header(tmp_path,
     monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient(captured))
     monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
 
-    transport_job.process_outbox_delivery(outbox_id)
+    transport_job.process_outbox_delivery(outbox_id, trace_id="trace-no-sig", span_id="span-no-sig")
 
     assert len(captured) == 1
     assert "X-RHEONIC-Signature" not in captured[0]["headers"]
@@ -202,7 +204,7 @@ def test_process_outbox_delivery_ignores_stored_project_payload_template_for_liv
     monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient(captured))
     monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
 
-    transport_job.process_outbox_delivery(outbox_id)
+    transport_job.process_outbox_delivery(outbox_id, trace_id="trace-template", span_id="span-template")
 
     assert len(captured) == 1
     rendered = json.loads(captured[0]["content"].decode("utf-8"))

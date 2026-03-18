@@ -12,7 +12,7 @@ from app.config import Settings
 from app.dependencies import get_ingest_event_service, get_ingest_key_service, get_redis_client, get_settings
 from app.domain.models.event import Event
 from app.infrastructure.redis.redis_client import RedisClient
-from app.logger import get_logger
+from app.logger import build_log_extra, get_logger
 from app.security.ingest_keys import hash_key, normalize_ingest_key
 
 logger = get_logger(__name__)
@@ -120,11 +120,14 @@ def ingest_event(
                 if not accepted:
                     logger.info(
                         "Duplicate ingest skipped by idempotency key",
-                        extra={"project_id": project_id},
+                        extra=build_log_extra(event="event_duplicate", metadata={"project_id": project_id}),
                     )
                     return {"status": "accepted"}
             except Exception:
-                logger.warning("Idempotency Redis unavailable; processing ingest in fail-open mode")
+                logger.warning(
+                    "Idempotency Redis unavailable; processing ingest in fail-open mode",
+                    extra=build_log_extra(event="cache_unavailable", metadata={"component": "idempotency"}),
+                )
 
         try:
             rate_limit_window_seconds = max(int(settings.rate_limit_window_seconds), 1)
@@ -142,7 +145,10 @@ def ingest_event(
         except HTTPException:
             raise
         except Exception:
-            logger.warning("Rate-limit Redis unavailable; processing ingest in fail-open mode")
+            logger.warning(
+                "Rate-limit Redis unavailable; processing ingest in fail-open mode",
+                extra=build_log_extra(event="cache_unavailable", metadata={"component": "rate_limit"}),
+            )
 
         # normalize token values from payload
         input_tokens, output_tokens, total_tokens = _resolve_tokens(payload)
@@ -169,10 +175,19 @@ def ingest_event(
 
         # execute ingest use-case
         service.ingest(event)
-        logger.info("Event accepted", extra={"project_id": project_id, "provider": payload.provider})
+        logger.info(
+            "Event accepted",
+            extra=build_log_extra(
+                event="event_ingested",
+                metadata={"project_id": project_id, "provider": payload.provider, "model": payload.model},
+            ),
+        )
         return {"status": "accepted"}
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Event ingest failed", extra={"project_id": ingest_key})
+        logger.exception(
+            "Event ingest failed",
+            extra=build_log_extra(event="error", metadata={"project_id": project_id if 'project_id' in locals() else None}),
+        )
         raise HTTPException(status_code=500, detail="Failed to ingest event")

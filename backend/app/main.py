@@ -1,7 +1,6 @@
 # FastAPI application entrypoint.
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,7 +13,7 @@ from app.config import Settings
 from app.dependencies import get_db_session_factory, get_redis_client
 from app.domain.models.project import Project
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
-from app.logger import configure_logging, get_logger
+from app.logger import bind_trace_context, build_log_extra, configure_logging, generate_span_id, generate_trace_id, get_logger, reset_trace_context
 
 logger = get_logger(__name__)
 
@@ -55,8 +54,8 @@ async def lifespan(_: FastAPI):
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     # Create and configure the FastAPI application instance.
-    configure_logging()
     _settings = settings or Settings()
+    configure_logging(service_name="backend", level=_settings.log_level)
     app = FastAPI(title=_settings.app_name, lifespan=lifespan)
     origins = _settings.cors_origin_list
     app.add_middleware(
@@ -64,28 +63,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=origins or (["http://localhost:5173"] if _settings.app_env_normalized == "dev" else []),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Accept", "Origin", "X-Project-Ingest-Key", "X-Idempotency-Key"],
+        allow_headers=[
+            "Content-Type",
+            "Accept",
+            "Origin",
+            "X-Project-Ingest-Key",
+            "X-Idempotency-Key",
+            "X-Trace-ID",
+            "X-Span-ID",
+            "X-Request-ID",
+        ],
     )
 
     @app.middleware("http")
     async def request_context_middleware(request: Request, call_next):
-        request_id = request.headers.get("X-Request-ID") or str(uuid4())
-        request.state.request_id = request_id
-        logger.info(
-            "HTTP request started",
-            extra={"request_id": request_id, "method": request.method, "path": request.url.path},
-        )
-        response = await call_next(request)
-        response.headers.setdefault("X-Request-ID", request_id)
-        logger.info(
-            "HTTP request completed",
-            extra={
-                "request_id": request_id,
-                "method": request.method,
-                "path": request.url.path,
-                "status_code": response.status_code,
-            },
-        )
+        trace_id = request.headers.get("X-Trace-ID") or request.headers.get("X-Request-ID") or generate_trace_id()
+        span_id = request.headers.get("X-Span-ID") or generate_span_id()
+        request.state.trace_id = trace_id
+        request.state.span_id = span_id
+        request.state.request_id = trace_id
+        context_tokens = bind_trace_context(trace_id=trace_id, span_id=span_id)
+        try:
+            response = await call_next(request)
+        except Exception:
+            reset_trace_context(context_tokens)
+            raise
+        response.headers.setdefault("X-Trace-ID", trace_id)
+        response.headers.setdefault("X-Span-ID", span_id)
+        response.headers.setdefault("X-Request-ID", trace_id)
+        reset_trace_context(context_tokens)
         return response
 
     @app.middleware("http")
@@ -107,12 +113,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Return standardized error payloads for known API failures.
         logger.warning(
             "HTTP exception raised",
-            extra={
-                "request_id": getattr(request.state, "request_id", None),
-                "method": request.method,
-                "path": request.url.path,
-                "status_code": exc.status_code,
-            },
+            extra=build_log_extra(
+                event="http_error",
+                metadata={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": exc.status_code,
+                },
+                trace_id=getattr(request.state, "trace_id", None),
+                span_id=getattr(request.state, "span_id", None),
+            ),
         )
         if isinstance(exc.detail, dict) and "error" in exc.detail:
             payload = exc.detail["error"]
@@ -127,11 +137,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Hide unexpected exception internals from clients.
         logger.exception(
             "Unhandled application exception",
-            extra={
-                "request_id": getattr(request.state, "request_id", None),
-                "method": request.method,
-                "path": request.url.path,
-            },
+            extra=build_log_extra(
+                event="error",
+                metadata={
+                    "method": request.method,
+                    "path": request.url.path,
+                },
+                trace_id=getattr(request.state, "trace_id", None),
+                span_id=getattr(request.state, "span_id", None),
+            ),
         )
         _ = exc
         return build_error_response(500, "internal_error", "Internal server error")

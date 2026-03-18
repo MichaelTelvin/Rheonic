@@ -41,8 +41,12 @@ def test_health_and_ready_ok(monkeypatch) -> None:
         ready = client.get("/ready")
     assert health.status_code == 200
     assert health.json()["status"] == "ok"
+    assert health.headers["X-Trace-ID"]
+    assert health.headers["X-Span-ID"]
     assert ready.status_code == 200
     assert ready.json()["status"] == "ready"
+    assert ready.headers["X-Trace-ID"]
+    assert ready.headers["X-Span-ID"]
 
 
 def test_ready_returns_503_when_dependency_fails(monkeypatch) -> None:
@@ -52,4 +56,3 @@ def test_ready_returns_503_when_dependency_fails(monkeypatch) -> None:
     with TestClient(main_module.app) as client:
         ready = client.get("/ready")
     assert ready.status_code == 503
-

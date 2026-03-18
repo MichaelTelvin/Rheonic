@@ -10,10 +10,12 @@ class FakeHttpClient:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    def post(self, url: str, json: dict[str, Any], headers: dict[str, str]) -> None:
+    def post(self, url: str, json: dict[str, Any], headers: dict[str, str], timeout: float | None = None) -> None:
+        _ = timeout
         self.calls.append({"url": url, "json": json, "headers": headers})
 
-    def get(self, url: str, headers: dict[str, str] | None = None) -> Any:
+    def get(self, url: str, headers: dict[str, str] | None = None, timeout: float | None = None) -> Any:
+        _ = timeout
         self.calls.append({"url": url, "headers": headers or {}, "method": "GET"})
         return type("Response", (), {"status_code": 200})()
 
@@ -27,13 +29,15 @@ class FlakyHttpClient:
     def __init__(self) -> None:
         self.calls = 0
 
-    def post(self, url: str, json: dict[str, Any], headers: dict[str, str]) -> Any:
+    def post(self, url: str, json: dict[str, Any], headers: dict[str, str], timeout: float | None = None) -> Any:
+        _ = timeout
         self.calls += 1
         if self.calls == 1:
             return type("Response", (), {"status_code": 503})()
         return type("Response", (), {"status_code": 200})()
 
-    def get(self, url: str, headers: dict[str, str] | None = None) -> Any:
+    def get(self, url: str, headers: dict[str, str] | None = None, timeout: float | None = None) -> Any:
+        _ = timeout
         return type("Response", (), {"status_code": 200})()
 
     def close(self) -> None:
@@ -58,6 +62,7 @@ def test_client_flush_sends_header_and_payload() -> None:
     post_calls = [call for call in fake_http.calls if "json" in call]
     assert len(post_calls) == 1
     assert post_calls[0]["headers"]["X-Project-Ingest-Key"] == "p1"
+    assert post_calls[0]["headers"]["X-Trace-ID"]
 
 
 def test_queue_overflow_drop_newest_policy() -> None:
@@ -120,4 +125,5 @@ def test_warm_connections_hits_health_endpoint() -> None:
     assert len(get_calls) == 2
     assert get_calls[0]["url"] == "http://localhost:8000/health"
     assert get_calls[1]["url"] == "http://localhost:8000/api/v1/protect/config"
-    assert get_calls[1]["headers"] == {"X-Project-Ingest-Key": "p1"}
+    assert get_calls[1]["headers"]["X-Project-Ingest-Key"] == "p1"
+    assert get_calls[1]["headers"]["X-Trace-ID"]

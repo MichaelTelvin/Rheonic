@@ -14,7 +14,15 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     httpx = None  # type: ignore[assignment]
 
-from rheonic.logger import configure_logging, get_logger
+from rheonic.logger import (
+    bind_trace_context,
+    build_log_extra,
+    configure_logging,
+    generate_trace_id,
+    get_logger,
+    get_trace_id,
+    reset_trace_context,
+)
 from rheonic.config import sdk_config
 from rheonic.protect_engine import ProtectEngine
 from rheonic.token_estimator import prewarm_token_estimator
@@ -135,7 +143,10 @@ class Client:
         try:
             env_debug = os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"}
             self._debug_enabled = debug or env_debug
-            configure_logging(level="DEBUG" if self._debug_enabled else None)
+            configure_logging(
+                level="DEBUG" if self._debug_enabled else None,
+                environment=environment,
+            )
 
             self.ingest_key = ingest_key
             resolved_base_url = base_url or os.getenv("RHEONIC_BASE_URL", sdk_config.default_base_url)
@@ -182,9 +193,9 @@ class Client:
             self._worker.start()
             self.warm_connections()
             atexit.register(self.close)
-            logger.info("SDK client initialized")
+            logger.info("SDK client initialized", extra=build_log_extra(event="sdk_client_initialized"))
         except Exception:
-            logger.exception("SDK client initialization failed")
+            logger.exception("SDK client initialization failed", extra=build_log_extra(event="error"))
             raise
 
     def capture_event(self, event: dict[str, Any]) -> None:
@@ -202,7 +213,7 @@ class Client:
                         return
                 self._queue.append(normalized)
         except Exception:
-            logger.exception("capture_event enqueue failed")
+            logger.exception("capture_event enqueue failed", extra=build_log_extra(event="error"))
             return
 
     def flush(self, timeout_s: float | None = None) -> None:
@@ -218,7 +229,7 @@ class Client:
                     event = self._queue.popleft()
                 self._send_event(event)
         except Exception:
-            logger.exception("flush failed")
+            logger.exception("flush failed", extra=build_log_extra(event="error"))
             return
 
     def close(self) -> None:
@@ -233,7 +244,7 @@ class Client:
             self.flush(timeout_s=sdk_config.default_flush_timeout_s)
             self._http_client.close()
         except Exception:
-            logger.exception("client close failed")
+            logger.exception("client close failed", extra=build_log_extra(event="error"))
             return
 
     def stats(self) -> dict[str, int]:
@@ -252,25 +263,30 @@ class Client:
             return
         if extra:
             rendered = " ".join(f"{key}={extra[key]}" for key in sorted(extra))
-            logger.debug("%s [%s]", message, rendered, extra=extra)
+            logger.debug(
+                message,
+                extra=build_log_extra(event="sdk_debug", metadata={**extra, "rendered": rendered}),
+            )
             return
-        logger.debug(message)
+        logger.debug(message, extra=build_log_extra(event="sdk_debug"))
 
     def preflight_protect_decision(self, context: dict[str, object]) -> dict[str, object]:
         # Evaluate protect decision for provider call preflight.
         try:
             return self._protect_engine.evaluate(context)
         except Exception:
-            logger.exception("protect preflight failed unexpectedly")
+            logger.exception("protect preflight failed unexpectedly", extra=build_log_extra(event="error"))
             if self.protect_fail_mode == "closed":
                 return {"decision": "block", "reason": "decision_unavailable"}
             return {"decision": "allow", "reason": "decision_unavailable"}
 
     def warm_connections(self) -> None:
         # Best-effort warmup of the shared backend HTTP connection and protect runtime config.
+        context_tokens = bind_trace_context(trace_id=generate_trace_id())
         try:
             response = self._http_client.get(
                 f"{self.base_url}/health",
+                headers={"X-Trace-ID": get_trace_id()},
                 timeout=min(self.request_timeout_s, 1.0),
             )
             status_code = int(getattr(response, "status_code", 0))
@@ -282,6 +298,7 @@ class Client:
             self.debug_log("SDK protect config bootstrap completed")
         except Exception:
             self.debug_log("SDK protect config bootstrap failed")
+        reset_trace_context(context_tokens)
 
     def instrument_openai(
         self,
@@ -365,6 +382,7 @@ class Client:
 
     def _send_event_once(self, event: dict[str, Any]) -> tuple[bool, bool]:
         # Send one event and classify retry behavior.
+        context_tokens = bind_trace_context(trace_id=generate_trace_id())
         try:
             response = self._http_client.post(
                 f"{self.base_url}/api/v1/events",
@@ -372,6 +390,7 @@ class Client:
                 headers={
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self.ingest_key,
+                    "X-Trace-ID": get_trace_id(),
                 },
             )
             status_code = int(getattr(response, "status_code", 0))
@@ -382,8 +401,10 @@ class Client:
             return False, False
         except Exception:
             if self._debug_enabled:
-                logger.debug("SDK send failed; retrying once", exc_info=True)
+                logger.debug("SDK send failed; retrying once", exc_info=True, extra=build_log_extra(event="http_retry"))
             return False, True
+        finally:
+            reset_trace_context(context_tokens)
 
 
 RheonicClient = Client

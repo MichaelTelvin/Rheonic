@@ -22,7 +22,7 @@ from app.domain.detectors.contracts import Signal
 from app.domain.models.user import User
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.config import app_config
-from app.logger import get_logger
+from app.logger import build_log_extra, get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -140,13 +140,18 @@ def protect_decision(
             )
         logger.info(
             "Protect decision evaluated",
-            extra={
-                "project_id": project_id,
-                "provider": payload.provider,
-                "decision": decision.decision,
-                "reason": decision.reason,
-                "latency_ms": latency_ms,
-            },
+            extra=build_log_extra(
+                event="protect_action",
+                metadata={
+                    "project_id": project_id,
+                    "provider": payload.provider,
+                    "model": payload.model,
+                    "environment": payload.environment,
+                    "decision": decision.decision,
+                    "reason": decision.reason,
+                    "latency_ms": latency_ms,
+                },
+            ),
         )
         return ProtectDecisionOut(
             decision=decision.decision,
@@ -162,7 +167,7 @@ def protect_decision(
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Protect decision endpoint failed")
+        logger.exception("Protect decision endpoint failed", extra=build_log_extra(event="error"))
         raise HTTPException(status_code=500, detail="Failed to evaluate protect decision")
 
 
@@ -205,7 +210,7 @@ def protect_decision_timeout(
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Protect decision-timeout endpoint failed")
+        logger.exception("Protect decision-timeout endpoint failed", extra=build_log_extra(event="error"))
         raise HTTPException(status_code=500, detail="Failed to record decision timeout")
 
 
@@ -248,7 +253,7 @@ def protect_decision_unavailable(
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Protect decision-unavailable endpoint failed")
+        logger.exception("Protect decision-unavailable endpoint failed", extra=build_log_extra(event="error"))
         raise HTTPException(status_code=500, detail="Failed to record decision unavailable fallback")
 
 

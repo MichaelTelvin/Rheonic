@@ -6,7 +6,7 @@ from typing import Any
 from uuid import uuid4
 
 from rheonic.config import sdk_config
-from rheonic.logger import get_logger
+from rheonic.logger import bind_trace_context, build_log_extra, generate_trace_id, get_logger, get_trace_id, reset_trace_context
 
 try:
     import httpx
@@ -74,6 +74,7 @@ class ProtectEngine:
         timeout_s = max(self._decision_timeout_ms, 1) / 1000.0
         started_at = time.perf_counter()
         request_id = uuid4().hex
+        context_tokens = bind_trace_context(trace_id=generate_trace_id())
         try:
             response = self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision",
@@ -81,6 +82,7 @@ class ProtectEngine:
                 headers={
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
+                    "X-Trace-ID": get_trace_id(),
                     "X-Rheonic-Protect-Request-Id": request_id,
                 },
                 timeout_s=timeout_s,
@@ -165,13 +167,15 @@ class ProtectEngine:
                     request_id=request_id,
                 )
             return self._fallback_decision()
+        finally:
+            reset_trace_context(context_tokens)
 
     def bootstrap(self) -> None:
         # Load runtime protect config so timeout fallback matches server-side project mode.
         try:
             response = self._get_with_timeout(
                 f"{self._base_url}/api/v1/protect/config",
-                headers={"X-Project-Ingest-Key": self._ingest_key},
+                headers={"X-Project-Ingest-Key": self._ingest_key, "X-Trace-ID": generate_trace_id()},
                 timeout_s=max(self._request_timeout_s, 0.1),
             )
             status_code = int(getattr(response, "status_code", 0))
@@ -250,45 +254,37 @@ class ProtectEngine:
 
     def _report_decision_timeout_fire_and_forget(self, provider: str | None, request_id: str) -> None:
         # Report decision timeout without blocking caller flow.
-        def _send() -> None:
-            try:
-                self._post_with_timeout(
-                    f"{self._base_url}/api/v1/protect/decision-timeout",
-                    json={"environment": self._environment, "provider": provider, "request_id": request_id},
-                    headers={
-                        "Content-Type": "application/json",
-                        "X-Project-Ingest-Key": self._ingest_key,
-                        "X-Rheonic-Protect-Request-Id": request_id,
-                    },
-                    timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),
-                )
-            except Exception:
-                return
-
-        import threading
-
-        threading.Thread(target=_send, daemon=True).start()
+        try:
+            self._post_with_timeout(
+                f"{self._base_url}/api/v1/protect/decision-timeout",
+                json={"environment": self._environment, "provider": provider, "request_id": request_id},
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Project-Ingest-Key": self._ingest_key,
+                    "X-Trace-ID": get_trace_id() or generate_trace_id(),
+                    "X-Rheonic-Protect-Request-Id": request_id,
+                },
+                timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),
+            )
+        except Exception:
+            return
 
     def _report_decision_unavailable_fire_and_forget(self, provider: str | None, request_id: str) -> None:
         # Report non-timeout preflight fallback without blocking caller flow.
-        def _send() -> None:
-            try:
-                self._post_with_timeout(
-                    f"{self._base_url}/api/v1/protect/decision-unavailable",
-                    json={"environment": self._environment, "provider": provider, "request_id": request_id},
-                    headers={
-                        "Content-Type": "application/json",
-                        "X-Project-Ingest-Key": self._ingest_key,
-                        "X-Rheonic-Protect-Request-Id": request_id,
-                    },
-                    timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),
-                )
-            except Exception:
-                return
-
-        import threading
-
-        threading.Thread(target=_send, daemon=True).start()
+        try:
+            self._post_with_timeout(
+                f"{self._base_url}/api/v1/protect/decision-unavailable",
+                json={"environment": self._environment, "provider": provider, "request_id": request_id},
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Project-Ingest-Key": self._ingest_key,
+                    "X-Trace-ID": get_trace_id() or generate_trace_id(),
+                    "X-Rheonic-Protect-Request-Id": request_id,
+                },
+                timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),
+            )
+        except Exception:
+            return
 
     def _debug(self, message: str, **extra: object) -> None:
         if callable(self._debug_logger):

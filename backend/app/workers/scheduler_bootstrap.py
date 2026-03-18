@@ -9,7 +9,7 @@ from redis import Redis
 from rq_scheduler import Scheduler
 
 from app.config import Settings, app_config
-from app.logger import get_logger
+from app.logger import build_log_extra, configure_logging, generate_trace_id, get_logger
 
 logger = get_logger(__name__)
 
@@ -63,6 +63,7 @@ def ensure_recurring_jobs(
 def main() -> None:
     """Connect to Redis and bootstrap recurring scheduler jobs."""
     settings = Settings()
+    configure_logging(service_name="scheduler", level=settings.log_level)
     redis_conn = Redis.from_url(settings.redis_url)
     scheduler = Scheduler(queue_name=settings.rq_queue_name, connection=redis_conn)
 
@@ -79,7 +80,14 @@ def main() -> None:
         ),
     ]
     scheduled = ensure_recurring_jobs(scheduler=scheduler, jobs=jobs)
-    logger.info("Scheduler bootstrap completed", extra={"scheduled": scheduled, "total_jobs": len(jobs)})
+    logger.info(
+        "Scheduler bootstrap completed",
+        extra=build_log_extra(
+            event="scheduler_bootstrap_completed",
+            metadata={"scheduled": scheduled, "total_jobs": len(jobs)},
+            trace_id=generate_trace_id(),
+        ),
+    )
 
 
 if __name__ == "__main__":
