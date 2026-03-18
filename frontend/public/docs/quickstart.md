@@ -78,6 +78,32 @@ client.capture_event(
 
 Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all capture/instrumentation calls. Rheonic prewarms tokenizer state and the backend connection when the client starts, so reusing that client avoids repeated protect cold-start latency.
 
+## 4.1 SDK Logging
+The SDK emits structured JSON logs to stdout. You do not need to configure file logging.
+
+Typical SDK log object:
+
+```json
+{
+  "timestamp": "2026-03-18T09:20:15.145102+00:00",
+  "level": "info",
+  "service": "sdk-python",
+  "env": "staging",
+  "trace_id": "f4ac8b6b-6f8d-4f4c-b54f-3c2c2f76a27b",
+  "span_id": "9f12db3a1d204f8f",
+  "event": "sdk_client_initialized",
+  "message": "SDK client initialized",
+  "metadata": {}
+}
+```
+
+What to expect:
+- backend requests automatically carry `X-Trace-ID`,
+- SDK logs share that `trace_id` so you can correlate app, backend, worker, and webhook activity,
+- sensitive fields such as tokens or API keys are redacted and should not appear in logs.
+
+If you already collect stdout logs into Grafana Loki or another aggregator, the SDK logs are ready to ingest as-is.
+
 ## 5. Verify in the Dashboard
 After your first event:
 - `Dashboard` should show non-zero request and token activity.

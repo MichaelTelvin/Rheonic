@@ -165,11 +165,6 @@ class TransportOutboxRecord(Base):
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class PricingRecord:
-    # Persistence record placeholder for pricing.
-    pass
-
-
 class UserRecord(Base):
     # Persistence record for users.
     __tablename__ = "users"

@@ -20,6 +20,31 @@ Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` 
 
 Create one long-lived SDK client at app startup and reuse it for all provider calls. The SDK prewarms tokenizer state and the backend connection on client initialization, so reusing a single client avoids paying protect cold-start cost on every request.
 
+## Logging
+
+The SDK emits structured JSON logs to stdout. You do not need to configure file logging.
+
+Example log:
+
+```json
+{
+  "timestamp": "2026-03-18T09:20:15.145102+00:00",
+  "level": "info",
+  "service": "sdk-node",
+  "env": "staging",
+  "trace_id": "f4ac8b6b-6f8d-4f4c-b54f-3c2c2f76a27b",
+  "span_id": "9f12db3a1d204f8f",
+  "event": "sdk_client_initialized",
+  "message": "SDK client initialized",
+  "metadata": {}
+}
+```
+
+Notes:
+- backend requests automatically include `X-Trace-ID`,
+- SDK logs share that `trace_id` so you can correlate SDK, backend, worker, and webhook activity,
+- sensitive fields such as API keys and tokens are redacted.
+
 ## Integration Path 1: Manual Capture (generic)
 
 ```ts

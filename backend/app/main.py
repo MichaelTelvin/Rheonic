@@ -1,6 +1,5 @@
 # FastAPI application entrypoint.
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,34 +10,9 @@ from app.api.error_responses import build_error_response, default_code_for_statu
 from app.api.routers import api_router
 from app.config import Settings
 from app.dependencies import get_db_session_factory, get_redis_client
-from app.domain.models.project import Project
-from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.logger import bind_trace_context, build_log_extra, configure_logging, generate_span_id, generate_trace_id, get_logger, reset_trace_context
 
 logger = get_logger(__name__)
-
-
-def _seed_demo_project() -> None:
-    # Seed a local demo project when the projects table is empty.
-    try:
-        repository = ProjectRepositoryImpl(session_factory=get_db_session_factory())
-        projects = repository.list_projects()
-        if projects:
-            logger.debug("Project seed skipped because projects already exist", extra={"count": len(projects)})
-            return
-
-        repository.create_project(
-            Project(
-                id="p1",
-                name="Demo Project",
-                user_id=None,
-                created_at=datetime.now(timezone.utc),
-            )
-        )
-        logger.info("Demo project seeded", extra={"project_id": "p1"})
-    except Exception:
-        logger.exception("Failed seeding demo project")
-        raise
 
 
 @asynccontextmanager

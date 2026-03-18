@@ -87,7 +87,12 @@ class IngestEventService:
             tok_cap = project.protect_max_tok_per_min if project is not None else None
             protect_enabled = bool(project.protect_enabled) if project is not None else False
             mode = "protect" if protect_enabled else "observe"
-            recent_events = self._event_repository.list_recent(project_id=event.project_id, limit=200,  provider=provider)
+            recent_limit = max(int(self._retry_storm_count), int(self._loop_count)) + 8
+            recent_events = self._event_repository.list_recent(
+                project_id=event.project_id,
+                limit=recent_limit,
+                provider=provider,
+            )
             ctx = DetectionContext(
                 project_id=event.project_id,
                 provider=provider,

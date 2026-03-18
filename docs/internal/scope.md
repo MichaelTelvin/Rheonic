@@ -1,6 +1,6 @@
 Rheonic — Scope (Current State)
 
-Status: MVP Core is complete. Core platform, protect mode, scheduler jobs, webhook alerts, provider scoping, and docs viewer are implemented.
+Status: MVP Core is complete. Core platform, protect mode, scheduled operations, webhook alerts, provider scoping, and docs viewer are implemented.
 
 ========================================
 Implemented
