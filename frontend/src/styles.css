@@ -1887,6 +1887,12 @@ select {
   overflow: hidden;
 }
 
+.setup-banner-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+  min-height: 66px;
+}
+
 .setup-banner::before {
   content: "";
   position: absolute;

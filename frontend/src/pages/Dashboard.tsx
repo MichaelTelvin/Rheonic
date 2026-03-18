@@ -159,6 +159,7 @@ export function Dashboard(): JSX.Element {
   }, [hasEvents, hasIngestKey, loadingProjects, projectId, projects.length, setupStatusResolved]);
   const isSetupComplete = setupStage === "complete";
   const showSetupBanner = !loadingProjects && setupStage !== "complete" && !setupBannerDismissed;
+  const showSetupBannerPlaceholder = !loadingProjects && Boolean(projectId) && setupStage === "checking" && !setupBannerDismissed;
   const webhookIssueToken = webhookIssue ? `${webhookIssue.lastAt ?? "none"}:${webhookIssue.count}` : null;
   const showWebhookIssueBanner = Boolean(projectId && webhookIssue && webhookIssueToken !== webhookIssueDismissedToken);
 
@@ -297,7 +298,7 @@ export function Dashboard(): JSX.Element {
     if (setupStage === "no_project") {
       return {
         title: "Setup required",
-        text: "Create your first project to generate an ingest key and start receiving telemetry.",
+        text: "Create your first project to generate an ingest key and follow next steps in Quickstart.",
         primaryLabel: "Go to Projects",
         primaryTo: "/app/projects",
         secondaryLabel: "Open Quickstart",
@@ -688,6 +689,7 @@ export function Dashboard(): JSX.Element {
             </div>
           </section>
         ) : null}
+        {!showSetupBanner && showSetupBannerPlaceholder ? <section className="setup-banner setup-banner-placeholder" aria-hidden="true" /> : null}
 
         {showWebhookIssueBanner ? (
           <Card className="dashboard-alert-card">
