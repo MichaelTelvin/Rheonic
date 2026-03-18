@@ -161,7 +161,7 @@ describe("App", () => {
       </TestRouter>,
     );
 
-    expect(await screen.findByText("Dashboard Page")).toBeDefined();
+    expect(await screen.findByRole("button", { name: "Mock Login" })).toBeDefined();
   });
 
   it("renders not found page for unknown non-app routes", async () => {

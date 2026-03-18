@@ -159,7 +159,7 @@ export function Dashboard(): JSX.Element {
   }, [hasEvents, hasIngestKey, loadingProjects, projectId, projects.length, setupStatusResolved]);
   const isSetupComplete = setupStage === "complete";
   const showSetupBanner = !loadingProjects && setupStage !== "complete" && !setupBannerDismissed;
-  const showSetupBannerPlaceholder = !loadingProjects && Boolean(projectId) && setupStage === "checking" && !setupBannerDismissed;
+  const showSetupBannerPlaceholder = (loadingProjects || (Boolean(projectId) && setupStage === "checking")) && !setupBannerDismissed;
   const webhookIssueToken = webhookIssue ? `${webhookIssue.lastAt ?? "none"}:${webhookIssue.count}` : null;
   const showWebhookIssueBanner = Boolean(projectId && webhookIssue && webhookIssueToken !== webhookIssueDismissedToken);
 

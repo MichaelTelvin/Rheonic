@@ -25,7 +25,7 @@ export function Login({ onAuthSuccess }: LoginProps): JSX.Element {
     const submitInputVersion = inputVersionRef.current;
     const normalizedEmail = email.trim().toLowerCase();
     const nextEmailError = normalizedEmail ? "" : "Email is required.";
-    const nextPasswordError = password ? "" : "Password is required.";
+    const nextPasswordError = password ? validatePassword(password, isRegister) : "Password is required.";
     setEmailError(nextEmailError);
     setPasswordError(nextPasswordError);
     setFormError("");
@@ -95,7 +95,7 @@ export function Login({ onAuthSuccess }: LoginProps): JSX.Element {
               markInputChanged();
               setPasswordError("");
             }}
-            placeholder="At least 8 characters"
+            placeholder={isRegister ? "12+ chars, upper/lower, number, symbol" : "Your password"}
           />
           <p className="input-error-slot">{passwordError || "\u00A0"}</p>
           <p className="input-error-slot">{formError || "\u00A0"}</p>
@@ -122,4 +122,26 @@ export function Login({ onAuthSuccess }: LoginProps): JSX.Element {
       </section>
     </main>
   );
+}
+
+function validatePassword(password: string, isRegister: boolean): string {
+  if (!isRegister) {
+    return "";
+  }
+  if (password.length < 12) {
+    return "Password must be at least 12 characters.";
+  }
+  if (!/[a-z]/.test(password)) {
+    return "Password must include a lowercase letter.";
+  }
+  if (!/[A-Z]/.test(password)) {
+    return "Password must include an uppercase letter.";
+  }
+  if (!/[0-9]/.test(password)) {
+    return "Password must include a number.";
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return "Password must include a symbol.";
+  }
+  return "";
 }

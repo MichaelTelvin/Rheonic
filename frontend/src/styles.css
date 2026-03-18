@@ -1890,7 +1890,7 @@ select {
 .setup-banner-placeholder {
   visibility: hidden;
   pointer-events: none;
-  min-height: 66px;
+  min-height: 88px;
 }
 
 .setup-banner::before {

@@ -7,6 +7,7 @@ import { Login } from "./Login";
 
 const mockLogin = vi.fn();
 const mockRegister = vi.fn();
+const STRONG_PASSWORD = "Password123!";
 
 vi.mock("../api/client", async (importOriginal) => {
   const original = await importOriginal<typeof import("../api/client")>();
@@ -52,11 +53,11 @@ describe("Login", () => {
 
     render(<Login onAuthSuccess={onAuthSuccess} />);
     await user.type(screen.getByLabelText("Email"), "  TEST@Example.com ");
-    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.type(screen.getByLabelText("Password"), STRONG_PASSWORD);
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith("test@example.com", "password123");
+      expect(mockLogin).toHaveBeenCalledWith("test@example.com", STRONG_PASSWORD);
       expect(onAuthSuccess).toHaveBeenCalledWith(expect.objectContaining({ email: "test@example.com" }));
     });
   });
@@ -71,12 +72,12 @@ describe("Login", () => {
     render(<Login onAuthSuccess={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
     await user.type(screen.getByLabelText("Email"), "new@example.com");
-    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.type(screen.getByLabelText("Password"), STRONG_PASSWORD);
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
-      expect(mockRegister).toHaveBeenCalledWith("new@example.com", "password123");
-      expect(mockLogin).toHaveBeenCalledWith("new@example.com", "password123");
+      expect(mockRegister).toHaveBeenCalledWith("new@example.com", STRONG_PASSWORD);
+      expect(mockLogin).toHaveBeenCalledWith("new@example.com", STRONG_PASSWORD);
     });
   });
 
@@ -98,7 +99,7 @@ describe("Login", () => {
     });
     render(<Login onAuthSuccess={vi.fn()} />);
     await user.type(screen.getByLabelText("Email"), "enter@example.com");
-    await user.type(screen.getByLabelText("Password"), "password123{enter}");
+    await user.type(screen.getByLabelText("Password"), `${STRONG_PASSWORD}{enter}`);
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalled();
     });

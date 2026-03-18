@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: March 8, 2026.
+Last updated: March 18, 2026.
 Rheonic is operated by Michael Telvin, an individual entrepreneur registered in Georgia.
 
 ## What we collect

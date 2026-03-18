@@ -1,6 +1,6 @@
 # Data Processing Addendum (DPA)
 
-Last updated: March 2026
+Last updated: March 18, 2026.
 This Data Processing Addendum is between the customer and Michael Telvin, an individual entrepreneur operating Rheonic.
 
 ## Roles

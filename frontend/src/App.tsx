@@ -131,7 +131,7 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
-    const publicRoutes = new Set(["/", "/quickstart", "/privacy", "/terms", "/dpa"]);
+    const publicRoutes = new Set(["/", "/quickstart", "/privacy", "/terms", "/dpa", "/login", "/signup"]);
 
     if (publicRoutes.has(location.pathname)) {
       setUser(null);

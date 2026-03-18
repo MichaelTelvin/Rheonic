@@ -31,8 +31,7 @@ class AuthService:
     def register(self, email: str, password: str) -> User:
         # Register a user account.
         normalized_email = sanitize_email(email)
-        if len(password) < 8:
-            raise HTTPException(status_code=400, detail="password must be at least 8 characters")
+        self._validate_password(password)
         if self._user_repository.get_by_email(normalized_email) is not None:
             raise HTTPException(status_code=409, detail="email already exists")
         user = User(
@@ -131,6 +130,18 @@ class AuthService:
             jti=current_jti,
             revoked_at=datetime.now(timezone.utc),
         )
+
+    def _validate_password(self, password: str) -> None:
+        if len(password) < 12:
+            raise HTTPException(status_code=400, detail="password must be at least 12 characters")
+        if not any(char.islower() for char in password):
+            raise HTTPException(status_code=400, detail="password must include a lowercase letter")
+        if not any(char.isupper() for char in password):
+            raise HTTPException(status_code=400, detail="password must include an uppercase letter")
+        if not any(char.isdigit() for char in password):
+            raise HTTPException(status_code=400, detail="password must include a number")
+        if not any(not char.isalnum() for char in password):
+            raise HTTPException(status_code=400, detail="password must include a symbol")
 
     def _build_refresh_session(self, *, user_id: str) -> RefreshSession:
         issued_at = datetime.now(timezone.utc)

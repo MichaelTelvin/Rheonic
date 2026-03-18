@@ -9,6 +9,8 @@ from app.dependencies import get_db_session_factory, get_redis_client, get_setti
 from app.infrastructure.db.models import Base, IncidentRecord, RefreshSessionRecord
 from app.main import app
 
+STRONG_PASSWORD = "Password123!"
+
 
 class _FakeRedisClient:
     def __init__(self) -> None:
@@ -54,12 +56,12 @@ def _register_and_login(client: TestClient, email: str, password: str) -> None:
 def test_register_and_login_happy_path_sets_auth_cookies(tmp_path) -> None:
     # Register/login should succeed, return user info, and set auth cookies.
     with _make_client(tmp_path) as client:
-        register_response = client.post("/api/v1/auth/register", json={"email": "User@Example.com", "password": "password123"})
+        register_response = client.post("/api/v1/auth/register", json={"email": "User@Example.com", "password": STRONG_PASSWORD})
         assert register_response.status_code == 200
         assert register_response.json()["email"] == "user@example.com"
         assert "password_hash" not in register_response.json()
 
-        login_response = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "password123"})
+        login_response = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": STRONG_PASSWORD})
         assert login_response.status_code == 200
         login_body = login_response.json()
         assert login_body["user"]["email"] == "user@example.com"
@@ -73,7 +75,7 @@ def test_register_and_login_happy_path_sets_auth_cookies(tmp_path) -> None:
 def test_refresh_issues_new_cookie_backed_session(tmp_path) -> None:
     # Refresh endpoint should exchange a valid refresh cookie for a new auth cookie pair.
     with _make_client(tmp_path) as client:
-        _register_and_login(client, "refresh@example.com", "password123")
+        _register_and_login(client, "refresh@example.com", STRONG_PASSWORD)
         settings = get_settings()
         original_refresh_cookie = client.cookies.get(settings.auth_refresh_cookie_name)
         assert original_refresh_cookie
@@ -114,7 +116,7 @@ def test_refresh_rejects_invalid_cookie(tmp_path) -> None:
 def test_me_and_logout_use_cookie_session(tmp_path) -> None:
     # Browser session endpoints should resolve the current user and clear cookies on logout.
     with _make_client(tmp_path) as client:
-        _register_and_login(client, "session@example.com", "password123")
+        _register_and_login(client, "session@example.com", STRONG_PASSWORD)
         settings = get_settings()
         refresh_cookie = client.cookies.get(settings.auth_refresh_cookie_name)
         assert refresh_cookie
@@ -143,7 +145,7 @@ def test_me_and_logout_use_cookie_session(tmp_path) -> None:
 
 def test_refresh_rotation_revokes_prior_refresh_session_server_side(tmp_path) -> None:
     with _make_client(tmp_path) as client:
-        _register_and_login(client, "rotate@example.com", "password123")
+        _register_and_login(client, "rotate@example.com", STRONG_PASSWORD)
         session_factory = get_db_session_factory()
 
         with session_factory.create_session() as session:
@@ -164,7 +166,7 @@ def test_refresh_rotation_revokes_prior_refresh_session_server_side(tmp_path) ->
 
 def test_logout_revokes_current_refresh_session_server_side(tmp_path) -> None:
     with _make_client(tmp_path) as client:
-        _register_and_login(client, "logout@example.com", "password123")
+        _register_and_login(client, "logout@example.com", STRONG_PASSWORD)
         settings = get_settings()
         session_factory = get_db_session_factory()
 
@@ -196,7 +198,7 @@ def test_protected_routes_require_cookie(tmp_path) -> None:
 def test_protected_routes_with_cookie_return_200(tmp_path) -> None:
     # Protected routes should work with valid auth cookies.
     with _make_client(tmp_path) as client:
-        _register_and_login(client, "owner@example.com", "password123")
+        _register_and_login(client, "owner@example.com", STRONG_PASSWORD)
         response = client.get("/api/v1/projects")
         assert response.status_code == 200
 
@@ -204,12 +206,12 @@ def test_protected_routes_with_cookie_return_200(tmp_path) -> None:
 def test_tenant_scoping_blocks_cross_user_project_access(tmp_path) -> None:
     # User B should not access User A project keys from a separate cookie session.
     with _make_client(tmp_path) as owner_client, _make_client(tmp_path) as other_client:
-        _register_and_login(owner_client, "owner@example.com", "password123")
+        _register_and_login(owner_client, "owner@example.com", STRONG_PASSWORD)
         create_project = owner_client.post("/api/v1/projects", json={"name": "Owner Project"})
         assert create_project.status_code == 200
         project_id = create_project.json()["id"]
 
-        _register_and_login(other_client, "other@example.com", "password123")
+        _register_and_login(other_client, "other@example.com", STRONG_PASSWORD)
         other_list = other_client.get(f"/api/v1/projects/{project_id}/keys")
         assert other_list.status_code == 404
 
@@ -217,7 +219,7 @@ def test_tenant_scoping_blocks_cross_user_project_access(tmp_path) -> None:
 def test_tenant_scoping_blocks_cross_user_key_revoke(tmp_path) -> None:
     # User B must not revoke User A key from a separate cookie session.
     with _make_client(tmp_path) as owner_client, _make_client(tmp_path) as other_client:
-        _register_and_login(owner_client, "owner_revoke@example.com", "password123")
+        _register_and_login(owner_client, "owner_revoke@example.com", STRONG_PASSWORD)
         create_project = owner_client.post("/api/v1/projects", json={"name": "Owner Revoke Project"})
         assert create_project.status_code == 200
         project_id = create_project.json()["id"]
@@ -225,7 +227,7 @@ def test_tenant_scoping_blocks_cross_user_key_revoke(tmp_path) -> None:
         assert create_key.status_code == 200
         key_id = create_key.json()["key_id"]
 
-        _register_and_login(other_client, "other_revoke@example.com", "password123")
+        _register_and_login(other_client, "other_revoke@example.com", STRONG_PASSWORD)
         revoke_response = other_client.post(f"/api/v1/keys/{key_id}/revoke")
         assert revoke_response.status_code == 404
 
@@ -233,7 +235,7 @@ def test_tenant_scoping_blocks_cross_user_key_revoke(tmp_path) -> None:
 def test_tenant_scoping_blocks_cross_user_incident_resolve(tmp_path) -> None:
     # User B must not resolve User A incident from a separate cookie session.
     with _make_client(tmp_path) as owner_client, _make_client(tmp_path) as other_client:
-        _register_and_login(owner_client, "owner_inc@example.com", "password123")
+        _register_and_login(owner_client, "owner_inc@example.com", STRONG_PASSWORD)
         create_project = owner_client.post("/api/v1/projects", json={"name": "Owner Incident Project"})
         assert create_project.status_code == 200
         project_id = create_project.json()["id"]
@@ -258,7 +260,7 @@ def test_tenant_scoping_blocks_cross_user_incident_resolve(tmp_path) -> None:
             )
             session.commit()
 
-        _register_and_login(other_client, "other_inc@example.com", "password123")
+        _register_and_login(other_client, "other_inc@example.com", STRONG_PASSWORD)
         resolve_response = other_client.post(f"/api/v1/incidents/{incident_id}/resolve")
         assert resolve_response.status_code == 404
 
@@ -266,12 +268,12 @@ def test_tenant_scoping_blocks_cross_user_incident_resolve(tmp_path) -> None:
 def test_tenant_scoping_blocks_cross_user_metrics_read(tmp_path) -> None:
     # User B must not read realtime metrics for User A project from a separate cookie session.
     with _make_client(tmp_path) as owner_client, _make_client(tmp_path) as other_client:
-        _register_and_login(owner_client, "owner_metrics@example.com", "password123")
+        _register_and_login(owner_client, "owner_metrics@example.com", STRONG_PASSWORD)
         create_project = owner_client.post("/api/v1/projects", json={"name": "Owner Metrics Project"})
         assert create_project.status_code == 200
         project_id = create_project.json()["id"]
 
-        _register_and_login(other_client, "other_metrics@example.com", "password123")
+        _register_and_login(other_client, "other_metrics@example.com", STRONG_PASSWORD)
         metrics_response = other_client.get(f"/api/v1/metrics/realtime?project_id={project_id}")
         assert metrics_response.status_code == 404
 
@@ -279,7 +281,7 @@ def test_tenant_scoping_blocks_cross_user_metrics_read(tmp_path) -> None:
 def test_project_providers_endpoint_auth_and_tenant_scoping(tmp_path) -> None:
     # Providers endpoint should require auth and enforce ownership.
     with _make_client(tmp_path) as owner_client, _make_client(tmp_path) as other_client:
-        _register_and_login(owner_client, "owner_providers@example.com", "password123")
+        _register_and_login(owner_client, "owner_providers@example.com", STRONG_PASSWORD)
         create_project = owner_client.post("/api/v1/projects", json={"name": "Owner Providers Project"})
         assert create_project.status_code == 200
         project_id = create_project.json()["id"]
@@ -287,7 +289,7 @@ def test_project_providers_endpoint_auth_and_tenant_scoping(tmp_path) -> None:
         unauthenticated = other_client.get(f"/api/v1/projects/{project_id}/providers")
         assert unauthenticated.status_code == 401
 
-        _register_and_login(other_client, "other_providers@example.com", "password123")
+        _register_and_login(other_client, "other_providers@example.com", STRONG_PASSWORD)
         forbidden = other_client.get(f"/api/v1/projects/{project_id}/providers")
         assert forbidden.status_code == 404
 
@@ -295,11 +297,11 @@ def test_project_providers_endpoint_auth_and_tenant_scoping(tmp_path) -> None:
 def test_sanitization_rejects_invalid_email_project_and_key_label(tmp_path) -> None:
     # Invalid email/project/key inputs should fail with 400 and clear messages.
     with _make_client(tmp_path) as client:
-        bad_email = client.post("/api/v1/auth/register", json={"email": "bad\n@email.com", "password": "password123"})
+        bad_email = client.post("/api/v1/auth/register", json={"email": "bad\n@email.com", "password": STRONG_PASSWORD})
         assert bad_email.status_code == 400
         assert bad_email.json()["error"]["message"] == "email contains invalid characters"
 
-        _register_and_login(client, "valid@example.com", "password123")
+        _register_and_login(client, "valid@example.com", STRONG_PASSWORD)
         bad_project = client.post("/api/v1/projects", json={"name": "Bad/Project"})
         assert bad_project.status_code == 400
         assert bad_project.json()["error"]["message"] == "project name has invalid format"
@@ -316,24 +318,24 @@ def test_sanitization_rejects_invalid_email_project_and_key_label(tmp_path) -> N
 def test_register_is_rate_limited_per_client_and_email(tmp_path) -> None:
     with _make_client(tmp_path, redis_client=_FakeRedisClient()) as client:
         for index in range(3):
-            response = client.post("/api/v1/auth/register", json={"email": f"user{index}@example.com", "password": "password123"})
+            response = client.post("/api/v1/auth/register", json={"email": f"user{index}@example.com", "password": STRONG_PASSWORD})
             assert response.status_code == 200
 
-        limited = client.post("/api/v1/auth/register", json={"email": "overflow@example.com", "password": "password123"})
+        limited = client.post("/api/v1/auth/register", json={"email": "overflow@example.com", "password": STRONG_PASSWORD})
         assert limited.status_code == 429
         assert limited.json() == {"error": {"code": "too_many_requests", "message": "rate limit exceeded"}}
 
 
 def test_login_is_rate_limited_after_repeated_failures(tmp_path) -> None:
     with _make_client(tmp_path, redis_client=_FakeRedisClient()) as client:
-        register_response = client.post("/api/v1/auth/register", json={"email": "user@example.com", "password": "password123"})
+        register_response = client.post("/api/v1/auth/register", json={"email": "user@example.com", "password": STRONG_PASSWORD})
         assert register_response.status_code == 200
 
         for _ in range(3):
             response = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "wrong-password"})
             assert response.status_code == 401
 
-        limited = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "password123"})
+        limited = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": STRONG_PASSWORD})
         assert limited.status_code == 429
         assert limited.json() == {"error": {"code": "too_many_requests", "message": "rate limit exceeded"}}
 
@@ -347,3 +349,10 @@ def test_refresh_is_rate_limited_by_client(tmp_path) -> None:
         limited = client.post("/api/v1/auth/refresh")
         assert limited.status_code == 429
         assert limited.json() == {"error": {"code": "too_many_requests", "message": "rate limit exceeded"}}
+
+
+def test_register_rejects_weak_password(tmp_path) -> None:
+    with _make_client(tmp_path) as client:
+        response = client.post("/api/v1/auth/register", json={"email": "weak@example.com", "password": "password123"})
+        assert response.status_code == 400
+        assert response.json()["error"]["message"] == "password must be at least 12 characters"
