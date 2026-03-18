@@ -33,4 +33,4 @@ To the maximum extent allowed by law, the beta service is provided "as is" witho
 
 ## Contact
 
-Questions about these terms: legal@rheonic.ai
+Questions about these terms: legal@rheonic.dev

@@ -29,7 +29,7 @@ Rheonic will assist the Customer in responding to data subject requests where ap
 
 ## Deletion
 
-Customer may request deletion of account-related data by contacting privacy@rheonic.ai. Data may also be deleted as part of beta system resets.
+Customer may request deletion of account-related data by contacting privacy@rheonic.dev. Data may also be deleted as part of beta system resets.
 
 ## Changes
 
@@ -37,4 +37,4 @@ This DPA may be updated alongside the Privacy Policy as the service evolves.
 
 ## Contact
 
-privacy@rheonic.ai
+privacy@rheonic.dev

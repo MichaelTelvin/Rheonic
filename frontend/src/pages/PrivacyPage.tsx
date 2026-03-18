@@ -63,12 +63,12 @@ export function PrivacyPage(): JSX.Element {
             <h2>Your requests</h2>
             <p>
               To request access, correction, deletion, or export of account-related data, contact{" "}
-              <a href="mailto:privacy@rheonic.ai">privacy@rheonic.ai</a>. For beta, we will handle requests manually.
+              <a href="mailto:privacy@rheonic.dev">privacy@rheonic.dev</a>. For beta, we will handle requests manually.
             </p>
 
             <h2>Contact</h2>
             <p>
-              Privacy questions can be sent to <a href="mailto:privacy@rheonic.ai">privacy@rheonic.ai</a>.
+              Privacy questions can be sent to <a href="mailto:privacy@rheonic.dev">privacy@rheonic.dev</a>.
             </p>
           </article>
         </div>

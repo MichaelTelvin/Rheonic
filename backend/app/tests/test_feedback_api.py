@@ -92,9 +92,9 @@ def test_feedback_endpoint_rejects_empty_message(tmp_path) -> None:
 
 def test_public_config_returns_public_contact_email() -> None:
     # Public config endpoint should expose configured contact email.
-    app.dependency_overrides[get_settings] = lambda: Settings(public_contact_email="hello@rheonic.ai")
+    app.dependency_overrides[get_settings] = lambda: Settings(public_contact_email="hello@rheonic.dev")
     client = TestClient(app)
     response = client.get("/api/v1/public-config")
     assert response.status_code == 200
-    assert response.json() == {"public_contact_email": "hello@rheonic.ai"}
+    assert response.json() == {"public_contact_email": "hello@rheonic.dev"}
     app.dependency_overrides.clear()

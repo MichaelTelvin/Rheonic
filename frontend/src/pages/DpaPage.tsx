@@ -54,7 +54,7 @@ export function DpaPage(): JSX.Element {
             <h2>Deletion</h2>
             <p>
               Customer may request deletion of account-related data by contacting{" "}
-              <a href="mailto:privacy@rheonic.ai">privacy@rheonic.ai</a>. Data may also be deleted as part of beta
+              <a href="mailto:privacy@rheonic.dev">privacy@rheonic.dev</a>. Data may also be deleted as part of beta
               system resets.
             </p>
 
@@ -63,7 +63,7 @@ export function DpaPage(): JSX.Element {
 
             <h2>Contact</h2>
             <p>
-              <a href="mailto:privacy@rheonic.ai">privacy@rheonic.ai</a>
+              <a href="mailto:privacy@rheonic.dev">privacy@rheonic.dev</a>
             </p>
           </article>
         </div>

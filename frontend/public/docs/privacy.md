@@ -40,8 +40,8 @@ We use reasonable technical and organizational measures to protect service data,
 
 ## Your requests
 
-To request access, correction, deletion, or export of account-related data, contact privacy@rheonic.ai. For beta, requests are handled manually.
+To request access, correction, deletion, or export of account-related data, contact privacy@rheonic.dev. For beta, requests are handled manually.
 
 ## Contact
 
-Privacy questions: privacy@rheonic.ai
+Privacy questions: privacy@rheonic.dev

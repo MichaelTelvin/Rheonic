@@ -63,7 +63,7 @@ export function TermsPage(): JSX.Element {
 
             <h2>Contact</h2>
             <p>
-              Questions about these terms can be sent to <a href="mailto:legal@rheonic.ai">legal@rheonic.ai</a>.
+              Questions about these terms can be sent to <a href="mailto:legal@rheonic.dev">legal@rheonic.dev</a>.
             </p>
           </article>
         </div>
