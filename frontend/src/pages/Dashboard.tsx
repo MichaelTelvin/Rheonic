@@ -159,7 +159,8 @@ export function Dashboard(): JSX.Element {
   }, [hasEvents, hasIngestKey, loadingProjects, projectId, projects.length, setupStatusResolved]);
   const isSetupComplete = setupStage === "complete";
   const showSetupBanner = !loadingProjects && setupStage !== "complete" && !setupBannerDismissed;
-  const showSetupBannerPlaceholder = (loadingProjects || (Boolean(projectId) && setupStage === "checking")) && !setupBannerDismissed;
+  const showSetupBannerSlot =
+    !setupBannerDismissed && (loadingProjects || setupStage !== "complete" || (Boolean(projectId) && setupStage === "checking"));
   const webhookIssueToken = webhookIssue ? `${webhookIssue.lastAt ?? "none"}:${webhookIssue.count}` : null;
   const showWebhookIssueBanner = Boolean(projectId && webhookIssue && webhookIssueToken !== webhookIssueDismissedToken);
 
@@ -666,8 +667,8 @@ export function Dashboard(): JSX.Element {
         </section>
 
         {globalBanner ? <section className="banner">{globalBanner}</section> : null}
-        {showSetupBanner ? (
-          <section className="setup-banner" aria-live="polite">
+        {showSetupBannerSlot ? (
+          <section className={`setup-banner${showSetupBanner ? "" : " setup-banner-placeholder"}`} aria-hidden={!showSetupBanner} aria-live={showSetupBanner ? "polite" : undefined}>
             <div className="setup-banner-copy">
               <div className="setup-banner-title">{setupBannerContent.title}</div>
               <div className="setup-banner-text">{setupBannerContent.text}</div>
@@ -689,7 +690,6 @@ export function Dashboard(): JSX.Element {
             </div>
           </section>
         ) : null}
-        {!showSetupBanner && showSetupBannerPlaceholder ? <section className="setup-banner setup-banner-placeholder" aria-hidden="true" /> : null}
 
         {showWebhookIssueBanner ? (
           <Card className="dashboard-alert-card">
