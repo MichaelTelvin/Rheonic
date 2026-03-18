@@ -94,7 +94,6 @@ def update_project_webhook(
             webhook_enabled=payload.enabled,
             email_enabled=payload.email_enabled,
             webhook_url=normalized_url,
-            webhook_payload_template_json=None,
         )
         return ProjectWebhookOut(
             enabled=updated.webhook_enabled,

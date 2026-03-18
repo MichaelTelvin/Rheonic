@@ -22,9 +22,7 @@ class ProjectService:
     def list_projects(self, user_id: str) -> list[Project]:
         # Return projects for dashboard selection scoped to user.
         try:
-            projects = self._project_repository.list_projects_for_user(user_id=user_id)
-            logger.debug("Projects listed", extra={"count": len(projects)})
-            return projects
+            return self._project_repository.list_projects_for_user(user_id=user_id)
         except Exception:
             logger.exception("Project service list failed")
             raise
@@ -46,9 +44,7 @@ class ProjectService:
                 user_id=user_id,
                 created_at=datetime.now(timezone.utc),
             )
-            created = self._project_repository.create_project(project)
-            logger.info("Project created via service", extra={"project_id": created.id})
-            return created
+            return self._project_repository.create_project(project)
         except HTTPException:
             raise
         except Exception:
@@ -101,7 +97,6 @@ class ProjectService:
         webhook_enabled: bool,
         email_enabled: bool,
         webhook_url: str | None,
-        webhook_payload_template_json: str | None,
     ) -> Project:
         # Update webhook configuration for owned project.
         _ = self.get_project_webhook_settings(project_id=project_id, user_id=user_id)
@@ -110,7 +105,6 @@ class ProjectService:
             webhook_enabled=webhook_enabled,
             email_enabled=email_enabled,
             webhook_url=webhook_url,
-            webhook_payload_template_json=webhook_payload_template_json,
         )
         if updated is None:
             raise HTTPException(status_code=404, detail="project not found")

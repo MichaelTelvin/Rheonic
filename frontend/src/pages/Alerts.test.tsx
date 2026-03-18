@@ -89,7 +89,7 @@ describe("Alerts webhook settings", () => {
     expect(screen.getByRole("button", { name: "View payload" })).toBeTruthy();
   });
 
-  it("saves webhook settings without payload template json", async () => {
+  it("saves webhook settings", async () => {
     render(<Alerts />);
     await screen.findByRole("button", { name: "Save alerts" });
 
@@ -103,7 +103,7 @@ describe("Alerts webhook settings", () => {
     });
   });
 
-  it("tests webhook without payload template json", async () => {
+  it("tests webhook with the current URL draft only", async () => {
     mocks.fetchProjectWebhook
       .mockResolvedValueOnce({
         enabled: true,
@@ -131,6 +131,34 @@ describe("Alerts webhook settings", () => {
       url: "https://hooks.example.test/rheonic",
     });
     expect(mocks.updateProjectWebhook).not.toHaveBeenCalled();
+  });
+
+  it("allows webhook test with a URL draft even when webhook delivery is toggled off", async () => {
+    mocks.fetchProjectWebhook.mockResolvedValueOnce({
+      enabled: false,
+      email_enabled: false,
+      url: "",
+      last_status: null,
+      last_at: null,
+      last_error: null,
+    });
+
+    render(<Alerts />);
+    await screen.findByRole("button", { name: "Save alerts" });
+
+    fireEvent.change(screen.getByLabelText("Webhook URL"), {
+      target: { value: "https://hooks.example.test/manual-check" },
+    });
+
+    const testButton = screen.getByRole("button", { name: "Test webhook" });
+    expect(testButton.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.click(testButton);
+
+    await waitFor(() => expect(mocks.testProjectWebhook).toHaveBeenCalled());
+    expect(mocks.testProjectWebhook.mock.calls[0][1]).toEqual({
+      url: "https://hooks.example.test/manual-check",
+    });
   });
 
   it("opens sample payload modal and copies json", async () => {

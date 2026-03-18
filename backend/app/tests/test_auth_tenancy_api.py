@@ -5,18 +5,39 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from app.dependencies import get_db_session_factory, get_settings
+from app.dependencies import get_db_session_factory, get_redis_client, get_settings
 from app.infrastructure.db.models import Base, IncidentRecord
 from app.main import app
 
 
-def _make_client(tmp_path) -> TestClient:
+class _FakeRedisClient:
+    def __init__(self) -> None:
+        self._values: dict[str, int] = {}
+
+    def incr(self, key: str) -> int:
+        value = self._values.get(key, 0) + 1
+        self._values[key] = value
+        return value
+
+    def expire(self, key: str, ttl_seconds: int) -> bool:
+        _ = (key, ttl_seconds)
+        return True
+
+
+def _make_client(tmp_path, *, redis_client: _FakeRedisClient | None = None) -> TestClient:
     # Configure isolated DB and JWT settings for auth tests.
     os.environ["DATABASE_URL"] = f"sqlite:///{tmp_path}/auth_tenancy_test.db"
     os.environ["JWT_SECRET"] = "test-secret"
     os.environ["APP_ENV"] = "dev"
+    os.environ["AUTH_RATE_LIMIT_WINDOW_SECONDS"] = "60"
+    os.environ["AUTH_REGISTER_RATE_LIMIT_PER_WINDOW"] = "3"
+    os.environ["AUTH_LOGIN_RATE_LIMIT_PER_WINDOW"] = "3"
+    os.environ["AUTH_REFRESH_RATE_LIMIT_PER_WINDOW"] = "3"
     get_db_session_factory.cache_clear()
     get_settings.cache_clear()
+    app.dependency_overrides.clear()
+    resolved_redis_client = redis_client or _FakeRedisClient()
+    app.dependency_overrides[get_redis_client] = lambda: resolved_redis_client
     session_factory = get_db_session_factory()
     Base.metadata.create_all(bind=session_factory.engine)
     return TestClient(app)
@@ -218,3 +239,39 @@ def test_sanitization_rejects_invalid_email_project_and_key_label(tmp_path) -> N
         bad_key = client.post(f"/api/v1/projects/{project_id}/keys", json={"name": "bad\tlabel"})
         assert bad_key.status_code == 400
         assert bad_key.json()["error"]["message"] == "key label contains invalid characters"
+
+
+def test_register_is_rate_limited_per_client_and_email(tmp_path) -> None:
+    with _make_client(tmp_path, redis_client=_FakeRedisClient()) as client:
+        for index in range(3):
+            response = client.post("/api/v1/auth/register", json={"email": f"user{index}@example.com", "password": "password123"})
+            assert response.status_code == 200
+
+        limited = client.post("/api/v1/auth/register", json={"email": "overflow@example.com", "password": "password123"})
+        assert limited.status_code == 429
+        assert limited.json() == {"error": {"code": "too_many_requests", "message": "rate limit exceeded"}}
+
+
+def test_login_is_rate_limited_after_repeated_failures(tmp_path) -> None:
+    with _make_client(tmp_path, redis_client=_FakeRedisClient()) as client:
+        register_response = client.post("/api/v1/auth/register", json={"email": "user@example.com", "password": "password123"})
+        assert register_response.status_code == 200
+
+        for _ in range(3):
+            response = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "wrong-password"})
+            assert response.status_code == 401
+
+        limited = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "password123"})
+        assert limited.status_code == 429
+        assert limited.json() == {"error": {"code": "too_many_requests", "message": "rate limit exceeded"}}
+
+
+def test_refresh_is_rate_limited_by_client(tmp_path) -> None:
+    with _make_client(tmp_path, redis_client=_FakeRedisClient()) as client:
+        for _ in range(3):
+            response = client.post("/api/v1/auth/refresh")
+            assert response.status_code == 401
+
+        limited = client.post("/api/v1/auth/refresh")
+        assert limited.status_code == 429
+        assert limited.json() == {"error": {"code": "too_many_requests", "message": "rate limit exceeded"}}

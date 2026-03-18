@@ -39,7 +39,6 @@ class MetricsService:
                 )
                 requests_60s += provider_requests
                 tokens_60s += provider_tokens
-            logger.debug("Realtime counters read", extra={"project_id": project_id})
             return {
                 "requests_60s": requests_60s,
                 "tokens_60s": tokens_60s,
@@ -86,7 +85,6 @@ class MetricsService:
                 "decision_latency_p95_60m_ms": (round(sum(latencies_p95) / len(latencies_p95)) if latencies_p95 else None),
                 "last": latest_last,
             }
-            logger.debug("Protect metrics read", extra={"project_id": project_id})
             return metrics
         except Exception:
             logger.exception("Protect metrics service failed", extra={"project_id": project_id})
@@ -113,7 +111,6 @@ class MetricsService:
                 "timeouts_60m": timeouts_60m,
                 "timeouts_30m": timeouts_30m,
             }
-            logger.debug("Protect health read", extra={"project_id": project_id})
             return metrics
         except Exception:
             logger.exception("Protect health service failed", extra={"project_id": project_id})

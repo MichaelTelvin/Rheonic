@@ -25,14 +25,12 @@ class RQWebhookDispatcher(WebhookDispatcher):
         event_type: str,
         *,
         override_url: str | None = None,
-        override_payload_template_json: str | None = None,
         force_send: bool = False,
     ) -> None:
         # Queue one outbox row; worker applies delivery + retries/backoff policy.
         transport_payload: dict[str, object] = {
             "body": dict(payload),
             "__transport_meta": {
-                "override_payload_template_json": override_payload_template_json,
                 "force_send": bool(force_send),
             },
         }

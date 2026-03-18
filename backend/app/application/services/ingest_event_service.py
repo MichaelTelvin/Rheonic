@@ -214,7 +214,7 @@ class IngestEventService:
                     project_id=event.project_id,
                     event_type="policy_gap.detected",
                     payload={
-                        "event_type": "policy_gap.detected",
+                        "event": "policy_gap.detected",
                         "project_id": event.project_id,
                         "provider": provider,
                         "model": model,

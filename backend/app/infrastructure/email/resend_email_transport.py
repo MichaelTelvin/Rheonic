@@ -63,8 +63,6 @@ class ResendEmailTransport:
             "Resend email delivered",
             extra={
                 "provider": "resend",
-                "to": to,
-                "subject": subject,
                 "provider_message_id": response_body.get("id"),
             },
         )

@@ -60,7 +60,6 @@ def _seed_project(
     project_id: str = "p1",
     *,
     protect_enabled: bool = True,
-    webhook_payload_template_json: str | None = None,
 ) -> None:
     with session_factory.create_session() as session:
         session.add(
@@ -74,7 +73,6 @@ def _seed_project(
                 protect_max_tok_per_min=None,
                 webhook_enabled=True,
                 webhook_url="https://example.test/hook",
-                webhook_payload_template_json=webhook_payload_template_json,
                 created_at=datetime.now(timezone.utc),
             )
         )
@@ -173,47 +171,6 @@ def test_process_outbox_delivery_webhook_does_not_add_signature_header(tmp_path,
 
     assert len(captured) == 1
     assert "X-RHEONIC-Signature" not in captured[0]["headers"]
-
-
-def test_process_outbox_delivery_ignores_stored_project_payload_template_for_live_webhooks(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
-    db_url = f"sqlite:///{tmp_path}/transport_webhook_template_project_ignored.db"
-    session_factory = DatabaseSessionFactory(database_url=db_url)
-    Base.metadata.create_all(bind=session_factory.engine)
-    _seed_project(
-        session_factory,
-        "p1",
-        webhook_payload_template_json="{\"text\":\"agent behavior anomaly detected\",\"project\":\"p1\",\"chat_id\":\"123456\"}",
-    )
-    service = TransportService(
-        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
-        enqueue_job=lambda outbox_id: None,
-        now_provider=lambda: datetime.now(timezone.utc),
-    )
-    outbox_id = service.enqueue(
-        project_id="p1",
-        kind="webhook",
-        event_type="incident.warn",
-        payload={"body": {"event": "incident.warn", "project_id": "p1", "incident_type": "retry_storm"}},
-        dedupe_key="render-project-template",
-    )
-
-    captured: list[dict[str, object]] = []
-    settings = transport_job.Settings(database_url=db_url, redis_url="redis://localhost:6379/15")
-    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
-    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
-    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient(captured))
-    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
-
-    transport_job.process_outbox_delivery(outbox_id, trace_id="trace-template", span_id="span-template")
-
-    assert len(captured) == 1
-    rendered = json.loads(captured[0]["content"].decode("utf-8"))
-    assert rendered["event"] == "incident.warn"
-    assert rendered["incident_type"] == "retry_storm"
-    assert rendered["project_id"] == "p1"
-    assert "rheonic" not in rendered
-    assert "chat_id" not in rendered
-    assert "text" not in rendered
 
 
 def test_process_outbox_delivery_webhook_failure_retries_then_dead_letters(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:

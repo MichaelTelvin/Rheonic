@@ -20,6 +20,6 @@ class NullEmailTransport:
         from_email: str,
         reply_to: str | None = None,
     ) -> None:
-        _ = html, text, from_email, reply_to
-        logger.info("Null email transport invoked", extra={"to": to, "subject": subject})
+        _ = to, subject, html, text, from_email, reply_to
+        logger.info("Null email transport invoked")
         raise EmailProviderNotConfiguredError("email provider not configured")

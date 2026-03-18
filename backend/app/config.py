@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     idempotency_ttl_seconds: int = 120
     ingest_rate_limit_per_minute: int = 600
     rate_limit_window_seconds: int = app_config.rate_limit_window_seconds
+    auth_rate_limit_window_seconds: int = app_config.rate_limit_window_seconds
+    auth_register_rate_limit_per_window: int = 10
+    auth_login_rate_limit_per_window: int = 10
+    auth_refresh_rate_limit_per_window: int = 30
     incident_dedup_window_seconds: int = 300
     retry_storm_window_seconds: int = app_config.retry_storm_window_seconds
     retry_storm_count: int = app_config.retry_storm_count

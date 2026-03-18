@@ -146,11 +146,10 @@ export function Alerts(): JSX.Element {
   const canTestWebhook = useMemo(
     () =>
       Boolean(projectId)
-      && webhookEnabledInput
       && webhookUrlInput.trim().length > 0
       && !webhookTesting
       && !webhookSaving,
-    [projectId, webhookEnabledInput, webhookUrlInput, webhookTesting, webhookSaving],
+    [projectId, webhookUrlInput, webhookTesting, webhookSaving],
   );
   const controlsDisabled = !projectId;
   const saveControlsDisabled = !projectId || webhookSaving;

@@ -99,7 +99,6 @@ class RollingWindow(RealtimeCounterStore):
             self._client.zremrangebyscore(tok_key, 0, cutoff_ms)
             self._client.expire(tok_key, app_config.rolling_counter_ttl_seconds)
 
-            logger.debug("Realtime counters incremented", extra={"project_id": project_id})
         except Exception:
             logger.exception("Failed incrementing realtime counters", extra={"project_id": project_id})
             raise
@@ -118,9 +117,7 @@ class RollingWindow(RealtimeCounterStore):
             requests_60s = self._client.zcard(req_key)
             token_members = self._client.zrangebyscore(tok_key, cutoff_ms, float("inf"))
             tokens_60s = sum(_member_tokens(member) for member in token_members)
-            counters = requests_60s, tokens_60s
-            logger.debug("Realtime counters fetched", extra={"project_id": project_id})
-            return counters
+            return requests_60s, tokens_60s
         except Exception:
             logger.exception("Failed fetching realtime counters", extra={"project_id": project_id})
             raise
@@ -129,12 +126,7 @@ class RollingWindow(RealtimeCounterStore):
         # Acquire incident dedupe lock.
         try:
             key = incident_open_lock_key(project_id, incident_type)
-            acquired = self._client.set_nx_ex(key, "1", ttl_seconds)
-            logger.debug(
-                "Incident dedupe lock attempt",
-                extra={"project_id": project_id, "incident_type": incident_type, "acquired": acquired},
-            )
-            return acquired
+            return self._client.set_nx_ex(key, "1", ttl_seconds)
         except Exception:
             logger.exception("Failed acquiring incident lock", extra={"project_id": project_id, "incident_type": incident_type})
             raise
@@ -144,7 +136,6 @@ class RollingWindow(RealtimeCounterStore):
         try:
             key = incident_open_lock_key(project_id, incident_type)
             self._client.delete(key)
-            logger.debug("Incident dedupe lock released", extra={"project_id": project_id, "incident_type": incident_type})
         except Exception:
             logger.exception("Failed releasing incident lock", extra={"project_id": project_id, "incident_type": incident_type})
             raise
@@ -166,4 +157,3 @@ def _default_now_ms() -> int:
 def _default_member_id() -> str:
     # Return unique member identifier component.
     return uuid4().hex
-

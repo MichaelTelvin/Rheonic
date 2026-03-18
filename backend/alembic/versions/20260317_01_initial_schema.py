@@ -40,7 +40,6 @@ def upgrade() -> None:
         sa.Column("webhook_enabled", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("email_enabled", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("webhook_url", sa.String(length=2048), nullable=True),
-        sa.Column("webhook_payload_template_json", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),

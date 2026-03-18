@@ -29,7 +29,6 @@ class DatabaseSessionFactory:
                 expire_on_commit=False,
                 class_=Session,
             )
-            logger.info("DatabaseSessionFactory initialized")
         except Exception:
             logger.exception("Failed to initialize DatabaseSessionFactory")
             raise

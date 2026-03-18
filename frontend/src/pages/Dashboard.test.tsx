@@ -88,7 +88,7 @@ describe("Dashboard", () => {
       </TestRouter>,
     );
     expect(await screen.findByText("Setup required")).toBeDefined();
-    expect(screen.getByText("Create your first project to generate an ingest key and start receiving telemetry.")).toBeDefined();
+    expect(screen.getByText("Create your first project to generate an ingest key and follow next steps in Quickstart.")).toBeDefined();
   });
 
   it("loads metrics and incidents for selected project", async () => {

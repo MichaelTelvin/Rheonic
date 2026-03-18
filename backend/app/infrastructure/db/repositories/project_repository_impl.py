@@ -141,7 +141,6 @@ class ProjectRepositoryImpl(ProjectRepository):
         webhook_enabled: bool,
         email_enabled: bool,
         webhook_url: str | None,
-        webhook_payload_template_json: str | None,
     ) -> Project | None:
         # Update and return project webhook settings.
         try:
@@ -152,7 +151,6 @@ class ProjectRepositoryImpl(ProjectRepository):
                 record.webhook_enabled = webhook_enabled
                 record.email_enabled = email_enabled
                 record.webhook_url = webhook_url
-                record.webhook_payload_template_json = webhook_payload_template_json
                 session.add(record)
                 session.commit()
                 session.refresh(record)
@@ -255,5 +253,4 @@ def _to_domain(record: ProjectRecord, settings: Settings | None = None) -> Proje
         webhook_enabled=bool(getattr(record, "webhook_enabled", False)),
         email_enabled=bool(getattr(record, "email_enabled", False)),
         webhook_url=getattr(record, "webhook_url", None),
-        webhook_payload_template_json=getattr(record, "webhook_payload_template_json", None),
     )

@@ -73,6 +73,7 @@ Rules:
 High-signal events emitted explicitly in code:
 
 - `http_error`
+- `auth_rate_limited`
 - `event_ingested`
 - `event_duplicate`
 - `protect_action`

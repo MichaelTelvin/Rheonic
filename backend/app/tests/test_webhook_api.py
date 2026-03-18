@@ -14,7 +14,7 @@ from app.main import app
 
 class FakeWebhookDispatcher:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, dict[str, object], str, str | None, str | None, bool]] = []
+        self.calls: list[tuple[str, dict[str, object], str, str | None, bool]] = []
 
     def enqueue(
         self,
@@ -23,7 +23,6 @@ class FakeWebhookDispatcher:
         event_type: str,
         *,
         override_url: str | None = None,
-        override_payload_template_json: str | None = None,
         force_send: bool = False,
     ) -> None:
         self.calls.append(
@@ -32,7 +31,6 @@ class FakeWebhookDispatcher:
                 payload,
                 event_type,
                 override_url,
-                override_payload_template_json,
                 force_send,
             )
         )
@@ -101,8 +99,7 @@ def test_project_webhook_owner_get_put_and_test(tmp_path) -> None:
     assert len(dispatcher.calls) == 1
     assert dispatcher.calls[0][2] == "webhook.test"
     assert dispatcher.calls[0][3] == "https://example.test/hook"
-    assert dispatcher.calls[0][4] is None
-    assert dispatcher.calls[0][5] is True
+    assert dispatcher.calls[0][4] is True
 
     _cleanup_overrides()
 
@@ -190,7 +187,7 @@ def test_project_webhook_test_is_available_in_observe_mode(tmp_path) -> None:
     assert test_response.status_code == 202
     assert len(dispatcher.calls) == 1
     assert dispatcher.calls[0][3] == "https://draft.test/hook"
-    assert dispatcher.calls[0][4] is None
+    assert dispatcher.calls[0][4] is True
 
     _cleanup_overrides()
 

@@ -18,7 +18,6 @@ class RedisClient:
             if not resolved_redis_url:
                 raise ValueError("REDIS_URL is not set")
             self._redis = Redis.from_url(resolved_redis_url)
-            logger.info("Redis client initialized")
         except Exception:
             logger.exception("Failed to initialize Redis client")
             raise

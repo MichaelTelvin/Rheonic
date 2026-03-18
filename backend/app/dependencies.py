@@ -30,13 +30,13 @@ from app.logger import get_logger
 from app.security.jwt_tokens import decode_access_token
 
 logger = get_logger(__name__)
+
+
 @lru_cache
 def get_db_session_factory() -> DatabaseSessionFactory:
     # Provide a shared database session factory.
     try:
-        session_factory = DatabaseSessionFactory()
-        logger.info("Database session factory initialized")
-        return session_factory
+        return DatabaseSessionFactory()
     except Exception:
         logger.exception("Failed to initialize database session factory")
         raise
@@ -46,9 +46,7 @@ def get_db_session_factory() -> DatabaseSessionFactory:
 def get_redis_client() -> RedisClient:
     # Provide a shared Redis client.
     try:
-        client = RedisClient()
-        logger.info("Redis client initialized")
-        return client
+        return RedisClient()
     except Exception:
         logger.exception("Failed to initialize Redis client")
         raise
@@ -58,9 +56,7 @@ def get_redis_client() -> RedisClient:
 def get_rolling_window() -> RollingWindow:
     # Provide a shared Redis rolling window adapter.
     try:
-        adapter = RollingWindow(client=get_redis_client())
-        logger.debug("Rolling window adapter initialized")
-        return adapter
+        return RollingWindow(client=get_redis_client())
     except Exception:
         logger.exception("Failed to initialize rolling window adapter")
         raise
@@ -70,9 +66,7 @@ def get_rolling_window() -> RollingWindow:
 def get_protect_action_store() -> ProtectActionStore:
     # Provide a shared Redis protect action counter adapter.
     try:
-        adapter = ProtectActionStore(redis_client=get_redis_client())
-        logger.debug("Protect action store initialized")
-        return adapter
+        return ProtectActionStore(redis_client=get_redis_client())
     except Exception:
         logger.exception("Failed to initialize protect action store")
         raise
@@ -82,9 +76,7 @@ def get_protect_action_store() -> ProtectActionStore:
 def get_settings() -> Settings:
     # Provide runtime settings.
     try:
-        settings = Settings()
-        logger.debug("Settings initialized")
-        return settings
+        return Settings()
     except Exception:
         logger.exception("Failed to initialize settings")
         raise
@@ -121,7 +113,7 @@ def get_transport_outbox_repository() -> TransportOutboxRepositoryImpl:
 def get_ingest_event_service() -> IngestEventService:
     # Provide an ingest event service instance.
     try:
-        service = IngestEventService(
+        return IngestEventService(
             event_repository=EventRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
@@ -136,8 +128,6 @@ def get_ingest_event_service() -> IngestEventService:
             transport_service=get_transport_service(),
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )
-        logger.debug("Ingest event service provided")
-        return service
     except Exception:
         logger.exception("Failed to construct ingest event service")
         raise
@@ -146,14 +136,12 @@ def get_ingest_event_service() -> IngestEventService:
 def get_metrics_service() -> MetricsService:
     # Provide a metrics service instance.
     try:
-        service = MetricsService(
+        return MetricsService(
             realtime_counters=get_rolling_window(),
             protect_action_store=get_protect_action_store(),
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
             transport_outbox_repository=TransportOutboxRepositoryImpl(session_factory=get_db_session_factory()),
         )
-        logger.debug("Metrics service provided")
-        return service
     except Exception:
         logger.exception("Failed to construct metrics service")
         raise
@@ -162,15 +150,13 @@ def get_metrics_service() -> MetricsService:
 def get_detect_incidents_service() -> DetectIncidentsService:
     # Provide an incident detection service instance.
     try:
-        service = DetectIncidentsService(
+        return DetectIncidentsService(
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
             webhook_dispatcher=get_webhook_dispatcher(),
             transport_service=get_transport_service(),
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )
-        logger.debug("Detect incidents service provided")
-        return service
     except Exception:
         logger.exception("Failed to construct detect incidents service")
         raise
@@ -192,11 +178,9 @@ def get_incident_manager() -> IncidentManager:
 def get_project_service() -> ProjectService:
     # Provide a project service instance.
     try:
-        service = ProjectService(
+        return ProjectService(
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )
-        logger.debug("Project service provided")
-        return service
     except Exception:
         logger.exception("Failed to construct project service")
         raise
@@ -205,12 +189,10 @@ def get_project_service() -> ProjectService:
 def get_ingest_key_service() -> IngestKeyService:
     # Provide an ingest key service instance.
     try:
-        service = IngestKeyService(
+        return IngestKeyService(
             ingest_key_repository=IngestKeyRepositoryImpl(session_factory=get_db_session_factory()),
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
         )
-        logger.debug("Ingest key service provided")
-        return service
     except Exception:
         logger.exception("Failed to construct ingest key service")
         raise

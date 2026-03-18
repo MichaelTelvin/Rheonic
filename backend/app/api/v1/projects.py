@@ -43,7 +43,6 @@ def list_projects(
     # List projects for selector population.
     try:
         projects = service.list_projects(user_id=current_user.id)
-        logger.debug("Projects list endpoint called", extra={"count": len(projects)})
         return [
             ProjectOut(
                 id=project.id,

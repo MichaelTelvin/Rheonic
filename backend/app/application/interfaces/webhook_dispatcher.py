@@ -13,7 +13,6 @@ class WebhookDispatcher(ABC):
         event_type: str,
         *,
         override_url: str | None = None,
-        override_payload_template_json: str | None = None,
         force_send: bool = False,
     ) -> None:
         # Enqueue a webhook delivery job for project/event.

@@ -62,10 +62,9 @@ class FakeWebhookDispatcher:
         event_type: str,
         *,
         override_url: str | None = None,
-        override_payload_template_json: str | None = None,
         force_send: bool = False,
     ) -> None:
-        _ = (override_url, override_payload_template_json, force_send)
+        _ = (override_url, force_send)
         self.calls.append((project_id, payload, event_type))
 
 
@@ -158,7 +157,7 @@ def test_new_provider_model_sends_webhook_once_and_creates_no_incident(tmp_path)
     project_id, payload, event_type = dispatcher.calls[0]
     assert project_id == "p1"
     assert event_type == "policy_gap.detected"
-    assert payload["event_type"] == "policy_gap.detected"
+    assert payload["event"] == "policy_gap.detected"
     assert payload["provider"] == "openai"
     assert payload["model"] == "gpt-4o-new"
     assert isinstance(payload.get("first_seen_at"), str)
@@ -272,7 +271,7 @@ def test_webhook_dispatched_on_policy_gap_contains_required_fields(tmp_path) -> 
     project_id, payload, event_type = dispatcher.calls[0]
     assert project_id == "p1"
     assert event_type == "policy_gap.detected"
-    assert payload["event_type"] == "policy_gap.detected"
+    assert payload["event"] == "policy_gap.detected"
     assert payload["provider"] == "google"
     assert payload["model"] == "gemini-new"
     assert isinstance(payload.get("first_seen_at"), str)

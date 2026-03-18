@@ -41,7 +41,6 @@ class EventRepositoryImpl(EventRepository):
                 )
                 session.add(record)
                 session.commit()
-                logger.debug("Event persisted", extra={"project_id": event.project_id, "event_id": event.id})
         except Exception:
             logger.exception("Failed to persist event", extra={"project_id": event.project_id})
             raise

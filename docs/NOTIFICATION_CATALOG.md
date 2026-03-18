@@ -18,7 +18,7 @@ This catalog reflects the implemented notification contract.
 | `protection.clamp_started` | webhook + email | `ProtectService` clamp reporting path | `event`, `project_id`, `provider`, `model`, `environment`, `reason`, `requests_60s`, `tokens_60s`, `req_cap`, `tok_cap`, `estimated_next_tokens`, `clamp`, `sent_at` | Project webhook URL + owning user account email | Protect only; once when clamp first begins affecting traffic |
 | `protection.block` | webhook + email | `ProtectService` block reporting path + fail-closed fallback reporting path | `event`, `project_id`, `provider`, `model`, `environment`, `reason`, `detail_reason`, `requests_60s`, `tokens_60s`, `req_cap`, `tok_cap`, `blocked_until`, `retry_after_seconds`, `source`, `sent_at` | Project webhook URL + owning user account email | Protect only |
 | `incident.resolved` | webhook + email | `DetectIncidentsService` and `AutoCloseIncidentsService` resolved enqueue paths | `event`, `project_id`, `incident_id`, `incident_type`, `resolved_by`, `resolved_at`, `created_at`, `last_seen_at`, `provider`, `model`, `environment`, `sent_at` | Project webhook URL + owning user account email | Observe + Protect |
-| `policy_gap.detected` | webhook | `IngestEventService._detect_policy_gap_if_needed` | `event_type`, `project_id`, `provider`, `model`, `first_seen_at`, `sent_at` | Project webhook URL | Observe + Protect; first-seen `(project, provider, model)` |
+| `policy_gap.detected` | webhook | `IngestEventService._detect_policy_gap_if_needed` | `event`, `project_id`, `provider`, `model`, `first_seen_at`, `sent_at` | Project webhook URL | Observe + Protect; first-seen `(project, provider, model)` |
 | `webhook.delivery_failed` | email | transport worker terminal webhook failure hook | `project_id`, `event_type`, `destination`, `status`, `attempts`, `max_attempts`, `last_error_code`, `last_error_message`, `updated_at` | Owning user account email | Protect only; only when webhook is enabled and terminal failure is reached |
 | `webhook.test` | webhook | `POST /api/v1/projects/{project_id}/webhook/test` | `event`, `project_id`, `sent_at` | Project webhook URL or test override URL | Mode-independent; excluded from delivery-failure banner/email |
 | `feedback.submitted` | email | `POST /api/v1/feedback` | `message`, `email`, `user_id`, `user_email`, `project_id`, `page`, `mode`, `timestamp`, `app_version` | Feedback report address (`Settings.feedback_report_email`) | Mode-independent (authenticated feedback action) |
@@ -97,7 +97,6 @@ Current implementation:
 - The raw project webhook is machine-readable and sends the canonical Rheonic payload.
 - The Alerts page shows a sample raw webhook payload for inspection and copying, but does not expose a payload editor.
 - `webhook.test` validates URL/reachability only; it does not use a custom body editor.
-- Any legacy stored `webhook_payload_template_json` is ignored for live raw webhook delivery.
 
 Sample raw webhook payload (`protection.warn`):
 
@@ -126,7 +125,7 @@ Deferred to V2:
 - provider-specific message templates
 - webhook-backed adapter presets
 - per-event templates
-- custom request headers beyond the signing secret
+- custom request headers
 - custom HTTP methods
 
 ## Email Template Catalog
