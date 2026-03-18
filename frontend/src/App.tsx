@@ -22,6 +22,7 @@ import { Protect } from "./pages/Protect";
 import { QuickstartPage } from "./pages/QuickstartPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
+import { DpaPage } from "./pages/DpaPage";
 
 interface AuthenticatedAppLayoutProps {
   userEmail: string | null;
@@ -197,6 +198,7 @@ export function App(): JSX.Element {
         <Route path="/quickstart" element={<QuickstartPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/dpa" element={<DpaPage />} />
         <Route path="/docs" element={<Navigate to="/app/docs" replace />} />
         <Route
           path="/login"

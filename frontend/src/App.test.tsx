@@ -84,6 +84,7 @@ describe("App", () => {
     expect(screen.getAllByRole("link", { name: "Sign in" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Privacy" }).getAttribute("href")).toBe("/privacy");
     expect(screen.getByRole("link", { name: "Terms" }).getAttribute("href")).toBe("/terms");
+    expect(screen.getByRole("link", { name: "DPA" }).getAttribute("href")).toBe("/dpa");
   });
 
   it("renders quickstart page on /quickstart", () => {
@@ -116,6 +117,16 @@ describe("App", () => {
     );
     expect(screen.getByRole("heading", { name: "Terms of Use" })).toBeDefined();
     expect(screen.getByText(/Rheonic is provided for business evaluation and operational monitoring/i)).toBeDefined();
+  });
+
+  it("renders dpa page on /dpa", () => {
+    render(
+      <TestRouter initialEntries={["/dpa"]}>
+        <App />
+      </TestRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "Data Processing Addendum" })).toBeDefined();
+    expect(screen.getByText(/Customer is the data controller/i)).toBeDefined();
   });
 
   it("renders dashboard after login success", async () => {

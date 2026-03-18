@@ -121,6 +121,10 @@ export function PublicLayout({
                   ·
                 </span>
                 <Link to="/terms">Terms</Link>
+                <span aria-hidden="true" className="public-footer-dot">
+                  ·
+                </span>
+                <Link to="/dpa">DPA</Link>
               </div>
               <p className="public-footer-contact">
                 Questions or feedback:{" "}
@@ -146,6 +150,10 @@ export function PublicLayout({
                   ·
                 </span>
                 <Link to="/terms">Terms</Link>
+                <span aria-hidden="true" className="public-footer-dot">
+                  ·
+                </span>
+                <Link to="/dpa">DPA</Link>
                 <span aria-hidden="true" className="public-footer-dot">
                   ·
                 </span>
