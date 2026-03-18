@@ -113,6 +113,7 @@ function RequireAuth({ isAuthenticated, sessionResolved, children }: RequireAuth
 }
 
 export function App(): JSX.Element {
+  const location = useLocation();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionResolved, setSessionResolved] = useState<boolean>(false);
 
@@ -130,6 +131,15 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
+    const publicRoutes = new Set(["/", "/quickstart", "/privacy", "/terms", "/dpa"]);
+
+    if (publicRoutes.has(location.pathname)) {
+      setUser(null);
+      setSessionResolved(true);
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const restoreSession = async (): Promise<void> => {
       try {
@@ -161,7 +171,7 @@ export function App(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [location.pathname]);
 
   const signOut = useCallback(async (): Promise<void> => {
     try {

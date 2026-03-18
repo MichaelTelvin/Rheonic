@@ -50,7 +50,7 @@ bash deploy/staging_doppler.sh down -v
 bash deploy/staging_doppler.sh up -d --build
 bash deploy/staging_doppler.sh logs db_init
 bash deploy/staging_doppler.sh exec backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/ready').read().decode())"
-bash deploy/staging_doppler.sh exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select version_num from alembic_version;"
+bash deploy/staging_doppler.sh exec postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select version_num from alembic_version;"'
 bash deploy/staging_doppler.sh ps
 ```
 

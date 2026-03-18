@@ -191,7 +191,7 @@ describe("App", () => {
   });
 
   it("restores authenticated session and signs out through backend logout", async () => {
-    mockFetchCurrentUser.mockResolvedValue({
+    mockFetchCurrentUser.mockResolvedValueOnce({
       id: "u1",
       email: "persisted@example.com",
       created_at: new Date().toISOString(),

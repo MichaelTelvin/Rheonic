@@ -1,8 +1,7 @@
-import { useEffect, useState, type MouseEvent as ReactMouseEvent, type PropsWithChildren } from "react";
+import { useEffect, useState, type PropsWithChildren } from "react";
 import { Link } from "react-router-dom";
 import { fetchPublicConfig } from "../api/client";
 import { frontendConfig } from "../config";
-import { useAuthContext } from "../context/AuthContext";
 import { RheonicLogoMark } from "./RheonicLogoMark";
 
 interface PublicLayoutProps extends PropsWithChildren {
@@ -27,10 +26,7 @@ export function PublicLayout({
   showBetaBadge = false,
   children,
 }: PublicLayoutProps): JSX.Element {
-  const { isAuthenticated, signOut } = useAuthContext();
-  const docsHref = isAuthenticated ? "/docs" : "/login";
-  const authHref = isAuthenticated ? "/" : navAuthHref;
-  const authLabel = isAuthenticated ? "Sign out" : navAuthLabel;
+  const docsHref = "/login";
   const [scrolled, setScrolled] = useState(false);
   const [publicContactEmail, setPublicContactEmail] = useState<string>(frontendConfig.publicContactEmail || "feedback@example.com");
   const isV2Surface = shellClassName?.includes("public-shell-marketing") || shellClassName?.includes("quickstart-v2-shell");
@@ -71,16 +67,6 @@ export function PublicLayout({
     };
   }, []);
 
-  const handleSignOut = (event: ReactMouseEvent<HTMLAnchorElement>): void => {
-    if (!isAuthenticated) {
-      return;
-    }
-    event.preventDefault();
-    void signOut().finally(() => {
-      window.location.assign("/");
-    });
-  };
-
   return (
     <main className={`public-page${isV2Surface ? " public-page-v2" : ""}`}>
       <div className={`public-shell${shellClassName ? ` ${shellClassName}` : ""}`}>
@@ -94,9 +80,7 @@ export function PublicLayout({
             {showHomeLink ? <Link to="/">Home</Link> : null}
             {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
             {showDocsLink ? <Link to={docsHref}>{docsLinkLabel}</Link> : null}
-            <Link className="public-login-link" to={authHref} onClick={handleSignOut}>
-              {authLabel}
-            </Link>
+            <Link className="public-login-link" to={navAuthHref}>{navAuthLabel}</Link>
           </nav>
         </header>
 
@@ -110,9 +94,7 @@ export function PublicLayout({
                 <span aria-hidden="true" className="public-footer-dot">
                   ·
                 </span>
-                <Link to={authHref} onClick={handleSignOut}>
-                  {isAuthenticated ? "Sign out" : "Sign in"}
-                </Link>
+                <Link to={navAuthHref}>{navAuthLabel}</Link>
                 <span aria-hidden="true" className="public-footer-dot">
                   ·
                 </span>
@@ -157,9 +139,7 @@ export function PublicLayout({
                 <span aria-hidden="true" className="public-footer-dot">
                   ·
                 </span>
-                <Link to={authHref} onClick={handleSignOut}>
-                  {isAuthenticated ? "Sign out" : "Sign in"}
-                </Link>
+                <Link to={navAuthHref}>{navAuthLabel}</Link>
               </div>
               <p>© 2026 Rheonic</p>
             </>
@@ -169,9 +149,7 @@ export function PublicLayout({
                 {showHomeLink ? <Link to="/">Home</Link> : null}
                 {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
                 {showDocsLink ? <Link to={docsHref}>{docsLinkLabel}</Link> : null}
-                <Link to={authHref} onClick={handleSignOut}>
-                  {isAuthenticated ? "Sign out" : "Sign in"}
-                </Link>
+                <Link to={navAuthHref}>{navAuthLabel}</Link>
               </div>
               <p>© {new Date().getFullYear()} Rheonic</p>
             </>

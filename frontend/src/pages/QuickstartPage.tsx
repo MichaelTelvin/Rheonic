@@ -331,13 +331,9 @@ except RHEONICBlockedError:
               </div>
               <CodeBlock
                 code={`RHEONIC_INGEST_KEY=<your_project_ingest_key>
-RHEONIC_BACKEND_URL=<value_shown_in_dashboard>
-OPENAI_API_KEY=<provider_key>`}
+RHEONIC_BACKEND_URL=<value_shown_in_dashboard>`}
                 language="bash"
               />
-              <p className="quickstart-step-muted">
-                Provider API keys are used only by the provider SDK. Rheonic does not access or store them.
-              </p>
             </section>
 
             <section id="instrument" className="quickstart-step-card">
