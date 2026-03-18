@@ -54,6 +54,9 @@ def configure_logging(*, service_name: str = "sdk-python", level: str | None = N
     root_logger.handlers.clear()
     root_logger.setLevel(resolved_level)
     root_logger.addHandler(handler)
+    # Keep third-party transport chatter out of normal SDK output.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:
