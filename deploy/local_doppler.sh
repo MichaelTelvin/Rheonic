@@ -17,4 +17,4 @@ if [[ -z "${DOPPLER_TOKEN:-}" ]]; then
   exit 1
 fi
 
-exec doppler run --project "$project" --config "$config" -- docker compose -f docker-compose.yml "$@"
+exec doppler run --token "$DOPPLER_TOKEN" --project "$project" --config "$config" -- docker compose -f docker-compose.yml "$@"

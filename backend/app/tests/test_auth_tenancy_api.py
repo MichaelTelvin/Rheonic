@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.dependencies import get_db_session_factory, get_redis_client, get_settings
-from app.infrastructure.db.models import Base, IncidentRecord
+from app.infrastructure.db.models import Base, IncidentRecord, RefreshSessionRecord
 from app.main import app
 
 
@@ -74,13 +74,28 @@ def test_refresh_issues_new_cookie_backed_session(tmp_path) -> None:
     # Refresh endpoint should exchange a valid refresh cookie for a new auth cookie pair.
     with _make_client(tmp_path) as client:
         _register_and_login(client, "refresh@example.com", "password123")
+        settings = get_settings()
+        original_refresh_cookie = client.cookies.get(settings.auth_refresh_cookie_name)
+        assert original_refresh_cookie
         refresh_response = client.post("/api/v1/auth/refresh")
         assert refresh_response.status_code == 200
         payload = refresh_response.json()
         assert payload["user"]["email"] == "refresh@example.com"
-        settings = get_settings()
         assert refresh_response.cookies.get(settings.auth_access_cookie_name)
         assert refresh_response.cookies.get(settings.auth_refresh_cookie_name)
+        rotated_refresh_cookie = refresh_response.cookies.get(settings.auth_refresh_cookie_name)
+        assert rotated_refresh_cookie
+        assert rotated_refresh_cookie != original_refresh_cookie
+
+        replay_client = _make_client(tmp_path)
+        replay_client.cookies.set(
+            settings.auth_refresh_cookie_name,
+            original_refresh_cookie,
+            path=f"{settings.api_prefix}/v1/auth",
+        )
+        replay_response = replay_client.post("/api/v1/auth/refresh")
+        assert replay_response.status_code == 401
+        replay_client.close()
 
 
 def test_refresh_rejects_invalid_cookie(tmp_path) -> None:
@@ -100,6 +115,9 @@ def test_me_and_logout_use_cookie_session(tmp_path) -> None:
     # Browser session endpoints should resolve the current user and clear cookies on logout.
     with _make_client(tmp_path) as client:
         _register_and_login(client, "session@example.com", "password123")
+        settings = get_settings()
+        refresh_cookie = client.cookies.get(settings.auth_refresh_cookie_name)
+        assert refresh_cookie
 
         me_response = client.get("/api/v1/auth/me")
         assert me_response.status_code == 200
@@ -111,6 +129,60 @@ def test_me_and_logout_use_cookie_session(tmp_path) -> None:
 
         post_logout_me = client.get("/api/v1/auth/me")
         assert post_logout_me.status_code == 401
+
+        replay_client = _make_client(tmp_path)
+        replay_client.cookies.set(
+            settings.auth_refresh_cookie_name,
+            refresh_cookie,
+            path=f"{settings.api_prefix}/v1/auth",
+        )
+        replay_response = replay_client.post("/api/v1/auth/refresh")
+        assert replay_response.status_code == 401
+        replay_client.close()
+
+
+def test_refresh_rotation_revokes_prior_refresh_session_server_side(tmp_path) -> None:
+    with _make_client(tmp_path) as client:
+        _register_and_login(client, "rotate@example.com", "password123")
+        session_factory = get_db_session_factory()
+
+        with session_factory.create_session() as session:
+            assert session.query(RefreshSessionRecord).count() == 1
+
+        refresh_response = client.post("/api/v1/auth/refresh")
+        assert refresh_response.status_code == 200
+
+        with session_factory.create_session() as session:
+            rows = session.query(RefreshSessionRecord).order_by(RefreshSessionRecord.created_at.asc()).all()
+        assert len(rows) == 2
+        revoked = next(row for row in rows if row.jti != rows[-1].jti)
+        active = rows[-1]
+        assert revoked.revoked_at is not None
+        assert revoked.replaced_by_jti == active.jti
+        assert active.revoked_at is None
+
+
+def test_logout_revokes_current_refresh_session_server_side(tmp_path) -> None:
+    with _make_client(tmp_path) as client:
+        _register_and_login(client, "logout@example.com", "password123")
+        settings = get_settings()
+        session_factory = get_db_session_factory()
+
+        refresh_cookie = client.cookies.get(settings.auth_refresh_cookie_name)
+        assert refresh_cookie
+
+        with session_factory.create_session() as session:
+            row = session.query(RefreshSessionRecord).first()
+            assert row is not None
+            assert row.revoked_at is None
+
+        logout_response = client.post("/api/v1/auth/logout")
+        assert logout_response.status_code == 200
+
+        with session_factory.create_session() as session:
+            row = session.query(RefreshSessionRecord).first()
+            assert row is not None
+            assert row.revoked_at is not None
 
 
 def test_protected_routes_require_cookie(tmp_path) -> None:

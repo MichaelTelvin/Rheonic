@@ -237,9 +237,15 @@ async def refresh(
 
 
 @router.post("/logout", response_model=LogoutOut)
-async def logout(response: Response, settings: Settings = Depends(get_settings)) -> LogoutOut:
+async def logout(
+    request: Request,
+    response: Response,
+    service: AuthService = Depends(get_auth_service),
+    settings: Settings = Depends(get_settings),
+) -> LogoutOut:
     # Clear auth cookies for the current browser session.
     try:
+        service.logout(request.cookies.get(settings.auth_refresh_cookie_name))
         _clear_auth_cookies(response, settings)
         logger.info("Logout completed")
         return LogoutOut(status="ok")

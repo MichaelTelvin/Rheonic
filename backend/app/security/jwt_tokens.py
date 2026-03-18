@@ -26,6 +26,7 @@ def create_access_token(
 def create_refresh_token(
     user_id: str,
     email: str,
+    jti: str,
     secret: str,
     algorithm: str,
     expires_minutes: int,
@@ -36,6 +37,7 @@ def create_refresh_token(
         "sub": user_id,
         "email": email,
         "typ": "refresh",
+        "jti": jti,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
     }

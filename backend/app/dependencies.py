@@ -19,6 +19,7 @@ from app.infrastructure.db.repositories.event_repository_impl import EventReposi
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
+from app.infrastructure.db.repositories.refresh_session_repository_impl import RefreshSessionRepositoryImpl
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
 from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
@@ -220,6 +221,7 @@ def get_auth_service() -> AuthService:
     try:
         return AuthService(
             user_repository=UserRepositoryImpl(session_factory=get_db_session_factory()),
+            refresh_session_repository=RefreshSessionRepositoryImpl(session_factory=get_db_session_factory()),
             settings=get_settings(),
         )
     except Exception:
