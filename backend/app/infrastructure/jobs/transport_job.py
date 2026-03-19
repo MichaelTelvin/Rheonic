@@ -82,24 +82,27 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
             },
         ),
     )
+    delivery_metadata: dict[str, object] = {}
     try:
         if outbox.kind == "webhook":
-            _deliver_webhook(outbox_id=outbox.id)
+            delivery_metadata = _deliver_webhook(outbox_id=outbox.id)
         elif outbox.kind == "email":
-            _deliver_email(outbox_id=outbox.id, settings=settings)
+            delivery_metadata = _deliver_email(outbox_id=outbox.id, settings=settings)
         else:
             raise RuntimeError(f"unsupported transport kind: {outbox.kind}")
         repository.mark_delivered(outbox_id=outbox.id, now=datetime.now(timezone.utc))
+        success_metadata = {
+            "outbox_id": outbox.id,
+            "kind": outbox.kind,
+            "event_type": outbox.event_type,
+            "project_id": outbox.project_id,
+        }
+        success_metadata.update(delivery_metadata)
         logger.info(
             "Outbox delivery succeeded",
             extra=build_log_extra(
                 event="outbox_delivered",
-                metadata={
-                    "outbox_id": outbox.id,
-                    "kind": outbox.kind,
-                    "event_type": outbox.event_type,
-                    "project_id": outbox.project_id,
-                },
+                metadata=success_metadata,
             ),
         )
     except Exception as exc:
@@ -175,17 +178,17 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
         reset_trace_context(context_tokens)
 
 
-def _deliver_webhook(*, outbox_id: str) -> None:
+def _deliver_webhook(*, outbox_id: str) -> dict[str, object]:
     settings = Settings()
     now = datetime.now(timezone.utc)
     outbox_repository = TransportOutboxRepositoryImpl(session_factory=DatabaseSessionFactory())
     project_repository = ProjectRepositoryImpl(session_factory=DatabaseSessionFactory())
     outbox = outbox_repository.get_by_id(outbox_id)
     if outbox is None:
-        return
+        return {}
     project = project_repository.get_project(outbox.project_id)
     if project is None:
-        return
+        return {}
 
     payload = dict(outbox.payload or {})
     transport_meta = payload.get("__transport_meta") if isinstance(payload.get("__transport_meta"), dict) else {}
@@ -193,11 +196,11 @@ def _deliver_webhook(*, outbox_id: str) -> None:
     force_send = bool(transport_meta.get("force_send", False))
 
     if not force_send and (not project.webhook_enabled or not project.webhook_url):
-        return
+        return {}
 
     target_url = outbox.destination or project.webhook_url
     if not target_url:
-        return
+        return {}
 
     rendered_body = body_payload
 
@@ -232,15 +235,19 @@ def _deliver_webhook(*, outbox_id: str) -> None:
         ),
     )
     _ = now
+    return {
+        "destination": target_url,
+        "status_code": getattr(response, "status_code", None),
+    }
 
 
-def _deliver_email(*, outbox_id: str, settings: Settings) -> None:
+def _deliver_email(*, outbox_id: str, settings: Settings) -> dict[str, object]:
     outbox_repository = TransportOutboxRepositoryImpl(session_factory=DatabaseSessionFactory())
     project_repository = ProjectRepositoryImpl(session_factory=DatabaseSessionFactory())
     user_repository = UserRepositoryImpl(session_factory=DatabaseSessionFactory())
     outbox = outbox_repository.get_by_id(outbox_id)
     if outbox is None:
-        return
+        return {}
     project = project_repository.get_project(outbox.project_id)
 
     # Feedback is an internal workflow. Project alerts resolve to the owning user
@@ -259,7 +266,7 @@ def _deliver_email(*, outbox_id: str, settings: Settings) -> None:
                 metadata={"outbox_id": outbox.id, "event_type": outbox.event_type, "project_id": outbox.project_id},
             ),
         )
-        return
+        return {}
     if not destination:
         raise ValueError("email destination is missing")
     if not outbox.template:
@@ -284,6 +291,7 @@ def _deliver_email(*, outbox_id: str, settings: Settings) -> None:
         from_email=sender,
         reply_to=reply_to,
     )
+    return {"destination": destination}
 
 
 def _error_details(exc: Exception) -> tuple[str, str]:

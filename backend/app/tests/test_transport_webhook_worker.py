@@ -126,6 +126,34 @@ def test_process_outbox_delivery_webhook_success_marks_delivered(tmp_path, monke
         assert row.delivered_at is not None
 
 
+def test_process_outbox_delivery_webhook_success_logs_destination_in_outbox_delivered(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_webhook_success_logs_destination.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    _seed_project(session_factory, "p-log")
+    outbox_id = _enqueue_webhook_outbox(session_factory, "p-log")
+
+    settings = transport_job.Settings(database_url=db_url, redis_url="redis://localhost:6379/15")
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient())
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id, trace_id="trace-log", span_id="span-log")
+
+    emitted = [
+        json.loads(line)
+        for line in capsys.readouterr().out.splitlines()
+        if line.strip().startswith("{")
+    ]
+    delivered_log = next(payload for payload in emitted if payload.get("event") == "outbox_delivered")
+
+    assert delivered_log["metadata"]["destination"] == "https://example.test/hook"
+    assert delivered_log["metadata"]["status_code"] == 200
+
+
 def test_process_outbox_delivery_webhook_sends_in_observe_mode_when_webhook_is_enabled(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     db_url = f"sqlite:///{tmp_path}/transport_webhook_observe_success.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
