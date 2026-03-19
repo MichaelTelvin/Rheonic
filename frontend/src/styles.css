@@ -1248,7 +1248,7 @@ body {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  margin-top: 4px;
+  margin-top: 12px;
 }
 
 .auth-actions .modal-button {
@@ -1850,7 +1850,7 @@ select {
 }
 
 .input-error-slot {
-  margin: 2px 0 10px;
+  margin: 2px 0 14px;
   min-height: 20px;
   font-size: 0.79rem;
   line-height: 1.2;

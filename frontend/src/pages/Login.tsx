@@ -88,7 +88,7 @@ export function Login({ onAuthSuccess }: LoginProps): JSX.Element {
           <label htmlFor="login-password">Password</label>
           <input
             id="login-password"
-            className={`text-input ${passwordMessage ? "input-error" : ""}`}
+            className={`text-input ${passwordError ? "input-error" : ""}`}
             type="password"
             autoComplete={isRegister ? "new-password" : "current-password"}
             value={password}
