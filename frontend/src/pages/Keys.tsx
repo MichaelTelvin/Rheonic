@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 
 import { createKey, listKeys, revokeKey, rotateKey, type CreateKeyResponse, type IngestKeyItem } from "../api/client";
 import { Card } from "../components/Card";
@@ -11,11 +11,38 @@ import { formatRelative } from "./dashboardUtils";
 const NAME_REGEX = new RegExp(frontendConfig.dashboardNamePattern);
 const NAME_MAX = frontendConfig.dashboardNameMaxLength;
 
+type KeysCacheState = {
+  keys: IngestKeyItem[];
+};
+
+function keysCacheKey(projectId: string): string {
+  return `rheonic:keys:${projectId}`;
+}
+
+function readKeysCache(projectId: string | null): KeysCacheState | null {
+  if (!projectId) {
+    return null;
+  }
+  try {
+    const raw = window.sessionStorage.getItem(keysCacheKey(projectId));
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<KeysCacheState>;
+    return {
+      keys: Array.isArray(parsed.keys) ? parsed.keys : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function Keys(): JSX.Element {
   const { projectId } = useProjectContext();
+  const initialCache = readKeysCache(projectId);
 
-  const [keys, setKeys] = useState<IngestKeyItem[]>([]);
-  const [loadingKeys, setLoadingKeys] = useState<boolean>(true);
+  const [keys, setKeys] = useState<IngestKeyItem[]>(initialCache?.keys ?? []);
+  const [loadingKeys, setLoadingKeys] = useState<boolean>(projectId ? initialCache === null : false);
   const [keysError, setKeysError] = useState<string | null>(null);
   const [newKeyName, setNewKeyName] = useState<string>("");
   const [creatingKey, setCreatingKey] = useState<boolean>(false);
@@ -23,6 +50,29 @@ export function Keys(): JSX.Element {
   const [latestPlaintextKey, setLatestPlaintextKey] = useState<CreateKeyResponse | null>(null);
   const [copiedAction, setCopiedAction] = useState<string | null>(null);
   const activeKeys = keys.filter((key) => key.status === "active");
+
+  useLayoutEffect(() => {
+    const cached = readKeysCache(projectId);
+    setKeys(cached?.keys ?? []);
+    setLoadingKeys(projectId ? cached === null : false);
+    setKeysError(null);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(
+        keysCacheKey(projectId),
+        JSON.stringify({
+          keys,
+        } satisfies KeysCacheState),
+      );
+    } catch {
+      // Ignore cache write failures.
+    }
+  }, [keys, projectId]);
 
   const validateKeyLabel = (value: string): string | null => {
     if (!value) {
@@ -58,7 +108,8 @@ export function Keys(): JSX.Element {
     }
 
     let cancelled = false;
-    setLoadingKeys(true);
+    const cached = readKeysCache(projectId);
+    setLoadingKeys(cached === null);
     setKeysError(null);
 
     const load = async (): Promise<void> => {

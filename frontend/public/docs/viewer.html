@@ -111,11 +111,10 @@
         display: block;
       }
       .canvas.chart.incident .chart-image {
-        width: min(820px, calc(100% - 40px));
         margin: 0 auto;
       }
       .canvas.chart.protect .chart-image {
-        width: 100%;
+        margin: 0 auto;
       }
       .doc h1,
       .doc h2,
@@ -178,9 +177,7 @@
       </section>
       <section class="panel">
         <div class="canvas">
-          <article id="doc" class="doc">
-            <p class="muted">Loading...</p>
-          </article>
+          <article id="doc" class="doc"></article>
         </div>
       </section>
     </main>
@@ -316,7 +313,6 @@
           if (route.chart) {
             panel.className = "canvas chart " + route.chart;
             target.className = "doc chart-doc";
-            target.innerHTML = "<div class='doc-loading'><p>Loading chart...</p></div>";
             const src = route.chart === "protect" ? "/docs/architecture/protect_decision_flow.svg" : "/docs/architecture/incident_flow.svg";
             const alt = route.chart === "protect" ? "Protect decision flow" : "Incident flow";
             const image = new Image();
@@ -343,7 +339,6 @@
             return;
           }
 
-          target.innerHTML = "<div class='doc-loading'><p>Loading document...</p></div>";
           try {
             const response = await fetch("./" + route.doc + ".md");
             if (!response.ok) {

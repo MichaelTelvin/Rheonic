@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 import {
   ApiError,
@@ -27,13 +27,6 @@ function formatDateTime(iso: string | null): string {
   return value.toLocaleString();
 }
 
-function statusUpdated(previous: ProjectWebhookSettings | null, next: ProjectWebhookSettings): boolean {
-  if (!previous) {
-    return Boolean(next.last_status || next.last_at);
-  }
-  return next.last_status !== previous.last_status || next.last_at !== previous.last_at;
-}
-
 const SAMPLE_WARN_PAYLOAD = JSON.stringify(
   {
     event: "protection.warn",
@@ -58,23 +51,81 @@ const SAMPLE_WARN_PAYLOAD = JSON.stringify(
   2,
 );
 
+type AlertsCacheState = {
+  webhookSettings: ProjectWebhookSettings | null;
+  protectEnabled: boolean;
+};
+
+function alertsCacheKey(projectId: string): string {
+  return `rheonic:alerts:${projectId}`;
+}
+
+function readAlertsCache(projectId: string | null): AlertsCacheState | null {
+  if (!projectId) {
+    return null;
+  }
+  try {
+    const raw = window.sessionStorage.getItem(alertsCacheKey(projectId));
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<AlertsCacheState>;
+    return {
+      webhookSettings: parsed.webhookSettings ?? null,
+      protectEnabled: Boolean(parsed.protectEnabled),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function Alerts(): JSX.Element {
   const { projectId } = useProjectContext();
   const { user } = useAuthContext();
   const webhookTestMarkerKey = projectId ? `rheonic:webhookTestAt:${projectId}` : null;
+  const initialCache = readAlertsCache(projectId);
 
-  const [webhookSettings, setWebhookSettings] = useState<ProjectWebhookSettings | null>(null);
-  const [webhookEnabledInput, setWebhookEnabledInput] = useState<boolean>(false);
-  const [emailEnabledInput, setEmailEnabledInput] = useState<boolean>(false);
-  const [webhookUrlInput, setWebhookUrlInput] = useState<string>("");
+  const [webhookSettings, setWebhookSettings] = useState<ProjectWebhookSettings | null>(initialCache?.webhookSettings ?? null);
+  const [webhookEnabledInput, setWebhookEnabledInput] = useState<boolean>(initialCache?.webhookSettings?.enabled ?? false);
+  const [emailEnabledInput, setEmailEnabledInput] = useState<boolean>(Boolean(initialCache?.webhookSettings?.email_enabled));
+  const [webhookUrlInput, setWebhookUrlInput] = useState<string>(initialCache?.webhookSettings?.url ?? "");
   const [webhookSaving, setWebhookSaving] = useState<boolean>(false);
   const [webhookTesting, setWebhookTesting] = useState<boolean>(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
-  const [protectEnabled, setProtectEnabled] = useState<boolean>(false);
-  const [loadingSettings, setLoadingSettings] = useState<boolean>(true);
+  const [protectEnabled, setProtectEnabled] = useState<boolean>(initialCache?.protectEnabled ?? false);
+  const [loadingSettings, setLoadingSettings] = useState<boolean>(projectId ? initialCache === null : false);
   const [showPayloadModal, setShowPayloadModal] = useState<boolean>(false);
   const [payloadCopied, setPayloadCopied] = useState<boolean>(false);
   const accountEmail = user?.email ?? "your account email";
+
+  useLayoutEffect(() => {
+    const cached = readAlertsCache(projectId);
+    const cachedSettings = cached?.webhookSettings ?? null;
+    setWebhookSettings(cachedSettings);
+    setWebhookEnabledInput(cachedSettings?.enabled ?? false);
+    setEmailEnabledInput(Boolean(cachedSettings?.email_enabled));
+    setWebhookUrlInput(cachedSettings?.url ?? "");
+    setProtectEnabled(cached?.protectEnabled ?? false);
+    setLoadingSettings(projectId ? cached === null : false);
+    setWebhookError(null);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(
+        alertsCacheKey(projectId),
+        JSON.stringify({
+          webhookSettings,
+          protectEnabled,
+        } satisfies AlertsCacheState),
+      );
+    } catch {
+      // Ignore cache write failures.
+    }
+  }, [projectId, protectEnabled, webhookSettings]);
 
   const reloadWebhookSettings = async (preserveInputs = false, showLoading = true): Promise<void> => {
     if (!projectId) {
@@ -110,7 +161,8 @@ export function Alerts(): JSX.Element {
 
     let cancelled = false;
     const loadSettings = async (): Promise<void> => {
-      setLoadingSettings(true);
+      const cached = readAlertsCache(projectId);
+      setLoadingSettings(cached === null);
       try {
         const [settings, protectSettings] = await Promise.all([
           fetchProjectWebhook(projectId),
@@ -232,28 +284,11 @@ export function Alerts(): JSX.Element {
       if (webhookTestMarkerKey) {
         window.localStorage.setItem(webhookTestMarkerKey, String(Date.now()));
       }
-      const baseline = webhookSettings;
       await testProjectWebhook(projectId, {
         url: webhookUrlInput.trim() || undefined,
       });
-      let latest: ProjectWebhookSettings | null = null;
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        await new Promise((resolve) => {
-          window.setTimeout(resolve, 700);
-        });
-        latest = await fetchProjectWebhook(projectId);
-        if (statusUpdated(baseline, latest)) {
-          break;
-        }
-      }
-      if (latest) {
-        setWebhookSettings(latest);
-      }
-      if (latest?.last_status === "success") {
-        showAppToast("Webhook test succeeded");
-      } else {
-        showAppToast("Webhook test failed");
-      }
+      showAppToast("Webhook test queued");
+      await reloadWebhookSettings(true, false);
     } catch (error) {
       if (error instanceof ApiError && error.status) {
         showAppToast(`Webhook test failed (HTTP ${error.status})`);

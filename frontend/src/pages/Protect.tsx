@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 
 import {
   deleteProject,
@@ -15,8 +15,35 @@ import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { getProtectReadiness, type ProtectReadiness } from "./protectReadiness";
 
+type ProtectCacheState = {
+  protectSettings: ProjectProtectSettings | null;
+};
+
+function protectCacheKey(projectId: string): string {
+  return `rheonic:protect:${projectId}`;
+}
+
+function readProtectCache(projectId: string | null): ProtectCacheState | null {
+  if (!projectId) {
+    return null;
+  }
+  try {
+    const raw = window.sessionStorage.getItem(protectCacheKey(projectId));
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<ProtectCacheState>;
+    return {
+      protectSettings: parsed.protectSettings ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function Protect(): JSX.Element {
   const { projectId, projects, setProjectId, reloadProjects } = useProjectContext();
+  const initialCache = readProtectCache(projectId);
 
   const navigateTo = (path: string): void => {
     if (window.location.pathname === path) {
@@ -26,14 +53,20 @@ export function Protect(): JSX.Element {
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
-  const [protectSettings, setProtectSettings] = useState<ProjectProtectSettings | null>(null);
+  const [protectSettings, setProtectSettings] = useState<ProjectProtectSettings | null>(initialCache?.protectSettings ?? null);
   const [savingProtect, setSavingProtect] = useState<boolean>(false);
   const [protectError, setProtectError] = useState<string | null>(null);
-  const [protectEnabledInput, setProtectEnabledInput] = useState<boolean>(false);
-  const [protectMaxReqInput, setProtectMaxReqInput] = useState<string>("");
-  const [protectMaxTokInput, setProtectMaxTokInput] = useState<string>("");
-  const [protectFailModeInput, setProtectFailModeInput] = useState<"open" | "closed">("open");
-  const [applyClampInput, setApplyClampInput] = useState<boolean>(false);
+  const [protectEnabledInput, setProtectEnabledInput] = useState<boolean>(Boolean(initialCache?.protectSettings?.protect_enabled));
+  const [protectMaxReqInput, setProtectMaxReqInput] = useState<string>(
+    initialCache?.protectSettings?.protect_max_req_per_min == null ? "" : String(initialCache.protectSettings.protect_max_req_per_min),
+  );
+  const [protectMaxTokInput, setProtectMaxTokInput] = useState<string>(
+    initialCache?.protectSettings?.protect_max_tok_per_min == null ? "" : String(initialCache.protectSettings.protect_max_tok_per_min),
+  );
+  const [protectFailModeInput, setProtectFailModeInput] = useState<"open" | "closed">(
+    initialCache?.protectSettings?.protect_fail_mode === "closed" ? "closed" : "open",
+  );
+  const [applyClampInput, setApplyClampInput] = useState<boolean>(Boolean(initialCache?.protectSettings?.apply_clamp));
   const [showEnableModal, setShowEnableModal] = useState<boolean>(false);
   const [loadingReadiness, setLoadingReadiness] = useState<boolean>(false);
   const [readinessError, setReadinessError] = useState<string | null>(null);
@@ -41,7 +74,7 @@ export function Protect(): JSX.Element {
   const [muteFor24h, setMuteFor24h] = useState<boolean>(false);
   const [pendingWarningsCount, setPendingWarningsCount] = useState<number | null>(null);
   const [showPostEnableToast, setShowPostEnableToast] = useState<boolean>(false);
-  const [loadingProtectSettings, setLoadingProtectSettings] = useState<boolean>(true);
+  const [loadingProtectSettings, setLoadingProtectSettings] = useState<boolean>(projectId ? initialCache === null : false);
 
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [deletingProject, setDeletingProject] = useState<boolean>(false);
@@ -68,6 +101,39 @@ export function Protect(): JSX.Element {
     setProtectFailModeInput(settings.protect_fail_mode === "closed" ? "closed" : "open");
     setApplyClampInput(Boolean(settings.apply_clamp));
   };
+
+  useLayoutEffect(() => {
+    const cached = readProtectCache(projectId);
+    if (cached?.protectSettings) {
+      setProtectSettings(cached.protectSettings);
+      applyInputsFromSettings(cached.protectSettings);
+    } else {
+      setProtectSettings(null);
+      setProtectEnabledInput(false);
+      setProtectMaxReqInput("");
+      setProtectMaxTokInput("");
+      setProtectFailModeInput("open");
+      setApplyClampInput(false);
+    }
+    setLoadingProtectSettings(projectId ? cached === null : false);
+    setProtectError(null);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(
+        protectCacheKey(projectId),
+        JSON.stringify({
+          protectSettings,
+        } satisfies ProtectCacheState),
+      );
+    } catch {
+      // Ignore cache write failures.
+    }
+  }, [projectId, protectSettings]);
 
   const readinessItems = useMemo(
     () => [
@@ -144,7 +210,8 @@ export function Protect(): JSX.Element {
 
     let cancelled = false;
     const loadSettings = async (): Promise<void> => {
-      setLoadingProtectSettings(true);
+      const cached = readProtectCache(projectId);
+      setLoadingProtectSettings(cached === null);
       try {
         const settings = await fetchProjectProtect(projectId);
         if (cancelled) {
