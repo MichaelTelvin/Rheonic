@@ -14,5 +14,5 @@ def test_staging_compose_contains_core_services_and_readiness_checks() -> None:
     assert "db_init:" in content
     assert "frontend:" in content
     assert "/ready" in content
-    assert "rq worker" in content
+    assert "python -m app.infrastructure.workers.worker" in content
     assert "scheduler_bootstrap" in content

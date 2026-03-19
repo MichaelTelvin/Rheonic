@@ -124,12 +124,12 @@ services:
       db_init:
         condition: service_completed_successfully
     command: >
-      sh -c "rq worker --url \"$$REDIS_URL\" \"$${RQ_QUEUE_NAME:-rheonic}\""
+      sh -c "python -m app.infrastructure.workers.worker"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "python -c \"import pathlib,sys; sys.exit(0 if any('rq worker' in p.read_text(errors='ignore') for p in pathlib.Path('/proc').glob('[0-9]*/cmdline')) else 1)\"",
+          "python -c \"import pathlib,sys; sys.exit(0 if any('app.infrastructure.workers.worker' in p.read_text(errors='ignore').replace(chr(0), ' ') for p in pathlib.Path('/proc').glob('[0-9]*/cmdline')) else 1)\"",
         ]
       interval: 15s
       timeout: 3s

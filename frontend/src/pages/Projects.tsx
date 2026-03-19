@@ -32,6 +32,18 @@ export function Projects(): JSX.Element {
     }
   };
 
+  const onCopyProjectId = async (value: string): Promise<void> => {
+    if (!navigator.clipboard) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      showAppToast("Project ID copied");
+    } catch {
+      showAppToast("Action failed. Try again");
+    }
+  };
+
   const validateProjectName = (value: string): string | null => {
     if (!value) {
       return "Project name is required.";
@@ -144,27 +156,33 @@ export function Projects(): JSX.Element {
                 <span>Name</span>
                 <span>ID</span>
                 <span>Created</span>
-                <span className="table-actions-header">Status</span>
+                <span className="table-actions-header">Actions</span>
               </div>
               {projects.map((project) => (
-                <button
-                  type="button"
-                  className={`project-table-row project-table-row-button${project.id === projectId ? " is-selected" : ""}`}
-                  key={project.id}
-                  onClick={() => setProjectId(project.id)}
-                  aria-pressed={project.id === projectId}
-                >
+                <div className={`project-table-row${project.id === projectId ? " is-selected" : ""}`} key={project.id}>
                   <span className="key-name">{project.name}</span>
                   <span className="subtle mono" title={project.id}>
                     {shortId(project.id)}
                   </span>
                   <span className="subtle">{formatRelative(project.created_at)}</span>
-                  <span className="table-actions-cell">
-                    <span className={`project-selection-label${project.id === projectId ? " is-selected" : ""}`}>
-                      {project.id === projectId ? "Selected" : "Click to select"}
-                    </span>
-                  </span>
-                </button>
+                  <div className="table-actions-cell project-table-actions">
+                    <button
+                      type="button"
+                      className="table-action-button"
+                      onClick={() => void onCopyProjectId(project.id)}
+                    >
+                      Copy ID
+                    </button>
+                    <button
+                      type="button"
+                      className={`table-action-button project-selection-button${project.id === projectId ? " is-selected" : ""}`}
+                      onClick={() => setProjectId(project.id)}
+                      aria-pressed={project.id === projectId}
+                    >
+                      {project.id === projectId ? "Selected" : "Select"}
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           ) : null}

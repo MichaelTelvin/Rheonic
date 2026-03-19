@@ -117,11 +117,16 @@ def configure_logging(*, service_name: str = "backend", level: str | None = None
     root_logger.setLevel(resolved_level)
     root_logger.addHandler(handler)
 
-    for logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error", "fastapi"):
+    for logger_name in ("uvicorn", "uvicorn.error", "fastapi"):
         logger = logging.getLogger(logger_name)
         logger.handlers.clear()
         logger.setLevel(resolved_level)
         logger.propagate = True
+
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.handlers.clear()
+    access_logger.setLevel(logging.WARNING)
+    access_logger.propagate = False
 
     for logger_name in ("rq", "rq.worker", "rq.job", "rq.queue"):
         logger = logging.getLogger(logger_name)

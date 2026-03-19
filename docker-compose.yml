@@ -84,7 +84,7 @@ services:
     volumes:
       - ./backend:/app
     command: >
-      sh -c "rq worker --url \"$$REDIS_URL\" \"$${RQ_QUEUE_NAME:-rheonic}\""
+      sh -c "python -m app.infrastructure.workers.worker"
     restart: unless-stopped
 
   scheduler:
