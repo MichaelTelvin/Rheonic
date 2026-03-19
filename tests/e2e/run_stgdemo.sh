@@ -16,28 +16,20 @@ fi
 
 preserve_env="RHEONIC_PROVIDER,RHEONIC_MODEL,RHEONIC_DEMO_CASE,RHEONIC_SCENARIO,RHEONIC_STEP_SLEEP_MS,RHEONIC_RETRY_STORM_COUNT,RHEONIC_LOOP_COUNT,RHEONIC_TOKEN_EXPLOSION_TOKENS,RHEONIC_CAP_BREACH_TOKENS,RHEONIC_REQ_CAP_BREACH_COUNT,RHEONIC_CAP_BREACH_REQ_TOKENS,RHEONIC_NEAR_CAP_TOKENS,RHEONIC_MAX_TOKENS,RHEONIC_NEAR_CAP_SEED_TOKENS,RHEONIC_PROTECT_DECISION_TIMEOUT_MS,RHEONIC_ENVIRONMENT,RHEONIC_DEBUG"
 IFS=',' read -r -a preserve_candidates <<< "$preserve_env"
-preserve_active=()
+override_env=()
 for var_name in "${preserve_candidates[@]}"; do
   if [[ -n "${!var_name+x}" ]]; then
     if [[ -z "${!var_name}" ]]; then
       unset "$var_name"
       continue
     fi
-    preserve_active+=("$var_name")
+    override_env+=("${var_name}=${!var_name}")
+    unset "$var_name"
   fi
 done
 
-preserve_arg=""
-if [[ ${#preserve_active[@]} -gt 0 ]]; then
-  preserve_arg="--preserve-env=$(IFS=,; printf '%s' "${preserve_active[*]}")"
-fi
-
-filtered_warning='^Warning: Ignoring Doppler secrets already defined in the environment due to --preserve-env flag$'
-
-if [[ -n "$preserve_arg" ]]; then
-  doppler run --project "$project" --config "$config" "$preserve_arg" -- "$@" \
-    2> >(grep -v "$filtered_warning" >&2)
+if [[ ${#override_env[@]} -gt 0 ]]; then
+  doppler run --project "$project" --config "$config" -- env "${override_env[@]}" "$@"
 else
-  doppler run --project "$project" --config "$config" -- "$@" \
-    2> >(grep -v "$filtered_warning" >&2)
+  doppler run --project "$project" --config "$config" -- "$@"
 fi
