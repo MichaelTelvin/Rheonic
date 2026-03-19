@@ -123,6 +123,12 @@ def configure_logging(*, service_name: str = "backend", level: str | None = None
         logger.setLevel(resolved_level)
         logger.propagate = True
 
+    for logger_name in ("rq", "rq.worker", "rq.job", "rq.queue"):
+        logger = logging.getLogger(logger_name)
+        logger.handlers.clear()
+        logger.setLevel(logging.WARNING)
+        logger.propagate = True
+
 
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)

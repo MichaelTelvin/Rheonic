@@ -32,4 +32,12 @@ if [[ ${#preserve_active[@]} -gt 0 ]]; then
   preserve_arg="--preserve-env=$(IFS=,; printf '%s' "${preserve_active[*]}")"
 fi
 
-exec doppler run --project "$project" --config "$config" ${preserve_arg:+$preserve_arg} -- "$@"
+filtered_warning='^Warning: Ignoring Doppler secrets already defined in the environment due to --preserve-env flag$'
+
+if [[ -n "$preserve_arg" ]]; then
+  doppler run --project "$project" --config "$config" "$preserve_arg" -- "$@" \
+    2> >(grep -v "$filtered_warning" >&2)
+else
+  doppler run --project "$project" --config "$config" -- "$@" \
+    2> >(grep -v "$filtered_warning" >&2)
+fi
