@@ -157,7 +157,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
         assert rendered["subject"] == subject
         assert expected_title in rendered["html"]
         assert expected_text_line in rendered["text"]
-        assert "Rheonic" in rendered["html"]
+        assert "RHEONIC" in rendered["html"]
         assert ">Protect alert<" not in rendered["html"]
         assert "UTC" in rendered["text"]
         assert render_template(template, payload) == rendered
