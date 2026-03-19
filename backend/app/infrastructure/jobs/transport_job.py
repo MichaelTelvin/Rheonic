@@ -261,7 +261,7 @@ def _deliver_email(*, outbox_id: str, settings: Settings) -> dict[str, object]:
     user_repository = UserRepositoryImpl(session_factory=DatabaseSessionFactory())
     outbox = outbox_repository.get_by_id(outbox_id)
     if outbox is None:
-        return {}
+        return {"skipped": True, "skip_reason": "outbox_missing"}
     project = project_repository.get_project(outbox.project_id)
 
     # Feedback is an internal workflow. Project alerts resolve to the owning user
@@ -280,7 +280,11 @@ def _deliver_email(*, outbox_id: str, settings: Settings) -> dict[str, object]:
                 metadata={"outbox_id": outbox.id, "event_type": outbox.event_type, "project_id": outbox.project_id},
             ),
         )
-        return {}
+        return {
+            "skipped": True,
+            "skip_reason": "email_disabled_or_missing_project",
+            "destination": None,
+        }
     if not destination:
         raise ValueError("email destination is missing")
     if not outbox.template:

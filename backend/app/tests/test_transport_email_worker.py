@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from app.application.services.transport_service import TransportService
@@ -254,3 +255,79 @@ def test_alert_email_delivery_is_skipped_when_project_email_alerts_are_disabled(
         row = session.query(TransportOutboxRecord).filter(TransportOutboxRecord.id == outbox_id).first()
         assert row is not None
         assert row.status == "delivered"
+
+
+def test_alert_email_skip_logs_outbox_skipped_instead_of_outbox_delivered(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_email_alert_skip_logs.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    now = datetime.now(timezone.utc)
+    with session_factory.create_session() as session:
+        session.add(UserRecord(id="u1", email="owner@example.com", password_hash="hashed", created_at=now))
+        session.add(
+            ProjectRecord(
+                id="p-skip-log",
+                name="SkipLog",
+                user_id="u1",
+                protect_enabled=True,
+                protect_fail_mode="open",
+                email_enabled=False,
+                created_at=now,
+            )
+        )
+        session.commit()
+
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: None,
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+    outbox_id = service.enqueue(
+        project_id="p-skip-log",
+        kind="email",
+        event_type="incident.resolved",
+        payload={
+            "project_id": "p-skip-log",
+            "incident_id": "i-1",
+            "incident_type": "retry_storm",
+            "resolved_by": "manual",
+            "resolved_at": "2026-03-19T11:00:00Z",
+            "created_at": "2026-03-19T10:55:00Z",
+            "last_seen_at": "2026-03-19T10:59:00Z",
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "staging",
+            "sent_at": "2026-03-19T11:00:00Z",
+        },
+        dedupe_key="incident-resolved-email-skipped-log",
+        template="incident_resolved",
+    )
+
+    sent: list[dict[str, object]] = []
+    settings = transport_job.Settings(
+        database_url=db_url,
+        redis_url="redis://localhost:6379/15",
+        resend_api_key="re_test",
+        email_from_alerts="Rheonic Alerts <alerts@mail.rheonic.dev>",
+        email_from_system="Rheonic System <system@mail.rheonic.dev>",
+        email_reply_to="contact@rheonic.dev",
+    )
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeEmailClient(sent))
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id, trace_id="trace-email-skip", span_id="span-email-skip")
+
+    emitted = [
+        json.loads(line)
+        for line in capsys.readouterr().out.splitlines()
+        if line.strip().startswith("{")
+    ]
+    assert any(payload.get("event") == "email_skipped" for payload in emitted)
+    skipped_log = next(payload for payload in emitted if payload.get("event") == "outbox_skipped")
+    assert skipped_log["metadata"]["skip_reason"] == "email_disabled_or_missing_project"
+    assert not any(payload.get("event") == "outbox_delivered" for payload in emitted)
