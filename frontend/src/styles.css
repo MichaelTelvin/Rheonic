@@ -1867,9 +1867,24 @@ select {
   font-size: 0.86rem;
 }
 
+.dashboard-banner-rail {
+  position: fixed;
+  top: 82px;
+  right: 24px;
+  z-index: 16;
+  width: min(420px, calc(100vw - 296px));
+  display: grid;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.dashboard-floating-banner {
+  margin: 0;
+  pointer-events: auto;
+}
+
 .setup-banner {
   width: 100%;
-  margin: 16px 0 28px;
   padding: 9px 14px 9px 17px;
   min-height: 96px;
   border-radius: 10px;
@@ -1882,12 +1897,6 @@ select {
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.16);
   position: relative;
   overflow: hidden;
-}
-
-.setup-banner-placeholder {
-  visibility: hidden;
-  pointer-events: none;
-  min-height: 96px;
 }
 
 .setup-banner::before {
@@ -2222,7 +2231,7 @@ pre {
 #feedback-screenshot::file-selector-button {
   margin-right: 10px;
   border: 1px solid var(--control-border);
-  border-radius: 999px;
+  border-radius: 10px;
   background: rgba(30, 41, 59, 0.88);
   color: rgba(241, 245, 249, 0.96);
   font: inherit;
@@ -2236,6 +2245,10 @@ pre {
 #feedback-screenshot::file-selector-button:hover {
   background: rgba(51, 65, 85, 0.96);
   border-color: rgba(148, 163, 184, 0.42);
+}
+
+#feedback-screenshot {
+  color: rgba(148, 163, 184, 0.78);
 }
 
 .keys-create-row {
@@ -2535,10 +2548,14 @@ pre {
     margin-top: 0;
   }
 
+  .dashboard-banner-rail {
+    right: 18px;
+    width: min(420px, calc(100vw - 276px));
+  }
+
   .setup-banner {
     flex-direction: column;
     align-items: flex-start;
-    margin: 14px 0 22px;
     min-height: 132px;
   }
 
@@ -4085,6 +4102,13 @@ pre {
     overflow: visible;
   }
 
+  .dashboard-banner-rail {
+    top: 72px;
+    left: 20px;
+    right: 20px;
+    width: auto;
+  }
+
   .current-project-bar {
     position: sticky;
     left: 0;
@@ -4235,6 +4259,13 @@ pre {
     padding: 16px 14px 24px;
   }
 
+  .dashboard-banner-rail {
+    top: 72px;
+    right: 14px;
+    left: 14px;
+    width: auto;
+  }
+
   .current-project-bar {
     padding: 10px 0;
   }
@@ -4244,7 +4275,6 @@ pre {
   }
 
   .setup-banner {
-    margin: 12px 0 18px;
     padding: 10px 12px 10px 14px;
   }
 

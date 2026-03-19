@@ -167,8 +167,6 @@ export function Dashboard(): JSX.Element {
   }, [hasEvents, hasIngestKey, loadingProjects, projectId, projects.length, setupStatusResolved]);
   const isSetupComplete = setupStage === "complete";
   const showSetupBanner = !loadingProjects && setupStage !== "complete" && setupStage !== "checking" && !setupBannerDismissed;
-  const showSetupBannerSlot =
-    !setupBannerDismissed && (loadingProjects || setupStage !== "complete" || (Boolean(projectId) && setupStage === "checking"));
   const webhookIssueToken = webhookIssue ? `${webhookIssue.lastAt ?? "none"}:${webhookIssue.count}` : null;
   const showWebhookIssueBanner = Boolean(projectId && webhookIssue && webhookIssueToken !== webhookIssueDismissedToken);
 
@@ -651,6 +649,51 @@ export function Dashboard(): JSX.Element {
   return (
     <main className="dashboard">
       <div className="dashboard-content">
+        {(globalBanner || showSetupBanner || showWebhookIssueBanner) ? (
+          <section className="dashboard-banner-rail" aria-live="polite">
+            {globalBanner ? <section className="banner dashboard-floating-banner">{globalBanner}</section> : null}
+            {showSetupBanner ? (
+              <section className="setup-banner dashboard-floating-banner">
+                <div className="setup-banner-copy">
+                  <div className="setup-banner-title">{setupBannerContent.title}</div>
+                  <div className="setup-banner-text">{setupBannerContent.text}</div>
+                </div>
+                <div className="setup-banner-actions">
+                  {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
+                    <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
+                      {setupBannerContent.primaryLabel}
+                    </button>
+                  ) : null}
+                  {setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo ? (
+                    <button type="button" className="modal-button" onClick={() => navigate(setupBannerContent.secondaryTo)}>
+                      {setupBannerContent.secondaryLabel}
+                    </button>
+                  ) : null}
+                  <button type="button" className="modal-button" onClick={dismissSetupBanner}>
+                    Dismiss
+                  </button>
+                </div>
+              </section>
+            ) : null}
+            {showWebhookIssueBanner ? (
+              <Card className="dashboard-alert-card dashboard-floating-banner">
+                <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
+                <p className="subtle">
+                  {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
+                  {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
+                </p>
+                <div className="modal-actions form-actions">
+                  <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
+                    Check URL
+                  </button>
+                  <button type="button" className="modal-button" onClick={dismissWebhookIssueBanner}>
+                    Dismiss
+                  </button>
+                </div>
+              </Card>
+            ) : null}
+          </section>
+        ) : null}
         <section className="dashboard-hero">
           <div className="dashboard-hero-left">
             <h1 className="page-title">LLM Control Center</h1>
@@ -672,49 +715,6 @@ export function Dashboard(): JSX.Element {
             </div>
           </div>
         </section>
-
-        {globalBanner ? <section className="banner">{globalBanner}</section> : null}
-        {showSetupBannerSlot ? (
-          <section className={`setup-banner${showSetupBanner ? "" : " setup-banner-placeholder"}`} aria-hidden={!showSetupBanner} aria-live={showSetupBanner ? "polite" : undefined}>
-            <div className="setup-banner-copy">
-              <div className="setup-banner-title">{setupBannerContent.title}</div>
-              <div className="setup-banner-text">{setupBannerContent.text}</div>
-            </div>
-            <div className="setup-banner-actions">
-              {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
-                <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
-                  {setupBannerContent.primaryLabel}
-                </button>
-              ) : null}
-              {setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo ? (
-                <button type="button" className="modal-button" onClick={() => navigate(setupBannerContent.secondaryTo)}>
-                  {setupBannerContent.secondaryLabel}
-                </button>
-              ) : null}
-              <button type="button" className="modal-button" onClick={dismissSetupBanner}>
-                Dismiss
-              </button>
-            </div>
-          </section>
-        ) : null}
-
-        {showWebhookIssueBanner ? (
-          <Card className="dashboard-alert-card">
-            <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
-            <p className="subtle">
-              {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
-              {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
-            </p>
-            <div className="modal-actions form-actions">
-              <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
-                Check URL
-              </button>
-              <button type="button" className="modal-button" onClick={dismissWebhookIssueBanner}>
-                Dismiss
-              </button>
-            </div>
-          </Card>
-        ) : null}
 
         {!projectId ? (
           showSetupBanner ? null : (

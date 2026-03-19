@@ -94,6 +94,81 @@ def test_feedback_endpoint_rejects_empty_message(tmp_path) -> None:
     app.dependency_overrides.clear()
 
 
+def test_feedback_endpoint_rejects_invalid_report_type(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/feedback_api_invalid_report_type.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    app.dependency_overrides[get_transport_service] = lambda: _make_transport_service(db_url)
+    app.dependency_overrides[get_current_user] = lambda: User(
+        id="u1",
+        email="user@example.com",
+        password_hash="hashed",
+        created_at=datetime.now(timezone.utc),
+    )
+    client = TestClient(app)
+
+    response = client.post("/api/v1/feedback", json={"report_type": "exploit", "message": "test"})
+
+    assert response.status_code == 422
+    with session_factory.create_session() as session:
+        assert session.query(TransportOutboxRecord).count() == 0
+    app.dependency_overrides.clear()
+
+
+def test_feedback_endpoint_rejects_invalid_screenshot_metadata(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/feedback_api_invalid_screenshot.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    app.dependency_overrides[get_transport_service] = lambda: _make_transport_service(db_url)
+    app.dependency_overrides[get_current_user] = lambda: User(
+        id="u1",
+        email="user@example.com",
+        password_hash="hashed",
+        created_at=datetime.now(timezone.utc),
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/feedback",
+        json={
+            "report_type": "bug",
+            "message": "test",
+            "screenshot_name": "../../passwd",
+            "screenshot_content_type": "application/pdf",
+            "screenshot_base64": "not-base64",
+        },
+    )
+
+    assert response.status_code == 422
+    with session_factory.create_session() as session:
+        assert session.query(TransportOutboxRecord).count() == 0
+    app.dependency_overrides.clear()
+
+
+def test_feedback_endpoint_rejects_overlong_page_value(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/feedback_api_invalid_page.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    app.dependency_overrides[get_transport_service] = lambda: _make_transport_service(db_url)
+    app.dependency_overrides[get_current_user] = lambda: User(
+        id="u1",
+        email="user@example.com",
+        password_hash="hashed",
+        created_at=datetime.now(timezone.utc),
+    )
+    client = TestClient(app)
+
+    response = client.post("/api/v1/feedback", json={"message": "test", "page": "/" + ("a" * 240)})
+
+    assert response.status_code == 422
+    with session_factory.create_session() as session:
+        assert session.query(TransportOutboxRecord).count() == 0
+    app.dependency_overrides.clear()
+
+
 def test_public_config_returns_public_contact_email() -> None:
     # Public config endpoint should expose configured contact email.
     app.dependency_overrides[get_settings] = lambda: Settings(public_contact_email="hello@rheonic.dev")
