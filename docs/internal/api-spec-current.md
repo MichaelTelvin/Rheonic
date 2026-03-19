@@ -9,7 +9,7 @@ All routes are under `/api/v1/...`.
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/auth/me`
 
-Dashboard/browser auth is cookie-based (`HttpOnly` access + refresh cookies). Access cookies last 15 minutes, refresh/session cookies last 14 days, and refresh is sliding with no idle timeout. Every refresh rotates the refresh token and revokes the prior refresh session server-side; logout revokes the current refresh session server-side and clears browser cookies. Runtime ingest auth remains `X-Project-Ingest-Key`.
+Dashboard/browser auth is cookie-based (`HttpOnly` access + refresh cookies). Access cookies last 60 minutes, refresh/session cookies last 7 days, and refresh is sliding with no idle timeout. Every refresh rotates the refresh token and revokes the prior refresh session server-side; logout revokes the current refresh session server-side and clears browser cookies. Runtime ingest auth remains `X-Project-Ingest-Key`.
 
 ## Projects and keys
 - `GET /api/v1/projects`

@@ -71,8 +71,8 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     jwt_secret: str = ""
     jwt_alg: str = "HS256"
-    jwt_expires_min: int = 15
-    jwt_refresh_expires_min: int = 20160
+    jwt_expires_min: int = 60
+    jwt_refresh_expires_min: int = 10080
 
     # Redis settings.
     redis_host: str = "redis"

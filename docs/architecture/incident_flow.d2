@@ -2,7 +2,7 @@ direction: down
 
 vars: {
   d2-config: {
-    pad: 22
+    pad: 10
     sketch: false
     layout-engine: elk
   }
@@ -12,103 +12,103 @@ style: {
   fill: "#f4f6fb"
 }
 
-ingest: "Ingest\nPOST /api/v1/events\nscope: project+provider" {
+event: "Runtime event\nsent to Rheonic" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 11
+    border-radius: 16
+    font-size: 14
   }
 }
 
-counters: "Rolling Counters\nrequests_60s / tokens_60s\nscope: project+provider" {
+signals: "Usage signals update\nRecent requests and token activity" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 11
+    border-radius: 16
+    font-size: 14
   }
 }
 
-detectors: "Detector(s)\nnear_cap (req|tok|both)\nretry_storm\nloop_suspect\ntoken_explosion\n+ cap_breach logging from counters\n\nDominance per event:\nL3 cap_breach > L2 near_cap > L1 behavioral" {
+risk_check: "Risk is evaluated\nNear-cap pressure or unusual patterns" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 11
+    border-radius: 16
+    font-size: 14
   }
 }
 
-incident_manager: "IncidentManager\nopen / update\n(project+provider+incident_type)\ndedup window + count increment" {
+incident: "Incident opens or updates\nRepeated activity is grouped together" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 11
+    border-radius: 16
+    font-size: 14
   }
 }
 
-transport_outbox: "Transport outbox\nappend delivery row\nkind=webhook|email\nstatus=pending/sending/delivered/failed/dead" {
+alerts: "Alerts are queued\nWebhook or email can be sent" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 11
+    border-radius: 16
+    font-size: 14
   }
 }
 
-transport_worker: "RQ transport worker\nclaim pending row\ndeliver webhook/email\nretry/backoff\nupdate terminal status" {
+delivery: "Alert delivery runs\nRetries happen automatically" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 11
+    border-radius: 16
+    font-size: 14
   }
 }
 
-autoclose: "Auto-close\nresolve stale open incidents\ninactivity cooldown" {
+resolve: "Incident resolves\nManually or after activity settles" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 11
+    border-radius: 16
+    font-size: 14
   }
 }
 
-resolved: "Resolved incidents\n(manual or auto)" {
+history: "Incident history\nOpen and resolved states are kept" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 11
+    border-radius: 16
+    font-size: 14
   }
 }
 
-dashboard: "Dashboard metrics\nproject totals aggregate across providers\noptional provider filter\n+ delivery failures from outbox" {
+dashboard: "Dashboard view\nLive incidents, history,\nand delivery results" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 11
+    border-radius: 16
+    font-size: 14
   }
 }
 
-ingest -> counters
-counters -> detectors
-detectors -> incident_manager
-incident_manager -> transport_outbox
-transport_outbox -> transport_worker
-transport_worker -> dashboard
-incident_manager -> autoclose
-autoclose -> resolved
-resolved -> transport_outbox: "incident.resolved"
-resolved -> dashboard
+event -> signals
+signals -> risk_check
+risk_check -> incident
+incident -> alerts
+alerts -> delivery
+delivery -> dashboard
+incident -> resolve
+resolve -> history
+history -> alerts: "Resolved update"
+history -> dashboard

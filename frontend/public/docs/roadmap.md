@@ -7,6 +7,7 @@ Rheonic is actively evolving beyond the current MVP. The focus is to expand runt
 - **Cached response flows**: return cached or fallback responses for selected protected scenarios.
 - **Stronger rate limiting**: extend runtime controls beyond the current request and token caps.
 - **More policy actions**: add richer enforcement options and tuning presets for different workloads.
+- **Richer notification routes**: deliver alerts through more human-friendly channels such as Slack or Telegram, with formatting designed for fast operational response.
 - **Better analytics**: provide deeper trend views and longer-horizon visibility for protect and incident behavior.
 
 ## Longer-Term Areas

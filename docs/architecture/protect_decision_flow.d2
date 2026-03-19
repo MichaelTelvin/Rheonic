@@ -2,7 +2,7 @@ direction: down
 
 vars: {
   d2-config: {
-    pad: 28
+    pad: 10
     sketch: false
     layout-engine: elk
   }
@@ -12,43 +12,43 @@ style: {
   fill: "#f4f6fb"
 }
 
-app_call: "App request\nsent through Rheonic SDK" {
+app_call: "App request\nthrough Rheonic SDK" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
-mode_gate: "Project mode?\nObserve or Protect" {
+mode_gate: "Mode?\nObserve or Protect" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
-observe: "Observe mode\nRequest continues\nRheonic records what happened" {
+observe: "Observe mode\nRequest continues\nActivity is recorded" {
   style: {
     fill: "#eef3fb"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
-preflight: "Protect preflight\nChecks recent traffic and configured limits" {
+preflight: "Protect check\nTraffic and limits\nare reviewed" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
@@ -58,47 +58,47 @@ hard_limit: "Hard limit hit?\nCap exceeded or cooldown active" {
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
-risk_check: "Risk warning?\nNear cap or unusual traffic spike" {
+risk_check: "Warning needed?\nNear cap or unusual spike" {
   style: {
     fill: "#eef3fb"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
-allow: "Allow\nRequest goes to provider" {
+allow: "Allow\nRequest goes through" {
   style: {
     fill: "#f6efd8"
     stroke: "#c6ac63"
     font-color: "#5e4a1f"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
-warn: "Warn\nRequest goes to provider\nRheonic records a visible warning" {
+warn: "Warn\nRequest goes through\nAlert is recorded" {
   style: {
     fill: "#f6efd8"
     stroke: "#c6ac63"
     font-color: "#5e4a1f"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
-block: "Block\nRequest is stopped before the provider call" {
+block: "Block\nRequest is stopped\nbefore the provider call" {
   style: {
     fill: "#f7e4ea"
     stroke: "#bf8095"
     font-color: "#61283d"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
@@ -108,47 +108,47 @@ provider: "Provider call" {
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
-alerts: "Alerts\nWebhook or email for warn/block events" {
+alerts: "Alerts\nWebhook or email\nfor warn and block events" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
-recording: "Recorded outcomes\nUsage, protect decisions, and incidents" {
+recording: "Recorded outcomes\nUsage, decisions,\nand incidents" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 19
   }
 }
 
-fallback: "If the protect check is unavailable\nSDK records a fallback outcome" {
+fallback: "Fallback path\nUsed if protect check\nis unavailable or times out" {
   style: {
     fill: "#eef3fb"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 17
   }
 }
 
-dashboard: "Dashboard view\nMetrics, incidents, and latest protect results" {
+dashboard: "Dashboard view\nMetrics, incidents,\nand latest results" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 16
+    font-size: 17
   }
 }
 
@@ -168,7 +168,7 @@ block -> alerts
 provider -> recording
 observe -> recording
 block -> recording
-app_call -> fallback: "If the check times out"
+app_call -> fallback: "If needed"
 fallback -> recording
 recording -> dashboard
 alerts -> dashboard
