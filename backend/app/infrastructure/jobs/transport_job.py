@@ -235,19 +235,6 @@ def _deliver_webhook(*, outbox_id: str) -> dict[str, object]:
     with httpx.Client(timeout=timeout) as client:
         response = client.post(target_url, content=body_bytes, headers=headers)
         response.raise_for_status()
-    logger.info(
-        "Webhook delivered",
-        extra=build_log_extra(
-            event="webhook_sent",
-            metadata={
-                "outbox_id": outbox.id,
-                "event_type": outbox.event_type,
-                "project_id": outbox.project_id,
-                "destination": target_url,
-                "status_code": getattr(response, "status_code", None),
-            },
-        ),
-    )
     _ = now
     return {
         "destination": target_url,

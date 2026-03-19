@@ -145,7 +145,9 @@ class MetricsService:
             exclude_event_types=exclude_event_types,
             since=cutoff,
         )
+        if latest is None or latest.status == "delivered":
+            return {"count": 0, "last_attempt_at": None}
         last_attempt_at = None
-        if latest is not None and latest.status in {"failed", "dead"}:
+        if latest.status in {"failed", "dead"}:
             last_attempt_at = (latest.delivered_at or latest.updated_at).isoformat()
         return {"count": int(count), "last_attempt_at": last_attempt_at}

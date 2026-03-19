@@ -128,7 +128,7 @@ def configure_logging(*, service_name: str = "backend", level: str | None = None
     access_logger.setLevel(logging.WARNING)
     access_logger.propagate = False
 
-    for logger_name in ("rq", "rq.worker", "rq.job", "rq.queue"):
+    for logger_name in ("rq", "rq.worker", "rq.job", "rq.queue", "httpx", "httpcore"):
         logger = logging.getLogger(logger_name)
         logger.handlers.clear()
         logger.setLevel(logging.WARNING)

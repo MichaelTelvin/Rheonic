@@ -266,3 +266,61 @@ def test_get_delivery_failures_uses_24h_window(tmp_path, monkeypatch) -> None:
     payload = service.get_delivery_failures(project_id="p1", kind="webhook")
     assert payload["count"] == 1
     assert str(payload["last_attempt_at"]).startswith("2026-03-17T10:01:00")
+
+
+def test_get_delivery_failures_returns_zero_after_more_recent_success(tmp_path, monkeypatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/delivery_failures_metrics_latest_success.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    outbox_repo = TransportOutboxRepositoryImpl(session_factory=session_factory)
+
+    base = datetime(2026, 3, 17, 12, 0, 0, tzinfo=timezone.utc)
+    failed_row, _ = outbox_repo.create_or_get_deduped(
+        project_id="p1",
+        kind="webhook",
+        event_type="policy_gap.detected",
+        destination="https://example.test/hook",
+        subject=None,
+        template=None,
+        payload={"event": "policy_gap.detected"},
+        dedupe_key="failed-row",
+        max_attempts=1,
+        now=base,
+    )
+    success_row, _ = outbox_repo.create_or_get_deduped(
+        project_id="p1",
+        kind="webhook",
+        event_type="policy_gap.detected",
+        destination="https://example.test/hook",
+        subject=None,
+        template=None,
+        payload={"event": "policy_gap.detected"},
+        dedupe_key="success-row",
+        max_attempts=1,
+        now=base + timedelta(minutes=5),
+    )
+
+    outbox_repo.claim_for_send(outbox_id=failed_row.id, now=base + timedelta(seconds=1))
+    outbox_repo.mark_failed(
+        outbox_id=failed_row.id,
+        now=base + timedelta(seconds=2),
+        error_code="webhook_http_error",
+        error_message="HTTP 500",
+        next_attempt_at=None,
+        dead=True,
+    )
+    outbox_repo.claim_for_send(outbox_id=success_row.id, now=base + timedelta(minutes=5, seconds=1))
+    outbox_repo.mark_delivered(outbox_id=success_row.id, now=base + timedelta(minutes=5, seconds=2))
+
+    service = MetricsService(
+        realtime_counters=_FakeRealtimeCounters(),
+        protect_action_store=_FakeProtectActionStore(),
+        project_repository=_FakeProjectRepository(),
+        transport_outbox_repository=outbox_repo,
+    )
+
+    _FrozenDateTime.set_current(base + timedelta(minutes=10))
+    monkeypatch.setattr("app.application.services.metrics_service.datetime", _FrozenDateTime)
+
+    payload = service.get_delivery_failures(project_id="p1", kind="webhook")
+    assert payload == {"count": 0, "last_attempt_at": None}
