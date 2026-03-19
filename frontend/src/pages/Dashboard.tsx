@@ -141,6 +141,8 @@ export function Dashboard(): JSX.Element {
   const [setupBannerDismissed, setSetupBannerDismissed] = useState<boolean>(() => readDismissedFlag(`rheonic:setupBannerDismissed:${projectId ?? "none"}`));
   const [webhookIssue, setWebhookIssue] = useState<{ count: number; lastAt: string | null } | null>(null);
   const [webhookIssueDismissedToken, setWebhookIssueDismissedToken] = useState<string | null>(null);
+  const [setupBannerClosing, setSetupBannerClosing] = useState<boolean>(false);
+  const [webhookIssueBannerClosing, setWebhookIssueBannerClosing] = useState<boolean>(false);
 
   const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
   const webhookIssueDismissStorageKey = useMemo<string>(() => `rheonic:webhookIssueDismissed:${projectId ?? "none"}`, [projectId]);
@@ -169,6 +171,8 @@ export function Dashboard(): JSX.Element {
   const showSetupBanner = !loadingProjects && setupStage !== "complete" && setupStage !== "checking" && !setupBannerDismissed;
   const webhookIssueToken = webhookIssue ? `${webhookIssue.lastAt ?? "none"}:${webhookIssue.count}` : null;
   const showWebhookIssueBanner = Boolean(projectId && webhookIssue && webhookIssueToken !== webhookIssueDismissedToken);
+  const renderSetupBanner = showSetupBanner || setupBannerClosing;
+  const renderWebhookIssueBanner = showWebhookIssueBanner || webhookIssueBannerClosing;
 
   const incidentSummary = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -198,6 +202,8 @@ export function Dashboard(): JSX.Element {
     setSetupStatusResolved(cached?.setupStatusResolved ?? false);
     setWebhookIssue(null);
     setWebhookIssueDismissedToken(null);
+    setSetupBannerClosing(false);
+    setWebhookIssueBannerClosing(false);
     setLastMetricsSuccessAt(cached?.lastMetricsSuccessAt ?? null);
   }, [projectId]);
 
@@ -281,16 +287,24 @@ export function Dashboard(): JSX.Element {
   }, [loadingProjects, projectId]);
 
   const dismissSetupBanner = useCallback((): void => {
-    window.localStorage.setItem(setupDismissStorageKey, "1");
-    setSetupBannerDismissed(true);
+    setSetupBannerClosing(true);
+    window.setTimeout(() => {
+      window.localStorage.setItem(setupDismissStorageKey, "1");
+      setSetupBannerDismissed(true);
+      setSetupBannerClosing(false);
+    }, 220);
   }, [setupDismissStorageKey]);
 
   const dismissWebhookIssueBanner = useCallback((): void => {
     if (!webhookIssueToken) {
       return;
     }
-    window.localStorage.setItem(webhookIssueDismissStorageKey, webhookIssueToken);
-    setWebhookIssueDismissedToken(webhookIssueToken);
+    setWebhookIssueBannerClosing(true);
+    window.setTimeout(() => {
+      window.localStorage.setItem(webhookIssueDismissStorageKey, webhookIssueToken);
+      setWebhookIssueDismissedToken(webhookIssueToken);
+      setWebhookIssueBannerClosing(false);
+    }, 220);
   }, [webhookIssueDismissStorageKey, webhookIssueToken]);
 
   const setupBannerContent = useMemo<{
@@ -649,11 +663,11 @@ export function Dashboard(): JSX.Element {
   return (
     <main className="dashboard">
       <div className="dashboard-content">
-        {(globalBanner || showSetupBanner || showWebhookIssueBanner) ? (
+        {(globalBanner || renderSetupBanner || renderWebhookIssueBanner) ? (
           <section className="dashboard-banner-rail" aria-live="polite">
             {globalBanner ? <section className="banner dashboard-floating-banner">{globalBanner}</section> : null}
-            {showSetupBanner ? (
-              <section className="setup-banner dashboard-floating-banner">
+            {renderSetupBanner ? (
+              <section className={`setup-banner dashboard-floating-banner${setupBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
                 <div className="setup-banner-copy">
                   <div className="setup-banner-title">{setupBannerContent.title}</div>
                   <div className="setup-banner-text">{setupBannerContent.text}</div>
@@ -675,8 +689,8 @@ export function Dashboard(): JSX.Element {
                 </div>
               </section>
             ) : null}
-            {showWebhookIssueBanner ? (
-              <Card className="dashboard-alert-card dashboard-floating-banner">
+            {renderWebhookIssueBanner ? (
+              <Card className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
                 <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
                 <p className="subtle">
                   {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}

@@ -1869,18 +1869,27 @@ select {
 
 .dashboard-banner-rail {
   position: fixed;
-  top: 82px;
-  right: 24px;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 16;
-  width: min(420px, calc(100vw - 296px));
+  width: min(760px, calc(100vw - 340px));
   display: grid;
   gap: 12px;
   pointer-events: none;
+  justify-items: center;
 }
 
 .dashboard-floating-banner {
   margin: 0;
   pointer-events: auto;
+  width: 100%;
+  animation: dashboardBannerSlideIn 220ms ease;
+  transform-origin: top center;
+}
+
+.dashboard-floating-banner--closing {
+  animation: dashboardBannerSlideOut 220ms ease forwards;
 }
 
 .setup-banner {
@@ -1897,6 +1906,30 @@ select {
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.16);
   position: relative;
   overflow: hidden;
+}
+
+@keyframes dashboardBannerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashboardBannerSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-18px);
+  }
 }
 
 .setup-banner::before {
@@ -2549,8 +2582,8 @@ pre {
   }
 
   .dashboard-banner-rail {
-    right: 18px;
-    width: min(420px, calc(100vw - 276px));
+    top: 74px;
+    width: min(720px, calc(100vw - 300px));
   }
 
   .setup-banner {
@@ -4104,9 +4137,9 @@ pre {
 
   .dashboard-banner-rail {
     top: 72px;
-    left: 20px;
-    right: 20px;
-    width: auto;
+    left: 50%;
+    right: auto;
+    width: min(680px, calc(100vw - 40px));
   }
 
   .current-project-bar {
@@ -4261,9 +4294,9 @@ pre {
 
   .dashboard-banner-rail {
     top: 72px;
-    right: 14px;
-    left: 14px;
-    width: auto;
+    left: 50%;
+    right: auto;
+    width: calc(100vw - 28px);
   }
 
   .current-project-bar {
