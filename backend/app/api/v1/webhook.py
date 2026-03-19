@@ -16,8 +16,7 @@ from app.dependencies import (
     get_transport_outbox_repository,
 )
 from app.domain.models.user import User
-from app.logger import get_logger
-from app.observability import generate_span_id, generate_trace_id, get_trace_id
+from app.logger import generate_span_id, generate_trace_id, get_logger, get_trace_id
 from app.security.webhook_urls import ensure_webhook_url_is_safe, normalize_webhook_url
 
 logger = get_logger(__name__)
