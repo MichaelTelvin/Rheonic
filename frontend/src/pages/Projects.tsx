@@ -156,30 +156,35 @@ export function Projects(): JSX.Element {
                 <span>Name</span>
                 <span>ID</span>
                 <span>Created</span>
-                <span className="table-actions-header">Actions</span>
+                <span className="table-actions-header">Status</span>
               </div>
               {projects.map((project) => (
                 <div className={`project-table-row${project.id === projectId ? " is-selected" : ""}`} key={project.id}>
                   <span className="key-name">{project.name}</span>
-                  <span className="subtle mono" title={project.id}>
-                    {shortId(project.id)}
-                  </span>
+                  <div className="project-id-cell">
+                    <span className="subtle mono" title={project.id}>
+                      {shortId(project.id)}
+                    </span>
+                    <button
+                      type="button"
+                      className="project-id-copy-button"
+                      onClick={() => void onCopyProjectId(project.id)}
+                      aria-label={`Copy project ID for ${project.name}`}
+                    >
+                      Copy
+                    </button>
+                  </div>
                   <span className="subtle">{formatRelative(project.created_at)}</span>
                   <div className="table-actions-cell project-table-actions">
                     <button
                       type="button"
-                      className="table-action-button"
-                      onClick={() => void onCopyProjectId(project.id)}
-                    >
-                      Copy ID
-                    </button>
-                    <button
-                      type="button"
-                      className={`table-action-button project-selection-button${project.id === projectId ? " is-selected" : ""}`}
+                      className="project-selection-button"
                       onClick={() => setProjectId(project.id)}
                       aria-pressed={project.id === projectId}
                     >
-                      {project.id === projectId ? "Selected" : "Select"}
+                      <span className={`project-selection-label${project.id === projectId ? " is-selected" : ""}`}>
+                        {project.id === projectId ? "Selected" : "Click to select"}
+                      </span>
                     </button>
                   </div>
                 </div>
