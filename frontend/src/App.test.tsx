@@ -71,6 +71,29 @@ describe("App", () => {
       protect_max_req_per_min: null,
       protect_max_tok_per_min: null,
     });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        const docs: Record<string, string> = {
+          "/docs/privacy.md": "# Privacy Policy\n\nWe collect account, project, and usage data needed to operate Rheonic.",
+          "/docs/terms.md": "# Terms of Use\n\nRheonic is provided for business evaluation and operational monitoring of LLM traffic.",
+          "/docs/dpa.md": "# Data Processing Addendum\n\nCustomer is the data controller.",
+        };
+        const body = docs[url];
+
+        if (!body) {
+          return Promise.resolve(new Response("Not found", { status: 404 }));
+        }
+
+        return Promise.resolve(
+          new Response(body, {
+            status: 200,
+            headers: { "Content-Type": "text/markdown" },
+          }),
+        );
+      }),
+    );
   });
 
   it("renders landing on public root with CTA buttons", () => {
@@ -99,34 +122,34 @@ describe("App", () => {
     expect(screen.getByText(/pip install/i)).toBeDefined();
   });
 
-  it("renders privacy page on /privacy", () => {
+  it("renders privacy page on /privacy", async () => {
     render(
       <TestRouter initialEntries={["/privacy"]}>
         <App />
       </TestRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Privacy Policy" })).toBeDefined();
-    expect(screen.getByText(/We collect account, project, and usage data/i)).toBeDefined();
+    expect(await screen.findByRole("heading", { name: "Privacy Policy" })).toBeDefined();
+    expect(await screen.findByText(/We collect account, project, and usage data/i)).toBeDefined();
   });
 
-  it("renders terms page on /terms", () => {
+  it("renders terms page on /terms", async () => {
     render(
       <TestRouter initialEntries={["/terms"]}>
         <App />
       </TestRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Terms of Use" })).toBeDefined();
-    expect(screen.getByText(/Rheonic is provided for business evaluation and operational monitoring/i)).toBeDefined();
+    expect(await screen.findByRole("heading", { name: "Terms of Use" })).toBeDefined();
+    expect(await screen.findByText(/Rheonic is provided for business evaluation and operational monitoring/i)).toBeDefined();
   });
 
-  it("renders dpa page on /dpa", () => {
+  it("renders dpa page on /dpa", async () => {
     render(
       <TestRouter initialEntries={["/dpa"]}>
         <App />
       </TestRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Data Processing Addendum" })).toBeDefined();
-    expect(screen.getByText(/Customer is the data controller/i)).toBeDefined();
+    expect(await screen.findByRole("heading", { name: "Data Processing Addendum" })).toBeDefined();
+    expect(await screen.findByText(/Customer is the data controller/i)).toBeDefined();
   });
 
   it("renders dashboard after login success", async () => {

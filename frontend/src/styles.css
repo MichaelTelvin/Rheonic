@@ -600,10 +600,6 @@ body {
   overflow-wrap: anywhere;
 }
 
-.public-footer-contact-email {
-  color: #60a5fa;
-}
-
 .quickstart-page {
   margin-top: 28px;
 }
@@ -6928,7 +6924,11 @@ html {
 
 .docs-article h1,
 .docs-article h2,
-.docs-article p {
+.docs-article h3,
+.docs-article p,
+.docs-article ul,
+.docs-article ol,
+.docs-article pre {
   max-width: 70ch;
 }
 
@@ -6943,10 +6943,53 @@ html {
   letter-spacing: 0.02em;
 }
 
+.docs-article h3 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1rem;
+}
+
 .docs-article p {
   margin: 0 0 1rem;
   color: rgba(17, 25, 49, 0.82);
   line-height: 1.65;
+}
+
+.docs-article ul,
+.docs-article ol {
+  margin: 0 0 1rem;
+  padding-left: 1.3rem;
+  color: rgba(17, 25, 49, 0.82);
+  line-height: 1.65;
+}
+
+.docs-article li + li {
+  margin-top: 0.35rem;
+}
+
+.docs-article a {
+  color: #0d32b2;
+}
+
+.docs-article code {
+  padding: 0.12rem 0.35rem;
+  border-radius: 0.35rem;
+  background: rgba(13, 50, 178, 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.95em;
+}
+
+.docs-article pre {
+  margin: 0 0 1rem;
+  padding: 1rem;
+  overflow-x: auto;
+  border: 1px solid rgba(19, 45, 99, 0.12);
+  border-radius: 1rem;
+  background: rgba(13, 50, 178, 0.04);
+}
+
+.docs-article pre code {
+  padding: 0;
+  background: transparent;
 }
 
 .docs-eyebrow {

@@ -109,7 +109,7 @@ export function PublicLayout({
                 <Link to="/dpa">DPA</Link>
               </div>
               <p className="public-footer-contact">
-                Questions or feedback:{" "}
+                Feedback:{" "}
                 <span className="public-footer-contact-email">
                   {publicContactEmail}
                 </span>
