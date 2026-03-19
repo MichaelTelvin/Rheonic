@@ -15,8 +15,12 @@ router = APIRouter()
 
 class FeedbackIn(BaseModel):
     # Frontend feedback payload.
+    report_type: str | None = None
     message: str
     email: str | None = None
+    screenshot_name: str | None = None
+    screenshot_content_type: str | None = None
+    screenshot_base64: str | None = None
     project_id: str | None = None
     page: str | None = None
     mode: str | None = None
@@ -36,7 +40,11 @@ def send_feedback(
         raise HTTPException(status_code=400, detail="message is required")
 
     event_time = payload.timestamp or datetime.now(timezone.utc).isoformat()
+    screenshot_name = (payload.screenshot_name or "").strip()
+    screenshot_content_type = (payload.screenshot_content_type or "").strip()
+    screenshot_base64 = (payload.screenshot_base64 or "").strip()
     payload_body: dict[str, object] = {
+        "report_type": (payload.report_type or "").strip() or "feedback",
         "message": message,
         "email": (payload.email or "").strip() or current_user.email,
         "user_id": current_user.id,
@@ -47,6 +55,10 @@ def send_feedback(
         "timestamp": event_time,
         "app_version": (payload.app_version or "").strip() or "-",
     }
+    if screenshot_name and screenshot_content_type and screenshot_base64:
+        payload_body["screenshot_name"] = screenshot_name
+        payload_body["screenshot_content_type"] = screenshot_content_type
+        payload_body["screenshot_base64"] = screenshot_base64
 
     try:
         dedupe_key = build_transport_dedupe_key(

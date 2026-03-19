@@ -86,7 +86,7 @@ def test_feedback_email_delivery_uses_system_sender_and_reply_to(tmp_path, monke
         project_id="p1",
         kind="email",
         event_type="feedback.submitted",
-        payload={"message": "test", "timestamp": "2026-03-15T10:00:00Z"},
+        payload={"report_type": "bug", "message": "test", "timestamp": "2026-03-15T10:00:00Z"},
         dedupe_key="feedback-email-delivery",
         template="feedback_submitted",
     )
@@ -114,7 +114,61 @@ def test_feedback_email_delivery_uses_system_sender_and_reply_to(tmp_path, monke
     assert payload["from"] == "Rheonic System <system@mail.rheonic.dev>"
     assert payload["to"] == ["ops@rheonic.dev"]
     assert payload["reply_to"] == ["contact@rheonic.dev"]
-    assert payload["subject"] == "Rheonic beta feedback"
+    assert payload["subject"] == "Rheonic beta bug report"
+
+
+def test_feedback_email_delivery_passes_screenshot_attachment_to_provider(tmp_path, monkeypatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_email_feedback_attachment.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: None,
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+    outbox_id = service.enqueue(
+        project_id="p1",
+        kind="email",
+        event_type="feedback.submitted",
+        payload={
+            "report_type": "bug",
+            "message": "test",
+            "timestamp": "2026-03-15T10:00:00Z",
+            "screenshot_name": "bug.png",
+            "screenshot_content_type": "image/png",
+            "screenshot_base64": "ZmFrZS1wbmctYnl0ZXM=",
+        },
+        dedupe_key="feedback-email-attachment",
+        template="feedback_submitted",
+    )
+
+    sent: list[dict[str, object]] = []
+    settings = transport_job.Settings(
+        database_url=db_url,
+        redis_url="redis://localhost:6379/15",
+        resend_api_key="re_test",
+        email_from_alerts="Rheonic Alerts <alerts@mail.rheonic.dev>",
+        email_from_system="Rheonic System <system@mail.rheonic.dev>",
+        email_reply_to="contact@rheonic.dev",
+        feedback_report_email="ops@rheonic.dev",
+    )
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeEmailClient(sent))
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id)
+
+    assert len(sent) == 1
+    attachments = sent[0]["json"]["attachments"]
+    assert attachments == [
+        {
+            "filename": "bug.png",
+            "content": "ZmFrZS1wbmctYnl0ZXM=",
+            "content_type": "image/png",
+        }
+    ]
 
 
 def test_alert_email_delivery_resolves_project_owner_and_alert_sender(tmp_path, monkeypatch) -> None:

@@ -29,6 +29,7 @@ class ResendEmailTransport:
         text: str | None = None,
         from_email: str,
         reply_to: str | None = None,
+        attachments: list[dict[str, str]] | None = None,
     ) -> None:
         payload: dict[str, object] = {
             "from": from_email,
@@ -40,6 +41,8 @@ class ResendEmailTransport:
             payload["text"] = text
         if reply_to:
             payload["reply_to"] = [reply_to]
+        if attachments:
+            payload["attachments"] = attachments
 
         headers = {
             "Authorization": f"Bearer {self._api_key}",

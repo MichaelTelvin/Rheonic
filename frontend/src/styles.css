@@ -2210,6 +2210,11 @@ pre {
   resize: vertical;
 }
 
+.feedback-attachment-hint {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+}
+
 .keys-create-row {
   display: flex;
   gap: 10px;

@@ -38,6 +38,7 @@ def test_feedback_endpoint_enqueues_outbox_email_and_returns_202(tmp_path) -> No
     response = client.post(
         "/api/v1/feedback",
         json={
+            "report_type": "bug",
             "message": "The alerts setup was confusing.",
             "email": "feedback@example.com",
             "project_id": "p1",
@@ -59,8 +60,11 @@ def test_feedback_endpoint_enqueues_outbox_email_and_returns_202(tmp_path) -> No
         assert row.event_type == "feedback.submitted"
         assert row.template == "feedback_submitted"
         assert row.status == "pending"
+        assert row.payload["report_type"] == "bug"
         assert row.payload["message"] == "The alerts setup was confusing."
+        assert row.payload["user_id"] == "u1"
         assert row.payload["user_email"] == "user@example.com"
+        assert row.payload["project_id"] == "p1"
 
     app.dependency_overrides.clear()
 

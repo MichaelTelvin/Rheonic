@@ -301,6 +301,7 @@ def _deliver_email(*, outbox_id: str, settings: Settings) -> dict[str, object]:
     sender = _resolve_email_sender(settings=settings, event_type=outbox.event_type)
     reply_to = (settings.email_reply_to or "").strip() or None
     transport = _build_email_transport(settings=settings)
+    attachments = _extract_email_attachments(outbox.payload or {})
     transport.send(
         to=destination,
         subject=subject,
@@ -308,6 +309,7 @@ def _deliver_email(*, outbox_id: str, settings: Settings) -> dict[str, object]:
         text=rendered.get("text"),
         from_email=sender,
         reply_to=reply_to,
+        attachments=attachments,
     )
     return {"destination": destination}
 
@@ -373,6 +375,21 @@ def _build_email_transport(*, settings: Settings):
     if provider:
         raise ValueError(f"unsupported email provider: {provider}")
     return NullEmailTransport()
+
+
+def _extract_email_attachments(payload: dict[str, object]) -> list[dict[str, str]] | None:
+    screenshot_name = str(payload.get("screenshot_name") or "").strip()
+    screenshot_content_type = str(payload.get("screenshot_content_type") or "").strip()
+    screenshot_base64 = str(payload.get("screenshot_base64") or "").strip()
+    if not screenshot_name or not screenshot_content_type or not screenshot_base64:
+        return None
+    return [
+        {
+            "filename": screenshot_name,
+            "content": screenshot_base64,
+            "content_type": screenshot_content_type,
+        }
+    ]
 
 
 def _enqueue_webhook_failure_email(*, outbox, settings: Settings) -> None:

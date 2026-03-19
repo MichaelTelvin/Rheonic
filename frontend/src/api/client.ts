@@ -119,8 +119,12 @@ export interface LoginResponse {
 }
 
 export interface FeedbackInput {
+  report_type?: "feedback" | "bug";
   message: string;
   email?: string | null;
+  screenshot_name?: string | null;
+  screenshot_content_type?: string | null;
+  screenshot_base64?: string | null;
   project_id?: string | null;
   page?: string | null;
   mode?: string | null;

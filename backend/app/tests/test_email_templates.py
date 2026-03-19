@@ -26,6 +26,7 @@ def test_email_template_helpers_render_human_readable_values() -> None:
 
 def test_feedback_template_snapshot_is_deterministic() -> None:
     payload = {
+        "report_type": "bug",
         "message": "Need dark mode",
         "email": "u@example.com",
         "user_id": "u1",
@@ -37,10 +38,11 @@ def test_feedback_template_snapshot_is_deterministic() -> None:
         "app_version": "1.2.3",
     }
     rendered = render_template("feedback_submitted", payload)
-    assert rendered["subject"] == "Rheonic beta feedback"
-    assert "Rheonic beta feedback" in rendered["html"]
-    assert "New feedback submission received." in rendered["html"]
+    assert rendered["subject"] == "Rheonic beta bug report"
+    assert "Rheonic beta bug report" in rendered["html"]
+    assert "New product report received." in rendered["html"]
     assert "System" in rendered["html"]
+    assert "report_type: Bug report" in rendered["text"]
     assert "Mar 05, 2026 10:00 UTC" in rendered["html"]
     assert "timestamp: Mar 05, 2026 10:00 UTC" in rendered["text"]
     assert render_template("feedback_submitted", payload) == rendered

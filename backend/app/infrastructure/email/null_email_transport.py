@@ -19,7 +19,8 @@ class NullEmailTransport:
         text: str | None = None,
         from_email: str,
         reply_to: str | None = None,
+        attachments: list[dict[str, str]] | None = None,
     ) -> None:
-        _ = to, subject, html, text, from_email, reply_to
+        _ = to, subject, html, text, from_email, reply_to, attachments
         logger.info("Null email transport invoked")
         raise EmailProviderNotConfiguredError("email provider not configured")
