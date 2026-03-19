@@ -32,17 +32,9 @@ We are actively expanding Rheonic beyond the current protect and incident set. P
 - additional policy actions and tuning presets,
 - deeper analytics and longer-term trend views.
 
-## Supported Integrations
-- Node SDK
-- Python SDK
-- OpenAI
-- Anthropic
-- Google
-
 ## Recommended Reading
 1. `Quickstart` for first-time setup.
-2. `Integrations` for SDK usage patterns.
-3. `Protect Mode` before enabling enforcement.
-4. `Alerts` if you want email or webhook delivery.
-5. `Roadmap` for upcoming product direction.
-6. `API Reference` for endpoint-level details.
+2. `Protect Mode` before enabling enforcement.
+3. `Alerts` if you want email or webhook delivery.
+4. `Roadmap` for upcoming product direction.
+5. `API Reference` for endpoint-level details.

@@ -18,11 +18,6 @@ const docs: DocItem[] = [
     href: "/docs/viewer.html?doc=quickstart",
   },
   {
-    title: "Integrations",
-    description: "SDK setup, provider wrappers, and runtime integration patterns.",
-    href: "/docs/viewer.html?doc=integrations",
-  },
-  {
     title: "Protect Mode",
     description: "Observe versus Protect, caps, fail modes, and rollout guidance.",
     href: "/docs/viewer.html?doc=protect-mode",
@@ -60,7 +55,7 @@ export function Architecture(): JSX.Element {
       <div className="dashboard-content page-stack">
         <section>
           <h1 className="page-title">Documentation</h1>
-          <p className="page-subtitle">Customer docs for setup, integrations, runtime protection, and operations</p>
+          <p className="page-subtitle">Customer docs for setup, runtime protection, and operations</p>
         </section>
 
         <section className="docs-hub-grid">

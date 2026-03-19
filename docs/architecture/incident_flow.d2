@@ -18,17 +18,17 @@ event: "Runtime event\nsent to Rheonic" {
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 14
+    font-size: 12
   }
 }
 
-signals: "Usage signals update\nRecent requests and token activity" {
+signals: "Usage signals update\nRecent request and token activity" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 14
+    font-size: 12
   }
 }
 
@@ -38,7 +38,7 @@ risk_check: "Risk is evaluated\nNear-cap pressure or unusual patterns" {
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 14
+    font-size: 12
   }
 }
 
@@ -48,27 +48,17 @@ incident: "Incident opens or updates\nRepeated activity is grouped together" {
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 14
+    font-size: 12
   }
 }
 
-alerts: "Alerts are queued\nWebhook or email can be sent" {
+alerts: "Alerts can be sent\nWebhook or email" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 14
-  }
-}
-
-delivery: "Alert delivery runs\nRetries happen automatically" {
-  style: {
-    fill: "#e4edf8"
-    stroke: "#7e95be"
-    font-color: "#21324d"
-    border-radius: 16
-    font-size: 14
+    font-size: 12
   }
 }
 
@@ -78,27 +68,17 @@ resolve: "Incident resolves\nManually or after activity settles" {
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 14
+    font-size: 12
   }
 }
 
-history: "Incident history\nOpen and resolved states are kept" {
+dashboard: "Dashboard view\nLive incidents, history,\nand alert results" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
     border-radius: 16
-    font-size: 14
-  }
-}
-
-dashboard: "Dashboard view\nLive incidents, history,\nand delivery results" {
-  style: {
-    fill: "#e4edf8"
-    stroke: "#7e95be"
-    font-color: "#21324d"
-    border-radius: 16
-    font-size: 14
+    font-size: 12
   }
 }
 
@@ -106,9 +86,6 @@ event -> signals
 signals -> risk_check
 risk_check -> incident
 incident -> alerts
-alerts -> delivery
-delivery -> dashboard
 incident -> resolve
-resolve -> history
-history -> alerts: "Resolved update"
-history -> dashboard
+alerts -> dashboard
+resolve -> dashboard

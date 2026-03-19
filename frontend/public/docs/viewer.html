@@ -156,7 +156,6 @@
         <div id="doc-tabs" class="tabs">
           <a id="tab-overview" class="tab" href="?doc=overview">Overview</a>
           <a id="tab-quickstart" class="tab" href="?doc=quickstart">Quickstart</a>
-          <a id="tab-integrations" class="tab" href="?doc=integrations">Integrations</a>
           <a id="tab-protect-mode" class="tab" href="?doc=protect-mode">Protect Mode</a>
           <a id="tab-incidents" class="tab" href="?doc=incidents">Incidents</a>
           <a id="tab-alerts" class="tab" href="?doc=alerts">Alerts</a>
@@ -280,7 +279,7 @@
       }
 
       (function () {
-        const allowedDocs = new Set(["overview", "quickstart", "integrations", "protect-mode", "incidents", "alerts", "roadmap", "api-reference", "architecture"]);
+        const allowedDocs = new Set(["overview", "quickstart", "protect-mode", "incidents", "alerts", "roadmap", "api-reference", "architecture"]);
         const allowedCharts = new Set(["incident", "protect"]);
         const docCache = new Map();
         const docTabs = document.getElementById("doc-tabs");

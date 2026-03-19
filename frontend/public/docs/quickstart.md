@@ -134,6 +134,5 @@ Open `Alerts` to:
 - test webhook delivery before relying on it in production.
 
 ## Next Steps
-- Read `Integrations` for provider wrappers and runtime behavior.
 - Read `Protect Mode` before rollout.
 - Read `Alerts` if you want email or webhook notifications.
