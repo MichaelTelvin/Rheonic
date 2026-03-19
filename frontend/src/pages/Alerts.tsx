@@ -279,7 +279,6 @@ export function Alerts(): JSX.Element {
       return;
     }
     setWebhookTesting(true);
-    setWebhookError(null);
     try {
       if (webhookTestMarkerKey) {
         window.localStorage.setItem(webhookTestMarkerKey, String(Date.now()));
@@ -288,20 +287,19 @@ export function Alerts(): JSX.Element {
         url: webhookUrlInput.trim() || undefined,
       });
       if (result.status === "success") {
-        const suffix = result.status_code ? ` (${result.status_code})` : "";
-        showAppToast(`Webhook test succeeded${suffix}`);
+        showAppToast("Webhook test succeeded");
       } else {
-        const detail = result.error ?? (result.status_code ? `HTTP ${result.status_code}` : null);
+        const detail = result.error?.trim();
         showAppToast(detail ? `Webhook test failed: ${detail}` : "Webhook test failed");
       }
       await reloadWebhookSettings(true, false);
     } catch (error) {
-      if (error instanceof ApiError && error.status) {
-        showAppToast(`Webhook test failed (HTTP ${error.status})`);
+      if (error instanceof ApiError) {
+        const detail = error.message?.trim();
+        showAppToast(detail ? `Webhook test failed: ${detail}` : "Webhook test failed");
       } else {
         showAppToast("Webhook test failed");
       }
-      setWebhookError(error instanceof Error ? error.message : "Failed to queue webhook test.");
     } finally {
       setWebhookTesting(false);
     }

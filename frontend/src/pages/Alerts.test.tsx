@@ -131,7 +131,7 @@ describe("Alerts webhook settings", () => {
       url: "https://hooks.example.test/rheonic",
     });
     expect(mocks.updateProjectWebhook).not.toHaveBeenCalled();
-    await waitFor(() => expect(mocks.showAppToast).toHaveBeenCalledWith("Webhook test succeeded (200)"));
+    await waitFor(() => expect(mocks.showAppToast).toHaveBeenCalledWith("Webhook test succeeded"));
   });
 
   it("allows webhook test with a URL draft even when webhook delivery is toggled off", async () => {

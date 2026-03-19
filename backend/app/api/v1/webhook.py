@@ -8,7 +8,7 @@ from pydantic import AnyHttpUrl, BaseModel
 
 from app.application.interfaces.transport_outbox_repository import TransportOutboxRepository
 from app.application.services.project_service import ProjectService
-from app.config import Settings
+from app.config import Settings, app_config
 from app.dependencies import (
     get_current_user,
     get_project_service,
@@ -155,6 +155,7 @@ def test_project_webhook(
 
 
 def _send_webhook_test_request(*, project_id: str, target_url: str, settings: Settings) -> httpx.Response:
+    _ = settings
     payload = {
         "event": "webhook.test",
         "project_id": project_id,
@@ -168,10 +169,10 @@ def _send_webhook_test_request(*, project_id: str, target_url: str, settings: Se
         "X-Span-ID": generate_span_id(),
     }
     timeout = httpx.Timeout(
-        connect=settings.webhook_timeout_connect_seconds,
-        read=settings.webhook_timeout_read_seconds,
-        write=settings.webhook_timeout_write_seconds,
-        pool=settings.webhook_timeout_pool_seconds,
+        connect=app_config.webhook_timeout_connect_seconds,
+        read=app_config.webhook_timeout_read_seconds,
+        write=app_config.webhook_timeout_write_seconds,
+        pool=app_config.webhook_timeout_pool_seconds,
     )
     with httpx.Client(timeout=timeout) as client:
         response = client.post(target_url, content=body_bytes, headers=headers)
