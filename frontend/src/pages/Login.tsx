@@ -62,6 +62,8 @@ export function Login({ onAuthSuccess }: LoginProps): JSX.Element {
     void onSubmit();
   };
 
+  const passwordMessage = passwordError || formError;
+
   return (
     <main className="auth-page">
       <section className="auth-card">
@@ -86,7 +88,7 @@ export function Login({ onAuthSuccess }: LoginProps): JSX.Element {
           <label htmlFor="login-password">Password</label>
           <input
             id="login-password"
-            className={`text-input ${passwordError ? "input-error" : ""}`}
+            className={`text-input ${passwordMessage ? "input-error" : ""}`}
             type="password"
             autoComplete={isRegister ? "new-password" : "current-password"}
             value={password}
@@ -97,8 +99,7 @@ export function Login({ onAuthSuccess }: LoginProps): JSX.Element {
             }}
             placeholder={isRegister ? "12+ chars, upper/lower, number, symbol" : "Your password"}
           />
-          <p className="input-error-slot">{passwordError || "\u00A0"}</p>
-          <p className="input-error-slot">{formError || "\u00A0"}</p>
+          <p className="input-error-slot">{passwordMessage || "\u00A0"}</p>
 
           <div className="auth-actions">
             <button type="submit" className="modal-button modal-primary auth-submit-button" disabled={busy}>
