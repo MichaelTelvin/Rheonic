@@ -6935,17 +6935,20 @@ html {
 .docs-article h1 {
   margin: 0 0 1rem;
   font-size: clamp(2.4rem, 4vw, 3.4rem);
+  color: #111931;
 }
 
 .docs-article h2 {
   margin: 2rem 0 0.65rem;
   font-size: 1.1rem;
   letter-spacing: 0.02em;
+  color: #111931;
 }
 
 .docs-article h3 {
   margin: 1.5rem 0 0.5rem;
   font-size: 1rem;
+  color: #111931;
 }
 
 .docs-article p {
