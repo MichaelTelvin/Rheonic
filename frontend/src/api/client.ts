@@ -77,6 +77,12 @@ export interface TestProjectWebhookInput {
   url?: string;
 }
 
+export interface TestProjectWebhookResult {
+  status: "success" | "failed" | string;
+  status_code?: number | null;
+  error?: string | null;
+}
+
 export interface UpdateProjectProtectInput {
   protect_enabled: boolean;
   protect_fail_mode: "open" | "closed";
@@ -334,8 +340,8 @@ export async function updateProjectWebhook(
   });
 }
 
-export async function testProjectWebhook(projectId: string, payload?: TestProjectWebhookInput): Promise<{ status: string }> {
-  return request<{ status: string }>(`/api/v1/projects/${encodeURIComponent(projectId)}/webhook/test`, {
+export async function testProjectWebhook(projectId: string, payload?: TestProjectWebhookInput): Promise<TestProjectWebhookResult> {
+  return request<TestProjectWebhookResult>(`/api/v1/projects/${encodeURIComponent(projectId)}/webhook/test`, {
     method: "POST",
     body: payload ? JSON.stringify(payload) : undefined,
   });

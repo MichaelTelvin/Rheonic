@@ -284,10 +284,16 @@ export function Alerts(): JSX.Element {
       if (webhookTestMarkerKey) {
         window.localStorage.setItem(webhookTestMarkerKey, String(Date.now()));
       }
-      await testProjectWebhook(projectId, {
+      const result = await testProjectWebhook(projectId, {
         url: webhookUrlInput.trim() || undefined,
       });
-      showAppToast("Webhook test queued");
+      if (result.status === "success") {
+        const suffix = result.status_code ? ` (${result.status_code})` : "";
+        showAppToast(`Webhook test succeeded${suffix}`);
+      } else {
+        const detail = result.error ?? (result.status_code ? `HTTP ${result.status_code}` : null);
+        showAppToast(detail ? `Webhook test failed: ${detail}` : "Webhook test failed");
+      }
       await reloadWebhookSettings(true, false);
     } catch (error) {
       if (error instanceof ApiError && error.status) {

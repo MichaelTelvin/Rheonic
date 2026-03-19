@@ -75,7 +75,7 @@ describe("Alerts webhook settings", () => {
       last_at: null,
       last_error: null,
     });
-    mocks.testProjectWebhook.mockResolvedValue({ status: "queued" });
+    mocks.testProjectWebhook.mockResolvedValue({ status: "success", status_code: 200, error: null });
     mocks.showAppToast.mockReset();
   });
 
@@ -131,7 +131,7 @@ describe("Alerts webhook settings", () => {
       url: "https://hooks.example.test/rheonic",
     });
     expect(mocks.updateProjectWebhook).not.toHaveBeenCalled();
-    await waitFor(() => expect(mocks.showAppToast).toHaveBeenCalledWith("Webhook test queued"));
+    await waitFor(() => expect(mocks.showAppToast).toHaveBeenCalledWith("Webhook test succeeded (200)"));
   });
 
   it("allows webhook test with a URL draft even when webhook delivery is toggled off", async () => {
