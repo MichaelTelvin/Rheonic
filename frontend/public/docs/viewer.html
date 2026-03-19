@@ -96,6 +96,15 @@
       .doc.chart-doc {
         max-width: none;
       }
+      .doc-loading {
+        min-height: 52vh;
+        display: flex;
+        align-items: flex-start;
+      }
+      .doc-loading p {
+        margin: 0;
+        color: #475569;
+      }
       .chart-image {
         max-width: 100%;
         height: auto;
@@ -267,16 +276,6 @@
         return out.join("");
       }
 
-      function freezePanelHeight(panel) {
-        panel.style.minHeight = Math.max(panel.offsetHeight, window.innerHeight * 0.68) + "px";
-      }
-
-      function releasePanelHeight(panel) {
-        window.requestAnimationFrame(() => {
-          panel.style.minHeight = "";
-        });
-      }
-
       (function () {
         const allowedDocs = new Set(["overview", "quickstart", "protect-mode", "incidents", "alerts", "roadmap", "api-reference", "architecture"]);
         const allowedCharts = new Set(["incident", "protect"]);
@@ -311,42 +310,27 @@
           }
         }
 
-        function prefetchAssets() {
-          allowedDocs.forEach((doc) => {
-            fetch("./" + doc + ".md", { cache: "force-cache" })
-              .then((response) => (response.ok ? response.text() : null))
-              .then((markdown) => {
-                if (typeof markdown === "string" && !docCache.has(doc)) {
-                  docCache.set(doc, renderMarkdown(markdown));
-                }
-              })
-              .catch(() => {});
-          });
-
-          ["/docs/architecture/incident_flow.svg", "/docs/architecture/protect_decision_flow.svg"].forEach((src) => {
-            const image = new Image();
-            image.decoding = "async";
-            image.src = src;
-          });
-        }
-
         async function renderRoute(route) {
-          freezePanelHeight(panel);
           setActiveTabs(route);
 
           if (route.chart) {
             panel.className = "canvas chart " + route.chart;
             target.className = "doc chart-doc";
+            target.innerHTML = "<div class='doc-loading'><p>Loading chart...</p></div>";
             const src = route.chart === "protect" ? "/docs/architecture/protect_decision_flow.svg" : "/docs/architecture/incident_flow.svg";
             const alt = route.chart === "protect" ? "Protect decision flow" : "Incident flow";
-            target.innerHTML = '<img class="chart-image" src="' + src + '" alt="' + alt + '" />';
-            const image = target.querySelector(".chart-image");
-            if (image) {
-              image.addEventListener("load", () => releasePanelHeight(panel), { once: true });
-              image.addEventListener("error", () => releasePanelHeight(panel), { once: true });
-            } else {
-              releasePanelHeight(panel);
-            }
+            const image = new Image();
+            image.className = "chart-image";
+            image.alt = alt;
+            image.decoding = "async";
+            image.onload = () => {
+              target.innerHTML = "";
+              target.appendChild(image);
+            };
+            image.onerror = () => {
+              target.innerHTML = "<p class='muted'>Failed to load chart.</p>";
+            };
+            image.src = src;
             return;
           }
 
@@ -356,12 +340,12 @@
           const cacheKey = route.doc;
           if (docCache.has(cacheKey)) {
             target.innerHTML = docCache.get(cacheKey);
-            releasePanelHeight(panel);
             return;
           }
 
+          target.innerHTML = "<div class='doc-loading'><p>Loading document...</p></div>";
           try {
-            const response = await fetch("./" + route.doc + ".md", { cache: "no-store" });
+            const response = await fetch("./" + route.doc + ".md");
             if (!response.ok) {
               throw new Error("HTTP " + response.status);
             }
@@ -371,9 +355,26 @@
             target.innerHTML = rendered;
           } catch (error) {
             target.innerHTML = "<p class='muted'>Failed to load document.</p>";
-          } finally {
-            releasePanelHeight(panel);
           }
+        }
+
+        function warmViewerAssets() {
+          allowedDocs.forEach((doc) => {
+            if (docCache.has(doc)) {
+              return;
+            }
+            fetch("./" + doc + ".md")
+              .then((response) => (response.ok ? response.text() : Promise.reject(new Error("HTTP " + response.status))))
+              .then((markdown) => {
+                docCache.set(doc, renderMarkdown(markdown));
+              })
+              .catch(() => {});
+          });
+          ["/docs/architecture/incident_flow.svg", "/docs/architecture/protect_decision_flow.svg"].forEach((src) => {
+            const image = new Image();
+            image.decoding = "async";
+            image.src = src;
+          });
         }
 
         document.addEventListener("click", (event) => {
@@ -399,13 +400,12 @@
           void renderRoute(parseRoute(window.location.search));
         });
 
-        if ("requestIdleCallback" in window) {
-          window.requestIdleCallback(prefetchAssets);
-        } else {
-          window.setTimeout(prefetchAssets, 0);
-        }
-
         void renderRoute(parseRoute(window.location.search));
+        if ("requestIdleCallback" in window) {
+          window.requestIdleCallback(warmViewerAssets);
+        } else {
+          window.setTimeout(warmViewerAssets, 150);
+        }
       })();
     </script>
   </body>

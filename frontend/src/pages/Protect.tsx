@@ -311,27 +311,7 @@ export function Protect(): JSX.Element {
       </main>
     );
   }
-
-  if (loadingProtectSettings && protectSettings === null) {
-    return (
-      <main className="dashboard">
-        <div className="dashboard-content page-stack">
-          <section>
-            <h1 className="page-title">Project settings</h1>
-            <p className="page-subtitle">Configure limits and protection behavior</p>
-          </section>
-          <Card className="form-card card--form card-loading-shell">
-            <h2 className="section-title">Project configuration</h2>
-            <p className="subtle card-loading-copy">Loading project settings...</p>
-          </Card>
-          <Card className="form-card card--form danger-zone-card card-loading-shell">
-            <h2 className="section-title">Delete project</h2>
-            <p className="subtle card-loading-copy">Loading project settings...</p>
-          </Card>
-        </div>
-      </main>
-    );
-  }
+  const initialLoading = loadingProtectSettings && protectSettings === null;
 
   const onProtectModeChange = async (nextMode: "observe" | "protect"): Promise<void> => {
     if (nextMode === "observe") {
@@ -433,10 +413,14 @@ export function Protect(): JSX.Element {
           <p className="page-subtitle">Configure limits and protection behavior</p>
         </section>
 
-        <Card className="form-card card--form">
+        <Card className={`form-card card--form${initialLoading ? " card-loading-shell" : ""}`}>
           <h2 className="section-title">Project configuration</h2>
-          <div className="protect-settings-grid" data-testid="protect-form-column">
-            <FormColumn>
+          {initialLoading ? (
+            <p className="subtle card-loading-copy">Loading project settings...</p>
+          ) : (
+            <>
+              <div className="protect-settings-grid" data-testid="protect-form-column">
+                <FormColumn>
               <div className="form-field protect-mode">
                 <label htmlFor="protect-mode-select">Project mode</label>
                 <select
@@ -490,9 +474,9 @@ export function Protect(): JSX.Element {
                   onChange={(event) => setProtectMaxTokInput(sanitizeDigits(event.target.value))}
                 />
               </div>
-            </FormColumn>
+                </FormColumn>
 
-            <FormColumn>
+                <FormColumn>
               <fieldset className={`protect-fail-mode ${failModeDisabled ? "is-disabled" : ""}`} disabled={failModeDisabled}>
                 <legend>On guard error</legend>
                 <label>
@@ -541,53 +525,61 @@ export function Protect(): JSX.Element {
                   <span>{applyClampInput ? "On" : "Off"}</span>
                 </label>
               </fieldset>
-            </FormColumn>
-          </div>
+                </FormColumn>
+              </div>
 
-          <p className="form-error-slot">{protectError ?? "\u00A0"}</p>
-          {showPostEnableToast ? (
-            <div className="protect-soft-warning-toast" role="status" aria-live="polite">
-              <span>Protect enabled — some settings need attention.</span>
-              <button type="button" className="modal-button" onClick={() => navigateTo("/app/settings")}>
-                Open settings
-              </button>
-            </div>
-          ) : null}
-          <div className="modal-actions form-actions">
-            <button
-              type="button"
-              className="modal-button modal-primary action-btn"
-              onClick={() => void onSaveProtectSettings()}
-              disabled={savingProtect || !projectId}
-            >
-              {savingProtect ? "Saving..." : "Save"}
-            </button>
-          </div>
+              <p className="form-error-slot">{protectError ?? "\u00A0"}</p>
+              {showPostEnableToast ? (
+                <div className="protect-soft-warning-toast" role="status" aria-live="polite">
+                  <span>Protect enabled - some settings need attention.</span>
+                  <button type="button" className="modal-button" onClick={() => navigateTo("/app/settings")}>
+                    Open settings
+                  </button>
+                </div>
+              ) : null}
+              <div className="modal-actions form-actions">
+                <button
+                  type="button"
+                  className="modal-button modal-primary action-btn"
+                  onClick={() => void onSaveProtectSettings()}
+                  disabled={savingProtect || !projectId}
+                >
+                  {savingProtect ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </>
+          )}
         </Card>
 
-        <Card className="form-card card--form danger-zone-card">
+        <Card className={`form-card card--form danger-zone-card${initialLoading ? " card-loading-shell" : ""}`}>
           <h2 className="section-title">Delete project</h2>
-          <p className="danger-zone-description">Delete this project and all associated data.</p>
-          <p className="danger-zone-description">This action permanently deletes:</p>
-          <ul className="danger-zone-list">
-            <li>telemetry events</li>
-            <li>incidents</li>
-            <li>API keys</li>
-            <li>limits configuration</li>
-            <li>webhook settings</li>
-          </ul>
-          <div className="modal-actions form-actions">
-            <button
-              type="button"
-              className="modal-button action-btn danger-zone-delete-button"
-              onClick={() => {
-                setShowDeleteModal(true);
-              }}
-              disabled={!projectId}
-            >
-              Delete
-            </button>
-          </div>
+          {initialLoading ? (
+            <p className="subtle card-loading-copy">Loading project settings...</p>
+          ) : (
+            <>
+              <p className="danger-zone-description">Delete this project and all associated data.</p>
+              <p className="danger-zone-description">This action permanently deletes:</p>
+              <ul className="danger-zone-list">
+                <li>telemetry events</li>
+                <li>incidents</li>
+                <li>API keys</li>
+                <li>limits configuration</li>
+                <li>webhook settings</li>
+              </ul>
+              <div className="modal-actions form-actions">
+                <button
+                  type="button"
+                  className="modal-button action-btn danger-zone-delete-button"
+                  onClick={() => {
+                    setShowDeleteModal(true);
+                  }}
+                  disabled={!projectId}
+                >
+                  Delete
+                </button>
+              </div>
+            </>
+          )}
         </Card>
 
         {showEnableModal ? (

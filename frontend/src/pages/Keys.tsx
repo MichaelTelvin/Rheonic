@@ -238,8 +238,14 @@ export function Keys(): JSX.Element {
               <span className="subtle">Created</span>
               <span className="subtle key-actions-col table-actions-header">Actions</span>
             </div>
-            {loadingKeys ? <div className="key-row key-row-data key-row-placeholder">Loading keys...</div> : null}
-            {activeKeys.length === 0 ? <p className="subtle">No keys yet.</p> : null}
+            {loadingKeys ? (
+              <>
+                <div className="key-row key-row-data key-row-placeholder">Loading keys...</div>
+                <div className="key-row key-row-data key-row-placeholder" aria-hidden="true" />
+                <div className="key-row key-row-data key-row-placeholder" aria-hidden="true" />
+              </>
+            ) : null}
+            {!loadingKeys && activeKeys.length === 0 ? <p className="subtle">No keys yet.</p> : null}
             {activeKeys.map((key) => (
               <div className="key-row key-row-data" key={key.id}>
                 <span className="key-name">{key.name}</span>

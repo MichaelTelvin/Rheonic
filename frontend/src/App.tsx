@@ -32,36 +32,6 @@ interface AuthenticatedAppLayoutProps {
 function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayoutProps): JSX.Element {
   const [feedbackModalOpen, setFeedbackModalOpen] = useState<boolean>(false);
 
-  useEffect(() => {
-    const onPointerDown = (event: PointerEvent): void => {
-      const target = event.target as HTMLElement | null;
-      const select = target?.closest("select");
-      if (!(select instanceof HTMLSelectElement)) {
-        return;
-      }
-      if (!select.closest(".app-shell")) {
-        return;
-      }
-      const rect = select.getBoundingClientRect();
-      const minSpaceBelow = 260;
-      const shortfall = minSpaceBelow - (window.innerHeight - rect.bottom);
-      if (shortfall <= 0) {
-        return;
-      }
-      const appMain = document.querySelector(".app-main") as HTMLElement | null;
-      if (appMain && appMain.scrollHeight > appMain.clientHeight) {
-        appMain.scrollBy({ top: shortfall + 12, behavior: "smooth" });
-        return;
-      }
-      window.scrollBy({ top: shortfall + 12, behavior: "smooth" });
-    };
-
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-    };
-  }, []);
-
   return (
     <div className="app-shell">
       <Sidebar userEmail={userEmail} onSignOut={onSignOut} onSendFeedback={() => setFeedbackModalOpen(true)} />
@@ -96,6 +66,10 @@ function ScrollToTop(): null {
   const location = useLocation();
 
   useEffect(() => {
+    const appMain = document.querySelector(".app-main");
+    if (appMain instanceof HTMLElement) {
+      appMain.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
     window.scrollTo(0, 0);
   }, [location.pathname]);
 

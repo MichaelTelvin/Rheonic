@@ -287,25 +287,7 @@ export function Alerts(): JSX.Element {
       </main>
     );
   }
-
-  if (loadingSettings && webhookSettings === null) {
-    return (
-      <main className="dashboard alerts-dashboard">
-        <div className="dashboard-content page-stack alerts-page-stack">
-          <section>
-            <h1 className="page-title">Alerts</h1>
-            <p className="page-subtitle">Configure protect lifecycle alert routes for email and webhook delivery</p>
-          </section>
-          <div className="alerts-cards-grid">
-            <Card className="form-card card--form alerts-webhook-card card-loading-shell">
-              <h2 className="section-title">Alert routes</h2>
-              <p className="subtle card-loading-copy">Loading alert settings...</p>
-            </Card>
-          </div>
-        </div>
-      </main>
-    );
-  }
+  const initialLoading = loadingSettings && webhookSettings === null;
 
   return (
     <main className="dashboard alerts-dashboard">
@@ -316,9 +298,15 @@ export function Alerts(): JSX.Element {
         </section>
 
         <div className="alerts-cards-grid">
-          <Card className="form-card card--form alerts-webhook-card">
-            <FormColumn testId="alerts-form-column">
-              <div className={`alerts-routes-form ${controlsDisabled ? "is-disabled" : ""}`}>
+          <Card className={`form-card card--form alerts-webhook-card${initialLoading ? " card-loading-shell" : ""}`}>
+            {initialLoading ? (
+              <>
+                <h2 className="section-title">Alert routes</h2>
+                <p className="subtle card-loading-copy">Loading alert settings...</p>
+              </>
+            ) : (
+              <FormColumn testId="alerts-form-column">
+                <div className={`alerts-routes-form ${controlsDisabled ? "is-disabled" : ""}`}>
                 <fieldset className={`protect-fail-mode alerts-route-section alerts-route-section--plain ${!protectEnabled ? "is-disabled" : ""}`}>
                   <legend>Email</legend>
                   <p className="alerts-intro">Protect mode only. Sends lifecycle alerts to your account email.</p>
@@ -429,10 +417,11 @@ export function Alerts(): JSX.Element {
                     {webhookSaving ? "Saving..." : "Save alerts"}
                   </button>
                 </div>
-              </div>
-              <p className="form-error-slot alerts-error-slot">{webhookError ?? "\u00A0"}</p>
-            </FormColumn>
-        </Card>
+                </div>
+                <p className="form-error-slot alerts-error-slot">{webhookError ?? "\u00A0"}</p>
+              </FormColumn>
+            )}
+          </Card>
         </div>
         {showPayloadModal ? (
           <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="alerts-payload-title">

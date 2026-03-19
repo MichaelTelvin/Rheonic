@@ -4662,7 +4662,7 @@ pre {
 
 /* Public marketing redesign: landing + quickstart only */
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 .public-shell.public-shell-marketing,

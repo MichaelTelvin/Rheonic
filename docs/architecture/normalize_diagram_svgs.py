@@ -53,6 +53,19 @@ def _normalize_svg(text: str) -> str:
     matches = list(re.finditer(r"<svg\b[^>]*>", text))
     second = matches[1]
     text = text[: second.start()] + repl(second.group(0), outer=False) + text[second.end() :]
+
+    # Strip embedded D2 font blobs so charts render faster in the browser using system fonts.
+    text = re.sub(r"@font-face\s*{.*?}", "", text, flags=re.DOTALL)
+    text = re.sub(
+        r'font-family:\s*"d2-[^"]+-font-bold";',
+        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;font-weight:700;',
+        text,
+    )
+    text = re.sub(
+        r'font-family:\s*"d2-[^"]+-font-italic";',
+        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;font-style:italic;',
+        text,
+    )
     return text
 
 
