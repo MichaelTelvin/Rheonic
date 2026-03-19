@@ -1,5 +1,5 @@
 from app.application.email_templates.base_layout import format_timestamp
-from app.application.email_templates.base_layout import format_evidence, humanize_incident_type
+from app.application.email_templates.base_layout import format_evidence, format_page_location, humanize_incident_type
 from app.application.email_templates.registry import render_template
 import pytest
 
@@ -14,6 +14,7 @@ def test_format_timestamp_renders_human_readable_utc() -> None:
 def test_email_template_helpers_render_human_readable_values() -> None:
     assert humanize_incident_type("retry_storm") == "Retry storm"
     assert humanize_incident_type("cap_breach") == "Cap breach"
+    assert format_page_location("/app/alerts") == "Dashboard / Alerts"
     evidence_copy = format_evidence({
         "count": 1,
         "provider": "openai",
@@ -32,7 +33,7 @@ def test_feedback_template_snapshot_is_deterministic() -> None:
         "user_id": "u1",
         "user_email": "u@example.com",
         "project_id": "p1",
-        "page": "/dashboard",
+        "page": "/app/alerts",
         "mode": "protect",
         "timestamp": "2026-03-05T10:00:00Z",
         "app_version": "1.2.3",
@@ -41,10 +42,11 @@ def test_feedback_template_snapshot_is_deterministic() -> None:
     assert rendered["subject"] == "Rheonic beta bug report"
     assert "Rheonic beta bug report" in rendered["html"]
     assert "New product report received." in rendered["html"]
-    assert "System" in rendered["html"]
-    assert "report_type: Bug report" in rendered["text"]
+    assert ">System<" not in rendered["html"]
+    assert "Report Type: Bug report" in rendered["text"]
+    assert "Page: Dashboard / Alerts" in rendered["text"]
     assert "Mar 05, 2026 10:00 UTC" in rendered["html"]
-    assert "timestamp: Mar 05, 2026 10:00 UTC" in rendered["text"]
+    assert "Timestamp: Mar 05, 2026 10:00 UTC" in rendered["text"]
     assert render_template("feedback_submitted", payload) == rendered
 
 
@@ -129,7 +131,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
             },
             "[Rheonic] Resolved: Loop suspect (p3)",
             "Incident resolved",
-            "Resolved by: auto",
+            "Resolved By: auto",
         ),
         (
             "webhook_delivery_failed",
@@ -146,7 +148,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
             },
             "[Rheonic] webhook.delivery_failed (p4)",
             "Webhook delivery failed",
-            "Error code: webhook_http_error",
+            "Error Code: webhook_http_error",
         ),
     ]
 
@@ -156,7 +158,6 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
         assert expected_title in rendered["html"]
         assert expected_text_line in rendered["text"]
         assert "Rheonic" in rendered["html"]
-        assert "Protect alert" in rendered["html"]
         assert "UTC" in rendered["text"]
         assert render_template(template, payload) == rendered
 
@@ -178,8 +179,8 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
         },
     )
     assert "Reason: Retry storm" in warn_rendered["text"]
-    assert "Estimated next tokens: 50" in warn_rendered["text"]
-    assert "Clamp recommendation: Recommended max output tokens: 40" in warn_rendered["text"]
+    assert "Estimated Next Tokens: 50" in warn_rendered["text"]
+    assert "Clamp Recommendation: Recommended max output tokens: 40" in warn_rendered["text"]
 
 
 def test_removed_templates_are_not_registered() -> None:

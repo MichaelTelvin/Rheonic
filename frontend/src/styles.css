@@ -2215,6 +2215,29 @@ pre {
   font-size: 0.8rem;
 }
 
+#feedback-screenshot {
+  padding: 10px 12px;
+}
+
+#feedback-screenshot::file-selector-button {
+  margin-right: 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.88);
+  color: rgba(241, 245, 249, 0.96);
+  font: inherit;
+  font-size: 0.84rem;
+  line-height: 1.1;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+#feedback-screenshot::file-selector-button:hover {
+  background: rgba(51, 65, 85, 0.96);
+  border-color: rgba(148, 163, 184, 0.42);
+}
+
 .keys-create-row {
   display: flex;
   gap: 10px;

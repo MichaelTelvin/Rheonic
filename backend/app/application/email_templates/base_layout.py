@@ -74,11 +74,38 @@ def format_evidence(value: object) -> str:
     return "\n".join(lines) if lines else "-"
 
 
-def render_base_email(*, eyebrow: str, title: str, subtitle: str, fields: list[tuple[str, str]]) -> dict[str, str]:
+def format_page_location(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw or raw == "-":
+        return "-"
+    path = raw.split("?", 1)[0].split("#", 1)[0].strip()
+    if not path:
+        return raw
+    if path.startswith("/app/"):
+        section = path[len("/app/") :].strip("/")
+        if not section:
+            return "Dashboard"
+        return "Dashboard / " + " / ".join(_humanize_segment(part) for part in section.split("/") if part)
+    if path == "/app":
+        return "Dashboard"
+    if path.startswith("/"):
+        return " / ".join(_humanize_segment(part) for part in path.strip("/").split("/") if part) or raw
+    return raw
+
+
+def render_base_email(
+    *,
+    eyebrow: str | None,
+    title: str,
+    subtitle: str,
+    fields: list[tuple[str, str]],
+    footer: str | None = None,
+) -> dict[str, str]:
     safe_title = escape(title)
     safe_subtitle = escape(subtitle)
-    safe_eyebrow = escape(eyebrow)
-    normalized_fields = [(str(label), str(value)) for label, value in fields]
+    safe_eyebrow = escape(str(eyebrow or "").strip())
+    normalized_fields = [(_humanize_field_label(str(label)), str(value)) for label, value in fields]
+    footer_copy = (footer or "").strip()
 
     rows_html = "".join(
         "<tr>"
@@ -87,6 +114,18 @@ def render_base_email(*, eyebrow: str, title: str, subtitle: str, fields: list[t
         "</tr>"
         for label, value in normalized_fields
     )
+    eyebrow_html = (
+        f"<div style=\"margin-top:12px;font:600 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#f59e0b;\">{safe_eyebrow}</div>"
+        if safe_eyebrow
+        else ""
+    )
+    footer_html = (
+        "<p style=\"margin:20px 0 0;font:400 13px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#667085;\">"
+        f"{escape(footer_copy)}"
+        "</p>"
+        if footer_copy
+        else ""
+    )
     html = (
         "<!doctype html>"
         "<html><body style=\"margin:0;padding:0;background:#f4f4f5;\">"
@@ -94,14 +133,13 @@ def render_base_email(*, eyebrow: str, title: str, subtitle: str, fields: list[t
         "<div style=\"max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e4e7ec;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(16,24,40,0.08);\">"
         "<div style=\"padding:28px 28px 18px;background:linear-gradient(135deg,#101828 0%,#1d2939 100%);\">"
         "<div style=\"display:flex;align-items:center;gap:10px;\">"
-        "<span style=\"display:inline-block;position:relative;width:24px;height:24px;border:2px solid #8da2ff;border-radius:7px;box-sizing:border-box;\">"
-        "<span style=\"position:absolute;left:3px;top:9px;width:7px;height:2px;background:#8da2ff;border-radius:2px;\"></span>"
-        "<span style=\"position:absolute;right:3px;top:9px;width:7px;height:2px;background:#8da2ff;border-radius:2px;\"></span>"
-        "<span style=\"position:absolute;left:7px;top:7px;width:6px;height:6px;border:2px solid #8da2ff;border-radius:50%;\"></span>"
+        "<span style=\"display:inline-block;position:relative;width:24px;height:24px;box-sizing:border-box;\">"
+        "<span style=\"position:absolute;left:1px;top:5px;width:12px;height:12px;border:2px solid #8da2ff;border-radius:4px;transform:rotate(45deg);\"></span>"
+        "<span style=\"position:absolute;right:1px;top:5px;width:12px;height:12px;border:2px solid #c4b5fd;border-radius:4px;transform:rotate(45deg);\"></span>"
         "</span>"
         "<span style=\"font:700 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#cbd5e1;\">Rheonic</span>"
         "</div>"
-        f"<div style=\"margin-top:12px;font:600 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#f59e0b;\">{safe_eyebrow}</div>"
+        f"{eyebrow_html}"
         f"<h1 style=\"margin:10px 0 0;font:700 30px/1.15 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#ffffff;\">{safe_title}</h1>"
         f"<p style=\"margin:14px 0 0;font:400 15px/1.7 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#d0d5dd;\">{safe_subtitle}</p>"
         "</div>"
@@ -109,16 +147,45 @@ def render_base_email(*, eyebrow: str, title: str, subtitle: str, fields: list[t
         "<table style=\"width:100%;border-collapse:collapse;border-spacing:0;background:#fcfcfd;border:1px solid #eaecf0;border-radius:14px;overflow:hidden;\">"
         f"{rows_html}"
         "</table>"
-        "<p style=\"margin:20px 0 0;font:400 13px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#667085;\">"
-        "This alert was generated by Rheonic because your project has notifications enabled."
-        "</p>"
+        f"{footer_html}"
         "</div>"
         "</div>"
         "</div>"
         "</body></html>"
     )
 
-    text_lines = [f"Rheonic {eyebrow}", title, subtitle, ""]
+    text_lines = ["Rheonic", title, subtitle, ""]
+    if safe_eyebrow:
+        text_lines.insert(1, str(eyebrow))
     text_lines.extend(f"{label}: {value}" for label, value in normalized_fields)
+    if footer_copy:
+        text_lines.extend(["", footer_copy])
     text = "\n".join(text_lines)
     return {"html": html, "text": text}
+
+
+def _humanize_field_label(label: str) -> str:
+    normalized = label.strip()
+    if not normalized:
+        return "-"
+    replacements = {
+        "id": "ID",
+        "ids": "IDs",
+        "url": "URL",
+        "urls": "URLs",
+        "api": "API",
+        "sdk": "SDK",
+    }
+    if "_" not in normalized and normalized.replace(" ", "").isalpha():
+        words = normalized.split()
+        return " ".join(replacements.get(word.lower(), word if word.isupper() else word.capitalize()) for word in words)
+    words = normalized.replace("/", " / ").replace("_", " ").split()
+    humanized: list[str] = []
+    for word in words:
+        lowered = word.lower()
+        humanized.append(replacements.get(lowered, word.capitalize()))
+    return " ".join(humanized).replace(" / ", " / ")
+
+
+def _humanize_segment(value: str) -> str:
+    return _humanize_field_label(value.replace("-", " "))
