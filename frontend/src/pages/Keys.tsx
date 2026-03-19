@@ -211,14 +211,14 @@ export function Keys(): JSX.Element {
               <div className="secret-actions">
                 <button
                   type="button"
-                  className={`modal-button ${copiedAction === "key" ? "copied" : ""}`}
+                  className="modal-button"
                   onClick={() => void copyText(latestPlaintextKey.key, "key")}
                 >
                   Copy key
                 </button>
                 <button
                   type="button"
-                  className={`modal-button ${copiedAction === "env" ? "copied" : ""}`}
+                  className="modal-button"
                   onClick={() => void copyText(`RHEONIC_INGEST_KEY=\"${latestPlaintextKey.key}\"`, "env")}
                 >
                   Copy env var

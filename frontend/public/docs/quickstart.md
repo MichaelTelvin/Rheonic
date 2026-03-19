@@ -111,9 +111,12 @@ After your first event:
 - `Incidents` remains empty until detector conditions are met.
 
 If nothing appears:
-- confirm the selected project matches the ingest key you created,
-- confirm `RHEONIC_BACKEND_URL` points to your backend,
-- confirm the SDK call completed successfully.
+- make sure you are viewing the same project where you created the ingest key,
+- send one more test event after copying the new key, so you know traffic was generated after setup,
+- check your app logs or terminal output for SDK errors, failed requests, or missing environment variables,
+- confirm your app is using the backend URL you configured for Rheonic. If you are self-hosting, this should be your reachable Rheonic backend address, not a placeholder value.
+
+If you are still not seeing data, open `Keys` and create a fresh ingest key, update your app environment, restart the app, and send another test event.
 
 ## 6. Enable Protect Mode
 When you are ready to enforce runtime limits:

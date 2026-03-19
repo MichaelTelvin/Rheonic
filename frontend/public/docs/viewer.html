@@ -78,6 +78,8 @@
         background: #f4f6fb;
         border-radius: 8px;
         padding: 28px;
+        min-height: 68vh;
+        transition: min-height 120ms ease;
       }
       .canvas.chart {
         padding: 8px;
@@ -264,50 +266,120 @@
         return out.join("");
       }
 
-      (async function () {
+      function freezePanelHeight(panel) {
+        panel.style.minHeight = Math.max(panel.offsetHeight, window.innerHeight * 0.68) + "px";
+      }
+
+      function releasePanelHeight(panel) {
+        window.requestAnimationFrame(() => {
+          panel.style.minHeight = "";
+        });
+      }
+
+      (function () {
         const allowedDocs = new Set(["overview", "quickstart", "integrations", "protect-mode", "incidents", "alerts", "roadmap", "api-reference", "architecture"]);
         const allowedCharts = new Set(["incident", "protect"]);
-        const params = new URLSearchParams(window.location.search);
-        const requestedChart = params.get("chart");
-        const requestedDoc = params.get("doc");
-        const chart = allowedCharts.has(requestedChart) ? requestedChart : null;
-        const doc = chart ? null : allowedDocs.has(requestedDoc) ? requestedDoc : "overview";
+        const docCache = new Map();
         const docTabs = document.getElementById("doc-tabs");
         const chartTabs = document.getElementById("chart-tabs");
-
         const target = document.getElementById("doc");
         const panel = target ? target.closest(".canvas") : null;
         if (!target || !panel) return;
 
-        if (chart) {
-          if (docTabs) docTabs.classList.add("hidden");
-          if (chartTabs) chartTabs.classList.remove("hidden");
-          const chartTab = document.getElementById("tab-chart-" + chart);
-          if (chartTab) chartTab.classList.add("active");
-          panel.classList.add("chart", chart);
-          target.className = "doc chart-doc";
-          const src = chart === "protect" ? "/docs/architecture/protect_decision_flow.svg" : "/docs/architecture/incident_flow.svg";
-          const alt = chart === "protect" ? "Protect decision flow" : "Incident flow";
-          target.innerHTML = '<img class="chart-image" src="' + src + '" alt="' + alt + '" />';
-          return;
+        function parseRoute(search) {
+          const params = new URLSearchParams(search);
+          const requestedChart = params.get("chart");
+          const requestedDoc = params.get("doc");
+          const chart = allowedCharts.has(requestedChart) ? requestedChart : null;
+          const doc = chart ? null : allowedDocs.has(requestedDoc) ? requestedDoc : "overview";
+          return { chart, doc };
         }
 
-        if (docTabs) docTabs.classList.remove("hidden");
-        if (chartTabs) chartTabs.classList.add("hidden");
-        const tab = document.getElementById("tab-" + doc);
-        if (tab) tab.classList.add("active");
-        target.className = "doc";
-
-        try {
-          const response = await fetch("./" + doc + ".md", { cache: "no-store" });
-          if (!response.ok) {
-            throw new Error("HTTP " + response.status);
+        function setActiveTabs(route) {
+          document.querySelectorAll(".tab.active").forEach((tab) => tab.classList.remove("active"));
+          if (route.chart) {
+            if (docTabs) docTabs.classList.add("hidden");
+            if (chartTabs) chartTabs.classList.remove("hidden");
+            const chartTab = document.getElementById("tab-chart-" + route.chart);
+            if (chartTab) chartTab.classList.add("active");
+          } else {
+            if (docTabs) docTabs.classList.remove("hidden");
+            if (chartTabs) chartTabs.classList.add("hidden");
+            const docTab = document.getElementById("tab-" + route.doc);
+            if (docTab) docTab.classList.add("active");
           }
-          const markdown = await response.text();
-          target.innerHTML = renderMarkdown(markdown);
-        } catch (error) {
-          target.innerHTML = "<p class='muted'>Failed to load document.</p>";
         }
+
+        async function renderRoute(route) {
+          freezePanelHeight(panel);
+          setActiveTabs(route);
+
+          if (route.chart) {
+            panel.className = "canvas chart " + route.chart;
+            target.className = "doc chart-doc";
+            const src = route.chart === "protect" ? "/docs/architecture/protect_decision_flow.svg" : "/docs/architecture/incident_flow.svg";
+            const alt = route.chart === "protect" ? "Protect decision flow" : "Incident flow";
+            target.innerHTML = '<img class="chart-image" src="' + src + '" alt="' + alt + '" />';
+            const image = target.querySelector(".chart-image");
+            if (image) {
+              image.addEventListener("load", () => releasePanelHeight(panel), { once: true });
+              image.addEventListener("error", () => releasePanelHeight(panel), { once: true });
+            } else {
+              releasePanelHeight(panel);
+            }
+            return;
+          }
+
+          panel.className = "canvas";
+          target.className = "doc";
+
+          const cacheKey = route.doc;
+          if (docCache.has(cacheKey)) {
+            target.innerHTML = docCache.get(cacheKey);
+            releasePanelHeight(panel);
+            return;
+          }
+
+          try {
+            const response = await fetch("./" + route.doc + ".md", { cache: "no-store" });
+            if (!response.ok) {
+              throw new Error("HTTP " + response.status);
+            }
+            const markdown = await response.text();
+            const rendered = renderMarkdown(markdown);
+            docCache.set(cacheKey, rendered);
+            target.innerHTML = rendered;
+          } catch (error) {
+            target.innerHTML = "<p class='muted'>Failed to load document.</p>";
+          } finally {
+            releasePanelHeight(panel);
+          }
+        }
+
+        document.addEventListener("click", (event) => {
+          const eventTarget = event.target;
+          if (!(eventTarget instanceof Element)) {
+            return;
+          }
+          const link = eventTarget.closest("a.tab");
+          if (!link) return;
+          const url = new URL(link.href, window.location.href);
+          if (url.origin !== window.location.origin || url.pathname !== window.location.pathname) {
+            return;
+          }
+          event.preventDefault();
+          if (url.search === window.location.search) {
+            return;
+          }
+          window.history.pushState({}, "", url);
+          void renderRoute(parseRoute(url.search));
+        });
+
+        window.addEventListener("popstate", () => {
+          void renderRoute(parseRoute(window.location.search));
+        });
+
+        void renderRoute(parseRoute(window.location.search));
       })();
     </script>
   </body>

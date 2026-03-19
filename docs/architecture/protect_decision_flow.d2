@@ -2,7 +2,7 @@ direction: down
 
 vars: {
   d2-config: {
-    pad: 20
+    pad: 28
     sketch: false
     layout-engine: elk
   }
@@ -12,113 +12,93 @@ style: {
   fill: "#f4f6fb"
 }
 
-sdk_call: "SDK wrapper call\nalways runs preflight decision" {
+app_call: "App request\nsent through Rheonic SDK" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
-mode_gate: "Backend project mode\nObserve or Protect" {
+mode_gate: "Project mode?\nObserve or Protect" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
-preflight: "Protect preflight\nPOST /api/v1/protect/decision\nscope: project+provider" {
+observe: "Observe mode\nRequest continues\nRheonic records what happened" {
+  style: {
+    fill: "#eef3fb"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 16
+    font-size: 16
+  }
+}
+
+preflight: "Protect preflight\nChecks recent traffic and configured limits" {
   style: {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
-inputs: "Decision inputs\nrolling counters (project+provider)\ncaps\nestimated_next_tokens (protect preflight only)" {
+hard_limit: "Hard limit hit?\nCap exceeded or cooldown active" {
   style: {
-    fill: "#e8eef9"
+    fill: "#eef3fb"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
-caps: "Caps check (block)\ncooldown_active -> block\ntokens_60s >= tok_cap -> tok_cap_breach\nrequests_60s >= req_cap -> req_cap_breach" {
+risk_check: "Risk warning?\nNear cap or unusual traffic spike" {
   style: {
-    fill: "#e8eef9"
+    fill: "#eef3fb"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
-warn_signals: "Warn signals (protect mode only)\nnear_cap (predictive: req|tok|both)\nretry_storm\nloop_suspect\ntoken_explosion" {
-  style: {
-    fill: "#e8eef9"
-    stroke: "#7e95be"
-    font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
-  }
-}
-
-ingest_note: "Ingest dominance (incident emission)\nL3 cap_breach > L2 near_cap > L1 behavioral\n(does not change decision order)" {
-  style: {
-    fill: "#e4edf8"
-    stroke: "#7e95be"
-    font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
-  }
-}
-
-allow_warn: "allow / warn\nprovider call proceeds" {
+allow: "Allow\nRequest goes to provider" {
   style: {
     fill: "#f6efd8"
     stroke: "#c6ac63"
     font-color: "#5e4a1f"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
-block: "block\nRHEONICBlockedError\nprovider call prevented" {
+warn: "Warn\nRequest goes to provider\nRheonic records a visible warning" {
+  style: {
+    fill: "#f6efd8"
+    stroke: "#c6ac63"
+    font-color: "#5e4a1f"
+    border-radius: 16
+    font-size: 16
+  }
+}
+
+block: "Block\nRequest is stopped before the provider call" {
   style: {
     fill: "#f7e4ea"
     stroke: "#bf8095"
     font-color: "#61283d"
-    border-radius: 14
-    font-size: 13
-  }
-}
-
-transport_outbox: "Transport outbox\nappend delivery row\nkind=webhook|email\ndedupe key enforced" {
-  style: {
-    fill: "#e4edf8"
-    stroke: "#7e95be"
-    font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
-  }
-}
-
-transport_worker: "RQ transport worker\nclaim pending row\ndeliver webhook/email\nretry/backoff\nupdate outbox status" {
-  style: {
-    fill: "#e4edf8"
-    stroke: "#7e95be"
-    font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
@@ -127,90 +107,68 @@ provider: "Provider call" {
     fill: "#e8eef9"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
-ingest: "POST /api/v1/events\ntelemetry ingest\n(project+provider counters/incidents)" {
-  style: {
-    fill: "#e8eef9"
-    stroke: "#7e95be"
-    font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
-  }
-}
-
-incident_pipeline: "Incident pipeline source\nIngest counters -> Detector(s) -> IncidentManager\n+ preflight near_cap warn -> visible incident" {
+alerts: "Alerts\nWebhook or email for warn/block events" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
-metrics: "Protect metrics\nproject totals aggregate across providers\noptional provider filter\n+ delivery failures from outbox" {
+recording: "Recorded outcomes\nUsage, protect decisions, and incidents" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
-finalizer: "Canonical outcome finalizer\none request_id -> one outcome\nsource: live | timeout_fallback | unavailable_fallback" {
+fallback: "If the protect check is unavailable\nSDK records a fallback outcome" {
+  style: {
+    fill: "#eef3fb"
+    stroke: "#7e95be"
+    font-color: "#21324d"
+    border-radius: 16
+    font-size: 16
+  }
+}
+
+dashboard: "Dashboard view\nMetrics, incidents, and latest protect results" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
     font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
+    border-radius: 16
+    font-size: 16
   }
 }
 
-fallback_report: "Fallback report\nSDK timeout/unavailable report\nsame request_id finalized once" {
-  style: {
-    fill: "#e8eef9"
-    stroke: "#7e95be"
-    font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
-  }
-}
-
-sdk_call -> preflight
-preflight -> mode_gate
+app_call -> mode_gate
 mode_gate -> observe: "Observe"
-mode_gate -> inputs: "Protect"
+mode_gate -> preflight: "Protect"
 observe -> provider
-inputs -> caps
-inputs -> ingest_note
-caps -> block: "block"
-caps -> warn_signals: "no block"
-warn_signals -> allow_warn: "warn / allow"
-warn_signals -> transport_outbox: "warn -> protection.warn\nclamp -> protection.clamp_started"
-warn_signals -> incident_pipeline: "near_cap -> visible incident"
-block -> transport_outbox: "block -> protection.block"
-allow_warn -> provider
-preflight -> finalizer: "live outcome"
-sdk_call -> fallback_report: "on timeout/unavailable"
-fallback_report -> finalizer
-provider -> ingest
-transport_outbox -> transport_worker
-transport_worker -> metrics
-ingest -> incident_pipeline
-ingest -> metrics
-finalizer -> metrics: "allow / warn / block counters\n+ last outcome"
-observe: "Observe mode result\nallow only\nincident.warn / incident.resolved\npolicy_gap.detected" {
-  style: {
-    fill: "#e8eef9"
-    stroke: "#7e95be"
-    font-color: "#21324d"
-    border-radius: 14
-    font-size: 13
-  }
-}
+preflight -> hard_limit
+hard_limit -> block: "Yes"
+hard_limit -> risk_check: "No"
+risk_check -> warn: "Yes"
+risk_check -> allow: "No"
+allow -> provider
+warn -> provider
+warn -> alerts
+block -> alerts
+provider -> recording
+observe -> recording
+block -> recording
+app_call -> fallback: "If the check times out"
+fallback -> recording
+recording -> dashboard
+alerts -> dashboard

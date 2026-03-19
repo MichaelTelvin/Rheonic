@@ -99,6 +99,14 @@ function writeDashboardCache(projectId: string, state: DashboardCachedState): vo
   }
 }
 
+function readDismissedFlag(storageKey: string): boolean {
+  try {
+    return window.localStorage.getItem(storageKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function Dashboard(): JSX.Element {
   const { loadingProjects, projects, projectId } = useProjectContext();
   const navigate = useNavigate();
@@ -130,7 +138,7 @@ export function Dashboard(): JSX.Element {
   const [hasIngestKey, setHasIngestKey] = useState<boolean>(initialDashboardState?.hasIngestKey ?? false);
   const [hasEvents, setHasEvents] = useState<boolean>(initialDashboardState?.hasEvents ?? false);
   const [setupStatusResolved, setSetupStatusResolved] = useState<boolean>(initialDashboardState?.setupStatusResolved ?? false);
-  const [setupBannerDismissed, setSetupBannerDismissed] = useState<boolean>(false);
+  const [setupBannerDismissed, setSetupBannerDismissed] = useState<boolean>(() => readDismissedFlag(`rheonic:setupBannerDismissed:${projectId ?? "none"}`));
   const [webhookIssue, setWebhookIssue] = useState<{ count: number; lastAt: string | null } | null>(null);
   const [webhookIssueDismissedToken, setWebhookIssueDismissedToken] = useState<string | null>(null);
 
@@ -158,7 +166,7 @@ export function Dashboard(): JSX.Element {
     return "complete";
   }, [hasEvents, hasIngestKey, loadingProjects, projectId, projects.length, setupStatusResolved]);
   const isSetupComplete = setupStage === "complete";
-  const showSetupBanner = !loadingProjects && setupStage !== "complete" && !setupBannerDismissed;
+  const showSetupBanner = !loadingProjects && setupStage !== "complete" && setupStage !== "checking" && !setupBannerDismissed;
   const showSetupBannerSlot =
     !setupBannerDismissed && (loadingProjects || setupStage !== "complete" || (Boolean(projectId) && setupStage === "checking"));
   const webhookIssueToken = webhookIssue ? `${webhookIssue.lastAt ?? "none"}:${webhookIssue.count}` : null;
@@ -213,8 +221,7 @@ export function Dashboard(): JSX.Element {
   }, [hasEvents, hasIngestKey, incidents, lastMetricsSuccessAt, metrics, projectId, protectDecisionStats, selectedProvider, setupStatusResolved]);
 
   useEffect(() => {
-    const dismissed = window.localStorage.getItem(setupDismissStorageKey) === "1";
-    setSetupBannerDismissed(dismissed);
+    setSetupBannerDismissed(readDismissedFlag(setupDismissStorageKey));
   }, [setupDismissStorageKey]);
 
   useEffect(() => {
