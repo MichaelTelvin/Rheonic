@@ -40,8 +40,8 @@ def render_protection_block(payload: dict[str, object]) -> dict[str, str]:
     reason_title, reason_subtitle = _reason_copy(reason, detail_reason)
 
     rendered = render_base_email(
-        eyebrow="Protect alert",
-        title="Protect blocked traffic",
+        eyebrow=None,
+        title="Blocked traffic",
         subtitle=reason_subtitle,
         fields=[
             ("Project ID", project_id),
@@ -62,7 +62,7 @@ def render_protection_block(payload: dict[str, object]) -> dict[str, str]:
         ],
     )
     return {
-        "subject": f"[Rheonic] Protect blocked traffic: {reason_title} ({project_id})",
+        "subject": f"[Rheonic] Protect alert: {reason_title} ({project_id})",
         "html": rendered["html"],
         "text": rendered["text"],
     }

@@ -115,7 +115,7 @@ def render_base_email(
         for label, value in normalized_fields
     )
     eyebrow_html = (
-        f"<div style=\"margin-top:12px;font:600 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#f59e0b;\">{safe_eyebrow}</div>"
+        f"<div style=\"margin-top:10px;font:600 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#f59e0b;\">{safe_eyebrow}</div>"
         if safe_eyebrow
         else ""
     )
@@ -131,16 +131,15 @@ def render_base_email(
         "<html><body style=\"margin:0;padding:0;background:#f4f4f5;\">"
         "<div style=\"margin:0;padding:32px 16px;\">"
         "<div style=\"max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e4e7ec;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(16,24,40,0.08);\">"
-        "<div style=\"padding:28px 28px 18px;background:linear-gradient(135deg,#101828 0%,#1d2939 100%);\">"
-        "<div style=\"display:flex;align-items:center;gap:10px;\">"
-        "<span style=\"display:inline-block;position:relative;width:24px;height:24px;box-sizing:border-box;\">"
-        "<span style=\"position:absolute;left:1px;top:5px;width:12px;height:12px;border:2px solid #8da2ff;border-radius:4px;transform:rotate(45deg);\"></span>"
-        "<span style=\"position:absolute;right:1px;top:5px;width:12px;height:12px;border:2px solid #c4b5fd;border-radius:4px;transform:rotate(45deg);\"></span>"
+        "<div style=\"padding:24px 28px 18px;background:linear-gradient(135deg,#101828 0%,#1d2939 100%);\">"
+        "<div style=\"display:flex;align-items:center;gap:12px;\">"
+        "<span style=\"display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:2px solid #8da2ff;border-radius:8px;box-sizing:border-box;\">"
+        "<span style=\"display:block;width:8px;height:14px;border-radius:999px;background:linear-gradient(180deg,#8da2ff 0%,#c4b5fd 100%);\"></span>"
         "</span>"
         "<span style=\"font:700 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#cbd5e1;\">Rheonic</span>"
         "</div>"
         f"{eyebrow_html}"
-        f"<h1 style=\"margin:10px 0 0;font:700 30px/1.15 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#ffffff;\">{safe_title}</h1>"
+        f"<h1 style=\"margin:10px 0 0;font:700 28px/1.15 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#ffffff;\">{safe_title}</h1>"
         f"<p style=\"margin:14px 0 0;font:400 15px/1.7 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#d0d5dd;\">{safe_subtitle}</p>"
         "</div>"
         "<div style=\"padding:20px 28px 28px;\">"

@@ -17,7 +17,7 @@ def render_incident_resolved(payload: dict[str, object]) -> dict[str, str]:
     sent_at = format_timestamp(payload.get("sent_at"))
 
     rendered = render_base_email(
-        eyebrow="Protect alert",
+        eyebrow=None,
         title="Incident resolved",
         subtitle="A previously open protect incident has been resolved.",
         fields=[
@@ -35,7 +35,7 @@ def render_incident_resolved(payload: dict[str, object]) -> dict[str, str]:
         ],
     )
     return {
-        "subject": f"[Rheonic] Resolved: {incident_type} ({project_id})",
+        "subject": f"[Rheonic] Protect alert: Resolved - {incident_type} ({project_id})",
         "html": rendered["html"],
         "text": rendered["text"],
     }

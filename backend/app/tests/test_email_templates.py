@@ -68,8 +68,8 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "sent_at": "2026-03-05T10:01:10Z",
                 "clamp": None,
             },
-            "[Rheonic] Protect warning: Retry storm (p1)",
-            "Protect warning issued",
+            "[Rheonic] Protect alert: Retry storm (p1)",
+            "Warning issued",
             "Action: Warn",
         ),
         (
@@ -90,8 +90,8 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "source": "live",
                 "sent_at": "2026-03-05T10:00:00Z",
             },
-            "[Rheonic] Protect blocked traffic: Token cap exceeded (p2)",
-            "Protect blocked traffic",
+            "[Rheonic] Protect alert: Token cap exceeded (p2)",
+            "Blocked traffic",
             "Action: Blocked",
         ),
         (
@@ -110,7 +110,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "clamp": {"recommended_max_output_tokens": 32},
                 "sent_at": "2026-03-05T10:00:00Z",
             },
-            "[Rheonic] Clamp started: Near cap (p2)",
+            "[Rheonic] Protect alert: Clamp started - Near cap (p2)",
             "Clamp started",
             "Action: Clamp",
         ),
@@ -129,7 +129,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "environment": "prod",
                 "sent_at": "2026-03-05T10:04:01Z",
             },
-            "[Rheonic] Resolved: Loop suspect (p3)",
+            "[Rheonic] Protect alert: Resolved - Loop suspect (p3)",
             "Incident resolved",
             "Resolved By: auto",
         ),
@@ -146,7 +146,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "last_error_message": "HTTP 500",
                 "updated_at": "2026-03-05T10:10:00Z",
             },
-            "[Rheonic] webhook.delivery_failed (p4)",
+            "[Rheonic] Protect alert: Webhook delivery failed (p4)",
             "Webhook delivery failed",
             "Error Code: webhook_http_error",
         ),
@@ -158,6 +158,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
         assert expected_title in rendered["html"]
         assert expected_text_line in rendered["text"]
         assert "Rheonic" in rendered["html"]
+        assert ">Protect alert<" not in rendered["html"]
         assert "UTC" in rendered["text"]
         assert render_template(template, payload) == rendered
 

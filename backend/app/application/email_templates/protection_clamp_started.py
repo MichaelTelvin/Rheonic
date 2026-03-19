@@ -20,7 +20,7 @@ def render_protection_clamp_started(payload: dict[str, object]) -> dict[str, str
     sent_at = format_timestamp(payload.get("sent_at"))
 
     rendered = render_base_email(
-        eyebrow="Protect alert",
+        eyebrow=None,
         title="Clamp started",
         subtitle="Protect is actively reducing output to keep traffic within the configured budget.",
         fields=[
@@ -40,7 +40,7 @@ def render_protection_clamp_started(payload: dict[str, object]) -> dict[str, str
         ],
     )
     return {
-        "subject": f"[Rheonic] Clamp started: {reason} ({project_id})",
+        "subject": f"[Rheonic] Protect alert: Clamp started - {reason} ({project_id})",
         "html": rendered["html"],
         "text": rendered["text"],
     }

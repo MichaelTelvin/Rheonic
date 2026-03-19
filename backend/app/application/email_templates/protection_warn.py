@@ -23,8 +23,8 @@ def render_protection_warn(payload: dict[str, object]) -> dict[str, str]:
     sent_at = format_timestamp(payload.get("sent_at"))
 
     rendered = render_base_email(
-        eyebrow="Protect alert",
-        title="Protect warning issued",
+        eyebrow=None,
+        title="Warning issued",
         subtitle="Protect detected a risky condition and allowed traffic to continue.",
         fields=[
             ("Project ID", project_id),
@@ -43,7 +43,7 @@ def render_protection_warn(payload: dict[str, object]) -> dict[str, str]:
         ],
     )
     return {
-        "subject": f"[Rheonic] Protect warning: {reason} ({project_id})",
+        "subject": f"[Rheonic] Protect alert: {reason} ({project_id})",
         "html": rendered["html"],
         "text": rendered["text"],
     }

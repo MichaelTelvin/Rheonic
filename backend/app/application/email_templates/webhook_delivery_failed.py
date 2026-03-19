@@ -15,7 +15,7 @@ def render_webhook_delivery_failed(payload: dict[str, object]) -> dict[str, str]
     updated_at = format_timestamp(payload.get("updated_at"))
 
     rendered = render_base_email(
-        eyebrow="Protect alert",
+        eyebrow=None,
         title="Webhook delivery failed",
         subtitle="A configured webhook endpoint entered a failed or dead delivery state.",
         fields=[
@@ -31,7 +31,7 @@ def render_webhook_delivery_failed(payload: dict[str, object]) -> dict[str, str]
         ],
     )
     return {
-        "subject": f"[Rheonic] webhook.delivery_failed ({project_id})",
+        "subject": f"[Rheonic] Protect alert: Webhook delivery failed ({project_id})",
         "html": rendered["html"],
         "text": rendered["text"],
     }
