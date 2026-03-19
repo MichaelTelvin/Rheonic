@@ -284,6 +284,7 @@
         const allowedDocs = new Set(["overview", "quickstart", "protect-mode", "incidents", "alerts", "roadmap", "api-reference", "architecture"]);
         const allowedCharts = new Set(["incident", "protect"]);
         const docCache = new Map();
+        const chartCache = new Map();
         let initialRenderPending = true;
         const docTabs = document.getElementById("doc-tabs");
         const chartTabs = document.getElementById("chart-tabs");
@@ -321,6 +322,14 @@
           if (route.chart) {
             panel.className = "canvas chart " + route.chart;
             target.className = "doc chart-doc";
+            if (chartCache.has(route.chart)) {
+              target.innerHTML = chartCache.get(route.chart);
+              if (initialRenderPending) {
+                initialRenderPending = false;
+                document.body.classList.add("viewer-ready");
+              }
+              return;
+            }
             const src = route.chart === "protect" ? "/docs/architecture/protect_decision_flow.svg" : "/docs/architecture/incident_flow.svg";
             const alt = route.chart === "protect" ? "Protect decision flow" : "Incident flow";
             await new Promise((resolve) => {
@@ -331,6 +340,7 @@
               image.onload = () => {
                 target.innerHTML = "";
                 target.appendChild(image);
+                chartCache.set(route.chart, target.innerHTML);
                 resolve();
               };
               image.onerror = () => {

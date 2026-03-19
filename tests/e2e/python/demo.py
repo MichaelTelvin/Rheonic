@@ -18,6 +18,17 @@ if str(tests_src) not in sys.path:
 from rheonic import build_event, capture_event, create_client
 from dashboard_session import DashboardSession
 
+VERBOSE = (os.getenv("RHEONIC_VERBOSE", "") or "").lower() in {"1", "true", "yes"}
+
+
+def _log(message: str) -> None:
+    print(message)
+
+
+def _log_verbose(message: str) -> None:
+    if VERBOSE:
+        print(message)
+
 
 def _send_event(
     provider: str,
@@ -50,6 +61,8 @@ def _send_event(
 
 
 def _print_realtime_snapshot(dashboard_session: DashboardSession | None, project_id: str, provider: str, phase: str) -> None:
+    if not VERBOSE:
+        return
     if dashboard_session is None or not project_id:
         print(f"[SNAPSHOT] {phase}: (snapshot skipped: no dashboard session/project id)")
         return
@@ -69,6 +82,8 @@ def _print_realtime_snapshot(dashboard_session: DashboardSession | None, project
 
 
 def _print_incident_summary(dashboard_session: DashboardSession | None, project_id: str, provider: str) -> None:
+    if not VERBOSE:
+        return
     if dashboard_session is None or not project_id:
         print("[OBSERVE] incidents: (skipped: no dashboard session/project id)")
         return
@@ -109,6 +124,8 @@ def _print_recent_incident_summary(
     *,
     phase_started_at: datetime,
 ) -> None:
+    if not VERBOSE:
+        return
     if dashboard_session is None or not project_id:
         print("[OBSERVE] recent incidents: (skipped: no dashboard session/project id)")
         return
@@ -219,9 +236,9 @@ def main() -> None:
         dashboard_session = DashboardSession(backend_base_url)
         try:
             dashboard_session.login(auth_email, auth_password)
-            print("[OBSERVE] dashboard cookie session ready")
+            _log_verbose("[OBSERVE] dashboard cookie session ready")
         except Exception as error:
-            print(f"[OBSERVE] dashboard cookie session unavailable ({error})")
+            _log_verbose(f"[OBSERVE] dashboard cookie session unavailable ({error})")
             dashboard_session = None
 
     client = None
@@ -233,9 +250,8 @@ def main() -> None:
             debug=os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"},
         )
 
-        print(f"[DEMO] provider={provider} model={model} case={demo_case}")
-        print(f"[DEMO] environment={environment}")
-        print(
+        _log(f"[DEMO] observe {demo_case} provider={provider} model={model} environment={environment}")
+        _log_verbose(
             "[DEMO] params "
             f"retry_storm_count={retry_storm_count} loop_count={loop_count} "
             f"token_explosion_tokens={token_explosion_tokens} cap_breach_tokens={cap_breach_tokens} "
@@ -245,7 +261,7 @@ def main() -> None:
         )
 
         def run_steady() -> None:
-            print("\n[STEP] Steady traffic / no anomaly")
+            _log_verbose("\n[STEP] Steady traffic / no anomaly")
             phase_started_at = datetime.now().astimezone()
             _send_event(provider, model, endpoint, 42, "steady-1", environment)
             client.flush()
@@ -258,8 +274,8 @@ def main() -> None:
             )
 
         def run_near_cap() -> None:
-            print("\n[STEP] Near-cap logging (observe)")
-            print("[STEP] Requires project token/request cap configured in Settings page.")
+            _log_verbose("\n[STEP] Near-cap logging (observe)")
+            _log_verbose("[STEP] Requires project token/request cap configured in Settings page.")
             phase_started_at = datetime.now().astimezone()
             _send_event(provider, model, endpoint, near_cap_tokens, "near-cap", environment)
             client.flush()
@@ -272,7 +288,7 @@ def main() -> None:
             )
 
         def run_retry_storm() -> None:
-            print("\n[STEP] Retry storm")
+            _log_verbose("\n[STEP] Retry storm")
             phase_started_at = datetime.now().astimezone()
             for i in range(retry_storm_count):
                 _send_event(
@@ -297,7 +313,7 @@ def main() -> None:
             )
 
         def run_loop_suspect() -> None:
-            print("\n[STEP] Loop suspect")
+            _log_verbose("\n[STEP] Loop suspect")
             phase_started_at = datetime.now().astimezone()
             for i in range(loop_count):
                 _send_event(provider, model, endpoint, 60, "loop-fixed-signature", environment)
@@ -312,7 +328,7 @@ def main() -> None:
             )
 
         def run_token_explosion() -> None:
-            print("\n[STEP] Token explosion")
+            _log_verbose("\n[STEP] Token explosion")
             phase_started_at = datetime.now().astimezone()
             _send_event(provider, model, endpoint, token_explosion_tokens, "token-explosion", environment)
             client.flush()
@@ -325,8 +341,8 @@ def main() -> None:
             )
 
         def run_cap_breach() -> None:
-            print("\n[STEP] Cap breach logging (observe)")
-            print("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).")
+            _log_verbose("\n[STEP] Cap breach logging (observe)")
+            _log_verbose("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).")
             phase_started_at = datetime.now().astimezone()
             _send_event(provider, model, endpoint, cap_breach_tokens, "cap-breach", environment)
             client.flush()
@@ -339,8 +355,8 @@ def main() -> None:
             )
 
         def run_req_cap_breach() -> None:
-            print("\n[STEP] Request cap breach logging (observe)")
-            print("[STEP] Requires project request cap configured in Mode page (max requests per minute).")
+            _log_verbose("\n[STEP] Request cap breach logging (observe)")
+            _log_verbose("[STEP] Requires project request cap configured in Mode page (max requests per minute).")
             phase_started_at = datetime.now().astimezone()
             for i in range(cap_breach_req_count):
                 _send_event(
@@ -390,8 +406,8 @@ def main() -> None:
             _usage()
             return
 
-        print("\n[DONE] observe demo complete")
-        print(client.stats())
+        _log("[DONE] observe demo complete")
+        _log_verbose(str(client.stats()))
     finally:
         if client is not None:
             client.close()

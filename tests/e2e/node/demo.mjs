@@ -1,6 +1,18 @@
 import { buildEvent, createClient } from "../../../sdk-node/dist/index.js";
 import { DashboardSession } from "./dashboard_session.mjs";
 
+const verbose = ["1", "true", "yes"].includes((process.env.RHEONIC_VERBOSE ?? "").trim().toLowerCase());
+
+function log(message) {
+  console.log(message);
+}
+
+function logVerbose(message) {
+  if (verbose) {
+    console.log(message);
+  }
+}
+
 function printConfigHint() {
   console.log("  Run: make demo-stg-node RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach");
 }
@@ -28,24 +40,24 @@ function sleep(ms) {
 
 async function fetchRealtimeSnapshot(dashboardSession, projectId, provider, phase) {
   if (!dashboardSession || !projectId) {
-    console.log(`[SNAPSHOT] ${phase}: (snapshot skipped: no dashboard session/project id)`);
+    logVerbose(`[SNAPSHOT] ${phase}: (snapshot skipped: no dashboard session/project id)`);
     return;
   }
   const params = new URLSearchParams({ project_id: projectId });
   if (provider !== "all") params.set("provider", provider);
   try {
     const payload = await dashboardSession.request(`/api/v1/metrics/realtime?${params.toString()}`);
-    console.log(`[SNAPSHOT] ${phase}: req60=${payload.requests_60s} tok60=${payload.tokens_60s}`);
+    logVerbose(`[SNAPSHOT] ${phase}: req60=${payload.requests_60s} tok60=${payload.tokens_60s}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.log(`[SNAPSHOT] ${phase}: unavailable (${message})`);
+    logVerbose(`[SNAPSHOT] ${phase}: unavailable (${message})`);
     return;
   }
 }
 
 async function fetchIncidentSummary(dashboardSession, projectId, provider) {
   if (!dashboardSession || !projectId) {
-    console.log("[OBSERVE] incidents: (skipped: no dashboard session/project id)");
+    logVerbose("[OBSERVE] incidents: (skipped: no dashboard session/project id)");
     return;
   }
   const params = new URLSearchParams({ project_id: projectId, status: "open" });
@@ -55,7 +67,7 @@ async function fetchIncidentSummary(dashboardSession, projectId, provider) {
     incidents = await dashboardSession.request(`/api/v1/incidents?${params.toString()}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.log(`[OBSERVE] incidents summary unavailable (${message})`);
+    logVerbose(`[OBSERVE] incidents summary unavailable (${message})`);
     return;
   }
   const counts = new Map();
@@ -67,7 +79,7 @@ async function fetchIncidentSummary(dashboardSession, projectId, provider) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${v}`)
     .join(", ");
-  console.log(`[OBSERVE] incidents open=${incidents.length} types=${compact || "none"}`);
+  logVerbose(`[OBSERVE] incidents open=${incidents.length} types=${compact || "none"}`);
 }
 
 async function printPhase(dashboardSession, phase, projectId, provider) {
@@ -145,10 +157,10 @@ async function runDemo() {
     dashboardSession = new DashboardSession(backendBaseUrl);
     try {
       await dashboardSession.login(authEmail, authPassword);
-      console.log("[OBSERVE] dashboard cookie session ready");
+      logVerbose("[OBSERVE] dashboard cookie session ready");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.log(`[OBSERVE] dashboard cookie session unavailable (${message})`);
+      logVerbose(`[OBSERVE] dashboard cookie session unavailable (${message})`);
       dashboardSession = null;
     }
   }
@@ -159,21 +171,20 @@ async function runDemo() {
     debug: process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true",
   });
 
-  console.log(`[DEMO] provider=${provider} model=${model} case=${demoCase}`);
-  console.log(`[DEMO] environment=${environment}`);
-  console.log(
+  log(`[DEMO] observe ${demoCase} provider=${provider} model=${model} environment=${environment}`);
+  logVerbose(
     `[DEMO] params retry_storm_count=${retryStormCount} loop_count=${loopCount} token_explosion_tokens=${tokenExplosionTokens} cap_breach_tokens=${capBreachTokens} cap_breach_req_count=${capBreachReqCount} cap_breach_req_tokens=${capBreachReqTokens} near_cap_tokens=${nearCapTokens} step_sleep_ms=${stepSleepMs}`,
   );
 
   const runSteady = async () => {
-    console.log("\n[STEP] Steady traffic / no anomaly");
+    logVerbose("\n[STEP] Steady traffic / no anomaly");
     await sendEvent(client, provider, model, endpoint, 42, "steady-1");
     await client.flush();
     await printPhase(dashboardSession, "steady", projectId, provider);
   };
 
   const runRetryStorm = async () => {
-    console.log("\n[STEP] Retry storm");
+    logVerbose("\n[STEP] Retry storm");
     for (let i = 0; i < retryStormCount; i += 1) {
       await sendEvent(client, provider, model, endpoint, 50, `retry-${i + 1}`, {
         status: "error",
@@ -187,15 +198,15 @@ async function runDemo() {
   };
 
   const runNearCap = async () => {
-    console.log("\n[STEP] Near-cap logging (observe)");
-    console.log("[STEP] Requires project token/request cap configured in Settings page.");
+    logVerbose("\n[STEP] Near-cap logging (observe)");
+    logVerbose("[STEP] Requires project token/request cap configured in Settings page.");
     await sendEvent(client, provider, model, endpoint, nearCapTokens, "near-cap");
     await client.flush();
     await printPhase(dashboardSession, "near_cap", projectId, provider);
   };
 
   const runLoopSuspect = async () => {
-    console.log("\n[STEP] Loop suspect");
+    logVerbose("\n[STEP] Loop suspect");
     for (let i = 0; i < loopCount; i += 1) {
       await sendEvent(client, provider, model, endpoint, 60, "loop-fixed-signature");
       await sleep(stepSleepMs);
@@ -205,23 +216,23 @@ async function runDemo() {
   };
 
   const runTokenExplosion = async () => {
-    console.log("\n[STEP] Token explosion");
+    logVerbose("\n[STEP] Token explosion");
     await sendEvent(client, provider, model, endpoint, tokenExplosionTokens, "token-explosion");
     await client.flush();
     await printPhase(dashboardSession, "token_explosion", projectId, provider);
   };
 
   const runCapBreach = async () => {
-    console.log("\n[STEP] Cap breach logging (observe)");
-    console.log("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).");
+    logVerbose("\n[STEP] Cap breach logging (observe)");
+    logVerbose("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).");
     await sendEvent(client, provider, model, endpoint, capBreachTokens, "cap-breach");
     await client.flush();
     await printPhase(dashboardSession, "cap_breach", projectId, provider);
   };
 
   const runReqCapBreach = async () => {
-    console.log("\n[STEP] Request cap breach logging (observe)");
-    console.log("[STEP] Requires project request cap configured in Mode page (max requests per minute).");
+    logVerbose("\n[STEP] Request cap breach logging (observe)");
+    logVerbose("[STEP] Requires project request cap configured in Mode page (max requests per minute).");
     for (let i = 0; i < capBreachReqCount; i += 1) {
       await sendEvent(client, provider, model, endpoint, capBreachReqTokens, `req-cap-breach-${i + 1}`, {
         status: "ok",
@@ -261,8 +272,8 @@ async function runDemo() {
     process.exitCode = 1;
   }
 
-  console.log("\n[DONE] observe demo complete");
-  console.log(client.getStats());
+  log("[DONE] observe demo complete");
+  logVerbose(JSON.stringify(client.getStats()));
   client.close();
 }
 
