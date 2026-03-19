@@ -292,7 +292,6 @@ export function Alerts(): JSX.Element {
         const detail = result.error?.trim();
         showAppToast(detail ? `Webhook test failed: ${detail}` : "Webhook test failed");
       }
-      await reloadWebhookSettings(true, false);
     } catch (error) {
       if (error instanceof ApiError) {
         const detail = error.message?.trim();
