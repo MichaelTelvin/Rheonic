@@ -23,6 +23,9 @@
         background: radial-gradient(circle at top, #11182a 0%, var(--bg) 58%);
         color: var(--text);
       }
+      body:not(.viewer-ready) .panel {
+        visibility: hidden;
+      }
       .wrap {
         max-width: 1200px;
         margin: 24px auto;
@@ -111,8 +114,8 @@
         display: block;
       }
       .canvas.chart.incident .chart-image {
-        width: min(420px, 100%);
-        max-width: min(420px, 100%);
+        width: min(500px, 100%);
+        max-width: min(500px, 100%);
         margin: 0 auto;
       }
       .canvas.chart.protect .chart-image {
@@ -279,6 +282,7 @@
         const allowedDocs = new Set(["overview", "quickstart", "protect-mode", "incidents", "alerts", "roadmap", "api-reference", "architecture"]);
         const allowedCharts = new Set(["incident", "protect"]);
         const docCache = new Map();
+        let initialRenderPending = true;
         const docTabs = document.getElementById("doc-tabs");
         const chartTabs = document.getElementById("chart-tabs");
         const target = document.getElementById("doc");
@@ -317,18 +321,26 @@
             target.className = "doc chart-doc";
             const src = route.chart === "protect" ? "/docs/architecture/protect_decision_flow.svg" : "/docs/architecture/incident_flow.svg";
             const alt = route.chart === "protect" ? "Protect decision flow" : "Incident flow";
-            const image = new Image();
-            image.className = "chart-image";
-            image.alt = alt;
-            image.decoding = "async";
-            image.onload = () => {
-              target.innerHTML = "";
-              target.appendChild(image);
-            };
-            image.onerror = () => {
-              target.innerHTML = "<p class='muted'>Failed to load chart.</p>";
-            };
-            image.src = src;
+            await new Promise((resolve) => {
+              const image = new Image();
+              image.className = "chart-image";
+              image.alt = alt;
+              image.decoding = "async";
+              image.onload = () => {
+                target.innerHTML = "";
+                target.appendChild(image);
+                resolve();
+              };
+              image.onerror = () => {
+                target.innerHTML = "<p class='muted'>Failed to load chart.</p>";
+                resolve();
+              };
+              image.src = src;
+            });
+            if (initialRenderPending) {
+              initialRenderPending = false;
+              document.body.classList.add("viewer-ready");
+            }
             return;
           }
 
@@ -338,6 +350,10 @@
           const cacheKey = route.doc;
           if (docCache.has(cacheKey)) {
             target.innerHTML = docCache.get(cacheKey);
+            if (initialRenderPending) {
+              initialRenderPending = false;
+              document.body.classList.add("viewer-ready");
+            }
             return;
           }
 
@@ -352,6 +368,10 @@
             target.innerHTML = rendered;
           } catch (error) {
             target.innerHTML = "<p class='muted'>Failed to load document.</p>";
+          }
+          if (initialRenderPending) {
+            initialRenderPending = false;
+            document.body.classList.add("viewer-ready");
           }
         }
 
