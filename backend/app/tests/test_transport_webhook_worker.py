@@ -154,6 +154,47 @@ def test_process_outbox_delivery_webhook_success_logs_destination_in_outbox_deli
     assert delivered_log["metadata"]["status_code"] == 200
 
 
+def test_process_outbox_delivery_webhook_disabled_logs_skip_reason_instead_of_delivered(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_webhook_disabled_logs_skip.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    _seed_project(session_factory, "p-skip", protect_enabled=False)
+
+    with session_factory.create_session() as session:
+        record = session.query(ProjectRecord).filter(ProjectRecord.id == "p-skip").first()
+        assert record is not None
+        record.webhook_enabled = False
+        session.add(record)
+        session.commit()
+
+    outbox_id = _enqueue_webhook_outbox(session_factory, "p-skip")
+
+    captured: list[dict[str, object]] = []
+    settings = transport_job.Settings(database_url=db_url, redis_url="redis://localhost:6379/15")
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient(captured))
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id, trace_id="trace-skip", span_id="span-skip")
+
+    assert captured == []
+
+    emitted = [
+        json.loads(line)
+        for line in capsys.readouterr().out.splitlines()
+        if line.strip().startswith("{")
+    ]
+    skipped_log = next(payload for payload in emitted if payload.get("event") == "outbox_skipped")
+
+    assert skipped_log["metadata"]["skip_reason"] == "webhook_disabled_or_missing_url"
+    assert skipped_log["metadata"]["webhook_enabled"] is False
+    assert "destination" in skipped_log["metadata"]
+    assert not any(payload.get("event") == "outbox_delivered" for payload in emitted)
+
+
 def test_process_outbox_delivery_webhook_sends_in_observe_mode_when_webhook_is_enabled(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     db_url = f"sqlite:///{tmp_path}/transport_webhook_observe_success.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)

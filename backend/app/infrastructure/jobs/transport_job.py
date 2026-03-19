@@ -98,6 +98,15 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
             "project_id": outbox.project_id,
         }
         success_metadata.update(delivery_metadata)
+        if bool(success_metadata.pop("skipped", False)):
+            logger.info(
+                "Outbox delivery skipped",
+                extra=build_log_extra(
+                    event="outbox_skipped",
+                    metadata=success_metadata,
+                ),
+            )
+            return
         logger.info(
             "Outbox delivery succeeded",
             extra=build_log_extra(
@@ -185,10 +194,10 @@ def _deliver_webhook(*, outbox_id: str) -> dict[str, object]:
     project_repository = ProjectRepositoryImpl(session_factory=DatabaseSessionFactory())
     outbox = outbox_repository.get_by_id(outbox_id)
     if outbox is None:
-        return {}
+        return {"skipped": True, "skip_reason": "outbox_missing"}
     project = project_repository.get_project(outbox.project_id)
     if project is None:
-        return {}
+        return {"skipped": True, "skip_reason": "project_missing"}
 
     payload = dict(outbox.payload or {})
     transport_meta = payload.get("__transport_meta") if isinstance(payload.get("__transport_meta"), dict) else {}
@@ -196,11 +205,16 @@ def _deliver_webhook(*, outbox_id: str) -> dict[str, object]:
     force_send = bool(transport_meta.get("force_send", False))
 
     if not force_send and (not project.webhook_enabled or not project.webhook_url):
-        return {}
+        return {
+            "skipped": True,
+            "skip_reason": "webhook_disabled_or_missing_url",
+            "webhook_enabled": bool(project.webhook_enabled),
+            "destination": (project.webhook_url or "").strip() or None,
+        }
 
     target_url = outbox.destination or project.webhook_url
     if not target_url:
-        return {}
+        return {"skipped": True, "skip_reason": "webhook_destination_missing"}
 
     rendered_body = body_payload
 
