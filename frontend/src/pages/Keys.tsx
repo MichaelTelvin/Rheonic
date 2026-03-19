@@ -230,7 +230,7 @@ export function Keys(): JSX.Element {
 
         <Card className="card--table">
           <h2 className="section-title">Existing keys</h2>
-          <div className="keys-list">
+          <div className={`keys-list ${loadingKeys ? "keys-list-loading" : ""}`}>
             <div className="key-row key-row-header">
               <span className="subtle">Label</span>
               <span className="subtle">Status</span>
@@ -238,6 +238,7 @@ export function Keys(): JSX.Element {
               <span className="subtle">Created</span>
               <span className="subtle key-actions-col table-actions-header">Actions</span>
             </div>
+            {loadingKeys ? <div className="key-row key-row-data key-row-placeholder">Loading keys...</div> : null}
             {activeKeys.length === 0 ? <p className="subtle">No keys yet.</p> : null}
             {activeKeys.map((key) => (
               <div className="key-row key-row-data" key={key.id}>

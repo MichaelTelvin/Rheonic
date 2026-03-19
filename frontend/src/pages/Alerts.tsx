@@ -296,7 +296,12 @@ export function Alerts(): JSX.Element {
             <h1 className="page-title">Alerts</h1>
             <p className="page-subtitle">Configure protect lifecycle alert routes for email and webhook delivery</p>
           </section>
-          <section className="empty">Loading alert settings...</section>
+          <div className="alerts-cards-grid">
+            <Card className="form-card card--form alerts-webhook-card card-loading-shell">
+              <h2 className="section-title">Alert routes</h2>
+              <p className="subtle card-loading-copy">Loading alert settings...</p>
+            </Card>
+          </div>
         </div>
       </main>
     );

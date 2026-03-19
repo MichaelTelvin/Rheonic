@@ -82,7 +82,6 @@
         border-radius: 8px;
         padding: 28px;
         min-height: 68vh;
-        transition: min-height 120ms ease;
       }
       .canvas.chart {
         padding: 8px;
@@ -312,6 +311,25 @@
           }
         }
 
+        function prefetchAssets() {
+          allowedDocs.forEach((doc) => {
+            fetch("./" + doc + ".md", { cache: "force-cache" })
+              .then((response) => (response.ok ? response.text() : null))
+              .then((markdown) => {
+                if (typeof markdown === "string" && !docCache.has(doc)) {
+                  docCache.set(doc, renderMarkdown(markdown));
+                }
+              })
+              .catch(() => {});
+          });
+
+          ["/docs/architecture/incident_flow.svg", "/docs/architecture/protect_decision_flow.svg"].forEach((src) => {
+            const image = new Image();
+            image.decoding = "async";
+            image.src = src;
+          });
+        }
+
         async function renderRoute(route) {
           freezePanelHeight(panel);
           setActiveTabs(route);
@@ -380,6 +398,12 @@
         window.addEventListener("popstate", () => {
           void renderRoute(parseRoute(window.location.search));
         });
+
+        if ("requestIdleCallback" in window) {
+          window.requestIdleCallback(prefetchAssets);
+        } else {
+          window.setTimeout(prefetchAssets, 0);
+        }
 
         void renderRoute(parseRoute(window.location.search));
       })();

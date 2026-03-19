@@ -91,7 +91,7 @@ export function Incidents(): JSX.Element {
           if (error instanceof ApiError && error.status === 403) {
             setWarning("Incidents request was forbidden.");
           } else {
-            setWarning("Incidents polling failed.");
+            setWarning(null);
           }
         }
       } finally {

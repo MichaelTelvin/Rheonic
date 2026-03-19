@@ -320,7 +320,14 @@ export function Protect(): JSX.Element {
             <h1 className="page-title">Project settings</h1>
             <p className="page-subtitle">Configure limits and protection behavior</p>
           </section>
-          <section className="empty">Loading project settings...</section>
+          <Card className="form-card card--form card-loading-shell">
+            <h2 className="section-title">Project configuration</h2>
+            <p className="subtle card-loading-copy">Loading project settings...</p>
+          </Card>
+          <Card className="form-card card--form danger-zone-card card-loading-shell">
+            <h2 className="section-title">Delete project</h2>
+            <p className="subtle card-loading-copy">Loading project settings...</p>
+          </Card>
         </div>
       </main>
     );

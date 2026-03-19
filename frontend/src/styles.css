@@ -2222,6 +2222,10 @@ pre {
   margin-top: 26px;
 }
 
+.keys-list-loading {
+  min-height: 168px;
+}
+
 .key-row {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -2249,6 +2253,11 @@ pre {
 
 .key-row-data {
   background: rgba(15, 23, 42, 0.35);
+}
+
+.key-row-placeholder {
+  min-height: 56px;
+  color: rgba(229, 231, 235, 0.68);
 }
 
 .key-name {
@@ -3661,6 +3670,14 @@ pre {
 .card--content {
   width: 100%;
   max-width: 1100px;
+}
+
+.card-loading-shell {
+  min-height: 220px;
+}
+
+.card-loading-copy {
+  margin: 18px 0 0;
 }
 
 .key-row {
