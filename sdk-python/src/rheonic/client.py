@@ -18,6 +18,7 @@ from rheonic.logger import (
     bind_trace_context,
     build_log_extra,
     configure_logging,
+    generate_span_id,
     generate_trace_id,
     get_logger,
     get_trace_id,
@@ -193,7 +194,14 @@ class Client:
             self._worker.start()
             self.warm_connections()
             atexit.register(self.close)
-            logger.info("SDK client initialized", extra=build_log_extra(event="sdk_client_initialized"))
+            logger.info(
+                "SDK client initialized",
+                extra=build_log_extra(
+                    event="sdk_client_initialized",
+                    trace_id=generate_trace_id(),
+                    span_id=generate_span_id(),
+                ),
+            )
         except Exception:
             logger.exception("SDK client initialization failed", extra=build_log_extra(event="error"))
             raise
@@ -286,7 +294,7 @@ class Client:
         try:
             response = self._http_client.get(
                 f"{self.base_url}/health",
-                headers={"X-Trace-ID": get_trace_id()},
+                headers={"X-Trace-ID": get_trace_id(), "X-Span-ID": generate_span_id()},
                 timeout=min(self.request_timeout_s, 1.0),
             )
             status_code = int(getattr(response, "status_code", 0))
@@ -391,6 +399,7 @@ class Client:
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self.ingest_key,
                     "X-Trace-ID": get_trace_id(),
+                    "X-Span-ID": generate_span_id(),
                 },
             )
             status_code = int(getattr(response, "status_code", 0))

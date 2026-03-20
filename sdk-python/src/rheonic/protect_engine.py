@@ -6,7 +6,15 @@ from typing import Any
 from uuid import uuid4
 
 from rheonic.config import sdk_config
-from rheonic.logger import bind_trace_context, build_log_extra, generate_trace_id, get_logger, get_trace_id, reset_trace_context
+from rheonic.logger import (
+    bind_trace_context,
+    build_log_extra,
+    generate_span_id,
+    generate_trace_id,
+    get_logger,
+    get_trace_id,
+    reset_trace_context,
+)
 
 try:
     import httpx
@@ -178,7 +186,11 @@ class ProtectEngine:
         try:
             response = self._get_with_timeout(
                 f"{self._base_url}/api/v1/protect/config",
-                headers={"X-Project-Ingest-Key": self._ingest_key, "X-Trace-ID": generate_trace_id()},
+                headers={
+                    "X-Project-Ingest-Key": self._ingest_key,
+                    "X-Trace-ID": generate_trace_id(),
+                    "X-Span-ID": generate_span_id(),
+                },
                 timeout_s=max(self._request_timeout_s, 0.1),
             )
             status_code = int(getattr(response, "status_code", 0))
@@ -265,6 +277,7 @@ class ProtectEngine:
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
                     "X-Trace-ID": get_trace_id() or generate_trace_id(),
+                    "X-Span-ID": generate_span_id(),
                     "X-Rheonic-Protect-Request-Id": request_id,
                 },
                 timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),
@@ -282,6 +295,7 @@ class ProtectEngine:
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
                     "X-Trace-ID": get_trace_id() or generate_trace_id(),
+                    "X-Span-ID": generate_span_id(),
                     "X-Rheonic-Protect-Request-Id": request_id,
                 },
                 timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),

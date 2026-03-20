@@ -381,7 +381,6 @@ def test_alert_email_skip_logs_outbox_skipped_instead_of_outbox_delivered(
         for line in capsys.readouterr().out.splitlines()
         if line.strip().startswith("{")
     ]
-    assert any(payload.get("event") == "email_skipped" for payload in emitted)
     skipped_log = next(payload for payload in emitted if payload.get("event") == "outbox_skipped")
     assert skipped_log["metadata"]["skip_reason"] == "email_disabled_or_missing_project"
     assert not any(payload.get("event") == "outbox_delivered" for payload in emitted)

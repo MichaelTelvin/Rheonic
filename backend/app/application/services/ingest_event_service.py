@@ -146,7 +146,6 @@ class IngestEventService:
                 signals=signals,
                 mode=mode,
             )
-            logger.info("Event ingested", extra={"project_id": event.project_id, "event_id": event.id})
         except Exception:
             logger.exception("Ingest service failed", extra={"project_id": event.project_id})
             raise

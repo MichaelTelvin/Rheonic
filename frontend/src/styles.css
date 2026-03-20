@@ -6579,7 +6579,7 @@ html {
 }
 
 .public-shell.public-shell-marketing .public-footer-landing-legal {
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
 }
 
@@ -6595,6 +6595,14 @@ html {
 .public-shell.public-shell-marketing .public-footer-landing-legal .public-footer-contact,
 .public-shell.public-shell-marketing .public-footer-landing-legal .public-footer-contact .public-footer-contact-email {
   opacity: 1;
+}
+
+.public-shell.public-shell-marketing .public-footer-landing-legal .public-footer-links,
+.public-shell.public-shell-marketing .public-footer-landing-legal .public-footer-contact,
+.public-shell.public-shell-marketing .public-footer-landing-legal p {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
 }
 
 .public-shell.quickstart-v2-shell .public-footer-quickstart-legal .public-footer-links {

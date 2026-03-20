@@ -1,7 +1,7 @@
 import { sdkNodeConfig } from "./config.js";
 import { randomUUID } from "node:crypto";
 import { requestJson } from "./httpTransport.js";
-import { bindTraceContext, generateSpanId, generateTraceId, getTraceId } from "./logger.js";
+import { bindTraceContext, generateSpanId, generateTraceId, getSpanId, getTraceId } from "./logger.js";
 
 export type ProtectDecision = "allow" | "warn" | "block";
 export type ProtectFailMode = "open" | "closed";
@@ -191,6 +191,7 @@ export class ProtectEngine {
         headers: {
           "X-Project-Ingest-Key": this.ingestKey,
           "X-Trace-ID": generateTraceId(),
+          "X-Span-ID": generateSpanId(),
         },
       });
       if (!response.ok) {
@@ -221,6 +222,7 @@ export class ProtectEngine {
           "Content-Type": "application/json",
           "X-Project-Ingest-Key": this.ingestKey,
           "X-Trace-ID": generateTraceId(),
+          "X-Span-ID": generateSpanId(),
           "X-Rheonic-Protect-Request-Id": requestId,
         },
         body: JSON.stringify({ environment: this.environment, provider, model, request_id: requestId }),
@@ -238,6 +240,7 @@ export class ProtectEngine {
           "Content-Type": "application/json",
           "X-Project-Ingest-Key": this.ingestKey,
           "X-Trace-ID": generateTraceId(),
+          "X-Span-ID": generateSpanId(),
           "X-Rheonic-Protect-Request-Id": requestId,
         },
         body: JSON.stringify({ environment: this.environment, provider, model, request_id: requestId }),

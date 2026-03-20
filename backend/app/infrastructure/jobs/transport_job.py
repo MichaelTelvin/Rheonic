@@ -68,20 +68,6 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
         reset_trace_context(context_tokens)
         return
 
-    logger.info(
-        "Outbox delivery claimed",
-        extra=build_log_extra(
-            event="outbox_claimed",
-            metadata={
-                "outbox_id": outbox.id,
-                "kind": outbox.kind,
-                "event_type": outbox.event_type,
-                "project_id": outbox.project_id,
-                "attempts": int(outbox.attempts),
-                "max_attempts": int(outbox.max_attempts),
-            },
-        ),
-    )
     delivery_metadata: dict[str, object] = {}
     try:
         if outbox.kind == "webhook":
@@ -260,13 +246,6 @@ def _deliver_email(*, outbox_id: str, settings: Settings) -> dict[str, object]:
         user_repository=user_repository,
     )
     if destination is None:
-        logger.info(
-            "Email delivery skipped",
-            extra=build_log_extra(
-                event="email_skipped",
-                metadata={"outbox_id": outbox.id, "event_type": outbox.event_type, "project_id": outbox.project_id},
-            ),
-        )
         return {
             "skipped": True,
             "skip_reason": "email_disabled_or_missing_project",
@@ -381,12 +360,6 @@ def _extract_email_attachments(payload: dict[str, object]) -> list[dict[str, str
 
 def _enqueue_webhook_failure_email(*, outbox, settings: Settings) -> None:
     if outbox.event_type == "webhook.test":
-        logger.info(
-            "Skipping webhook failure email for webhook test [outbox_id=%s project_id=%s]",
-            outbox.id,
-            outbox.project_id,
-            extra={"outbox_id": outbox.id, "project_id": outbox.project_id, "event_type": outbox.event_type},
-        )
         return
     project_repository = ProjectRepositoryImpl(session_factory=DatabaseSessionFactory())
     project = project_repository.get_project(outbox.project_id)

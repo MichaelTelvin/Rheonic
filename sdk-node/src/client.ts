@@ -2,7 +2,7 @@ import type { EventPayload } from "./eventBuilder.js";
 import { sdkNodeConfig } from "./config.js";
 import { ProtectEngine, type ProtectContext, type ProtectEvaluation, type ProtectFailMode } from "./protectEngine.js";
 import { requestJson } from "./httpTransport.js";
-import { bindTraceContext, emitLog, generateSpanId, generateTraceId, getTraceId } from "./logger.js";
+import { bindTraceContext, emitLog, generateSpanId, generateTraceId, getSpanId, getTraceId } from "./logger.js";
 import { prewarmTokenEstimator } from "./tokenEstimator.js";
 import { instrumentOpenAI as instrumentOpenAIProvider, type OpenAIInstrumentationOptions } from "./providers/openaiAdapter.js";
 import { instrumentAnthropic as instrumentAnthropicProvider, type AnthropicInstrumentationOptions } from "./providers/anthropicAdapter.js";
@@ -89,6 +89,14 @@ export class Client {
 
     CLIENT_REGISTRY.add(this);
     registerExitHooks();
+    emitLog({
+      level: "info",
+      event: "sdk_client_initialized",
+      message: "SDK client initialized",
+      environment: this.environment,
+      traceId: generateTraceId(),
+      spanId: generateSpanId(),
+    });
   }
 
   public async captureEvent(event: EventPayload): Promise<void> {
@@ -175,9 +183,13 @@ export class Client {
 
   private async runWarmup(): Promise<void> {
     try {
-      const response = await requestJson(`${this.baseUrl}/health`, {
+      const response = await bindTraceContext(generateTraceId(), generateSpanId(), async () => await requestJson(`${this.baseUrl}/health`, {
         method: "GET",
-      });
+        headers: {
+          "X-Trace-ID": getTraceId(),
+          "X-Span-ID": getSpanId(),
+        },
+      }));
       this.debugLog("SDK connection warmup completed", { status_code: response.status });
     } catch {
       this.debugLog("SDK connection warmup failed");

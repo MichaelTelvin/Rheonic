@@ -175,13 +175,6 @@ def ingest_event(
 
         # execute ingest use-case
         service.ingest(event)
-        logger.info(
-            "Event accepted",
-            extra=build_log_extra(
-                event="event_ingested",
-                metadata={"project_id": project_id, "provider": payload.provider, "model": payload.model},
-            ),
-        )
         return {"status": "accepted"}
     except HTTPException:
         raise
