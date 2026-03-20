@@ -45,6 +45,7 @@ function formatAlertAttemptTime(iso: string | null): string {
 
 type SetupStage = "checking" | "no_project" | "no_selection" | "no_ingest_key" | "no_events" | "complete";
 type ProtectStatus = "awaiting" | "healthy" | "degraded" | "unavailable";
+const DASHBOARD_BANNER_EXIT_MS = 280;
 
 type DashboardCachedState = {
   selectedProvider: string;
@@ -143,6 +144,9 @@ export function Dashboard(): JSX.Element {
   const [webhookIssueDismissedToken, setWebhookIssueDismissedToken] = useState<string | null>(null);
   const [setupBannerClosing, setSetupBannerClosing] = useState<boolean>(false);
   const [webhookIssueBannerClosing, setWebhookIssueBannerClosing] = useState<boolean>(false);
+  const [bannerOverlayTop, setBannerOverlayTop] = useState<number>(92);
+  const dashboardContentRef = useRef<HTMLDivElement | null>(null);
+  const statusPanelRef = useRef<HTMLDivElement | null>(null);
 
   const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
   const webhookIssueDismissStorageKey = useMemo<string>(() => `rheonic:webhookIssueDismissed:${projectId ?? "none"}`, [projectId]);
@@ -292,7 +296,7 @@ export function Dashboard(): JSX.Element {
       window.localStorage.setItem(setupDismissStorageKey, "1");
       setSetupBannerDismissed(true);
       setSetupBannerClosing(false);
-    }, 220);
+    }, DASHBOARD_BANNER_EXIT_MS);
   }, [setupDismissStorageKey]);
 
   const dismissWebhookIssueBanner = useCallback((): void => {
@@ -304,8 +308,35 @@ export function Dashboard(): JSX.Element {
       window.localStorage.setItem(webhookIssueDismissStorageKey, webhookIssueToken);
       setWebhookIssueDismissedToken(webhookIssueToken);
       setWebhookIssueBannerClosing(false);
-    }, 220);
+    }, DASHBOARD_BANNER_EXIT_MS);
   }, [webhookIssueDismissStorageKey, webhookIssueToken]);
+
+  useLayoutEffect(() => {
+    const content = dashboardContentRef.current;
+    const statusPanel = statusPanelRef.current;
+    if (!content || !statusPanel) {
+      return;
+    }
+
+    const updateBannerOverlayTop = (): void => {
+      const contentRect = content.getBoundingClientRect();
+      const statusRect = statusPanel.getBoundingClientRect();
+      const nextTop = Math.max(18, statusRect.bottom - contentRect.top + 14);
+      setBannerOverlayTop(nextTop);
+    };
+
+    updateBannerOverlayTop();
+    const resizeObserver = new ResizeObserver(() => {
+      updateBannerOverlayTop();
+    });
+    resizeObserver.observe(content);
+    resizeObserver.observe(statusPanel);
+    window.addEventListener("resize", updateBannerOverlayTop);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateBannerOverlayTop);
+    };
+  }, [projectId, renderSetupBanner, renderWebhookIssueBanner, globalBanner]);
 
   const setupBannerContent = useMemo<{
     title: string;
@@ -662,62 +693,62 @@ export function Dashboard(): JSX.Element {
 
   return (
     <main className="dashboard">
-      <div className="dashboard-content">
+      <div className="dashboard-content" ref={dashboardContentRef}>
+        {(globalBanner || renderSetupBanner || renderWebhookIssueBanner) ? (
+          <section className="dashboard-banner-overlay" style={{ top: `${bannerOverlayTop}px` }} aria-live="polite">
+            <div className="dashboard-banner-rail">
+              {globalBanner ? <section className="banner dashboard-floating-banner">{globalBanner}</section> : null}
+              {renderSetupBanner ? (
+                <section className={`setup-banner dashboard-floating-banner${setupBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
+                  <div className="setup-banner-copy">
+                    <div className="setup-banner-title">{setupBannerContent.title}</div>
+                    <div className="setup-banner-text">{setupBannerContent.text}</div>
+                  </div>
+                  <div className="setup-banner-actions">
+                    {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
+                      <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
+                        {setupBannerContent.primaryLabel}
+                      </button>
+                    ) : null}
+                    {setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo ? (
+                      <button type="button" className="modal-button" onClick={() => navigate(setupBannerContent.secondaryTo)}>
+                        {setupBannerContent.secondaryLabel}
+                      </button>
+                    ) : null}
+                    <button type="button" className="modal-button" onClick={dismissSetupBanner}>
+                      Dismiss
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+              {renderWebhookIssueBanner ? (
+                <Card className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
+                  <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
+                  <p className="subtle">
+                    {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
+                    {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
+                  </p>
+                  <div className="modal-actions form-actions">
+                    <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
+                      Check URL
+                    </button>
+                    <button type="button" className="modal-button" onClick={dismissWebhookIssueBanner}>
+                      Dismiss
+                    </button>
+                  </div>
+                </Card>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
         <section className="dashboard-hero">
           <div className="dashboard-hero-left">
             <h1 className="page-title">LLM Control Center</h1>
             <p className="page-subtitle">Real-time monitoring and protection</p>
             <div className="hero-subtitle-divider" aria-hidden="true" />
           </div>
-          <div className="dashboard-hero-center" aria-live="polite">
-            {(globalBanner || renderSetupBanner || renderWebhookIssueBanner) ? (
-              <section className="dashboard-banner-rail">
-                {globalBanner ? <section className="banner dashboard-floating-banner">{globalBanner}</section> : null}
-                {renderSetupBanner ? (
-                  <section className={`setup-banner dashboard-floating-banner${setupBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
-                    <div className="setup-banner-copy">
-                      <div className="setup-banner-title">{setupBannerContent.title}</div>
-                      <div className="setup-banner-text">{setupBannerContent.text}</div>
-                    </div>
-                    <div className="setup-banner-actions">
-                      {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
-                        <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
-                          {setupBannerContent.primaryLabel}
-                        </button>
-                      ) : null}
-                      {setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo ? (
-                        <button type="button" className="modal-button" onClick={() => navigate(setupBannerContent.secondaryTo)}>
-                          {setupBannerContent.secondaryLabel}
-                        </button>
-                      ) : null}
-                      <button type="button" className="modal-button" onClick={dismissSetupBanner}>
-                        Dismiss
-                      </button>
-                    </div>
-                  </section>
-                ) : null}
-                {renderWebhookIssueBanner ? (
-                  <Card className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
-                    <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
-                    <p className="subtle">
-                      {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
-                      {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
-                    </p>
-                    <div className="modal-actions form-actions">
-                      <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
-                        Check URL
-                      </button>
-                      <button type="button" className="modal-button" onClick={dismissWebhookIssueBanner}>
-                        Dismiss
-                      </button>
-                    </div>
-                  </Card>
-                ) : null}
-              </section>
-            ) : null}
-          </div>
           <div className="dashboard-hero-right">
-            <div className="status-panel status-panel--accent" aria-live="polite">
+            <div ref={statusPanelRef} className="status-panel status-panel--accent" aria-live="polite">
               <div className="status-row">
                 <span className="status-row-label">System status</span>
                 <span className={`status-row-value status-${protectStatus.tone}`}>

@@ -1264,6 +1264,7 @@ body {
 
 .dashboard-content {
   width: 100%;
+  position: relative;
 }
 
 .header-row {
@@ -1352,7 +1353,7 @@ body {
 
 .dashboard-hero {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(360px, 480px) clamp(280px, 32vw, 340px);
+  grid-template-columns: minmax(280px, 1fr) clamp(280px, 32vw, 340px);
   gap: 18px;
   align-items: start;
   margin-bottom: 30px;
@@ -1383,15 +1384,6 @@ body {
       rgba(148, 163, 184, 0.12) 78%,
       rgba(148, 163, 184, 0.06) 88%,
       rgba(148, 163, 184, 0) 100%);
-}
-
-.dashboard-hero-center {
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 0;
-  position: relative;
 }
 
 .dashboard-hero-right {
@@ -1877,25 +1869,30 @@ select {
   font-size: 0.86rem;
 }
 
+.dashboard-banner-overlay {
+  position: absolute;
+  right: 0;
+  width: min(520px, calc(100% - 320px));
+  z-index: 18;
+  pointer-events: none;
+}
+
 .dashboard-banner-rail {
   width: 100%;
-  max-width: 480px;
   display: grid;
   gap: 12px;
-  overflow: hidden;
-  position: relative;
-  top: -24px;
 }
 
 .dashboard-floating-banner {
   margin: 0;
   width: 100%;
-  animation: dashboardBannerSlideIn 560ms cubic-bezier(0.16, 1, 0.3, 1);
-  transform-origin: top center;
+  pointer-events: auto;
+  animation: dashboardBannerSlideIn 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center right;
 }
 
 .dashboard-floating-banner--closing {
-  animation: dashboardBannerSlideOut 420ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: dashboardBannerSlideOut 280ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 .setup-banner {
@@ -1917,24 +1914,24 @@ select {
 @keyframes dashboardBannerSlideIn {
   from {
     opacity: 0;
-    transform: translateY(-72px);
+    transform: translateX(24px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
   }
 }
 
 @keyframes dashboardBannerSlideOut {
   from {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
   }
 
   to {
     opacity: 0;
-    transform: translateY(-62px);
+    transform: translateX(24px);
   }
 }
 
@@ -2573,10 +2570,6 @@ pre {
     margin-bottom: 22px;
   }
 
-  .dashboard-hero-center {
-    padding-top: 0;
-  }
-
   .dashboard-hero-right {
     justify-self: stretch;
     width: 100%;
@@ -2589,6 +2582,12 @@ pre {
 
   .dashboard-controls-main {
     margin-top: 0;
+  }
+
+  .dashboard-banner-overlay {
+    left: 0;
+    right: 0;
+    width: 100%;
   }
 
   .dashboard-banner-rail {
@@ -4312,6 +4311,10 @@ pre {
 @media (max-width: 700px) {
   .app-routes .dashboard {
     padding: 16px 14px 24px;
+  }
+
+  .dashboard-banner-overlay {
+    width: 100%;
   }
 
   .dashboard-banner-rail {

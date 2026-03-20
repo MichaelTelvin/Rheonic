@@ -115,6 +115,9 @@ def test_feedback_email_delivery_uses_system_sender_and_reply_to(tmp_path, monke
     assert payload["to"] == ["ops@rheonic.dev"]
     assert payload["reply_to"] == ["contact@rheonic.dev"]
     assert payload["subject"] == "Rheonic beta bug report"
+    assert payload["attachments"][0]["filename"] == "rheonic-logo.png"
+    assert payload["attachments"][0]["content_type"] == "image/png"
+    assert payload["attachments"][0]["content_id"] == "rheonic-logo"
 
 
 def test_feedback_email_delivery_passes_screenshot_attachment_to_provider(tmp_path, monkeypatch) -> None:
@@ -162,7 +165,10 @@ def test_feedback_email_delivery_passes_screenshot_attachment_to_provider(tmp_pa
 
     assert len(sent) == 1
     attachments = sent[0]["json"]["attachments"]
-    assert attachments == [
+    assert attachments[0]["filename"] == "rheonic-logo.png"
+    assert attachments[0]["content_type"] == "image/png"
+    assert attachments[0]["content_id"] == "rheonic-logo"
+    assert attachments[1:] == [
         {
             "filename": "bug.png",
             "content": "ZmFrZS1wbmctYnl0ZXM=",
@@ -238,7 +244,9 @@ def test_alert_email_delivery_resolves_project_owner_and_alert_sender(tmp_path, 
     assert payload["from"] == "Rheonic Alerts <alerts@mail.rheonic.dev>"
     assert payload["to"] == ["owner@example.com"]
     assert payload["reply_to"] == ["contact@rheonic.dev"]
-    assert payload["subject"] == "[Rheonic] Protect blocked traffic: Request cap exceeded (p-alert)"
+    assert payload["subject"] == "[Rheonic] Protect alert: Request cap exceeded (p-alert)"
+    assert payload["attachments"][0]["filename"] == "rheonic-logo.png"
+    assert payload["attachments"][0]["content_id"] == "rheonic-logo"
 
 
 def test_alert_email_delivery_is_skipped_when_project_email_alerts_are_disabled(tmp_path, monkeypatch) -> None:

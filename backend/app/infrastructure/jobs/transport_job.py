@@ -7,6 +7,7 @@ import httpx
 from redis import Redis
 from rq import Queue
 
+from app.application.email_templates.base_layout import get_base_email_inline_attachments
 from app.application.email_templates.registry import render_template
 from app.config import Settings, app_config
 from app.infrastructure.db.base import DatabaseSessionFactory
@@ -365,18 +366,19 @@ def _build_email_transport(*, settings: Settings):
 
 
 def _extract_email_attachments(payload: dict[str, object]) -> list[dict[str, str]] | None:
+    attachments = get_base_email_inline_attachments()
     screenshot_name = str(payload.get("screenshot_name") or "").strip()
     screenshot_content_type = str(payload.get("screenshot_content_type") or "").strip()
     screenshot_base64 = str(payload.get("screenshot_base64") or "").strip()
-    if not screenshot_name or not screenshot_content_type or not screenshot_base64:
-        return None
-    return [
-        {
-            "filename": screenshot_name,
-            "content": screenshot_base64,
-            "content_type": screenshot_content_type,
-        }
-    ]
+    if screenshot_name and screenshot_content_type and screenshot_base64:
+        attachments.append(
+            {
+                "filename": screenshot_name,
+                "content": screenshot_base64,
+                "content_type": screenshot_content_type,
+            }
+        )
+    return attachments or None
 
 
 def _enqueue_webhook_failure_email(*, outbox, settings: Settings) -> None:
