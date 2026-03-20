@@ -722,19 +722,19 @@ export function Dashboard(): JSX.Element {
                     <div className="setup-banner-title dashboard-alert-banner-title">{setupBannerContent.title}</div>
                     <div className="setup-banner-text dashboard-alert-banner-summary">{setupBannerContent.text}</div>
                     <div className="setup-banner-actions dashboard-alert-banner-actions">
-                    {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
-                      <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
-                        {setupBannerContent.primaryLabel}
+                      {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
+                        <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
+                          {setupBannerContent.primaryLabel}
+                        </button>
+                      ) : null}
+                      {setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo ? (
+                        <button type="button" className="modal-button" onClick={() => navigate(setupBannerContent.secondaryTo)}>
+                          {setupBannerContent.secondaryLabel}
+                        </button>
+                      ) : null}
+                      <button type="button" className="modal-button" onClick={dismissSetupBanner}>
+                        Dismiss
                       </button>
-                    ) : null}
-                    {setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo ? (
-                      <button type="button" className="modal-button" onClick={() => navigate(setupBannerContent.secondaryTo)}>
-                        {setupBannerContent.secondaryLabel}
-                      </button>
-                    ) : null}
-                    <button type="button" className="modal-button" onClick={dismissSetupBanner}>
-                      Dismiss
-                    </button>
                     </div>
                   </div>
                 </section>
@@ -784,11 +784,9 @@ export function Dashboard(): JSX.Element {
         </section>
 
         {!projectId ? (
-          showSetupBanner ? null : (
-            <section className="empty">
-              <p>Select a project to see realtime metrics.</p>
-            </section>
-          )
+          <section className="empty">
+            <p>Select a project to see realtime metrics.</p>
+          </section>
         ) : (
           <>
             <section className="dashboard-controls-main">

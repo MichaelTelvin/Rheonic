@@ -1909,28 +1909,14 @@ select {
 
 .setup-banner {
   width: 100%;
-  padding: 12px 16px;
+  padding: 14px 16px 13px;
   min-height: 0;
   border-radius: 12px;
-  border: 1px solid rgba(129, 140, 248, 0.18);
-  background: #1d2940;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.08), 0 0 18px rgba(99, 102, 241, 0.18);
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  background: #21304d;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(56, 189, 248, 0.08), 0 0 22px rgba(56, 189, 248, 0.22);
   position: relative;
   overflow: hidden;
-}
-
-.setup-banner-title {
-  font-size: 0.98rem;
-  line-height: 1.2;
-}
-
-.setup-banner-text {
-  font-size: 0.84rem;
-  line-height: 1.42;
-}
-
-.setup-banner-actions {
-  gap: 10px;
 }
 
 @keyframes dashboardBannerSlideIn {
@@ -1955,36 +1941,51 @@ select {
 
 .setup-banner-title {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.94rem;
   font-weight: 650;
   color: rgba(241, 245, 249, 0.98);
   line-height: 1.2;
 }
 
 .setup-banner-text {
-  margin-top: 4px;
   font-size: 0.84rem;
-  line-height: 1.36;
+  line-height: 1.42;
   color: rgba(226, 232, 240, 0.82);
+}
+
+.setup-banner .dashboard-alert-banner-layout {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "title"
+    "summary"
+    "actions";
+  row-gap: 11px;
+}
+
+.setup-banner .dashboard-alert-banner-summary {
+  white-space: normal;
 }
 
 .setup-banner-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-self: start;
 }
 
 .setup-banner-actions .modal-button {
-  min-width: 108px;
-  padding: 6px 11px;
-  font-size: 0.8rem;
+  min-width: 0;
+  padding: 5px 10px;
+  font-size: 0.75rem;
   border-color: rgba(148, 163, 184, 0.44);
   background: rgba(15, 23, 42, 0.44);
 }
 
 .setup-banner-actions .modal-button.modal-primary {
-  border-color: rgba(129, 140, 248, 0.52);
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.18) inset;
+  border-color: rgba(125, 211, 252, 0.42);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.14) inset;
 }
 
 .dashboard-alert-card {
@@ -2676,20 +2677,17 @@ pre {
   }
 
   .setup-banner {
-    flex-direction: column;
-    align-items: flex-start;
-    min-height: 132px;
+    min-height: 0;
   }
 
   .setup-banner-actions {
     width: 100%;
     flex-wrap: wrap;
-    margin-top: 4px;
   }
 
   .setup-banner-actions .modal-button {
     min-width: 0;
-    flex: 1 1 140px;
+    flex: 0 1 auto;
   }
 
   .dashboard-controls-main .toolbar {
