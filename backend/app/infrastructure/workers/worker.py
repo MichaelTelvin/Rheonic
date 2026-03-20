@@ -9,6 +9,18 @@ from app.logger import bind_trace_context, build_log_extra, configure_logging, g
 logger = get_logger(__name__)
 
 
+def _format_worker_exception(exc_type, exc_value, tb) -> str:
+    # RQ registry cleanup can pass a StackSummary instead of a traceback object.
+    if isinstance(tb, traceback.StackSummary):
+        return "".join(tb.format())
+    if tb is None:
+        return "".join(traceback.format_exception_only(exc_type, exc_value))
+    try:
+        return "".join(traceback.format_exception(exc_type, exc_value, tb))
+    except Exception:
+        return "".join(traceback.format_exception_only(exc_type, exc_value))
+
+
 def _job_exception_handler(job, exc_type, exc_value, tb) -> bool:
     # Log failed jobs with contextual information and traceback.
     project_id = None
@@ -28,7 +40,7 @@ def _job_exception_handler(job, exc_type, exc_value, tb) -> bool:
                 "project_id": project_id,
                 "error_type": getattr(exc_type, "__name__", str(exc_type)),
                 "error_message": str(exc_value),
-                "stack_trace": "".join(traceback.format_exception(exc_type, exc_value, tb)),
+                "stack_trace": _format_worker_exception(exc_type, exc_value, tb),
             },
             trace_id=trace_id,
         ),

@@ -98,6 +98,7 @@ def protect_decision(
     service: ProtectService = Depends(get_protect_service),
     protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
     incident_manager: IncidentManager = Depends(get_incident_manager),
+    ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
     request_id: str | None = Header(default=None, alias="X-Rheonic-Protect-Request-Id"),
 ) -> ProtectDecisionOut:
@@ -121,25 +122,28 @@ def protect_decision(
             raise HTTPException(status_code=401, detail="invalid ingest key")
         latency_ms = int((perf_counter() - start) * 1000)
         response.headers["X-Protect-Decision-Latency-Ms"] = str(latency_ms)
+        project = ingest_key_service.resolve_project(plaintext_key=ingest_key)
         if project_id:
             scoped_id = scoped_project_provider_id(project_id, payload.provider)
-            protect_action_store.finalize_outcome(
-                project_id=scoped_id,
-                decision=decision.decision,
-                reason=decision.reason,
-                source=app_config.protect_outcome_source_live,
-                request_id=request_id,
-            )
+            if project is not None and project.protect_enabled:
+                protect_action_store.finalize_outcome(
+                    project_id=scoped_id,
+                    decision=decision.decision,
+                    reason=decision.reason,
+                    source=app_config.protect_outcome_source_live,
+                    request_id=request_id,
+                )
             protect_action_store.record_health(
                 project_id=scoped_id,
                 latency_ms=latency_ms,
             )
-            _record_preflight_incident_if_needed(
-                incident_manager=incident_manager,
-                project_id=project_id,
-                payload=payload,
-                decision=decision,
-            )
+            if project is not None and project.protect_enabled:
+                _record_preflight_incident_if_needed(
+                    incident_manager=incident_manager,
+                    project_id=project_id,
+                    payload=payload,
+                    decision=decision,
+                )
         logger.info(
             "Protect decision evaluated",
             extra=build_log_extra(

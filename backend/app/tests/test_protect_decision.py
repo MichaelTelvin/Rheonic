@@ -670,6 +670,24 @@ def test_protect_decision_records_allow_warn_block_outcomes(tmp_path) -> None:
     _cleanup_overrides()
 
 
+def test_observe_mode_preflight_does_not_increment_protect_decision_counters(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Observe Preflight No Counters")
+    _set_protect(client, project_id, protect_enabled=False, protect_max_req_per_min=1000, protect_max_tok_per_min=1000)
+
+    before = _protect_metrics(client, project_id)
+    response = _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    after = _protect_metrics(client, project_id)
+
+    assert response["decision"] == "allow"
+    assert after["allowed_60m"] == before["allowed_60m"] == 0
+    assert after["warned_60m"] == before["warned_60m"] == 0
+    assert after["blocked_60m"] == before["blocked_60m"] == 0
+    assert after["last"] is None
+    assert after["decision_latency_p50_60m_ms"] is not None
+    _cleanup_overrides()
+
+
 def test_protect_metrics_support_provider_filter_with_same_schema(tmp_path) -> None:
     client, _, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Metrics")

@@ -341,7 +341,7 @@ export function Dashboard(): JSX.Element {
         ? tokenCardRect.top - contentRect.top - setupBannerHeight - 18
         : providerAlignedTop;
       const webhookTokenSafeTop = tokenCardRect && webhookBannerHeight > 0
-        ? tokenCardRect.top - contentRect.top - webhookBannerHeight - 18
+        ? tokenCardRect.top - contentRect.top - webhookBannerHeight - 19
         : minTop;
       const preferredSetupTop = Math.min(providerAlignedTop, setupTokenSafeTop);
       const preferredWebhookTop = Math.max(minTop, webhookTokenSafeTop);
