@@ -46,6 +46,7 @@ function formatAlertAttemptTime(iso: string | null): string {
 type SetupStage = "checking" | "no_project" | "no_selection" | "no_ingest_key" | "no_events" | "complete";
 type ProtectStatus = "awaiting" | "healthy" | "degraded" | "unavailable";
 const DASHBOARD_BANNER_EXIT_MS = 280;
+const DASHBOARD_METRICS_GAP_PX = 22;
 
 type DashboardCachedState = {
   selectedProvider: string;
@@ -144,7 +145,11 @@ export function Dashboard(): JSX.Element {
   const [webhookIssueDismissedToken, setWebhookIssueDismissedToken] = useState<string | null>(null);
   const [setupBannerClosing, setSetupBannerClosing] = useState<boolean>(false);
   const [webhookIssueBannerClosing, setWebhookIssueBannerClosing] = useState<boolean>(false);
-  const [bannerOverlayTop, setBannerOverlayTop] = useState<number>(92);
+  const [bannerOverlayStyle, setBannerOverlayStyle] = useState<{ top: number; right: number; width: number }>({
+    top: 120,
+    right: 24,
+    width: 420,
+  });
   const dashboardContentRef = useRef<HTMLDivElement | null>(null);
   const heroDividerRef = useRef<HTMLDivElement | null>(null);
 
@@ -321,8 +326,10 @@ export function Dashboard(): JSX.Element {
     const updateBannerOverlayTop = (): void => {
       const contentRect = content.getBoundingClientRect();
       const dividerRect = divider.getBoundingClientRect();
-      const nextTop = Math.max(18, dividerRect.bottom - contentRect.top + 18);
-      setBannerOverlayTop(nextTop);
+      const nextTop = Math.max(18, dividerRect.bottom + 18);
+      const nextRight = Math.max(14, window.innerWidth - contentRect.right);
+      const nextWidth = Math.max(320, (contentRect.width - DASHBOARD_METRICS_GAP_PX) / 2);
+      setBannerOverlayStyle({ top: nextTop, right: nextRight, width: nextWidth });
     };
 
     updateBannerOverlayTop();
@@ -695,7 +702,15 @@ export function Dashboard(): JSX.Element {
     <main className="dashboard">
       <div className="dashboard-content" ref={dashboardContentRef}>
         {(globalBanner || renderSetupBanner || renderWebhookIssueBanner) ? (
-          <section className="dashboard-banner-overlay" style={{ top: `${bannerOverlayTop}px` }} aria-live="polite">
+          <section
+            className="dashboard-banner-overlay"
+            style={{
+              top: `${bannerOverlayStyle.top}px`,
+              right: `${bannerOverlayStyle.right}px`,
+              width: `${bannerOverlayStyle.width}px`,
+            }}
+            aria-live="polite"
+          >
             <div className="dashboard-banner-rail">
               {globalBanner ? <section className="banner dashboard-floating-banner">{globalBanner}</section> : null}
               {renderSetupBanner ? (

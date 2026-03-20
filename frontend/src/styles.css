@@ -1870,11 +1870,8 @@ select {
 }
 
 .dashboard-banner-overlay {
-  position: absolute;
-  right: 0;
-  width: calc((100% - 22px) / 2);
-  max-width: 520px;
-  z-index: 18;
+  position: fixed;
+  z-index: 60;
   pointer-events: none;
 }
 
@@ -2633,6 +2630,7 @@ pre {
     left: 0;
     right: 0;
     width: 100%;
+    top: 72px !important;
   }
 
   .dashboard-alert-banner-layout {
@@ -4368,6 +4366,7 @@ pre {
 
   .dashboard-banner-overlay {
     width: 100%;
+    top: 72px !important;
   }
 
   .dashboard-banner-rail {
