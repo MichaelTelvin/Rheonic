@@ -1356,7 +1356,7 @@ body {
   grid-template-columns: minmax(280px, 1fr) clamp(280px, 32vw, 340px);
   gap: 18px;
   align-items: start;
-  margin-bottom: 30px;
+  margin-bottom: 46px;
   position: relative;
 }
 
@@ -1872,7 +1872,7 @@ select {
 .dashboard-banner-overlay {
   position: absolute;
   right: 0;
-  width: clamp(300px, 24vw, 350px);
+  width: min(520px, calc(100% - 360px));
   z-index: 18;
   pointer-events: none;
 }
@@ -1880,25 +1880,26 @@ select {
 .dashboard-banner-rail {
   width: 100%;
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .dashboard-floating-banner {
   margin: 0;
   width: 100%;
   pointer-events: auto;
-  animation: dashboardBannerSlideIn 180ms ease-out;
+  animation: dashboardBannerSlideIn 180ms ease-out both;
   transform-origin: center right;
   will-change: transform;
+  backface-visibility: hidden;
 }
 
 .dashboard-floating-banner--closing {
-  animation: dashboardBannerSlideOut 180ms ease-in forwards;
+  animation: dashboardBannerSlideOut 180ms ease-in both;
 }
 
 .setup-banner {
   width: 100%;
-  padding: 7px 10px 7px 12px;
+  padding: 10px 14px 10px 16px;
   min-height: 0;
   border-radius: 10px;
   border: 1px solid rgba(129, 140, 248, 0.18);
@@ -1906,7 +1907,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 14px;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
   position: relative;
   overflow: hidden;
@@ -1928,21 +1929,21 @@ select {
 
 @keyframes dashboardBannerSlideIn {
   from {
-    transform: translateX(24px);
+    transform: translate3d(42px, 0, 0);
   }
 
   to {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 @keyframes dashboardBannerSlideOut {
   from {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 
   to {
-    transform: translateX(24px);
+    transform: translate3d(42px, 0, 0);
   }
 }
 
@@ -1962,30 +1963,30 @@ select {
 
 .setup-banner-title {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.92rem;
   font-weight: 650;
   color: rgba(241, 245, 249, 0.98);
   line-height: 1.2;
 }
 
 .setup-banner-text {
-  margin-top: 3px;
-  font-size: 0.78rem;
-  line-height: 1.28;
+  margin-top: 4px;
+  font-size: 0.84rem;
+  line-height: 1.36;
   color: rgba(226, 232, 240, 0.82);
 }
 
 .setup-banner-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
 .setup-banner-actions .modal-button {
-  min-width: 96px;
-  padding: 5px 9px;
-  font-size: 0.76rem;
+  min-width: 108px;
+  padding: 6px 11px;
+  font-size: 0.8rem;
   border-color: rgba(148, 163, 184, 0.44);
   background: rgba(15, 23, 42, 0.44);
 }
@@ -1999,7 +2000,7 @@ select {
   border: 1px solid rgba(255, 180, 80, 0.35);
   background: #27211e;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
-  padding: 8px 10px;
+  padding: 10px 14px;
 }
 
 .dashboard-alert-card::before {
@@ -2008,27 +2009,27 @@ select {
 
 .dashboard-alert-card .card-title {
   color: inherit;
-  margin: 0 0 4px;
-  font-size: 0.84rem;
-  line-height: 1.22;
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+  line-height: 1.24;
 }
 
 .dashboard-alert-card .subtle {
   color: inherit;
   margin: 0;
-  font-size: 0.76rem;
-  line-height: 1.28;
+  font-size: 0.87rem;
+  line-height: 1.36;
 }
 
 .dashboard-alert-card .modal-actions.form-actions {
-  margin-top: 8px;
-  gap: 6px;
+  margin-top: 12px;
+  gap: 10px;
 }
 
 .dashboard-alert-card .modal-actions.form-actions .modal-button {
-  min-width: 92px;
-  padding: 5px 9px;
-  font-size: 0.76rem;
+  min-width: 108px;
+  padding: 6px 11px;
+  font-size: 0.8rem;
 }
 
 .dashboard-beta-note {
