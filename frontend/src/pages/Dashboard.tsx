@@ -145,6 +145,7 @@ export function Dashboard(): JSX.Element {
   const [webhookIssueDismissedToken, setWebhookIssueDismissedToken] = useState<string | null>(null);
   const [setupBannerClosing, setSetupBannerClosing] = useState<boolean>(false);
   const [webhookIssueBannerClosing, setWebhookIssueBannerClosing] = useState<boolean>(false);
+  const [setupBannerHeight, setSetupBannerHeight] = useState<number>(0);
   const [bannerOverlayStyle, setBannerOverlayStyle] = useState<{ top: number; right: number; width: number }>({
     top: 120,
     right: 24,
@@ -152,6 +153,7 @@ export function Dashboard(): JSX.Element {
   });
   const dashboardContentRef = useRef<HTMLDivElement | null>(null);
   const heroDividerRef = useRef<HTMLDivElement | null>(null);
+  const setupBannerRef = useRef<HTMLElement | null>(null);
   const tokenCardSlotClassName = "dashboard-banner-target";
 
   const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
@@ -329,8 +331,12 @@ export function Dashboard(): JSX.Element {
       const dividerRect = divider.getBoundingClientRect();
       const tokenCard = content.querySelector<HTMLElement>(`.${tokenCardSlotClassName}`);
       const tokenCardRect = tokenCard?.getBoundingClientRect() ?? null;
-      const nextTop = Math.max(12, dividerRect.bottom - 2);
-      const nextRight = Math.max(14, tokenCardRect ? window.innerWidth - tokenCardRect.right : window.innerWidth - contentRect.right);
+      const minTop = Math.max(16, dividerRect.bottom - contentRect.top - 6);
+      const preferredSetupTop = tokenCardRect && setupBannerHeight > 0
+        ? tokenCardRect.top - contentRect.top - setupBannerHeight - 44
+        : minTop;
+      const nextTop = renderSetupBanner ? Math.max(minTop, preferredSetupTop) : minTop;
+      const nextRight = Math.max(0, tokenCardRect ? contentRect.right - tokenCardRect.right : 0);
       const nextWidth = Math.max(320, tokenCardRect ? tokenCardRect.width : (contentRect.width - DASHBOARD_METRICS_GAP_PX) / 2);
       setBannerOverlayStyle({ top: nextTop, right: nextRight, width: nextWidth });
     };
@@ -346,7 +352,7 @@ export function Dashboard(): JSX.Element {
       resizeObserver.disconnect();
       window.removeEventListener("resize", updateBannerOverlayTop);
     };
-  }, [projectId]);
+  }, [projectId, renderSetupBanner, setupBannerHeight]);
 
   const setupBannerContent = useMemo<{
     title: string;
@@ -359,7 +365,7 @@ export function Dashboard(): JSX.Element {
     if (setupStage === "no_project") {
       return {
         title: "Setup required",
-        text: "Create your first project to generate an ingest key and follow next steps in Quickstart.",
+        text: "Create your first project, generate an ingest key, then follow Quickstart.",
         primaryLabel: "Go to Projects",
         primaryTo: "/app/projects",
         secondaryLabel: "Open Quickstart",
@@ -369,7 +375,7 @@ export function Dashboard(): JSX.Element {
     if (setupStage === "no_selection") {
       return {
         title: "Setup required",
-        text: "Select a project to view metrics. Then create an ingest key and instrument your provider.",
+        text: "Select a project, generate an ingest key, then follow Quickstart.",
         primaryLabel: "Open Projects",
         primaryTo: "/app/projects",
         secondaryLabel: "Open Quickstart",
@@ -379,7 +385,7 @@ export function Dashboard(): JSX.Element {
     if (setupStage === "no_ingest_key") {
       return {
         title: "Setup required",
-        text: "Create an ingest key to start receiving telemetry and preflight decisions.",
+        text: "Generate an ingest key, then follow Quickstart to instrument your SDK.",
         primaryLabel: "Open Keys",
         primaryTo: "/app/keys",
         secondaryLabel: "Open Quickstart",
@@ -401,6 +407,29 @@ export function Dashboard(): JSX.Element {
       secondaryTo: "/quickstart",
     };
   }, [setupStage]);
+
+  useLayoutEffect(() => {
+    const setupBanner = setupBannerRef.current;
+    if (!setupBanner || !renderSetupBanner) {
+      setSetupBannerHeight(0);
+      return;
+    }
+
+    const updateSetupBannerHeight = (): void => {
+      setSetupBannerHeight(setupBanner.getBoundingClientRect().height);
+    };
+
+    updateSetupBannerHeight();
+    const resizeObserver = new ResizeObserver(() => {
+      updateSetupBannerHeight();
+    });
+    resizeObserver.observe(setupBanner);
+    window.addEventListener("resize", updateSetupBannerHeight);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateSetupBannerHeight);
+    };
+  }, [renderSetupBanner, setupBannerContent.primaryLabel, setupBannerContent.secondaryLabel, setupBannerContent.text, setupBannerContent.title]);
 
   const refreshProviders = useCallback(async (): Promise<void> => {
     if (!projectId) {
@@ -703,7 +732,7 @@ export function Dashboard(): JSX.Element {
 
   return (
     <main className="dashboard">
-      <div className="dashboard-content" ref={dashboardContentRef}>
+      <div className="dashboard-content dashboard-home-content" ref={dashboardContentRef}>
         {(globalBanner || renderSetupBanner || renderWebhookIssueBanner) ? (
           <section
             className="dashboard-banner-overlay"
@@ -717,7 +746,10 @@ export function Dashboard(): JSX.Element {
             <div className="dashboard-banner-rail">
               {globalBanner ? <section className="banner dashboard-floating-banner">{globalBanner}</section> : null}
               {renderSetupBanner ? (
-                <section className={`setup-banner dashboard-floating-banner${setupBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
+                <section
+                  ref={setupBannerRef}
+                  className={`setup-banner dashboard-floating-banner${setupBannerClosing ? " dashboard-floating-banner--closing" : ""}`}
+                >
                   <div className="dashboard-alert-banner-layout">
                     <div className="setup-banner-title dashboard-alert-banner-title">{setupBannerContent.title}</div>
                     <div className="setup-banner-text dashboard-alert-banner-summary">{setupBannerContent.text}</div>
@@ -783,11 +815,7 @@ export function Dashboard(): JSX.Element {
           </div>
         </section>
 
-        {!projectId ? (
-          <section className="empty">
-            <p>Select a project to see realtime metrics.</p>
-          </section>
-        ) : (
+        {!projectId ? null : (
           <>
             <section className="dashboard-controls-main">
               <div className="toolbar">

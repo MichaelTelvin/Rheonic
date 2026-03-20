@@ -97,6 +97,39 @@ describe("api client", () => {
     expect(fetchMock.mock.calls[2]?.[1]?.credentials).toBe("include");
   });
 
+  it("refreshes and retries current-user restore on auth me 401", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { code: "unauthorized", message: "expired" } }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            user: { id: "u1", email: "u@example.com", created_at: new Date().toISOString() },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: "u1", email: "u@example.com", created_at: new Date().toISOString() }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchCurrentUser();
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(String(fetchMock.mock.calls[0]?.[0]).endsWith("/api/v1/auth/me")).toBe(true);
+    expect(String(fetchMock.mock.calls[1]?.[0]).endsWith("/api/v1/auth/refresh")).toBe(true);
+    expect(String(fetchMock.mock.calls[2]?.[0]).endsWith("/api/v1/auth/me")).toBe(true);
+  });
+
   it("retries stale 401s once after a recent refresh without sending a second refresh request", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-11T12:00:00Z"));

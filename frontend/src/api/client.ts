@@ -196,10 +196,11 @@ async function parseApiError(response: Response): Promise<ApiError> {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isAuthRoute = path.startsWith("/api/v1/auth/");
+  const allowsRefreshRetry = !isAuthRoute || path === "/api/v1/auth/me";
   const response = await executeRequest(path, init);
 
   if (response.status === 401) {
-    if (!isAuthRoute) {
+    if (allowsRefreshRetry) {
       if (Date.now() - lastRefreshSucceededAtMs <= recentRefreshRetryWindowMs) {
         const recentRetryResponse = await executeRequest(path, init);
         if (recentRetryResponse.ok) {

@@ -322,6 +322,25 @@ except RHEONICBlockedError:
                 </button>
               </div>
               <CodeBlock code={install} language="bash" />
+              <div className="quickstart-download-row" aria-label="SDK download options">
+                <button
+                  type="button"
+                  className={`landing-link-button${runtime === "node" ? " modal-primary" : ""}`}
+                  disabled
+                  aria-disabled="true"
+                >
+                  Download Node SDK
+                </button>
+                <button
+                  type="button"
+                  className={`landing-link-button${runtime === "python" ? " modal-primary" : ""}`}
+                  disabled
+                  aria-disabled="true"
+                >
+                  Download Python SDK
+                </button>
+                <span className="quickstart-download-note">Package downloads coming soon</span>
+              </div>
             </section>
 
             <section id="env" className="quickstart-step-card">
