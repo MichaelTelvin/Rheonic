@@ -1899,6 +1899,8 @@ select {
   filter: none !important;
   transform: translate3d(0, 0, 0);
   border-radius: 12px;
+  box-sizing: border-box;
+  contain: layout paint;
 }
 
 .dashboard-floating-banner--closing {
@@ -1991,6 +1993,7 @@ select {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
   border-radius: 12px;
   padding: 12px 16px;
+  min-height: 0;
 }
 
 .dashboard-alert-card::before {
