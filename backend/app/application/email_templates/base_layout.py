@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import base64
 from datetime import datetime, timezone
-from functools import lru_cache
 from html import escape
 import json
-from pathlib import Path
 
-_RHEONIC_EMAIL_LOGO_CID = "rheonic-logo"
+from app.config import Settings
 
 
 def format_timestamp(value: object) -> str:
@@ -139,7 +136,7 @@ def render_base_email(
         "<div style=\"padding:24px 28px 18px;background:linear-gradient(135deg,#101828 0%,#1d2939 100%);\">"
         "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">"
         "<tr>"
-        f"<td style=\"width:28px;height:28px;vertical-align:middle;\"><img src=\"cid:{_RHEONIC_EMAIL_LOGO_CID}\" width=\"28\" height=\"28\" alt=\"Rheonic logo\" style=\"display:block;width:28px;height:28px;border:0;outline:none;text-decoration:none;\" /></td>"
+        f"<td style=\"width:28px;height:28px;vertical-align:middle;\"><img src=\"{escape(_public_logo_url(), quote=True)}\" width=\"28\" height=\"28\" alt=\"Rheonic\" style=\"display:block;width:28px;height:28px;border:0;outline:none;text-decoration:none;\" /></td>"
         "<td style=\"width:10px;font-size:0;line-height:0;\">&nbsp;</td>"
         "<td style=\"font:700 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#7a7dff;\">RHEONIC</td>"
         "</tr>"
@@ -196,29 +193,8 @@ def _humanize_segment(value: str) -> str:
     return _humanize_field_label(value.replace("-", " "))
 
 
-def get_base_email_inline_attachments() -> list[dict[str, str]]:
-    attachment = _load_email_logo_attachment()
-    return [attachment] if attachment is not None else []
-
-
-@lru_cache(maxsize=1)
-def _load_email_logo_attachment() -> dict[str, str] | None:
-    for candidate in _email_logo_candidates():
-        if not candidate.exists():
-            continue
-        return {
-            "filename": "rheonic-logo.png",
-            "content": base64.b64encode(candidate.read_bytes()).decode("ascii"),
-            "content_type": "image/png",
-            "content_id": _RHEONIC_EMAIL_LOGO_CID,
-        }
-    return None
-
-
-def _email_logo_candidates() -> list[Path]:
-    module_path = Path(__file__).resolve()
-    repo_root = module_path.parents[4]
-    return [
-        repo_root / "frontend" / "public" / "assets" / "logo" / "logo-48.png",
-        repo_root / "frontend" / "public" / "assets" / "logo" / "logo-32.png",
-    ]
+def _public_logo_url() -> str:
+    base_url = Settings().rheonic_base_url.strip().rstrip("/")
+    if not base_url:
+        base_url = "https://rheonic.dev"
+    return f"{base_url}/assets/logo/logo-48.png"

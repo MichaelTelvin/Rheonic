@@ -1872,7 +1872,7 @@ select {
 .dashboard-banner-overlay {
   position: absolute;
   right: 0;
-  width: min(520px, calc(100% - 320px));
+  width: min(430px, calc(100% - 440px));
   z-index: 18;
   pointer-events: none;
 }
@@ -1897,11 +1897,11 @@ select {
 
 .setup-banner {
   width: 100%;
-  padding: 9px 14px 9px 17px;
-  min-height: 96px;
+  padding: 8px 12px 8px 14px;
+  min-height: 0;
   border-radius: 10px;
   border: 1px solid rgba(129, 140, 248, 0.18);
-  background: linear-gradient(100deg, rgba(35, 42, 64, 0.98), rgba(29, 45, 77, 0.98) 55%, rgba(23, 31, 49, 0.98));
+  background: #1d2940;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1911,26 +1911,36 @@ select {
   overflow: hidden;
 }
 
+.setup-banner-title {
+  font-size: 0.98rem;
+  line-height: 1.2;
+}
+
+.setup-banner-text {
+  font-size: 0.84rem;
+  line-height: 1.42;
+}
+
+.setup-banner-actions {
+  gap: 10px;
+}
+
 @keyframes dashboardBannerSlideIn {
   from {
-    opacity: 0;
     transform: translateX(24px);
   }
 
   to {
-    opacity: 1;
     transform: translateX(0);
   }
 }
 
 @keyframes dashboardBannerSlideOut {
   from {
-    opacity: 1;
     transform: translateX(0);
   }
 
   to {
-    opacity: 0;
     transform: translateX(24px);
   }
 }
@@ -1986,7 +1996,7 @@ select {
 
 .dashboard-alert-card {
   border: 1px solid rgba(255, 180, 80, 0.35);
-  background: rgba(255, 180, 80, 0.06);
+  background: #27211e;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
   padding-top: 12px;
   padding-bottom: 12px;
@@ -1998,10 +2008,25 @@ select {
 
 .dashboard-alert-card .card-title {
   color: inherit;
+  margin: 0 0 6px;
+  font-size: 0.98rem;
+  line-height: 1.25;
 }
 
 .dashboard-alert-card .subtle {
   color: inherit;
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.42;
+}
+
+.dashboard-alert-card {
+  padding: 10px 12px;
+}
+
+.dashboard-alert-card .modal-actions.form-actions {
+  margin-top: 10px;
+  gap: 10px;
 }
 
 .dashboard-beta-note {

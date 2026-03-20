@@ -43,6 +43,7 @@ def test_feedback_template_snapshot_is_deterministic() -> None:
     assert "Rheonic beta bug report" in rendered["html"]
     assert "New product report received." in rendered["html"]
     assert ">System<" not in rendered["html"]
+    assert "/assets/logo/logo-48.png" in rendered["html"]
     assert "Report Type: Bug report" in rendered["text"]
     assert "Page: Dashboard / Alerts" in rendered["text"]
     assert "Mar 05, 2026 10:00 UTC" in rendered["html"]
