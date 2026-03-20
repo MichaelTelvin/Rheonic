@@ -374,9 +374,9 @@ export function Dashboard(): JSX.Element {
       return {
         title: "Setup required",
         text: "Create your first project, generate an ingest key, then follow Quickstart.",
-        primaryLabel: "Go to Projects",
+        primaryLabel: "Projects",
         primaryTo: "/app/projects",
-        secondaryLabel: "Open Quickstart",
+        secondaryLabel: "Quickstart",
         secondaryTo: "/quickstart",
       };
     }
@@ -384,9 +384,9 @@ export function Dashboard(): JSX.Element {
       return {
         title: "Setup required",
         text: "Select a project, generate an ingest key, then follow Quickstart.",
-        primaryLabel: "Open Projects",
+        primaryLabel: "Projects",
         primaryTo: "/app/projects",
-        secondaryLabel: "Open Quickstart",
+        secondaryLabel: "Quickstart",
         secondaryTo: "/quickstart",
       };
     }
@@ -394,9 +394,9 @@ export function Dashboard(): JSX.Element {
       return {
         title: "Setup required",
         text: "Generate an ingest key, then follow Quickstart to instrument your SDK.",
-        primaryLabel: "Open Keys",
+        primaryLabel: "Keys",
         primaryTo: "/app/keys",
-        secondaryLabel: "Open Quickstart",
+        secondaryLabel: "Quickstart",
         secondaryTo: "/quickstart",
       };
     }
@@ -404,14 +404,14 @@ export function Dashboard(): JSX.Element {
       return {
         title: "Setup required",
         text: "Waiting for first event. Run one instrumented provider call to verify integration.",
-        primaryLabel: "Open Quickstart",
+        primaryLabel: "Quickstart",
         primaryTo: "/quickstart",
       };
     }
     return {
       title: "Setup required",
       text: "Checking setup status for this project.",
-      secondaryLabel: "Open Quickstart",
+      secondaryLabel: "Quickstart",
       secondaryTo: "/quickstart",
     };
   }, [setupStage]);
