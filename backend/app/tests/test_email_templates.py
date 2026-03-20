@@ -202,8 +202,10 @@ def test_fail_closed_protection_block_omits_blank_rows() -> None:
     assert "Tokens / 60s" not in rendered["text"]
     assert "Request cap" not in rendered["text"]
     assert "Token cap" not in rendered["text"]
-    assert "Blocked until" not in rendered["text"]
-    assert "Retry after" not in rendered["text"]
+    assert "Blocked Until" not in rendered["text"]
+    assert "Retry After" not in rendered["text"]
+    assert "Detail Reason: Decision timeout" in rendered["text"]
+    assert "Source: Timeout fallback" in rendered["text"]
 
 
 def test_fail_closed_protection_block_includes_metrics_when_present() -> None:

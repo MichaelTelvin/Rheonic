@@ -121,7 +121,7 @@ export class ProtectEngine {
           status_code: response.status,
           latency_ms: Date.now() - startedAt,
         });
-        void this.reportDecisionUnavailable(context.provider, requestId);
+        void this.reportDecisionUnavailable(context.provider, typeof context.model === "string" ? context.model : undefined, requestId);
         return this.failMode === "closed"
           ? { decision: "block", reason: "decision_unavailable" }
           : { decision: "allow", reason: "decision_unavailable" };
@@ -169,14 +169,14 @@ export class ProtectEngine {
           latency_ms: Date.now() - startedAt,
           timeout_ms: timeoutMs,
         });
-        void this.reportDecisionTimeout(context.provider, requestId);
+        void this.reportDecisionTimeout(context.provider, typeof context.model === "string" ? context.model : undefined, requestId);
       } else {
         this.debugLog?.("Protect preflight failed", {
           provider: context.provider,
           latency_ms: Date.now() - startedAt,
           error_type: extractErrorType(error),
         });
-        void this.reportDecisionUnavailable(context.provider, requestId);
+        void this.reportDecisionUnavailable(context.provider, typeof context.model === "string" ? context.model : undefined, requestId);
       }
       return this.failMode === "closed"
         ? { decision: "block", reason: "decision_unavailable" }
@@ -213,7 +213,7 @@ export class ProtectEngine {
     }
   }
 
-  private async reportDecisionTimeout(provider: string | undefined, requestId: string): Promise<void> {
+  private async reportDecisionTimeout(provider: string | undefined, model: string | undefined, requestId: string): Promise<void> {
     try {
       await requestJson(`${this.baseUrl}/api/v1/protect/decision-timeout`, {
         method: "POST",
@@ -223,14 +223,14 @@ export class ProtectEngine {
           "X-Trace-ID": generateTraceId(),
           "X-Rheonic-Protect-Request-Id": requestId,
         },
-        body: JSON.stringify({ environment: this.environment, provider, request_id: requestId }),
+        body: JSON.stringify({ environment: this.environment, provider, model, request_id: requestId }),
       });
     } catch {
       // Swallow timeout reporting errors; protect evaluation must never throw here.
     }
   }
 
-  private async reportDecisionUnavailable(provider: string | undefined, requestId: string): Promise<void> {
+  private async reportDecisionUnavailable(provider: string | undefined, model: string | undefined, requestId: string): Promise<void> {
     try {
       await requestJson(`${this.baseUrl}/api/v1/protect/decision-unavailable`, {
         method: "POST",
@@ -240,7 +240,7 @@ export class ProtectEngine {
           "X-Trace-ID": generateTraceId(),
           "X-Rheonic-Protect-Request-Id": requestId,
         },
-        body: JSON.stringify({ environment: this.environment, provider, request_id: requestId }),
+        body: JSON.stringify({ environment: this.environment, provider, model, request_id: requestId }),
       });
     } catch {
       // Swallow unavailable reporting errors; protect evaluation must never throw here.

@@ -811,7 +811,7 @@ def test_timeout_report_enqueues_fail_closed_protection_block_when_project_fail_
     response = client.post(
         "/api/v1/protect/decision-timeout",
         headers={"X-Project-Ingest-Key": ingest_key},
-        json={"environment": "dev", "provider": "openai"},
+        json={"environment": "dev", "provider": "openai", "model": "gpt-4o-mini"},
     )
 
     assert response.status_code == 202
@@ -819,6 +819,7 @@ def test_timeout_report_enqueues_fail_closed_protection_block_when_project_fail_
     assert dispatcher.calls[0][1] == "protection.block"
     assert dispatcher.calls[0][2]["reason"] == "fail_closed"
     assert dispatcher.calls[0][2]["detail_reason"] == "decision_timeout"
+    assert dispatcher.calls[0][2]["model"] == "gpt-4o-mini"
     assert dispatcher.calls[0][2]["requests_60s"] == 0
     assert dispatcher.calls[0][2]["tokens_60s"] == 0
     assert dispatcher.calls[0][2]["req_cap"] is None
@@ -839,7 +840,7 @@ def test_unavailable_report_records_allow_when_project_fail_mode_is_open(tmp_pat
     response = client.post(
         "/api/v1/protect/decision-unavailable",
         headers={"X-Project-Ingest-Key": ingest_key},
-        json={"environment": "dev", "provider": "openai"},
+        json={"environment": "dev", "provider": "openai", "model": "gpt-4o-mini"},
     )
 
     assert response.status_code == 202
@@ -864,7 +865,7 @@ def test_unavailable_report_records_block_when_project_fail_mode_is_closed(tmp_p
     response = client.post(
         "/api/v1/protect/decision-unavailable",
         headers={"X-Project-Ingest-Key": ingest_key},
-        json={"environment": "dev", "provider": "openai"},
+        json={"environment": "dev", "provider": "openai", "model": "gpt-4o-mini"},
     )
 
     assert response.status_code == 202
@@ -891,7 +892,7 @@ def test_unavailable_report_enqueues_fail_closed_protection_block_when_project_f
     response = client.post(
         "/api/v1/protect/decision-unavailable",
         headers={"X-Project-Ingest-Key": ingest_key},
-        json={"environment": "dev", "provider": "openai"},
+        json={"environment": "dev", "provider": "openai", "model": "gpt-4o-mini"},
     )
 
     assert response.status_code == 202
@@ -899,6 +900,7 @@ def test_unavailable_report_enqueues_fail_closed_protection_block_when_project_f
     assert dispatcher.calls[0][1] == "protection.block"
     assert dispatcher.calls[0][2]["reason"] == "fail_closed"
     assert dispatcher.calls[0][2]["detail_reason"] == "decision_unavailable"
+    assert dispatcher.calls[0][2]["model"] == "gpt-4o-mini"
     assert dispatcher.calls[0][2]["requests_60s"] == 0
     assert dispatcher.calls[0][2]["tokens_60s"] == 0
     assert dispatcher.calls[0][2]["req_cap"] is None

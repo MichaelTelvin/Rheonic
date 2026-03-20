@@ -97,6 +97,7 @@ class ProtectEngine:
                 )
                 self._report_decision_unavailable_fire_and_forget(
                     provider=str(context.get("provider")) if isinstance(context.get("provider"), str) else None,
+                    model=str(context.get("model")) if isinstance(context.get("model"), str) else None,
                     request_id=request_id,
                 )
                 return self._fallback_decision()
@@ -152,6 +153,7 @@ class ProtectEngine:
                 )
                 self._report_decision_timeout_fire_and_forget(
                     provider=str(provider) if isinstance(provider, str) else None,
+                    model=str(context.get("model")) if isinstance(context.get("model"), str) else None,
                     request_id=request_id,
                 )
             else:
@@ -164,6 +166,7 @@ class ProtectEngine:
                 )
                 self._report_decision_unavailable_fire_and_forget(
                     provider=str(provider) if isinstance(provider, str) else None,
+                    model=str(context.get("model")) if isinstance(context.get("model"), str) else None,
                     request_id=request_id,
                 )
             return self._fallback_decision()
@@ -252,12 +255,12 @@ class ProtectEngine:
             return True
         return False
 
-    def _report_decision_timeout_fire_and_forget(self, provider: str | None, request_id: str) -> None:
+    def _report_decision_timeout_fire_and_forget(self, provider: str | None, model: str | None, request_id: str) -> None:
         # Report decision timeout without blocking caller flow.
         try:
             self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision-timeout",
-                json={"environment": self._environment, "provider": provider, "request_id": request_id},
+                json={"environment": self._environment, "provider": provider, "model": model, "request_id": request_id},
                 headers={
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
@@ -269,12 +272,12 @@ class ProtectEngine:
         except Exception:
             return
 
-    def _report_decision_unavailable_fire_and_forget(self, provider: str | None, request_id: str) -> None:
+    def _report_decision_unavailable_fire_and_forget(self, provider: str | None, model: str | None, request_id: str) -> None:
         # Report non-timeout preflight fallback without blocking caller flow.
         try:
             self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision-unavailable",
-                json={"environment": self._environment, "provider": provider, "request_id": request_id},
+                json={"environment": self._environment, "provider": provider, "model": model, "request_id": request_id},
                 headers={
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,

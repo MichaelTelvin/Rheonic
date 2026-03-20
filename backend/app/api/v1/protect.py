@@ -79,6 +79,7 @@ class DecisionTimeoutIn(BaseModel):
     # Timeout report payload from SDK when decision preflight call times out.
     environment: str
     provider: str | None = None
+    model: str | None = None
     request_id: str | None = None
 
 
@@ -86,6 +87,7 @@ class DecisionUnavailableIn(BaseModel):
     # Failure report payload from SDK when preflight fails without a timeout.
     environment: str
     provider: str | None = None
+    model: str | None = None
     request_id: str | None = None
 
 
@@ -200,7 +202,7 @@ def protect_decision_timeout(
             protect_service.report_fail_closed_block(
                 project_id=project.id,
                 provider=provider,
-                model=None,
+                model=payload.model,
                 environment=payload.environment,
                 detail_reason="decision_timeout",
                 source=app_config.protect_outcome_source_timeout_fallback,
@@ -243,7 +245,7 @@ def protect_decision_unavailable(
             protect_service.report_fail_closed_block(
                 project_id=project.id,
                 provider=provider,
-                model=None,
+                model=payload.model,
                 environment=payload.environment,
                 detail_reason="decision_unavailable",
                 source=app_config.protect_outcome_source_unavailable_fallback,

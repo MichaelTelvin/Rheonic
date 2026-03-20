@@ -3,6 +3,20 @@ from __future__ import annotations
 from app.application.email_templates.base_layout import format_timestamp, render_base_email
 
 
+def _humanize_value(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return "-"
+    mapping = {
+        "decision_timeout": "Decision timeout",
+        "decision_unavailable": "Decision unavailable",
+        "timeout_fallback": "Timeout fallback",
+        "unavailable_fallback": "Unavailable fallback",
+        "live": "Live",
+    }
+    return mapping.get(normalized, normalized.replace("_", " ").replace("-", " ").title())
+
+
 def _reason_copy(reason: str, detail_reason: str) -> tuple[str, str]:
     normalized = (reason or "").strip().lower()
     detail = (detail_reason or "").strip().lower()
@@ -38,12 +52,14 @@ def render_protection_block(payload: dict[str, object]) -> dict[str, str]:
     source = str(payload.get("source") or "").strip()
     sent_at = format_timestamp(payload.get("sent_at"))
     reason_title, reason_subtitle = _reason_copy(reason, detail_reason)
+    detail_reason_copy = _humanize_value(detail_reason)
+    source_copy = _humanize_value(source)
 
     fields: list[tuple[str, str]] = [
         ("Project ID", project_id),
         ("Action", "Blocked"),
         ("Reason", reason_title),
-        ("Detail reason", detail_reason),
+        ("Detail reason", detail_reason_copy),
     ]
     if provider:
         fields.append(("Provider", provider))
@@ -64,7 +80,7 @@ def render_protection_block(payload: dict[str, object]) -> dict[str, str]:
     if retry_after_copy:
         fields.append(("Retry after", retry_after_copy))
     if source:
-        fields.append(("Source", source))
+        fields.append(("Source", source_copy))
     if sent_at != "-":
         fields.append(("Sent at", sent_at))
 
