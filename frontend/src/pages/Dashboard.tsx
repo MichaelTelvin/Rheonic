@@ -662,57 +662,59 @@ export function Dashboard(): JSX.Element {
 
   return (
     <main className="dashboard">
-      {(globalBanner || renderSetupBanner || renderWebhookIssueBanner) ? (
-        <section className="dashboard-banner-rail" aria-live="polite">
-          {globalBanner ? <section className="banner dashboard-floating-banner">{globalBanner}</section> : null}
-          {renderSetupBanner ? (
-            <section className={`setup-banner dashboard-floating-banner${setupBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
-              <div className="setup-banner-copy">
-                <div className="setup-banner-title">{setupBannerContent.title}</div>
-                <div className="setup-banner-text">{setupBannerContent.text}</div>
-              </div>
-              <div className="setup-banner-actions">
-                {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
-                  <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
-                    {setupBannerContent.primaryLabel}
-                  </button>
-                ) : null}
-                {setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo ? (
-                  <button type="button" className="modal-button" onClick={() => navigate(setupBannerContent.secondaryTo)}>
-                    {setupBannerContent.secondaryLabel}
-                  </button>
-                ) : null}
-                <button type="button" className="modal-button" onClick={dismissSetupBanner}>
-                  Dismiss
-                </button>
-              </div>
-            </section>
-          ) : null}
-          {renderWebhookIssueBanner ? (
-            <Card className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
-              <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
-              <p className="subtle">
-                {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
-                {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
-              </p>
-              <div className="modal-actions form-actions">
-                <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
-                  Check URL
-                </button>
-                <button type="button" className="modal-button" onClick={dismissWebhookIssueBanner}>
-                  Dismiss
-                </button>
-              </div>
-            </Card>
-          ) : null}
-        </section>
-      ) : null}
       <div className="dashboard-content">
         <section className="dashboard-hero">
           <div className="dashboard-hero-left">
             <h1 className="page-title">LLM Control Center</h1>
             <p className="page-subtitle">Real-time monitoring and protection</p>
             <div className="hero-subtitle-divider" aria-hidden="true" />
+          </div>
+          <div className="dashboard-hero-center" aria-live="polite">
+            {(globalBanner || renderSetupBanner || renderWebhookIssueBanner) ? (
+              <section className="dashboard-banner-rail">
+                {globalBanner ? <section className="banner dashboard-floating-banner">{globalBanner}</section> : null}
+                {renderSetupBanner ? (
+                  <section className={`setup-banner dashboard-floating-banner${setupBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
+                    <div className="setup-banner-copy">
+                      <div className="setup-banner-title">{setupBannerContent.title}</div>
+                      <div className="setup-banner-text">{setupBannerContent.text}</div>
+                    </div>
+                    <div className="setup-banner-actions">
+                      {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
+                        <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
+                          {setupBannerContent.primaryLabel}
+                        </button>
+                      ) : null}
+                      {setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo ? (
+                        <button type="button" className="modal-button" onClick={() => navigate(setupBannerContent.secondaryTo)}>
+                          {setupBannerContent.secondaryLabel}
+                        </button>
+                      ) : null}
+                      <button type="button" className="modal-button" onClick={dismissSetupBanner}>
+                        Dismiss
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
+                {renderWebhookIssueBanner ? (
+                  <Card className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
+                    <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
+                    <p className="subtle">
+                      {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
+                      {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
+                    </p>
+                    <div className="modal-actions form-actions">
+                      <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
+                        Check URL
+                      </button>
+                      <button type="button" className="modal-button" onClick={dismissWebhookIssueBanner}>
+                        Dismiss
+                      </button>
+                    </div>
+                  </Card>
+                ) : null}
+              </section>
+            ) : null}
           </div>
           <div className="dashboard-hero-right">
             <div className="status-panel status-panel--accent" aria-live="polite">
