@@ -336,7 +336,7 @@ export function Dashboard(): JSX.Element {
       resizeObserver.disconnect();
       window.removeEventListener("resize", updateBannerOverlayTop);
     };
-  }, [projectId, renderSetupBanner, renderWebhookIssueBanner, globalBanner]);
+  }, [projectId]);
 
   const setupBannerContent = useMemo<{
     title: string;
@@ -723,18 +723,22 @@ export function Dashboard(): JSX.Element {
               ) : null}
               {renderWebhookIssueBanner ? (
                 <Card className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
-                  <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
-                  <p className="subtle">
-                    {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
-                    {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
-                  </p>
-                  <div className="modal-actions form-actions">
-                    <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
-                      Check URL
-                    </button>
-                    <button type="button" className="modal-button" onClick={dismissWebhookIssueBanner}>
-                      Dismiss
-                    </button>
+                  <div className="dashboard-alert-banner-layout">
+                    <div className="dashboard-alert-banner-copy">
+                      <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
+                      <p className="subtle">
+                        {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
+                        {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
+                      </p>
+                    </div>
+                    <div className="modal-actions form-actions dashboard-alert-banner-actions">
+                      <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
+                        Check URL
+                      </button>
+                      <button type="button" className="modal-button" onClick={dismissWebhookIssueBanner}>
+                        Dismiss
+                      </button>
+                    </div>
                   </div>
                 </Card>
               ) : null}
