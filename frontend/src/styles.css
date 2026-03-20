@@ -2043,14 +2043,14 @@ select {
 
 .dashboard-alert-card .modal-actions.form-actions {
   margin-top: 0;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: nowrap;
 }
 
 .dashboard-alert-card .modal-actions.form-actions .modal-button {
-  min-width: 112px;
-  padding: 6px 14px;
-  font-size: 0.76rem;
+  min-width: 96px;
+  padding: 5px 12px;
+  font-size: 0.74rem;
 }
 
 .dashboard-beta-note {

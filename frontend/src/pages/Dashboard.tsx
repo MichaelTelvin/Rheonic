@@ -329,7 +329,7 @@ export function Dashboard(): JSX.Element {
       const dividerRect = divider.getBoundingClientRect();
       const tokenCard = content.querySelector<HTMLElement>(`.${tokenCardSlotClassName}`);
       const tokenCardRect = tokenCard?.getBoundingClientRect() ?? null;
-      const nextTop = Math.max(12, dividerRect.bottom + 2);
+      const nextTop = Math.max(12, dividerRect.bottom - 2);
       const nextRight = Math.max(14, tokenCardRect ? window.innerWidth - tokenCardRect.right : window.innerWidth - contentRect.right);
       const nextWidth = Math.max(320, tokenCardRect ? tokenCardRect.width : (contentRect.width - DASHBOARD_METRICS_GAP_PX) / 2);
       setBannerOverlayStyle({ top: nextTop, right: nextRight, width: nextWidth });
