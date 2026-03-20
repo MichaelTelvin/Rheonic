@@ -21,45 +21,58 @@ def _reason_copy(reason: str, detail_reason: str) -> tuple[str, str]:
 
 def render_protection_block(payload: dict[str, object]) -> dict[str, str]:
     project_id = str(payload.get("project_id") or "-")
-    provider = str(payload.get("provider") or "-")
-    model = str(payload.get("model") or "-")
-    environment = str(payload.get("environment") or "-")
+    provider = str(payload.get("provider") or "").strip()
+    model = str(payload.get("model") or "").strip()
+    environment = str(payload.get("environment") or "").strip()
     reason = str(payload.get("reason") or "-")
     detail_reason = str(payload.get("detail_reason") or "-")
-    requests_60s = str(payload.get("requests_60s") or "-")
-    tokens_60s = str(payload.get("tokens_60s") or "-")
-    req_cap = str(payload.get("req_cap") or "-")
-    tok_cap = str(payload.get("tok_cap") or "-")
+    requests_60s = payload.get("requests_60s")
+    tokens_60s = payload.get("tokens_60s")
+    req_cap = payload.get("req_cap")
+    tok_cap = payload.get("tok_cap")
     blocked_until = format_timestamp(payload.get("blocked_until"))
     retry_after_seconds = payload.get("retry_after_seconds")
-    retry_after_copy = "-"
+    retry_after_copy = ""
     if isinstance(retry_after_seconds, int) and retry_after_seconds > 0:
         retry_after_copy = f"{retry_after_seconds} seconds"
-    source = str(payload.get("source") or "-")
+    source = str(payload.get("source") or "").strip()
     sent_at = format_timestamp(payload.get("sent_at"))
     reason_title, reason_subtitle = _reason_copy(reason, detail_reason)
+
+    fields: list[tuple[str, str]] = [
+        ("Project ID", project_id),
+        ("Action", "Blocked"),
+        ("Reason", reason_title),
+        ("Detail reason", detail_reason),
+    ]
+    if provider:
+        fields.append(("Provider", provider))
+    if model:
+        fields.append(("Model", model))
+    if environment:
+        fields.append(("Environment", environment))
+    if isinstance(requests_60s, int):
+        fields.append(("Requests / 60s", str(requests_60s)))
+    if isinstance(tokens_60s, int):
+        fields.append(("Tokens / 60s", str(tokens_60s)))
+    if isinstance(req_cap, int):
+        fields.append(("Request cap", str(req_cap)))
+    if isinstance(tok_cap, int):
+        fields.append(("Token cap", str(tok_cap)))
+    if blocked_until != "-":
+        fields.append(("Blocked until", blocked_until))
+    if retry_after_copy:
+        fields.append(("Retry after", retry_after_copy))
+    if source:
+        fields.append(("Source", source))
+    if sent_at != "-":
+        fields.append(("Sent at", sent_at))
 
     rendered = render_base_email(
         eyebrow=None,
         title="Blocked traffic",
         subtitle=reason_subtitle,
-        fields=[
-            ("Project ID", project_id),
-            ("Provider", provider),
-            ("Model", model),
-            ("Environment", environment),
-            ("Action", "Blocked"),
-            ("Reason", reason_title),
-            ("Detail reason", detail_reason),
-            ("Requests / 60s", requests_60s),
-            ("Tokens / 60s", tokens_60s),
-            ("Request cap", req_cap),
-            ("Token cap", tok_cap),
-            ("Blocked until", blocked_until),
-            ("Retry after", retry_after_copy),
-            ("Source", source),
-            ("Sent at", sent_at),
-        ],
+        fields=fields,
     )
     return {
         "subject": f"[Rheonic] Protect alert: {reason_title} ({project_id})",

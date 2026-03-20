@@ -208,6 +208,7 @@ def get_protect_service() -> ProtectService:
             realtime_counters=get_rolling_window(),
             protect_action_store=get_protect_action_store(),
             protect_block_cooldown_seconds=get_settings().protect_block_cooldown_seconds,
+            project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
             webhook_dispatcher=get_webhook_dispatcher(),
             transport_service=get_transport_service(),
         )

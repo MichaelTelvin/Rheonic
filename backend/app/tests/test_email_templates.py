@@ -185,6 +185,51 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
     assert "Clamp Recommendation: Recommended max output tokens: 40" in warn_rendered["text"]
 
 
+def test_fail_closed_protection_block_omits_blank_rows() -> None:
+    rendered = render_template(
+        "protection_block",
+        {
+            "project_id": "p-fail",
+            "provider": "openai",
+            "environment": "staging",
+            "reason": "fail_closed",
+            "detail_reason": "decision_timeout",
+            "source": "timeout_fallback",
+            "sent_at": "2026-03-05T10:00:00Z",
+        },
+    )
+    assert "Requests / 60s" not in rendered["text"]
+    assert "Tokens / 60s" not in rendered["text"]
+    assert "Request cap" not in rendered["text"]
+    assert "Token cap" not in rendered["text"]
+    assert "Blocked until" not in rendered["text"]
+    assert "Retry after" not in rendered["text"]
+
+
+def test_fail_closed_protection_block_includes_metrics_when_present() -> None:
+    rendered = render_template(
+        "protection_block",
+        {
+            "project_id": "p-fail",
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "staging",
+            "reason": "fail_closed",
+            "detail_reason": "decision_timeout",
+            "requests_60s": 12,
+            "tokens_60s": 1440,
+            "req_cap": 500,
+            "tok_cap": 1750,
+            "source": "timeout_fallback",
+            "sent_at": "2026-03-05T10:00:00Z",
+        },
+    )
+    assert "Requests / 60s: 12" in rendered["text"]
+    assert "Tokens / 60s: 1440" in rendered["text"]
+    assert "Request Cap: 500" in rendered["text"]
+    assert "Token Cap: 1750" in rendered["text"]
+
+
 def test_removed_templates_are_not_registered() -> None:
     with pytest.raises(ValueError, match="unknown email template: incident_warn"):
         render_template("incident_warn", {})

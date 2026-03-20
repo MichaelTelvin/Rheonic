@@ -7,6 +7,7 @@ from typing import Callable
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.event_repository import EventRepository
+from app.application.interfaces.project_repository import ProjectRepository
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.ingest_key_service import IngestKeyService
@@ -58,6 +59,7 @@ class ProtectService:
         realtime_counters: RealtimeCounterStore,
         protect_action_store: ProtectActionStore,
         protect_block_cooldown_seconds: int,
+        project_repository: ProjectRepository | None = None,
         incident_dedup_window_seconds: int | None = None,
         event_repository: EventRepository | None = None,
         webhook_dispatcher: WebhookDispatcher | None = None,
@@ -70,6 +72,7 @@ class ProtectService:
         self._realtime_counters = realtime_counters
         self._protect_action_store = protect_action_store
         self._protect_block_cooldown_seconds = protect_block_cooldown_seconds
+        self._project_repository = project_repository
         self._incident_dedup_window_seconds = int(
             incident_dedup_window_seconds
             if incident_dedup_window_seconds is not None
@@ -713,6 +716,8 @@ class ProtectService:
             ttl_seconds=self._incident_dedup_window_seconds,
         ):
             return
+        project = self._project_repository.get_project(project_id) if self._project_repository is not None else None
+        requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=scoped_id)
         payload = {
             "event": "protection.block",
             "project_id": project_id,
@@ -721,12 +726,10 @@ class ProtectService:
             "environment": environment,
             "reason": "fail_closed",
             "detail_reason": detail_reason,
-            "requests_60s": None,
-            "tokens_60s": None,
-            "req_cap": None,
-            "tok_cap": None,
-            "blocked_until": None,
-            "retry_after_seconds": None,
+            "requests_60s": requests_60s,
+            "tokens_60s": tokens_60s,
+            "req_cap": project.protect_max_req_per_min if project is not None else None,
+            "tok_cap": project.protect_max_tok_per_min if project is not None else None,
             "source": source,
             "sent_at": self._now_provider().isoformat(),
         }

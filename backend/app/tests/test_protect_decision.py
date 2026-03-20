@@ -198,6 +198,7 @@ def _make_client(
         realtime_counters=rolling_window,
         protect_action_store=protect_action_store,
         protect_block_cooldown_seconds=cooldown_seconds,
+        project_repository=project_repository,
         webhook_dispatcher=webhook_dispatcher,  # type: ignore[arg-type]
         transport_service=transport_service,  # type: ignore[arg-type]
     )
@@ -818,6 +819,12 @@ def test_timeout_report_enqueues_fail_closed_protection_block_when_project_fail_
     assert dispatcher.calls[0][1] == "protection.block"
     assert dispatcher.calls[0][2]["reason"] == "fail_closed"
     assert dispatcher.calls[0][2]["detail_reason"] == "decision_timeout"
+    assert dispatcher.calls[0][2]["requests_60s"] == 0
+    assert dispatcher.calls[0][2]["tokens_60s"] == 0
+    assert dispatcher.calls[0][2]["req_cap"] is None
+    assert dispatcher.calls[0][2]["tok_cap"] is None
+    assert "blocked_until" not in dispatcher.calls[0][2]
+    assert "retry_after_seconds" not in dispatcher.calls[0][2]
     assert len(transport.calls) == 1
     assert transport.calls[0]["event_type"] == "protection.block"
     assert transport.calls[0]["template"] == "protection_block"
@@ -892,6 +899,12 @@ def test_unavailable_report_enqueues_fail_closed_protection_block_when_project_f
     assert dispatcher.calls[0][1] == "protection.block"
     assert dispatcher.calls[0][2]["reason"] == "fail_closed"
     assert dispatcher.calls[0][2]["detail_reason"] == "decision_unavailable"
+    assert dispatcher.calls[0][2]["requests_60s"] == 0
+    assert dispatcher.calls[0][2]["tokens_60s"] == 0
+    assert dispatcher.calls[0][2]["req_cap"] is None
+    assert dispatcher.calls[0][2]["tok_cap"] is None
+    assert "blocked_until" not in dispatcher.calls[0][2]
+    assert "retry_after_seconds" not in dispatcher.calls[0][2]
     assert len(transport.calls) == 1
     assert transport.calls[0]["event_type"] == "protection.block"
     assert transport.calls[0]["template"] == "protection_block"
