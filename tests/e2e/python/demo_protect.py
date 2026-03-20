@@ -515,9 +515,10 @@ def main() -> None:
         elif scenario == "near_cap":
             _assert_line("near_cap warn triggered", decision_value == "warn" and decision_reason == "near_cap" and not blocked)
             clamp_is_recommended = isinstance(clamp_recommended, int) and clamp_recommended > 0
+            clamp_should_apply = clamp_is_recommended and isinstance(max_tokens, int) and clamp_recommended < max_tokens
             clamp_used = clamp_is_recommended and used_max_tokens == clamp_recommended and provider_calls_delta >= 1
             _assert_line("clamp suggested", clamp_is_recommended)
-            if decision_payload.get("apply_clamp_enabled") is True:
+            if decision_payload.get("apply_clamp_enabled") is True and clamp_should_apply:
                 _assert_line("clamp applied", bool(clamp_applied) and clamp_used)
             else:
                 _assert_line("clamp not applied", not bool(clamp_applied) and not clamp_used)

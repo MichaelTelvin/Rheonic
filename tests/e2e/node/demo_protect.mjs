@@ -416,9 +416,10 @@ async function main() {
   } else if (scenario === "near_cap") {
     assertLine("near_cap warn triggered", !blocked && decision === "warn" && reason === "near_cap");
     const clampSuggested = typeof lastClampRecommended === "number" && lastClampRecommended > 0;
+    const clampShouldApply = clampSuggested && typeof maxTokens === "number" && lastClampRecommended < maxTokens;
     const clampEnforced = clampSuggested && usedMaxTokens === lastClampRecommended && providerCallsDelta >= 1;
     assertLine("clamp suggested", clampSuggested);
-    if (lastDecisionPayload?.apply_clamp_enabled === true) {
+    if (lastDecisionPayload?.apply_clamp_enabled === true && clampShouldApply) {
       assertLine("clamp applied", Boolean(lastClampApplied) && clampEnforced);
     } else {
       assertLine("clamp not applied", !lastClampApplied && !clampEnforced);

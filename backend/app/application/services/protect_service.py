@@ -266,6 +266,7 @@ class ProtectService:
                 max_req=max_req,
                 max_tok=max_tok,
                 estimated_next_tokens=estimated_next_tokens,
+                max_output_tokens=ctx.max_output_tokens,
                 apply_clamp_enabled=apply_clamp_enabled,
                 clamp=clamp,
             )
@@ -357,6 +358,7 @@ class ProtectService:
                 max_req=max_req,
                 max_tok=max_tok,
                 estimated_next_tokens=estimated_next_tokens,
+                max_output_tokens=ctx.max_output_tokens,
                 apply_clamp_enabled=apply_clamp_enabled,
                 clamp=clamp,
             )
@@ -410,6 +412,7 @@ class ProtectService:
                 max_req=max_req,
                 max_tok=max_tok,
                 estimated_next_tokens=estimated_next_tokens,
+                max_output_tokens=ctx.max_output_tokens,
                 apply_clamp_enabled=apply_clamp_enabled,
                 clamp=clamp,
             )
@@ -614,6 +617,7 @@ class ProtectService:
         max_req: int | None,
         max_tok: int | None,
         estimated_next_tokens: int | None,
+        max_output_tokens: int | None,
         apply_clamp_enabled: bool,
         clamp: dict[str, int | bool] | None,
     ) -> None:
@@ -634,7 +638,14 @@ class ProtectService:
             "clamp": clamp,
             "sent_at": now.isoformat(),
         }
-        clamp_started = bool(apply_clamp_enabled and isinstance(clamp, dict) and clamp.get("recommended_max_output_tokens"))
+        clamp_started = bool(
+            apply_clamp_enabled
+            and isinstance(clamp, dict)
+            and isinstance(max_output_tokens, int)
+            and max_output_tokens > 0
+            and isinstance(clamp.get("recommended_max_output_tokens"), int)
+            and int(clamp["recommended_max_output_tokens"]) < max_output_tokens
+        )
         if self._protect_action_store.mark_report_sent(
             project_id=scoped_id,
             report_type="warn",

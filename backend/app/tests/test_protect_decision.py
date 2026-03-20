@@ -508,6 +508,36 @@ def test_near_cap_warn_with_clamp_enabled_skips_warn_email_and_keeps_clamp_email
     _cleanup_overrides()
 
 
+def test_near_cap_warn_with_clamp_enabled_but_no_reduction_keeps_warn_email_only(tmp_path) -> None:
+    dispatcher = FakeWebhookDispatcher()
+    transport = FakeTransportService()
+    client, rolling_window, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher, transport_service=transport)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Clamp No Reduction")
+    _set_protect(client, project_id, protect_enabled=True, apply_clamp=True, protect_max_tok_per_min=300)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=230)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "input_tokens_estimate": 10,
+            "max_output_tokens": 32,
+        },
+    )
+    assert decision["decision"] == "warn"
+    assert decision["apply_clamp_enabled"] is True
+    assert int(decision["clamp"]["recommended_max_output_tokens"]) == 32
+    event_types = [event_type for _, event_type, _ in dispatcher.calls]
+    assert "protection.warn" in event_types
+    assert "protection.clamp_started" not in event_types
+    assert [call["event_type"] for call in transport.calls] == ["protection.warn"]
+    assert [call["template"] for call in transport.calls] == ["protection_warn"]
+    _cleanup_overrides()
+
+
 def test_near_cap_warn_creates_visible_incident_from_preflight(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Incident")
