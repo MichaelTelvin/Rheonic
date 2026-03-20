@@ -45,10 +45,7 @@ export function Sidebar({ userEmail, onSignOut, onSendFeedback }: SidebarProps):
           Visit site
         </Link>
         <button type="button" className="sidebar-feedback-button" onClick={onSendFeedback}>
-          <span>Report issue</span>
-          <span className="sidebar-feedback-arrow" aria-hidden="true">
-            →
-          </span>
+          <span>Send feedback</span>
         </button>
         <div className="sidebar-footer-divider" aria-hidden="true" />
         <div className="sidebar-user-row">

@@ -330,14 +330,22 @@ export function Dashboard(): JSX.Element {
       const contentRect = content.getBoundingClientRect();
       const dividerRect = divider.getBoundingClientRect();
       const tokenCard = content.querySelector<HTMLElement>(`.${tokenCardSlotClassName}`);
+      const controls = content.querySelector<HTMLElement>(".dashboard-controls-main");
       const tokenCardRect = tokenCard?.getBoundingClientRect() ?? null;
+      const controlsRect = controls?.getBoundingClientRect() ?? null;
       const minTop = Math.max(16, dividerRect.bottom - contentRect.top - 6);
-      const preferredSetupTop = tokenCardRect && setupBannerHeight > 0
-        ? tokenCardRect.top - contentRect.top - setupBannerHeight - 44
-        : minTop;
+      const providerAlignedTop = controlsRect ? Math.max(minTop, controlsRect.top - contentRect.top + 6) : minTop;
+      const tokenSafeTop = tokenCardRect && setupBannerHeight > 0
+        ? tokenCardRect.top - contentRect.top - setupBannerHeight - 18
+        : providerAlignedTop;
+      const preferredSetupTop = Math.min(providerAlignedTop, tokenSafeTop);
       const nextTop = renderSetupBanner ? Math.max(minTop, preferredSetupTop) : minTop;
       const nextRight = Math.max(0, tokenCardRect ? contentRect.right - tokenCardRect.right : 0);
-      const nextWidth = Math.max(320, tokenCardRect ? tokenCardRect.width : (contentRect.width - DASHBOARD_METRICS_GAP_PX) / 2);
+      const preferredWidth = tokenCardRect
+        ? tokenCardRect.width + (renderSetupBanner ? 220 : 120)
+        : Math.min(contentRect.width - 32, renderSetupBanner ? 760 : 620);
+      const maxWidth = Math.max(320, contentRect.width - nextRight);
+      const nextWidth = Math.max(renderSetupBanner ? 520 : 420, Math.min(preferredWidth, maxWidth));
       setBannerOverlayStyle({ top: nextTop, right: nextRight, width: nextWidth });
     };
 
@@ -915,7 +923,6 @@ export function Dashboard(): JSX.Element {
             </section>
           </>
         )}
-        <p className="dashboard-beta-note">Rheonic is in beta — your feedback shapes the product!</p>
       </div>
     </main>
   );
