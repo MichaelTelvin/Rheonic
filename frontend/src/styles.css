@@ -1872,7 +1872,8 @@ select {
 .dashboard-banner-overlay {
   position: absolute;
   right: 0;
-  width: min(500px, calc(100% - 400px));
+  width: calc((100% - 22px) / 2);
+  max-width: 520px;
   z-index: 18;
   pointer-events: none;
 }
@@ -1887,13 +1888,13 @@ select {
   margin: 0;
   width: 100%;
   pointer-events: auto;
-  animation: dashboardBannerSlideIn 180ms ease-out both;
+  animation: dashboardBannerSlideIn 180ms ease-out;
   will-change: transform;
   backface-visibility: hidden;
 }
 
 .dashboard-floating-banner--closing {
-  animation: dashboardBannerSlideOut 180ms ease-in both;
+  animation: dashboardBannerSlideOut 180ms ease-in forwards;
 }
 
 .setup-banner {

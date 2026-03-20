@@ -146,7 +146,7 @@ export function Dashboard(): JSX.Element {
   const [webhookIssueBannerClosing, setWebhookIssueBannerClosing] = useState<boolean>(false);
   const [bannerOverlayTop, setBannerOverlayTop] = useState<number>(92);
   const dashboardContentRef = useRef<HTMLDivElement | null>(null);
-  const statusPanelRef = useRef<HTMLDivElement | null>(null);
+  const heroDividerRef = useRef<HTMLDivElement | null>(null);
 
   const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
   const webhookIssueDismissStorageKey = useMemo<string>(() => `rheonic:webhookIssueDismissed:${projectId ?? "none"}`, [projectId]);
@@ -313,15 +313,15 @@ export function Dashboard(): JSX.Element {
 
   useLayoutEffect(() => {
     const content = dashboardContentRef.current;
-    const statusPanel = statusPanelRef.current;
-    if (!content || !statusPanel) {
+    const divider = heroDividerRef.current;
+    if (!content || !divider) {
       return;
     }
 
     const updateBannerOverlayTop = (): void => {
       const contentRect = content.getBoundingClientRect();
-      const statusRect = statusPanel.getBoundingClientRect();
-      const nextTop = Math.max(12, statusRect.bottom - contentRect.top + 8);
+      const dividerRect = divider.getBoundingClientRect();
+      const nextTop = Math.max(18, dividerRect.bottom - contentRect.top + 18);
       setBannerOverlayTop(nextTop);
     };
 
@@ -330,7 +330,7 @@ export function Dashboard(): JSX.Element {
       updateBannerOverlayTop();
     });
     resizeObserver.observe(content);
-    resizeObserver.observe(statusPanel);
+    resizeObserver.observe(divider);
     window.addEventListener("resize", updateBannerOverlayTop);
     return () => {
       resizeObserver.disconnect();
@@ -749,10 +749,10 @@ export function Dashboard(): JSX.Element {
           <div className="dashboard-hero-left">
             <h1 className="page-title">LLM Control Center</h1>
             <p className="page-subtitle">Real-time monitoring and protection</p>
-            <div className="hero-subtitle-divider" aria-hidden="true" />
+            <div ref={heroDividerRef} className="hero-subtitle-divider" aria-hidden="true" />
           </div>
           <div className="dashboard-hero-right">
-            <div ref={statusPanelRef} className="status-panel status-panel--accent" aria-live="polite">
+            <div className="status-panel status-panel--accent" aria-live="polite">
               <div className="status-row">
                 <span className="status-row-label">System status</span>
                 <span className={`status-row-value status-${protectStatus.tone}`}>
