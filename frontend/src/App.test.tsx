@@ -236,6 +236,47 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: "Mock Login" })).toBeDefined();
   });
 
+  it("keeps the last known session during non-401 restore failures", async () => {
+    window.sessionStorage.setItem(
+      "auth_user_cache",
+      JSON.stringify({
+        id: "u1",
+        email: "persisted@example.com",
+        created_at: new Date().toISOString(),
+      }),
+    );
+    mockFetchCurrentUser.mockRejectedValueOnce(new ApiError(503, "backend unavailable"));
+
+    render(
+      <TestRouter initialEntries={["/app"]}>
+        <App />
+      </TestRouter>,
+    );
+
+    expect(await screen.findByText("Dashboard Page")).toBeDefined();
+  });
+
+  it("clears the cached session on real unauthorized restore failures", async () => {
+    window.sessionStorage.setItem(
+      "auth_user_cache",
+      JSON.stringify({
+        id: "u1",
+        email: "persisted@example.com",
+        created_at: new Date().toISOString(),
+      }),
+    );
+    mockFetchCurrentUser.mockRejectedValueOnce(new ApiError(401, "not authenticated"));
+
+    render(
+      <TestRouter initialEntries={["/app"]}>
+        <App />
+      </TestRouter>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Mock Login" })).toBeDefined();
+    expect(window.sessionStorage.getItem("auth_user_cache")).toBeNull();
+  });
+
   it("registers and cleans unauthorized handler", () => {
     const { unmount } = render(
       <TestRouter>

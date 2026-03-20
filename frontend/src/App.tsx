@@ -24,6 +24,40 @@ import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
 import { DpaPage } from "./pages/DpaPage";
 
+const authUserCacheStorageKey = "auth_user_cache";
+
+function readCachedAuthUser(): AuthUser | null {
+  try {
+    const raw = window.sessionStorage.getItem(authUserCacheStorageKey);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as AuthUser;
+    if (
+      typeof parsed?.id !== "string"
+      || typeof parsed?.email !== "string"
+      || typeof parsed?.created_at !== "string"
+    ) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedAuthUser(user: AuthUser | null): void {
+  try {
+    if (user) {
+      window.sessionStorage.setItem(authUserCacheStorageKey, JSON.stringify(user));
+    } else {
+      window.sessionStorage.removeItem(authUserCacheStorageKey);
+    }
+  } catch {
+    // Ignore storage write failures and keep runtime auth authoritative.
+  }
+}
+
 interface AuthenticatedAppLayoutProps {
   userEmail: string | null;
   onSignOut: () => void | Promise<void>;
@@ -67,7 +101,7 @@ function ScrollToTop(): null {
 
   useEffect(() => {
     const appMain = document.querySelector(".app-main");
-    if (appMain instanceof HTMLElement) {
+    if (appMain instanceof HTMLElement && typeof appMain.scrollTo === "function") {
       appMain.scrollTo({ top: 0, left: 0, behavior: "auto" });
     }
     window.scrollTo(0, 0);
@@ -92,6 +126,7 @@ export function App(): JSX.Element {
   const [sessionResolved, setSessionResolved] = useState<boolean>(false);
 
   const clearSession = useCallback((): void => {
+    writeCachedAuthUser(null);
     setUser(null);
     setSessionResolved(true);
   }, []);
@@ -119,6 +154,7 @@ export function App(): JSX.Element {
       try {
         const currentUser = await fetchCurrentUser();
         if (!cancelled) {
+          writeCachedAuthUser(currentUser);
           setUser(currentUser);
         }
       } catch (error) {
@@ -126,14 +162,18 @@ export function App(): JSX.Element {
           return;
         }
         if (!(error instanceof ApiError) || error.status !== 401) {
+          const cachedUser = readCachedAuthUser();
           emitFrontendLog({
             level: "error",
             event: "http_response",
             message: "Failed to restore browser session",
             metadata: { error },
           });
+          setUser(cachedUser);
+        } else {
+          writeCachedAuthUser(null);
+          setUser(null);
         }
-        setUser(null);
       } finally {
         if (!cancelled) {
           setSessionResolved(true);
@@ -163,6 +203,7 @@ export function App(): JSX.Element {
   }, [clearSession]);
 
   const onAuthSuccess = (nextUser: AuthUser): void => {
+    writeCachedAuthUser(nextUser);
     setUser(nextUser);
     setSessionResolved(true);
   };
