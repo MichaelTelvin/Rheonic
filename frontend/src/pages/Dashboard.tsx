@@ -152,6 +152,7 @@ export function Dashboard(): JSX.Element {
   });
   const dashboardContentRef = useRef<HTMLDivElement | null>(null);
   const heroDividerRef = useRef<HTMLDivElement | null>(null);
+  const tokenCardSlotClassName = "dashboard-banner-target";
 
   const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
   const webhookIssueDismissStorageKey = useMemo<string>(() => `rheonic:webhookIssueDismissed:${projectId ?? "none"}`, [projectId]);
@@ -326,9 +327,11 @@ export function Dashboard(): JSX.Element {
     const updateBannerOverlayTop = (): void => {
       const contentRect = content.getBoundingClientRect();
       const dividerRect = divider.getBoundingClientRect();
-      const nextTop = Math.max(12, dividerRect.bottom + 8);
-      const nextRight = Math.max(14, window.innerWidth - contentRect.right);
-      const nextWidth = Math.max(320, (contentRect.width - DASHBOARD_METRICS_GAP_PX) / 2);
+      const tokenCard = content.querySelector<HTMLElement>(`.${tokenCardSlotClassName}`);
+      const tokenCardRect = tokenCard?.getBoundingClientRect() ?? null;
+      const nextTop = Math.max(12, dividerRect.bottom + 18);
+      const nextRight = Math.max(14, tokenCardRect ? window.innerWidth - tokenCardRect.right : window.innerWidth - contentRect.right);
+      const nextWidth = Math.max(320, tokenCardRect ? tokenCardRect.width : (contentRect.width - DASHBOARD_METRICS_GAP_PX) / 2);
       setBannerOverlayStyle({ top: nextTop, right: nextRight, width: nextWidth });
     };
 
@@ -829,7 +832,7 @@ export function Dashboard(): JSX.Element {
                 <div className="metric-card-bottom-spacer" aria-hidden="true" />
               </Card>
 
-              <Card>
+              <Card className={tokenCardSlotClassName}>
                 <h2 className="card-title">Tokens (60s)</h2>
                 <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.tokens_60s ?? 0)}</p>
                 <PulseMeter
