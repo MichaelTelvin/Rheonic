@@ -1390,7 +1390,8 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 6px;
+  padding-top: 0;
+  position: relative;
 }
 
 .dashboard-hero-right {
@@ -1882,17 +1883,19 @@ select {
   display: grid;
   gap: 12px;
   overflow: hidden;
+  position: relative;
+  top: -14px;
 }
 
 .dashboard-floating-banner {
   margin: 0;
   width: 100%;
-  animation: dashboardBannerSlideIn 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: dashboardBannerSlideIn 420ms cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: top center;
 }
 
 .dashboard-floating-banner--closing {
-  animation: dashboardBannerSlideOut 220ms ease forwards;
+  animation: dashboardBannerSlideOut 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 .setup-banner {
@@ -1914,7 +1917,7 @@ select {
 @keyframes dashboardBannerSlideIn {
   from {
     opacity: 0;
-    transform: translateY(-42px);
+    transform: translateY(-58px);
   }
 
   to {
@@ -1931,7 +1934,7 @@ select {
 
   to {
     opacity: 0;
-    transform: translateY(-34px);
+    transform: translateY(-46px);
   }
 }
 
