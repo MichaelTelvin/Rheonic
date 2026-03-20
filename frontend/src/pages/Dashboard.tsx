@@ -321,7 +321,7 @@ export function Dashboard(): JSX.Element {
     const updateBannerOverlayTop = (): void => {
       const contentRect = content.getBoundingClientRect();
       const statusRect = statusPanel.getBoundingClientRect();
-      const nextTop = Math.max(18, statusRect.bottom - contentRect.top + 14);
+      const nextTop = Math.max(12, statusRect.bottom - contentRect.top + 8);
       setBannerOverlayTop(nextTop);
     };
 
@@ -809,7 +809,6 @@ export function Dashboard(): JSX.Element {
                   color="var(--req)"
                   mode="requests"
                 />
-                <p className={`metric-card-warning ${metricsWarning ? "visible" : ""}`}>{metricsWarning ?? ""}</p>
               </Card>
 
               <Card>
@@ -820,7 +819,6 @@ export function Dashboard(): JSX.Element {
                   color="var(--accent)"
                   mode="tokens"
                 />
-                <p className={`metric-card-warning ${metricsWarning ? "visible" : ""}`}>{metricsWarning ?? ""}</p>
               </Card>
 
               <Card>

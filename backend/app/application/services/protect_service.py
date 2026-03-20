@@ -634,6 +634,7 @@ class ProtectService:
             "clamp": clamp,
             "sent_at": now.isoformat(),
         }
+        clamp_started = bool(apply_clamp_enabled and isinstance(clamp, dict) and clamp.get("recommended_max_output_tokens"))
         if self._protect_action_store.mark_report_sent(
             project_id=scoped_id,
             report_type="warn",
@@ -647,9 +648,9 @@ class ProtectService:
                 provider=provider,
                 payload=payload,
                 dedupe_seed=reason,
+                send_email=not clamp_started,
             )
 
-        clamp_started = bool(apply_clamp_enabled and isinstance(clamp, dict) and clamp.get("recommended_max_output_tokens"))
         if clamp_started and self._protect_action_store.mark_report_sent(
             project_id=scoped_id,
             report_type="clamp_started",
@@ -783,6 +784,7 @@ class ProtectService:
         provider: str,
         payload: dict[str, object],
         dedupe_seed: str,
+        send_email: bool = True,
     ) -> None:
         if self._webhook_dispatcher is not None:
             try:
@@ -796,7 +798,7 @@ class ProtectService:
                     "Failed to enqueue protection webhook",
                     extra={"project_id": project_id, "provider": provider, "event_type": event_type},
                 )
-        if self._transport_service is None:
+        if self._transport_service is None or not send_email:
             return
         try:
             dedupe_key = build_transport_dedupe_key(

@@ -1872,7 +1872,7 @@ select {
 .dashboard-banner-overlay {
   position: absolute;
   right: 0;
-  width: min(430px, calc(100% - 440px));
+  width: clamp(300px, 24vw, 350px);
   z-index: 18;
   pointer-events: none;
 }
@@ -1887,17 +1887,18 @@ select {
   margin: 0;
   width: 100%;
   pointer-events: auto;
-  animation: dashboardBannerSlideIn 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: dashboardBannerSlideIn 180ms ease-out;
   transform-origin: center right;
+  will-change: transform;
 }
 
 .dashboard-floating-banner--closing {
-  animation: dashboardBannerSlideOut 280ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: dashboardBannerSlideOut 180ms ease-in forwards;
 }
 
 .setup-banner {
   width: 100%;
-  padding: 8px 12px 8px 14px;
+  padding: 7px 10px 7px 12px;
   min-height: 0;
   border-radius: 10px;
   border: 1px solid rgba(129, 140, 248, 0.18);
@@ -1905,7 +1906,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
   position: relative;
   overflow: hidden;
@@ -1961,30 +1962,30 @@ select {
 
 .setup-banner-title {
   margin: 0;
-  font-size: 0.89rem;
+  font-size: 0.85rem;
   font-weight: 650;
   color: rgba(241, 245, 249, 0.98);
   line-height: 1.2;
 }
 
 .setup-banner-text {
-  margin-top: 4px;
-  font-size: 0.83rem;
-  line-height: 1.35;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  line-height: 1.28;
   color: rgba(226, 232, 240, 0.82);
 }
 
 .setup-banner-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
 .setup-banner-actions .modal-button {
-  min-width: 112px;
-  padding: 6px 11px;
-  font-size: 0.8rem;
+  min-width: 96px;
+  padding: 5px 9px;
+  font-size: 0.76rem;
   border-color: rgba(148, 163, 184, 0.44);
   background: rgba(15, 23, 42, 0.44);
 }
@@ -1998,8 +1999,7 @@ select {
   border: 1px solid rgba(255, 180, 80, 0.35);
   background: #27211e;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
-  padding-top: 12px;
-  padding-bottom: 12px;
+  padding: 8px 10px;
 }
 
 .dashboard-alert-card::before {
@@ -2008,25 +2008,27 @@ select {
 
 .dashboard-alert-card .card-title {
   color: inherit;
-  margin: 0 0 6px;
-  font-size: 0.98rem;
-  line-height: 1.25;
+  margin: 0 0 4px;
+  font-size: 0.84rem;
+  line-height: 1.22;
 }
 
 .dashboard-alert-card .subtle {
   color: inherit;
   margin: 0;
-  font-size: 0.84rem;
-  line-height: 1.42;
-}
-
-.dashboard-alert-card {
-  padding: 10px 12px;
+  font-size: 0.76rem;
+  line-height: 1.28;
 }
 
 .dashboard-alert-card .modal-actions.form-actions {
-  margin-top: 10px;
-  gap: 10px;
+  margin-top: 8px;
+  gap: 6px;
+}
+
+.dashboard-alert-card .modal-actions.form-actions .modal-button {
+  min-width: 92px;
+  padding: 5px 9px;
+  font-size: 0.76rem;
 }
 
 .dashboard-beta-note {
