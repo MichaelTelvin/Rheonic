@@ -1884,18 +1884,18 @@ select {
   gap: 12px;
   overflow: hidden;
   position: relative;
-  top: -14px;
+  top: -24px;
 }
 
 .dashboard-floating-banner {
   margin: 0;
   width: 100%;
-  animation: dashboardBannerSlideIn 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: dashboardBannerSlideIn 560ms cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: top center;
 }
 
 .dashboard-floating-banner--closing {
-  animation: dashboardBannerSlideOut 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: dashboardBannerSlideOut 420ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 .setup-banner {
@@ -1917,7 +1917,7 @@ select {
 @keyframes dashboardBannerSlideIn {
   from {
     opacity: 0;
-    transform: translateY(-58px);
+    transform: translateY(-72px);
   }
 
   to {
@@ -1934,7 +1934,7 @@ select {
 
   to {
     opacity: 0;
-    transform: translateY(-46px);
+    transform: translateY(-62px);
   }
 }
 

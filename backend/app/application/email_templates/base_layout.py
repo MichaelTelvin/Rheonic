@@ -4,6 +4,24 @@ from datetime import datetime, timezone
 from html import escape
 import json
 
+_RHEONIC_EMAIL_LOGO_SVG = (
+    "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\" width=\"28\" height=\"28\" role=\"img\" aria-label=\"Rheonic logo\">"
+    "<defs>"
+    "<linearGradient id=\"rheonic-email-logo-gradient\" x1=\"44\" y1=\"128\" x2=\"212\" y2=\"128\" gradientUnits=\"userSpaceOnUse\">"
+    "<stop offset=\"0%\" stop-color=\"#a78bfa\"/>"
+    "<stop offset=\"45%\" stop-color=\"#7a7dff\"/>"
+    "<stop offset=\"100%\" stop-color=\"#7cc1ff\"/>"
+    "</linearGradient>"
+    "</defs>"
+    "<rect x=\"39\" y=\"39\" width=\"178\" height=\"178\" fill=\"none\" stroke=\"url(#rheonic-email-logo-gradient)\" stroke-width=\"22\"/>"
+    "<g fill=\"none\" stroke=\"url(#rheonic-email-logo-gradient)\" stroke-width=\"12\" stroke-linecap=\"round\">"
+    "<path d=\"M 46 128 L 99 128\"/>"
+    "<path d=\"M 157 128 L 210 128\"/>"
+    "<circle cx=\"128\" cy=\"128\" r=\"31\"/>"
+    "</g>"
+    "</svg>"
+)
+
 
 def format_timestamp(value: object) -> str:
     raw = str(value or "").strip()
@@ -134,23 +152,7 @@ def render_base_email(
         "<div style=\"padding:24px 28px 18px;background:linear-gradient(135deg,#101828 0%,#1d2939 100%);\">"
         "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">"
         "<tr>"
-        "<td style=\"width:28px;height:28px;border:2px solid #7a7dff;border-radius:6px;\">"
-        "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:100%;height:100%;border-collapse:collapse;\">"
-        "<tr>"
-        "<td colspan=\"5\" style=\"height:9px;font-size:0;line-height:0;\">&nbsp;</td>"
-        "</tr>"
-        "<tr>"
-        "<td style=\"width:4px;font-size:0;line-height:0;\">&nbsp;</td>"
-        "<td style=\"width:6px;height:2px;background:#a78bfa;font-size:0;line-height:0;\">&nbsp;</td>"
-        "<td style=\"width:6px;height:6px;border-radius:999px;background:#7a7dff;font-size:0;line-height:0;\">&nbsp;</td>"
-        "<td style=\"width:6px;height:2px;background:#7cc1ff;font-size:0;line-height:0;\">&nbsp;</td>"
-        "<td style=\"width:4px;font-size:0;line-height:0;\">&nbsp;</td>"
-        "</tr>"
-        "<tr>"
-        "<td colspan=\"5\" style=\"height:9px;font-size:0;line-height:0;\">&nbsp;</td>"
-        "</tr>"
-        "</table>"
-        "</td>"
+        f"<td style=\"width:28px;height:28px;vertical-align:middle;\">{_RHEONIC_EMAIL_LOGO_SVG}</td>"
         "<td style=\"width:10px;font-size:0;line-height:0;\">&nbsp;</td>"
         "<td style=\"font:700 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#7a7dff;\">RHEONIC</td>"
         "</tr>"
