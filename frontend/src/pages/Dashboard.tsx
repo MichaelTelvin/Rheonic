@@ -326,7 +326,7 @@ export function Dashboard(): JSX.Element {
     const updateBannerOverlayTop = (): void => {
       const contentRect = content.getBoundingClientRect();
       const dividerRect = divider.getBoundingClientRect();
-      const nextTop = Math.max(18, dividerRect.bottom + 18);
+      const nextTop = Math.max(12, dividerRect.bottom + 8);
       const nextRight = Math.max(14, window.innerWidth - contentRect.right);
       const nextWidth = Math.max(320, (contentRect.width - DASHBOARD_METRICS_GAP_PX) / 2);
       setBannerOverlayStyle({ top: nextTop, right: nextRight, width: nextWidth });
@@ -739,13 +739,11 @@ export function Dashboard(): JSX.Element {
               {renderWebhookIssueBanner ? (
                 <Card className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
                   <div className="dashboard-alert-banner-layout">
-                    <div className="dashboard-alert-banner-copy">
-                      <h2 className="card-title">Webhook delivery issues in the last 24 hours</h2>
-                      <p className="subtle">
-                        {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
-                        {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
-                      </p>
-                    </div>
+                    <h2 className="card-title dashboard-alert-banner-title">Webhook delivery issues in the last 24 hours</h2>
+                    <p className="subtle dashboard-alert-banner-summary">
+                      {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
+                      {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
+                    </p>
                     <div className="modal-actions form-actions dashboard-alert-banner-actions">
                       <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
                         Check URL
