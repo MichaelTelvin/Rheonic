@@ -246,7 +246,7 @@ Switch Protect fail mode and verify both paths.
 Set fail mode to `open`, then make protect decision unavailable temporarily and run:
 
 ```bash
-make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=allow
+make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=allow RHEONIC_PROTECT_DECISION_TIMEOUT_MS=30
 ```
 
 Expected:
@@ -258,7 +258,7 @@ Expected:
 Set fail mode to `closed`, then make protect decision unavailable temporarily and run:
 
 ```bash
-make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=allow
+make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=allow RHEONIC_PROTECT_DECISION_TIMEOUT_MS=30
 ```
 
 Expected:

@@ -378,6 +378,13 @@ async function main() {
   const after = await providerCount();
   const providerCallsDelta = after - before;
   const usedMaxTokens = extractUsedMaxTokens(providerLastCall());
+  lastClampApplied = Boolean(
+    typeof lastClampRecommended === "number" &&
+      typeof maxTokens === "number" &&
+      lastClampRecommended < maxTokens &&
+      usedMaxTokens === lastClampRecommended &&
+      providerCallsDelta >= 1
+  );
 
   console.log(`[RESULT] blocked=${blocked} provider_calls_delta=${providerCallsDelta}`);
   if (scenario === "near_cap") {

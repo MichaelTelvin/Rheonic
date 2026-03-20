@@ -475,7 +475,7 @@ def test_near_cap_warn_dispatches_clamp_started_when_clamp_enabled(tmp_path) -> 
     )
     assert decision["decision"] == "warn"
     event_types = [event_type for _, event_type, _ in dispatcher.calls]
-    assert "protection.warn" in event_types
+    assert "protection.warn" not in event_types
     assert "protection.clamp_started" in event_types
     _cleanup_overrides()
 
@@ -501,7 +501,7 @@ def test_near_cap_warn_with_clamp_enabled_skips_warn_email_and_keeps_clamp_email
     )
     assert decision["decision"] == "warn"
     event_types = [event_type for _, event_type, _ in dispatcher.calls]
-    assert "protection.warn" in event_types
+    assert "protection.warn" not in event_types
     assert "protection.clamp_started" in event_types
     assert [call["event_type"] for call in transport.calls] == ["protection.clamp_started"]
     assert [call["template"] for call in transport.calls] == ["protection_clamp_started"]

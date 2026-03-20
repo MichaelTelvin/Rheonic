@@ -499,8 +499,14 @@ def main() -> None:
         clamp = decision_payload.get("clamp")
         clamp_payload = clamp if isinstance(clamp, dict) else {}
         clamp_recommended = clamp_payload.get("recommended_max_output_tokens")
-        clamp_applied = clamp_payload.get("applied")
         used_max_tokens = _extract_used_max_tokens(_provider_last_call())
+        clamp_applied = bool(
+            isinstance(clamp_recommended, int)
+            and isinstance(max_tokens, int)
+            and clamp_recommended < max_tokens
+            and used_max_tokens == clamp_recommended
+            and provider_calls_delta >= 1
+        )
 
         print(f"[RESULT] blocked={blocked} provider_calls_delta={provider_calls_delta}")
         if scenario == "near_cap":

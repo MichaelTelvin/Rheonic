@@ -659,6 +659,7 @@ class ProtectService:
                 provider=provider,
                 payload=payload,
                 dedupe_seed=reason,
+                send_webhook=not clamp_started,
                 send_email=not clamp_started,
             )
 
@@ -795,9 +796,10 @@ class ProtectService:
         provider: str,
         payload: dict[str, object],
         dedupe_seed: str,
+        send_webhook: bool = True,
         send_email: bool = True,
     ) -> None:
-        if self._webhook_dispatcher is not None:
+        if self._webhook_dispatcher is not None and send_webhook:
             try:
                 self._webhook_dispatcher.enqueue(
                     project_id=project_id,
