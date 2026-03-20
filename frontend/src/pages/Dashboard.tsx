@@ -715,11 +715,10 @@ export function Dashboard(): JSX.Element {
               {globalBanner ? <section className="banner dashboard-floating-banner">{globalBanner}</section> : null}
               {renderSetupBanner ? (
                 <section className={`setup-banner dashboard-floating-banner${setupBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
-                  <div className="setup-banner-copy">
-                    <div className="setup-banner-title">{setupBannerContent.title}</div>
-                    <div className="setup-banner-text">{setupBannerContent.text}</div>
-                  </div>
-                  <div className="setup-banner-actions">
+                  <div className="dashboard-alert-banner-layout">
+                    <div className="setup-banner-title dashboard-alert-banner-title">{setupBannerContent.title}</div>
+                    <div className="setup-banner-text dashboard-alert-banner-summary">{setupBannerContent.text}</div>
+                    <div className="setup-banner-actions dashboard-alert-banner-actions">
                     {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
                       <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
                         {setupBannerContent.primaryLabel}
@@ -733,11 +732,12 @@ export function Dashboard(): JSX.Element {
                     <button type="button" className="modal-button" onClick={dismissSetupBanner}>
                       Dismiss
                     </button>
+                    </div>
                   </div>
                 </section>
               ) : null}
               {renderWebhookIssueBanner ? (
-                <Card className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
+                <section className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
                   <div className="dashboard-alert-banner-layout">
                     <h2 className="card-title dashboard-alert-banner-title">Webhook delivery issues in the last 24 hours</h2>
                     <p className="subtle dashboard-alert-banner-summary">
@@ -753,7 +753,7 @@ export function Dashboard(): JSX.Element {
                       </button>
                     </div>
                   </div>
-                </Card>
+                </section>
               ) : null}
             </div>
           </section>
@@ -826,6 +826,7 @@ export function Dashboard(): JSX.Element {
                   color="var(--req)"
                   mode="requests"
                 />
+                <div className="metric-card-bottom-spacer" aria-hidden="true" />
               </Card>
 
               <Card>
@@ -836,6 +837,7 @@ export function Dashboard(): JSX.Element {
                   color="var(--accent)"
                   mode="tokens"
                 />
+                <div className="metric-card-bottom-spacer" aria-hidden="true" />
               </Card>
 
               <Card>

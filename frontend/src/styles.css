@@ -1773,6 +1773,10 @@ select {
   visibility: visible;
 }
 
+.metric-card-bottom-spacer {
+  min-height: 18px;
+}
+
 .protect-decisions-list {
   margin-top: 10px;
   display: grid;
@@ -1886,9 +1890,11 @@ select {
   width: 100%;
   pointer-events: auto;
   animation: dashboardBannerSlideIn 180ms ease-out;
+  transition: none;
   will-change: transform;
   backface-visibility: hidden;
   opacity: 1;
+  filter: none;
 }
 
 .dashboard-floating-banner--closing {
@@ -1902,11 +1908,7 @@ select {
   border-radius: 10px;
   border: 1px solid rgba(129, 140, 248, 0.18);
   background: #1d2940;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(99, 102, 241, 0.08), 0 0 18px rgba(99, 102, 241, 0.18);
   position: relative;
   overflow: hidden;
 }
@@ -1949,20 +1951,6 @@ select {
   }
 }
 
-.setup-banner::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 4px;
-  background: linear-gradient(180deg, rgba(129, 140, 248, 0.68), rgba(96, 165, 250, 0.58));
-}
-
-.setup-banner-copy {
-  min-width: 0;
-}
-
 .setup-banner-title {
   margin: 0;
   font-size: 0.92rem;
@@ -1982,7 +1970,6 @@ select {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-shrink: 0;
 }
 
 .setup-banner-actions .modal-button {
