@@ -1868,23 +1868,19 @@ select {
 }
 
 .dashboard-banner-rail {
-  position: fixed;
-  top: 74px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 16;
-  width: min(760px, calc(100vw - 340px));
+  width: 100%;
+  max-width: 1140px;
+  margin: -8px auto 18px;
   display: grid;
   gap: 12px;
-  pointer-events: none;
-  justify-items: center;
+  padding: 0 34px;
+  overflow: hidden;
 }
 
 .dashboard-floating-banner {
   margin: 0;
-  pointer-events: auto;
   width: 100%;
-  animation: dashboardBannerSlideIn 220ms ease;
+  animation: dashboardBannerSlideIn 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
   transform-origin: top center;
 }
 
@@ -1898,12 +1894,12 @@ select {
   min-height: 96px;
   border-radius: 10px;
   border: 1px solid rgba(129, 140, 248, 0.18);
-  background: linear-gradient(100deg, rgba(79, 70, 229, 0.13), rgba(37, 99, 235, 0.08) 55%, rgba(15, 23, 42, 0.2));
+  background: linear-gradient(100deg, rgba(35, 42, 64, 0.98), rgba(29, 45, 77, 0.98) 55%, rgba(23, 31, 49, 0.98));
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
   position: relative;
   overflow: hidden;
 }
@@ -1911,7 +1907,7 @@ select {
 @keyframes dashboardBannerSlideIn {
   from {
     opacity: 0;
-    transform: translateY(-18px);
+    transform: translateY(-28px);
   }
 
   to {
@@ -1928,7 +1924,7 @@ select {
 
   to {
     opacity: 0;
-    transform: translateY(-18px);
+    transform: translateY(-24px);
   }
 }
 
@@ -2582,8 +2578,8 @@ pre {
   }
 
   .dashboard-banner-rail {
-    top: 74px;
-    width: min(720px, calc(100vw - 300px));
+    width: 100%;
+    padding: 0 34px;
   }
 
   .setup-banner {
@@ -3400,25 +3396,41 @@ pre {
   text-align: center;
 }
 
+.project-table-id-header {
+  text-align: center;
+}
+
 .project-id-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  text-align: center;
+}
+
+.project-id-value {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
 }
 
 .project-id-copy-button {
-  border: 0;
-  background: transparent;
-  color: rgba(148, 163, 184, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(148, 163, 184, 0.1);
+  color: rgba(226, 232, 240, 0.82);
   font: inherit;
-  font-size: 0.78rem;
-  padding: 0;
+  font-size: 0.74rem;
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: 999px;
   cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 .project-id-copy-button:hover {
-  color: rgba(226, 232, 240, 0.96);
-  text-decoration: underline;
+  color: rgba(241, 245, 249, 0.94);
+  border-color: rgba(167, 139, 250, 0.28);
+  background: rgba(167, 139, 250, 0.12);
 }
 
 .project-table-actions {
@@ -4136,10 +4148,9 @@ pre {
   }
 
   .dashboard-banner-rail {
-    top: 72px;
-    left: 50%;
-    right: auto;
-    width: min(680px, calc(100vw - 40px));
+    width: 100%;
+    margin: -4px auto 16px;
+    padding: 0 20px;
   }
 
   .current-project-bar {
@@ -4293,10 +4304,9 @@ pre {
   }
 
   .dashboard-banner-rail {
-    top: 72px;
-    left: 50%;
-    right: auto;
-    width: calc(100vw - 28px);
+    width: 100%;
+    margin: -2px auto 14px;
+    padding: 0 14px;
   }
 
   .current-project-bar {

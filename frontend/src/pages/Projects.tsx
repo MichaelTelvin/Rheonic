@@ -154,7 +154,7 @@ export function Projects(): JSX.Element {
             <div className="project-table">
               <div className="project-table-head">
                 <span>Name</span>
-                <span>ID</span>
+                <span className="project-table-id-header">ID</span>
                 <span>Created</span>
                 <span className="table-actions-header">Status</span>
               </div>
@@ -162,7 +162,7 @@ export function Projects(): JSX.Element {
                 <div className={`project-table-row${project.id === projectId ? " is-selected" : ""}`} key={project.id}>
                   <span className="key-name">{project.name}</span>
                   <div className="project-id-cell">
-                    <span className="subtle mono" title={project.id}>
+                    <span className="subtle mono project-id-value" title={project.id}>
                       {shortId(project.id)}
                     </span>
                     <button
