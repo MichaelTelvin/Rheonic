@@ -146,6 +146,7 @@ export function Dashboard(): JSX.Element {
   const [setupBannerClosing, setSetupBannerClosing] = useState<boolean>(false);
   const [webhookIssueBannerClosing, setWebhookIssueBannerClosing] = useState<boolean>(false);
   const [setupBannerHeight, setSetupBannerHeight] = useState<number>(0);
+  const [webhookBannerHeight, setWebhookBannerHeight] = useState<number>(0);
   const [bannerOverlayStyle, setBannerOverlayStyle] = useState<{ top: number; right: number; width: number }>({
     top: 120,
     right: 24,
@@ -154,6 +155,7 @@ export function Dashboard(): JSX.Element {
   const dashboardContentRef = useRef<HTMLDivElement | null>(null);
   const heroDividerRef = useRef<HTMLDivElement | null>(null);
   const setupBannerRef = useRef<HTMLElement | null>(null);
+  const webhookBannerRef = useRef<HTMLElement | null>(null);
   const tokenCardSlotClassName = "dashboard-banner-target";
 
   const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
@@ -335,11 +337,19 @@ export function Dashboard(): JSX.Element {
       const controlsRect = controls?.getBoundingClientRect() ?? null;
       const minTop = Math.max(16, dividerRect.bottom - contentRect.top - 6);
       const providerAlignedTop = controlsRect ? Math.max(minTop, controlsRect.top - contentRect.top + 6) : minTop;
-      const tokenSafeTop = tokenCardRect && setupBannerHeight > 0
+      const setupTokenSafeTop = tokenCardRect && setupBannerHeight > 0
         ? tokenCardRect.top - contentRect.top - setupBannerHeight - 18
         : providerAlignedTop;
-      const preferredSetupTop = Math.min(providerAlignedTop, tokenSafeTop);
-      const nextTop = renderSetupBanner ? Math.max(minTop, preferredSetupTop) : minTop;
+      const webhookTokenSafeTop = tokenCardRect && webhookBannerHeight > 0
+        ? tokenCardRect.top - contentRect.top - webhookBannerHeight - 18
+        : minTop;
+      const preferredSetupTop = Math.min(providerAlignedTop, setupTokenSafeTop);
+      const preferredWebhookTop = Math.max(minTop, webhookTokenSafeTop);
+      const nextTop = renderSetupBanner
+        ? Math.max(minTop, preferredSetupTop)
+        : renderWebhookIssueBanner
+          ? preferredWebhookTop
+          : minTop;
       const nextRight = Math.max(0, tokenCardRect ? contentRect.right - tokenCardRect.right : 0);
       const preferredWidth = tokenCardRect
         ? tokenCardRect.width + (renderSetupBanner ? 220 : 120)
@@ -360,7 +370,7 @@ export function Dashboard(): JSX.Element {
       resizeObserver.disconnect();
       window.removeEventListener("resize", updateBannerOverlayTop);
     };
-  }, [projectId, renderSetupBanner, setupBannerHeight]);
+  }, [projectId, renderSetupBanner, renderWebhookIssueBanner, setupBannerHeight, webhookBannerHeight]);
 
   const setupBannerContent = useMemo<{
     title: string;
@@ -415,6 +425,13 @@ export function Dashboard(): JSX.Element {
       secondaryTo: "/quickstart",
     };
   }, [setupStage]);
+  const setupPrimaryTarget = setupBannerContent.primaryLabel && setupBannerContent.primaryTo
+    ? { label: setupBannerContent.primaryLabel, to: setupBannerContent.primaryTo }
+    : null;
+  const setupSecondaryTarget = setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo
+    ? { label: setupBannerContent.secondaryLabel, to: setupBannerContent.secondaryTo }
+    : null;
+  const visibleWebhookIssue = renderWebhookIssueBanner && webhookIssue ? webhookIssue : null;
 
   useLayoutEffect(() => {
     const setupBanner = setupBannerRef.current;
@@ -438,6 +455,29 @@ export function Dashboard(): JSX.Element {
       window.removeEventListener("resize", updateSetupBannerHeight);
     };
   }, [renderSetupBanner, setupBannerContent.primaryLabel, setupBannerContent.secondaryLabel, setupBannerContent.text, setupBannerContent.title]);
+
+  useLayoutEffect(() => {
+    const webhookBanner = webhookBannerRef.current;
+    if (!webhookBanner || !renderWebhookIssueBanner) {
+      setWebhookBannerHeight(0);
+      return;
+    }
+
+    const updateWebhookBannerHeight = (): void => {
+      setWebhookBannerHeight(webhookBanner.getBoundingClientRect().height);
+    };
+
+    updateWebhookBannerHeight();
+    const resizeObserver = new ResizeObserver(() => {
+      updateWebhookBannerHeight();
+    });
+    resizeObserver.observe(webhookBanner);
+    window.addEventListener("resize", updateWebhookBannerHeight);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateWebhookBannerHeight);
+    };
+  }, [renderWebhookIssueBanner, webhookIssue?.count, webhookIssue?.lastAt]);
 
   const refreshProviders = useCallback(async (): Promise<void> => {
     if (!projectId) {
@@ -762,14 +802,14 @@ export function Dashboard(): JSX.Element {
                     <div className="setup-banner-title dashboard-alert-banner-title">{setupBannerContent.title}</div>
                     <div className="setup-banner-text dashboard-alert-banner-summary">{setupBannerContent.text}</div>
                     <div className="setup-banner-actions dashboard-alert-banner-actions">
-                      {setupBannerContent.primaryLabel && setupBannerContent.primaryTo ? (
-                        <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupBannerContent.primaryTo)}>
-                          {setupBannerContent.primaryLabel}
+                      {setupPrimaryTarget ? (
+                        <button type="button" className="modal-button modal-primary" onClick={() => navigate(setupPrimaryTarget.to)}>
+                          {setupPrimaryTarget.label}
                         </button>
                       ) : null}
-                      {setupBannerContent.secondaryLabel && setupBannerContent.secondaryTo ? (
-                        <button type="button" className="modal-button" onClick={() => navigate(setupBannerContent.secondaryTo)}>
-                          {setupBannerContent.secondaryLabel}
+                      {setupSecondaryTarget ? (
+                        <button type="button" className="modal-button" onClick={() => navigate(setupSecondaryTarget.to)}>
+                          {setupSecondaryTarget.label}
                         </button>
                       ) : null}
                       <button type="button" className="modal-button" onClick={dismissSetupBanner}>
@@ -779,13 +819,16 @@ export function Dashboard(): JSX.Element {
                   </div>
                 </section>
               ) : null}
-              {renderWebhookIssueBanner ? (
-                <section className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
+              {visibleWebhookIssue ? (
+                <section
+                  ref={webhookBannerRef}
+                  className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}
+                >
                   <div className="dashboard-alert-banner-layout">
                     <h2 className="card-title dashboard-alert-banner-title">Webhook delivery issues in the last 24 hours</h2>
                     <p className="subtle dashboard-alert-banner-summary">
-                      {webhookIssue.count} {webhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
-                      {webhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(webhookIssue.lastAt)}` : ""}
+                      {visibleWebhookIssue.count} {visibleWebhookIssue.count === 1 ? "delivery failed" : "deliveries failed"}
+                      {visibleWebhookIssue.lastAt ? ` • Last attempt ${formatAlertAttemptTime(visibleWebhookIssue.lastAt)}` : ""}
                     </p>
                     <div className="modal-actions form-actions dashboard-alert-banner-actions">
                       <button type="button" className="modal-button modal-primary" onClick={() => navigate("/app/alerts")}>
