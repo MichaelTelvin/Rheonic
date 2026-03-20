@@ -226,7 +226,46 @@ Expected:
 - effective provider request uses clamped max output tokens
 - one `protection.clamp_started`
 
-## 11. Protect Resolved
+Repro values that should force a real clamp with the current staging defaults:
+
+```bash
+make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=near_cap RHEONIC_NEAR_CAP_SEED_TOKENS=1680
+```
+
+Expected:
+- protect returns `warn`
+- `recommended_max_output_tokens` is lower than `128`
+- provider call uses the reduced token cap
+- `protection.clamp_started` email is sent
+
+## 11. Fail Mode
+
+Switch Protect fail mode and verify both paths.
+
+### Fail Open
+Set fail mode to `open`, then make protect decision unavailable temporarily and run:
+
+```bash
+make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=allow
+```
+
+Expected:
+- request is allowed through
+- no provider-side block happens
+- backend records decision timeout or unavailable telemetry
+
+### Fail Closed
+Set fail mode to `closed`, then make protect decision unavailable temporarily and run:
+
+```bash
+make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=allow
+```
+
+Expected:
+- request is blocked
+- no provider call is made
+- reason resolves to `decision_unavailable` or fail-closed equivalent
+## 12. Protect Resolved
 
 Resolve one Protect incident manually.
 
@@ -236,7 +275,7 @@ Expected:
 
 If practical, also wait for one stale incident auto-close and verify the same semantics.
 
-## 12. Webhook Failure Path
+## 13. Webhook Failure Path
 
 Set a broken webhook URL in `Alerts`, keep email enabled, then trigger a real Protect event:
 
@@ -256,7 +295,7 @@ Then:
 
 Restore a valid webhook URL after that.
 
-## 13. SDK Validation
+## 14. SDK Validation
 
 ### Python
 Run:
@@ -283,7 +322,7 @@ Verify:
 - structured JSON SDK logs
 - same semantics as Python
 
-## 14. Logging Spot Check
+## 15. Logging Spot Check
 
 On staging:
 
@@ -300,7 +339,7 @@ Verify:
 - no full request/webhook payload dumps
 - worker logs show expected outbox lifecycle events
 
-## 15. Docs / Contract Sanity
+## 16. Docs / Contract Sanity
 
 Open and verify:
 - `Quickstart`
@@ -317,7 +356,7 @@ Confirm:
 - no old webhook editor wording remains
 - no old `decision.warn` / `incident.block` transport wording remains
 
-## 16. Final Sign-Off
+## 17. Final Sign-Off
 
 Beta is ready only if all are true:
 

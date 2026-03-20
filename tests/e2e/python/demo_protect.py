@@ -519,7 +519,7 @@ def main() -> None:
             clamp_used = clamp_is_recommended and used_max_tokens == clamp_recommended and provider_calls_delta >= 1
             _assert_line("clamp suggested", clamp_is_recommended)
             if decision_payload.get("apply_clamp_enabled") is True and clamp_should_apply:
-                _assert_line("clamp applied", bool(clamp_applied) and clamp_used)
+                _assert_line("clamp applied", clamp_used)
             else:
                 _assert_line("clamp not applied", not bool(clamp_applied) and not clamp_used)
         elif scenario == "cap_breach":

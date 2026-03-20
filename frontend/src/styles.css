@@ -2053,6 +2053,29 @@ select {
   font-size: 0.74rem;
 }
 
+@media (max-width: 1280px) {
+  .dashboard-banner-overlay {
+    max-width: calc(100vw - 32px);
+  }
+
+  .dashboard-alert-banner-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "title"
+      "summary"
+      "actions";
+  }
+
+  .dashboard-alert-banner-actions {
+    justify-self: start;
+    width: 100%;
+  }
+
+  .dashboard-alert-card .modal-actions.form-actions {
+    flex-wrap: wrap;
+  }
+}
+
 .dashboard-beta-note {
   margin: 38px 0 0;
   color: rgba(125, 211, 252, 0.7);

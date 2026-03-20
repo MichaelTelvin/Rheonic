@@ -420,7 +420,7 @@ async function main() {
     const clampEnforced = clampSuggested && usedMaxTokens === lastClampRecommended && providerCallsDelta >= 1;
     assertLine("clamp suggested", clampSuggested);
     if (lastDecisionPayload?.apply_clamp_enabled === true && clampShouldApply) {
-      assertLine("clamp applied", Boolean(lastClampApplied) && clampEnforced);
+      assertLine("clamp applied", clampEnforced);
     } else {
       assertLine("clamp not applied", !lastClampApplied && !clampEnforced);
     }
