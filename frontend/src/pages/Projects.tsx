@@ -92,106 +92,108 @@ export function Projects(): JSX.Element {
           <p className="page-subtitle">View and create projects</p>
         </section>
 
-        <section className="projects-top-grid">
-          <Card className="form-card card--form projects-create-card">
-            <h2 className="section-title">Create project</h2>
-            <FormColumn testId="projects-form-column">
-              <div className="form-field">
-                <label htmlFor="project-name-input">Project name</label>
-                <input
-                  id="project-name-input"
-                  className="text-input"
-                  value={newProjectName}
-                  onChange={(event) => setNewProjectName(event.target.value)}
-                  placeholder="e.g. Prod"
-                />
-              </div>
-              <p className="form-error-slot">{createProjectError ?? "\u00A0"}</p>
-              <div className="modal-actions form-actions">
-                <button
-                  type="button"
-                  className="modal-button modal-primary action-btn"
-                  onClick={() => void onCreateProject()}
-                  disabled={creatingProject}
-                >
-                  {creatingProject ? "Creating..." : "Create project"}
-                </button>
-              </div>
-            </FormColumn>
-          </Card>
-
-          <Card className="form-card projects-integration-card">
-            <h2 className="section-title">Integration</h2>
-            <div className="projects-integration-body">
-              <div className="form-field projects-integration-field">
-                <label htmlFor="projects-backend-url">Backend base URL</label>
-                <input
-                  id="projects-backend-url"
-                  className="text-input mono projects-integration-input"
-                  readOnly
-                  value={hasBackendBaseUrl ? backendBaseUrl : "Not configured"}
-                  aria-label="Backend base URL"
-                />
-              </div>
-              <div className="modal-actions form-actions projects-integration-actions">
-                <button
-                  type="button"
-                  className="modal-button modal-primary action-btn"
-                  onClick={() => void onCopyBackendUrl()}
-                  disabled={!hasBackendBaseUrl}
-                >
-                  Copy
-                </button>
-              </div>
-            </div>
-          </Card>
-        </section>
-
-        <Card className="card--table">
-          <h2 className="section-title">Project list</h2>
-          {projects.length === 0 ? <p className="subtle">No projects yet.</p> : null}
-          {projects.length > 0 ? (
-            <div className="project-table">
-              <div className="project-table-head">
-                <span>Name</span>
-                <span className="project-table-id-header">ID</span>
-                <span>Created</span>
-                <span className="table-actions-header">Status</span>
-              </div>
-              {projects.map((project) => (
-                <div className={`project-table-row${project.id === projectId ? " is-selected" : ""}`} key={project.id}>
-                  <span className="key-name">{project.name}</span>
-                  <div className="project-id-cell">
-                    <span className="subtle mono project-id-value" title={project.id}>
-                      {shortId(project.id)}
-                    </span>
-                    <button
-                      type="button"
-                      className="project-id-copy-button"
-                      onClick={() => void onCopyProjectId(project.id)}
-                      aria-label={`Copy project ID for ${project.name}`}
-                    >
-                      Copy
-                    </button>
-                  </div>
-                  <span className="subtle">{formatRelative(project.created_at)}</span>
-                  <div className="table-actions-cell project-table-actions">
-                    <button
-                      type="button"
-                      className="project-selection-button"
-                      onClick={() => setProjectId(project.id)}
-                      aria-pressed={project.id === projectId}
-                    >
-                      <span className={`project-selection-label${project.id === projectId ? " is-selected" : ""}`}>
-                        {project.id === projectId ? "Selected" : "Click to select"}
-                      </span>
-                    </button>
-                  </div>
+        <div className="projects-page-shell">
+          <section className="projects-top-grid projects-shell-width">
+            <Card className="form-card card--form projects-create-card">
+              <h2 className="section-title">Create project</h2>
+              <FormColumn testId="projects-form-column">
+                <div className="form-field">
+                  <label htmlFor="project-name-input">Project name</label>
+                  <input
+                    id="project-name-input"
+                    className="text-input"
+                    value={newProjectName}
+                    onChange={(event) => setNewProjectName(event.target.value)}
+                    placeholder="e.g. Prod"
+                  />
                 </div>
-              ))}
-            </div>
-          ) : null}
-        </Card>
+                <p className="form-error-slot">{createProjectError ?? "\u00A0"}</p>
+                <div className="modal-actions form-actions">
+                  <button
+                    type="button"
+                    className="modal-button modal-primary action-btn"
+                    onClick={() => void onCreateProject()}
+                    disabled={creatingProject}
+                  >
+                    {creatingProject ? "Creating..." : "Create project"}
+                  </button>
+                </div>
+              </FormColumn>
+            </Card>
+
+            <Card className="form-card projects-integration-card">
+              <h2 className="section-title">Integration</h2>
+              <div className="projects-integration-body">
+                <div className="form-field projects-integration-field">
+                  <label htmlFor="projects-backend-url">Backend base URL</label>
+                  <input
+                    id="projects-backend-url"
+                    className="text-input mono projects-integration-input"
+                    readOnly
+                    value={hasBackendBaseUrl ? backendBaseUrl : "Not configured"}
+                    aria-label="Backend base URL"
+                  />
+                </div>
+                <div className="modal-actions form-actions projects-integration-actions">
+                  <button
+                    type="button"
+                    className="modal-button modal-primary action-btn"
+                    onClick={() => void onCopyBackendUrl()}
+                    disabled={!hasBackendBaseUrl}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            </Card>
+          </section>
+
+          <Card className="card--table projects-list-card projects-shell-width">
+            <h2 className="section-title">Project list</h2>
+            {projects.length === 0 ? <p className="subtle">No projects yet.</p> : null}
+            {projects.length > 0 ? (
+              <div className="project-table">
+                <div className="project-table-head">
+                  <span>Name</span>
+                  <span className="project-table-id-header">ID</span>
+                  <span>Created</span>
+                  <span className="table-actions-header">Status</span>
+                </div>
+                {projects.map((project) => (
+                  <div className={`project-table-row${project.id === projectId ? " is-selected" : ""}`} key={project.id}>
+                    <span className="key-name">{project.name}</span>
+                    <div className="project-id-cell">
+                      <span className="subtle mono project-id-value" title={project.id}>
+                        {shortId(project.id)}
+                      </span>
+                      <button
+                        type="button"
+                        className="project-id-copy-button"
+                        onClick={() => void onCopyProjectId(project.id)}
+                        aria-label={`Copy project ID for ${project.name}`}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <span className="subtle">{formatRelative(project.created_at)}</span>
+                    <div className="table-actions-cell project-table-actions">
+                      <button
+                        type="button"
+                        className="project-selection-button"
+                        onClick={() => setProjectId(project.id)}
+                        aria-pressed={project.id === projectId}
+                      >
+                        <span className={`project-selection-label${project.id === projectId ? " is-selected" : ""}`}>
+                          {project.id === projectId ? "Selected" : "Click to select"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </Card>
+        </div>
       </div>
     </main>
   );

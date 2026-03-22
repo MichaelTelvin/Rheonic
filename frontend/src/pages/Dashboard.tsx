@@ -145,18 +145,6 @@ export function Dashboard(): JSX.Element {
   const [webhookIssueDismissedToken, setWebhookIssueDismissedToken] = useState<string | null>(null);
   const [setupBannerClosing, setSetupBannerClosing] = useState<boolean>(false);
   const [webhookIssueBannerClosing, setWebhookIssueBannerClosing] = useState<boolean>(false);
-  const [setupBannerHeight, setSetupBannerHeight] = useState<number>(0);
-  const [webhookBannerHeight, setWebhookBannerHeight] = useState<number>(0);
-  const [bannerOverlayStyle, setBannerOverlayStyle] = useState<{ top: number; right: number; width: number }>({
-    top: 120,
-    right: 24,
-    width: 420,
-  });
-  const dashboardContentRef = useRef<HTMLDivElement | null>(null);
-  const heroDividerRef = useRef<HTMLDivElement | null>(null);
-  const setupBannerRef = useRef<HTMLElement | null>(null);
-  const webhookBannerRef = useRef<HTMLElement | null>(null);
-  const tokenCardSlotClassName = "dashboard-banner-target";
 
   const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
   const webhookIssueDismissStorageKey = useMemo<string>(() => `rheonic:webhookIssueDismissed:${projectId ?? "none"}`, [projectId]);
@@ -321,57 +309,6 @@ export function Dashboard(): JSX.Element {
     }, DASHBOARD_BANNER_EXIT_MS);
   }, [webhookIssueDismissStorageKey, webhookIssueToken]);
 
-  useLayoutEffect(() => {
-    const content = dashboardContentRef.current;
-    const divider = heroDividerRef.current;
-    if (!content || !divider) {
-      return;
-    }
-
-    const updateBannerOverlayTop = (): void => {
-      const contentRect = content.getBoundingClientRect();
-      const dividerRect = divider.getBoundingClientRect();
-      const tokenCard = content.querySelector<HTMLElement>(`.${tokenCardSlotClassName}`);
-      const controls = content.querySelector<HTMLElement>(".dashboard-controls-main");
-      const tokenCardRect = tokenCard?.getBoundingClientRect() ?? null;
-      const controlsRect = controls?.getBoundingClientRect() ?? null;
-      const minTop = Math.max(16, dividerRect.bottom - contentRect.top - 6);
-      const providerAlignedTop = controlsRect ? Math.max(minTop, controlsRect.top - contentRect.top + 6) : minTop;
-      const setupTokenSafeTop = tokenCardRect && setupBannerHeight > 0
-        ? tokenCardRect.top - contentRect.top - setupBannerHeight - 18
-        : providerAlignedTop;
-      const webhookTokenSafeTop = tokenCardRect && webhookBannerHeight > 0
-        ? tokenCardRect.top - contentRect.top - webhookBannerHeight - 19
-        : minTop;
-      const preferredSetupTop = Math.min(providerAlignedTop, setupTokenSafeTop);
-      const preferredWebhookTop = Math.max(minTop, webhookTokenSafeTop);
-      const nextTop = renderSetupBanner
-        ? Math.max(minTop, preferredSetupTop)
-        : renderWebhookIssueBanner
-          ? preferredWebhookTop
-          : minTop;
-      const nextRight = Math.max(0, tokenCardRect ? contentRect.right - tokenCardRect.right : 0);
-      const preferredWidth = tokenCardRect
-        ? tokenCardRect.width + (renderSetupBanner ? 220 : 120)
-        : Math.min(contentRect.width - 32, renderSetupBanner ? 760 : 620);
-      const maxWidth = Math.max(320, contentRect.width - nextRight);
-      const nextWidth = Math.max(renderSetupBanner ? 520 : 420, Math.min(preferredWidth, maxWidth));
-      setBannerOverlayStyle({ top: nextTop, right: nextRight, width: nextWidth });
-    };
-
-    updateBannerOverlayTop();
-    const resizeObserver = new ResizeObserver(() => {
-      updateBannerOverlayTop();
-    });
-    resizeObserver.observe(content);
-    resizeObserver.observe(divider);
-    window.addEventListener("resize", updateBannerOverlayTop);
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", updateBannerOverlayTop);
-    };
-  }, [projectId, renderSetupBanner, renderWebhookIssueBanner, setupBannerHeight, webhookBannerHeight]);
-
   const setupBannerContent = useMemo<{
     title: string;
     text: string;
@@ -432,52 +369,6 @@ export function Dashboard(): JSX.Element {
     ? { label: setupBannerContent.secondaryLabel, to: setupBannerContent.secondaryTo }
     : null;
   const visibleWebhookIssue = renderWebhookIssueBanner && webhookIssue ? webhookIssue : null;
-
-  useLayoutEffect(() => {
-    const setupBanner = setupBannerRef.current;
-    if (!setupBanner || !renderSetupBanner) {
-      setSetupBannerHeight(0);
-      return;
-    }
-
-    const updateSetupBannerHeight = (): void => {
-      setSetupBannerHeight(setupBanner.getBoundingClientRect().height);
-    };
-
-    updateSetupBannerHeight();
-    const resizeObserver = new ResizeObserver(() => {
-      updateSetupBannerHeight();
-    });
-    resizeObserver.observe(setupBanner);
-    window.addEventListener("resize", updateSetupBannerHeight);
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", updateSetupBannerHeight);
-    };
-  }, [renderSetupBanner, setupBannerContent.primaryLabel, setupBannerContent.secondaryLabel, setupBannerContent.text, setupBannerContent.title]);
-
-  useLayoutEffect(() => {
-    const webhookBanner = webhookBannerRef.current;
-    if (!webhookBanner || !renderWebhookIssueBanner) {
-      setWebhookBannerHeight(0);
-      return;
-    }
-
-    const updateWebhookBannerHeight = (): void => {
-      setWebhookBannerHeight(webhookBanner.getBoundingClientRect().height);
-    };
-
-    updateWebhookBannerHeight();
-    const resizeObserver = new ResizeObserver(() => {
-      updateWebhookBannerHeight();
-    });
-    resizeObserver.observe(webhookBanner);
-    window.addEventListener("resize", updateWebhookBannerHeight);
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", updateWebhookBannerHeight);
-    };
-  }, [renderWebhookIssueBanner, webhookIssue?.count, webhookIssue?.lastAt]);
 
   const refreshProviders = useCallback(async (): Promise<void> => {
     if (!projectId) {
@@ -780,24 +671,36 @@ export function Dashboard(): JSX.Element {
 
   return (
     <main className="dashboard">
-      <div className="dashboard-content dashboard-home-content" ref={dashboardContentRef}>
+      <div className="dashboard-content dashboard-home-content">
+        <section className="dashboard-hero">
+          <div className="dashboard-hero-left">
+            <h1 className="page-title">LLM Control Center</h1>
+            <p className="page-subtitle">Real-time monitoring and protection</p>
+            <div className="hero-subtitle-divider" aria-hidden="true" />
+          </div>
+          <div className="dashboard-hero-right">
+            <div className="status-panel status-panel--accent" aria-live="polite">
+              <div className="status-row">
+                <span className="status-row-label">System status</span>
+                <span className={`status-row-value status-${protectStatus.tone}`}>
+                  {protectStatus.label}
+                </span>
+              </div>
+              <div className="status-row">
+                <span className="status-row-label">Dashboard sync</span>
+                <span className="status-row-value time-value">{formatTime(lastMetricsSuccessAt)}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {(globalBanner || renderSetupBanner || renderWebhookIssueBanner) ? (
-          <section
-            className="dashboard-banner-overlay"
-            style={{
-              top: `${bannerOverlayStyle.top}px`,
-              right: `${bannerOverlayStyle.right}px`,
-              width: `${bannerOverlayStyle.width}px`,
-            }}
-            aria-live="polite"
-          >
+          <section className={`dashboard-banner-slot${projectId ? "" : " dashboard-banner-slot--banner-only"}`} aria-live="polite">
+            {projectId ? <div className="dashboard-banner-slot-spacer" aria-hidden="true" /> : null}
             <div className="dashboard-banner-rail">
               {globalBanner ? <section className="banner dashboard-floating-banner">{globalBanner}</section> : null}
               {renderSetupBanner ? (
-                <section
-                  ref={setupBannerRef}
-                  className={`setup-banner dashboard-floating-banner${setupBannerClosing ? " dashboard-floating-banner--closing" : ""}`}
-                >
+                <section className={`setup-banner dashboard-floating-banner${setupBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
                   <div className="dashboard-alert-banner-layout">
                     <div className="setup-banner-title dashboard-alert-banner-title">{setupBannerContent.title}</div>
                     <div className="setup-banner-text dashboard-alert-banner-summary">{setupBannerContent.text}</div>
@@ -820,10 +723,7 @@ export function Dashboard(): JSX.Element {
                 </section>
               ) : null}
               {visibleWebhookIssue ? (
-                <section
-                  ref={webhookBannerRef}
-                  className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}
-                >
+                <section className={`dashboard-alert-card dashboard-floating-banner${webhookIssueBannerClosing ? " dashboard-floating-banner--closing" : ""}`}>
                   <div className="dashboard-alert-banner-layout">
                     <h2 className="card-title dashboard-alert-banner-title">Webhook delivery issues in the last 24 hours</h2>
                     <p className="subtle dashboard-alert-banner-summary">
@@ -844,27 +744,6 @@ export function Dashboard(): JSX.Element {
             </div>
           </section>
         ) : null}
-        <section className="dashboard-hero">
-          <div className="dashboard-hero-left">
-            <h1 className="page-title">LLM Control Center</h1>
-            <p className="page-subtitle">Real-time monitoring and protection</p>
-            <div ref={heroDividerRef} className="hero-subtitle-divider" aria-hidden="true" />
-          </div>
-          <div className="dashboard-hero-right">
-            <div className="status-panel status-panel--accent" aria-live="polite">
-              <div className="status-row">
-                <span className="status-row-label">System status</span>
-                <span className={`status-row-value status-${protectStatus.tone}`}>
-                  {protectStatus.label}
-                </span>
-              </div>
-              <div className="status-row">
-                <span className="status-row-label">Dashboard sync</span>
-                <span className="status-row-value time-value">{formatTime(lastMetricsSuccessAt)}</span>
-              </div>
-            </div>
-          </div>
-        </section>
 
         {!projectId ? null : (
           <>
@@ -909,7 +788,7 @@ export function Dashboard(): JSX.Element {
                 <div className="metric-card-bottom-spacer" aria-hidden="true" />
               </Card>
 
-              <Card className={tokenCardSlotClassName}>
+              <Card>
                 <h2 className="card-title">Tokens (60s)</h2>
                 <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.tokens_60s ?? 0)}</p>
                 <PulseMeter
