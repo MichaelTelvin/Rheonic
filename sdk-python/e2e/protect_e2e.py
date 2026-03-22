@@ -34,7 +34,7 @@ def _api(client: httpx.Client, path: str, *, method: str = "GET", json: dict | N
 def _seed() -> AuthContext:
     nonce = int(time.time() * 1000)
     email = f"python-e2e-{nonce}@example.com"
-    password = "password123"
+    password = "Password123!"
     session = httpx.Client(base_url=BACKEND_BASE_URL, timeout=5.0)
 
     _api(session, "/api/v1/auth/register", method="POST", json={"email": email, "password": password})

@@ -37,7 +37,7 @@ function makeOpenAIStub() {
 async function main() {
   const nonce = Date.now();
   const email = `node-e2e-${nonce}@example.com`;
-  const password = "password123";
+  const password = "Password123!";
   const session = new DashboardSession(backendBaseUrl);
 
   await session.request("/api/v1/auth/register", { method: "POST", body: JSON.stringify({ email, password }) });

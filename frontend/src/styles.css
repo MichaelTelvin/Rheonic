@@ -185,18 +185,6 @@ body {
   color: #0f172a;
 }
 
-.public-surface .public-shell {
-  width: min(calc(100% - (var(--public-shell-gutter) * 2)), var(--public-content-max));
-  margin: 0 auto;
-  padding: 20px var(--public-shell-gutter) 48px;
-}
-
-.public-shell.public-shell--marketing,
-.public-shell.public-shell--quickstart {
-  width: min(calc(100% - (var(--public-shell-gutter) * 2)), 1280px);
-  max-width: 1280px;
-}
-
 .public-brand {
   display: inline-flex;
   align-items: center;
@@ -388,12 +376,6 @@ body {
 
 .landing-section {
   margin-top: 34px;
-}
-
-.landing-section>h2 {
-  margin: 0 0 12px;
-  font-size: 1.32rem;
-  color: #0f172a;
 }
 
 .landing-panel {
@@ -1256,12 +1238,6 @@ body {
   justify-content: center;
 }
 
-.dashboard {
-  max-width: none;
-  margin: 0;
-  padding: 84px 28px 32px;
-}
-
 .dashboard-content {
   width: 100%;
   position: relative;
@@ -1354,10 +1330,6 @@ body {
   border: 1px solid rgba(167, 139, 250, 0.45);
   background: rgba(167, 139, 250, 0.15);
   color: #e9ddff;
-}
-
-.time-value {
-  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-hero {
@@ -2650,7 +2622,7 @@ pre {
     max-width: 320px;
   }
 
-  .dashboard {
+  .app-routes .dashboard {
     padding: 20px 16px 18px;
   }
 
@@ -3470,6 +3442,7 @@ pre {
 
 .form-column input[type="number"] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .form-column input[type="number"]::-webkit-outer-spin-button,
@@ -4644,37 +4617,8 @@ pre {
   }
 }
 
-/* Public marketing theme override: dark SaaS surface */
-.public-page {
-  min-height: 100vh;
-  background:
-    radial-gradient(980px 620px at -8% -8%, rgba(56, 189, 248, 0.24), transparent 60%),
-    radial-gradient(1100px 700px at 110% -12%, rgba(167, 139, 250, 0.28), transparent 58%),
-    radial-gradient(920px 540px at 50% 120%, rgba(59, 130, 246, 0.24), transparent 62%),
-    linear-gradient(180deg, #172742 0%, #1c355a 54%, #24456f 100%);
-  color: #e7ecf8;
-}
-
-.public-shell {
-  width: min(calc(100% - (var(--public-shell-gutter) * 2)), var(--public-content-max));
-  margin: 0 auto;
-  padding: 24px var(--public-shell-gutter) 56px;
-}
-
-.public-surface .public-shell--marketing {
-  padding-top: 18px;
-}
-
 .public-surface .public-brand {
   color: rgba(231, 236, 248, 0.92);
-}
-
-.public-surface .public-nav {
-  border: 1px solid rgba(125, 211, 252, 0.24);
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(14, 28, 52, 0.86), rgba(12, 23, 42, 0.8));
-  backdrop-filter: blur(10px);
-  box-shadow: 0 18px 42px rgba(7, 16, 35, 0.38);
 }
 
 .public-surface .public-nav-links a,
@@ -4794,13 +4738,6 @@ pre {
 
 .public-surface .landing-two-col {
   margin-top: 28px;
-}
-
-.public-surface .landing-section>h2 {
-  margin: 0 0 22px;
-  font-size: clamp(2.25rem, 3.4vw, 2.5rem);
-  letter-spacing: -0.02em;
-  color: #f5f8ff;
 }
 
 .landing-panel,
@@ -5070,6 +5007,7 @@ html {
 .public-surface .public-shell.public-shell--quickstart {
   width: min(calc(100% - (var(--public-shell-gutter) * 2)), 1280px);
   max-width: 1280px;
+  margin: 0 auto;
   color: #e6ecff;
   border-radius: 24px;
   padding: 20px var(--public-shell-gutter) 64px;
@@ -5169,13 +5107,6 @@ html {
 .landing-section,
 .landing-final-cta {
   margin-top: 140px;
-}
-
-.landing-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.98fr);
-  gap: clamp(32px, 3vw, 54px);
-  align-items: center;
 }
 
 .landing-hero-copy h1 {
