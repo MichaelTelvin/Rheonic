@@ -143,8 +143,56 @@ export function App(): JSX.Element {
     const publicRoutes = new Set(["/", "/quickstart", "/privacy", "/terms", "/dpa", "/login", "/signup"]);
 
     if (publicRoutes.has(location.pathname)) {
-      setUser(null);
-      setSessionResolved(true);
+      if (user) {
+        setSessionResolved(true);
+        return () => {
+          cancelled = true;
+        };
+      }
+      const cachedUser = readCachedAuthUser();
+      if (cachedUser) {
+        setUser(cachedUser);
+        setSessionResolved(true);
+        return () => {
+          cancelled = true;
+        };
+      }
+      if (sessionResolved) {
+        return () => {
+          cancelled = true;
+        };
+      }
+
+      const restorePublicSession = async (): Promise<void> => {
+        try {
+          const currentUser = await fetchCurrentUser();
+          if (!cancelled) {
+            writeCachedAuthUser(currentUser);
+            setUser(currentUser);
+          }
+        } catch (error) {
+          if (cancelled) {
+            return;
+          }
+          if (!(error instanceof ApiError) || error.status !== 401) {
+            emitFrontendLog({
+              level: "error",
+              event: "http_response",
+              message: "Failed to restore browser session",
+              metadata: { error },
+            });
+          } else {
+            writeCachedAuthUser(null);
+            setUser(null);
+          }
+        } finally {
+          if (!cancelled) {
+            setSessionResolved(true);
+          }
+        }
+      };
+
+      void restorePublicSession();
       return () => {
         cancelled = true;
       };
@@ -185,7 +233,7 @@ export function App(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [location.pathname]);
+  }, [location.pathname, sessionResolved, user]);
 
   const signOut = useCallback(async (): Promise<void> => {
     try {
