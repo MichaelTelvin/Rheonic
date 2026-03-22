@@ -264,13 +264,6 @@ body {
   margin-top: 48px;
 }
 
-.landing-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
-  gap: 32px;
-  align-items: center;
-}
-
 .landing-hero-left h1 {
   margin: 0;
   font-size: clamp(1.95rem, 4vw, 3.1rem);
@@ -286,14 +279,6 @@ body {
   line-height: 1.48;
   color: rgba(15, 23, 42, 0.77);
   max-width: 46ch;
-}
-
-.landing-hero-cta {
-  margin-top: 22px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
 }
 
 .landing-hero-right {
@@ -510,15 +495,6 @@ body {
   gap: 12px;
 }
 
-.landing-final-cta {
-  margin-top: 38px;
-  border: 1px solid rgba(71, 85, 105, 0.24);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.7));
-  border-radius: 16px;
-  padding: 18px;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.09);
-}
-
 .landing-schematic {
   border: 1px solid rgba(71, 85, 105, 0.22);
   border-radius: 14px;
@@ -555,18 +531,6 @@ body {
   border-top: 1px solid rgba(71, 85, 105, 0.35);
   border-right: 1px solid rgba(71, 85, 105, 0.35);
   transform: rotate(45deg);
-}
-
-.landing-final-cta h2 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 1.56rem;
-}
-
-.landing-final-cta p {
-  margin: 10px 0 0;
-  color: rgba(15, 23, 42, 0.75);
-  max-width: 58ch;
 }
 
 .landing-footer {

@@ -240,3 +240,5 @@ export function LegalDocumentPage({
     </PublicLayout>
   );
 }
+
+export default LegalDocumentPage;

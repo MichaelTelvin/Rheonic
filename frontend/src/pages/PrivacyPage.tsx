@@ -1,4 +1,4 @@
-import { LegalDocumentPage } from "../components/LegalDocumentPage";
+import LegalDocumentPage from "../components/LegalDocumentPage";
 
 export function PrivacyPage(): JSX.Element {
   return (
