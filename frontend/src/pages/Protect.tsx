@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 
+import { getProtectReadiness, type ProtectReadiness } from "./protectReadiness";
 import {
   deleteProject,
   fetchProjectProtect,
@@ -13,7 +14,6 @@ import { InfoTooltip } from "../components/InfoTooltip";
 import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
-import { getProtectReadiness, type ProtectReadiness } from "./protectReadiness";
 
 type ProtectCacheState = {
   protectSettings: ProjectProtectSettings | null;
@@ -205,7 +205,7 @@ export function Protect(): JSX.Element {
       setProtectSettings(null);
       setProtectError(null);
       setLoadingProtectSettings(false);
-      return;
+      return undefined;
     }
 
     let cancelled = false;

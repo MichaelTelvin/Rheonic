@@ -1,5 +1,5 @@
-from rheonic.protect_engine import RHEONICValidationError
 from rheonic.config import sdk_config
+from rheonic.protect_engine import RHEONICValidationError
 
 
 def validate_provider_model(provider: str, model: str | None) -> None:

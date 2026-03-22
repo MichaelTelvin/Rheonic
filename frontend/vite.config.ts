@@ -7,6 +7,17 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
     clearMocks: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      reportsDirectory: "./coverage",
+      thresholds: {
+        lines: 70,
+        functions: 55,
+        branches: 60,
+        statements: 70,
+      },
+    },
   },
   server: {
     proxy: {

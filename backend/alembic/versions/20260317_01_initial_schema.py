@@ -5,9 +5,8 @@ Revises: None
 Create Date: 2026-03-17
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20260317_01"
@@ -103,7 +102,9 @@ def upgrade() -> None:
     op.create_index("ix_incidents_project_id", "incidents", ["project_id"], unique=False)
     op.create_index("ix_incidents_status", "incidents", ["status"], unique=False)
     op.create_index("ix_incidents_fingerprint", "incidents", ["fingerprint"], unique=False)
-    op.create_index("ix_incidents_project_status_fingerprint", "incidents", ["project_id", "status", "fingerprint"], unique=False)
+    op.create_index(
+        "ix_incidents_project_status_fingerprint", "incidents", ["project_id", "status", "fingerprint"], unique=False
+    )
     op.create_index(
         "ix_incidents_project_provider_status_created_at",
         "incidents",
@@ -116,7 +117,9 @@ def upgrade() -> None:
         ["project_id", "provider", "last_seen_at"],
         unique=False,
     )
-    op.create_index("ix_incidents_project_status_created_at", "incidents", ["project_id", "status", "created_at"], unique=False)
+    op.create_index(
+        "ix_incidents_project_status_created_at", "incidents", ["project_id", "status", "created_at"], unique=False
+    )
 
     op.create_table(
         "project_models",
@@ -176,8 +179,12 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("project_id", "kind", "dedupe_key", name="uq_transport_outbox_project_kind_dedupe"),
     )
-    op.create_index("ix_transport_outbox_project_kind_status", "transport_outbox", ["project_id", "kind", "status"], unique=False)
-    op.create_index("ix_transport_outbox_status_next_attempt_at", "transport_outbox", ["status", "next_attempt_at"], unique=False)
+    op.create_index(
+        "ix_transport_outbox_project_kind_status", "transport_outbox", ["project_id", "kind", "status"], unique=False
+    )
+    op.create_index(
+        "ix_transport_outbox_status_next_attempt_at", "transport_outbox", ["status", "next_attempt_at"], unique=False
+    )
 
 
 def downgrade() -> None:

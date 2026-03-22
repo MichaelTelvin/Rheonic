@@ -1,12 +1,12 @@
 import { useState } from "react";
 
+import { formatRelative } from "./dashboardUtils";
 import { createProject } from "../api/client";
+import { showAppToast } from "../components/AppToastHost";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
-import { showAppToast } from "../components/AppToastHost";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
-import { formatRelative } from "./dashboardUtils";
 
 const NAME_REGEX = new RegExp(frontendConfig.dashboardNamePattern);
 const NAME_MAX = frontendConfig.dashboardNameMaxLength;

@@ -1,5 +1,6 @@
 # FastAPI application entrypoint.
 from contextlib import asynccontextmanager
+from typing import AsyncIterator, Awaitable, Callable
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,13 +11,21 @@ from app.api.error_responses import build_error_response, default_code_for_statu
 from app.api.routers import api_router
 from app.config import Settings
 from app.dependencies import get_db_session_factory, get_redis_client
-from app.logger import bind_trace_context, build_log_extra, configure_logging, generate_span_id, generate_trace_id, get_logger, reset_trace_context
+from app.logger import (
+    bind_trace_context,
+    build_log_extra,
+    configure_logging,
+    generate_span_id,
+    generate_trace_id,
+    get_logger,
+    reset_trace_context,
+)
 
 logger = get_logger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Initialize startup resources and seed local data.
     try:
         get_db_session_factory()
@@ -50,7 +59,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     @app.middleware("http")
-    async def request_context_middleware(request: Request, call_next):
+    async def request_context_middleware(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         trace_id = request.headers.get("X-Trace-ID") or request.headers.get("X-Request-ID") or generate_trace_id()
         span_id = request.headers.get("X-Span-ID") or generate_span_id()
         request.state.trace_id = trace_id
@@ -69,7 +81,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     @app.middleware("http")
-    async def security_headers_middleware(request: Request, call_next):
+    async def security_headers_middleware(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         # Apply baseline browser hardening headers for API and frontend clients.
         response: Response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -83,7 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     @app.exception_handler(HTTPException)
-    async def http_exception_handler(request: Request, exc: HTTPException):
+    async def http_exception_handler(request: Request, exc: HTTPException) -> Response:
         # Return standardized error payloads for known API failures.
         logger.warning(
             "HTTP exception raised",
@@ -107,7 +122,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return build_error_response(exc.status_code, default_code_for_status(exc.status_code), message)
 
     @app.exception_handler(Exception)
-    async def unhandled_exception_handler(request: Request, exc: Exception):
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> Response:
         # Hide unexpected exception internals from clients.
         logger.exception(
             "Unhandled application exception",

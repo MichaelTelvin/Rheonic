@@ -4,8 +4,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app.application.services.project_service import ProjectService
 from app.application.services.detect_incidents_service import DetectIncidentsService
+from app.application.services.project_service import ProjectService
 from app.dependencies import get_current_user, get_detect_incidents_service, get_project_service
 from app.domain.models.user import User
 from app.logger import get_logger

@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 
+import { formatRelative } from "./dashboardUtils";
 import { createKey, listKeys, revokeKey, rotateKey, type CreateKeyResponse, type IngestKeyItem } from "../api/client";
+import { showAppToast } from "../components/AppToastHost";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
-import { showAppToast } from "../components/AppToastHost";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
-import { formatRelative } from "./dashboardUtils";
 
 const NAME_REGEX = new RegExp(frontendConfig.dashboardNamePattern);
 const NAME_MAX = frontendConfig.dashboardNameMaxLength;
@@ -48,7 +48,7 @@ export function Keys(): JSX.Element {
   const [creatingKey, setCreatingKey] = useState<boolean>(false);
   const [processingKeyId, setProcessingKeyId] = useState<string | null>(null);
   const [latestPlaintextKey, setLatestPlaintextKey] = useState<CreateKeyResponse | null>(null);
-  const [copiedAction, setCopiedAction] = useState<string | null>(null);
+  const [, setCopiedAction] = useState<string | null>(null);
   const activeKeys = keys.filter((key) => key.status === "active");
 
   useLayoutEffect(() => {
@@ -60,7 +60,7 @@ export function Keys(): JSX.Element {
 
   useEffect(() => {
     if (!projectId) {
-      return;
+      return undefined;
     }
     try {
       window.sessionStorage.setItem(
@@ -72,6 +72,7 @@ export function Keys(): JSX.Element {
     } catch {
       // Ignore cache write failures.
     }
+    return undefined;
   }, [keys, projectId]);
 
   const validateKeyLabel = (value: string): string | null => {
@@ -104,7 +105,7 @@ export function Keys(): JSX.Element {
       setKeys([]);
       setLoadingKeys(false);
       setKeysError(null);
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -270,7 +271,7 @@ export function Keys(): JSX.Element {
                 <button
                   type="button"
                   className="modal-button"
-                  onClick={() => void copyText(`RHEONIC_INGEST_KEY=\"${latestPlaintextKey.key}\"`, "env")}
+                  onClick={() => void copyText(`RHEONIC_INGEST_KEY="${latestPlaintextKey.key}"`, "env")}
                 >
                   Copy env var
                 </button>

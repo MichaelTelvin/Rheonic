@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError } from "../api/client";
 import { Login } from "./Login";
+import { ApiError } from "../api/client";
 
 const mockLogin = vi.fn();
 const mockRegister = vi.fn();

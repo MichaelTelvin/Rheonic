@@ -10,9 +10,13 @@ def test_webhook_dispatcher_enqueues_outbox_row_and_dispatch_job(tmp_path, monke
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)
 
-    monkeypatch.setattr(rq_webhook_dispatcher, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(
+        rq_webhook_dispatcher, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url)
+    )
     captured_outbox_ids: list[str] = []
-    monkeypatch.setattr(rq_webhook_dispatcher, "enqueue_outbox_delivery", lambda outbox_id: captured_outbox_ids.append(outbox_id))
+    monkeypatch.setattr(
+        rq_webhook_dispatcher, "enqueue_outbox_delivery", lambda outbox_id: captured_outbox_ids.append(outbox_id)
+    )
 
     dispatcher = rq_webhook_dispatcher.RQWebhookDispatcher(redis_url="redis://localhost:6379/15")
     dispatcher.enqueue(

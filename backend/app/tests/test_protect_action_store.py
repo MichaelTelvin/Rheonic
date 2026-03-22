@@ -38,15 +38,21 @@ def test_mark_report_sent_is_true_only_once_per_marker() -> None:
     redis_client = _FakeRedisClient()
     store = ProtectActionStore(redis_client=redis_client)  # type: ignore[arg-type]
 
-    assert store.mark_report_sent(
-        project_id="project-1:openai",
-        report_type="warn",
-        marker="retry_storm",
-        ttl_seconds=300,
-    ) is True
-    assert store.mark_report_sent(
-        project_id="project-1:openai",
-        report_type="warn",
-        marker="retry_storm",
-        ttl_seconds=300,
-    ) is False
+    assert (
+        store.mark_report_sent(
+            project_id="project-1:openai",
+            report_type="warn",
+            marker="retry_storm",
+            ttl_seconds=300,
+        )
+        is True
+    )
+    assert (
+        store.mark_report_sent(
+            project_id="project-1:openai",
+            report_type="warn",
+            marker="retry_storm",
+            ttl_seconds=300,
+        )
+        is False
+    )

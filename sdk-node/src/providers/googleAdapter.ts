@@ -1,8 +1,9 @@
-import type { Client } from "../client.js";
 import { buildEvent } from "../eventBuilder.js";
-import { validateProviderModel } from "../providerModelValidation.js";
 import { RHEONICBlockedError, type ProtectEvaluation } from "../protectEngine.js";
+import { validateProviderModel } from "../providerModelValidation.js";
 import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
+
+import type { Client } from "../client.js";
 
 export interface GoogleInstrumentationOptions {
   client: Client;

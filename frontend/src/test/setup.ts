@@ -1,5 +1,5 @@
-import { afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
 
 function createStorage() {
   const store = new Map<string, string>();

@@ -9,20 +9,27 @@ from typing import Any
 
 import httpx
 
-repo_root = Path(__file__).resolve().parents[3]
-sdk_src = repo_root / "sdk-python" / "src"
-tests_src = repo_root / "tests" / "e2e" / "python"
-if str(sdk_src) not in sys.path:
-    sys.path.insert(0, str(sdk_src))
-if str(tests_src) not in sys.path:
-    sys.path.insert(0, str(tests_src))
-
-from rheonic.client import Client
-from rheonic.protect_engine import RHEONICBlockedError
-from rheonic.providers.anthropic_adapter import instrument_anthropic
-from rheonic.providers.google_adapter import instrument_google
-from rheonic.providers.openai_adapter import instrument_openai
-from dashboard_session import DashboardSession
+try:
+    from dashboard_session import DashboardSession
+    from rheonic.client import Client
+    from rheonic.protect_engine import RHEONICBlockedError
+    from rheonic.providers.anthropic_adapter import instrument_anthropic
+    from rheonic.providers.google_adapter import instrument_google
+    from rheonic.providers.openai_adapter import instrument_openai
+except ModuleNotFoundError:
+    repo_root = Path(__file__).resolve().parents[3]
+    sdk_src = repo_root / "sdk-python" / "src"
+    tests_src = repo_root / "tests" / "e2e" / "python"
+    if str(sdk_src) not in sys.path:
+        sys.path.insert(0, str(sdk_src))
+    if str(tests_src) not in sys.path:
+        sys.path.insert(0, str(tests_src))
+    from dashboard_session import DashboardSession
+    from rheonic.client import Client
+    from rheonic.protect_engine import RHEONICBlockedError
+    from rheonic.providers.anthropic_adapter import instrument_anthropic
+    from rheonic.providers.google_adapter import instrument_google
+    from rheonic.providers.openai_adapter import instrument_openai
 
 BACKEND_BASE_URL = os.getenv("RHEONIC_BACKEND_URL", "http://localhost:8000")
 PROVIDER_STUB_URL = os.getenv("RHEONIC_PROVIDER_URL", "http://localhost:8099")
@@ -36,7 +43,9 @@ class LoggingHttpClient:
         self._client = httpx.Client(timeout=timeout_s)
         self.last_decision_payload: dict[str, Any] | None = None
 
-    def post(self, url: str, json: dict[str, Any], headers: dict[str, str], timeout: float | None = None) -> httpx.Response:
+    def post(
+        self, url: str, json: dict[str, Any], headers: dict[str, str], timeout: float | None = None
+    ) -> httpx.Response:
         payload = json
         if url.endswith("/api/v1/protect/decision"):
             started_at = time.perf_counter()
@@ -60,10 +69,7 @@ class LoggingHttpClient:
             round_trip_latency_ms = int((time.perf_counter() - started_at) * 1000)
             print("=== PROTECT DECISION RESPONSE ===")
             if header_latency_ms is not None:
-                print(
-                    f"[LATENCY] protect_server_ms={header_latency_ms} "
-                    f"protect_round_trip_ms={round_trip_latency_ms}"
-                )
+                print(f"[LATENCY] protect_server_ms={header_latency_ms} protect_round_trip_ms={round_trip_latency_ms}")
             print(json_lib.dumps(payload, indent=2, sort_keys=True))
         return response
 
@@ -271,14 +277,20 @@ def _list_open_incidents(
         payload = dashboard_session.request("/api/v1/incidents", params=params)
         return payload if isinstance(payload, list) else []
     except httpx.HTTPError as exc:
-        status_code = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None else None
+        status_code = (
+            exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None else None
+        )
         if status_code in {401, 403}:
-            print(f"[INCIDENTS] skipped ({status_code} auth error; update dashboard cookie credentials for {auth_email})")
+            print(
+                f"[INCIDENTS] skipped ({status_code} auth error; update dashboard cookie credentials for {auth_email})"
+            )
             return []
         raise
 
 
-def _print_incidents(dashboard_session: DashboardSession | None, project_id: str, provider: str, auth_email: str) -> None:
+def _print_incidents(
+    dashboard_session: DashboardSession | None, project_id: str, provider: str, auth_email: str
+) -> None:
     incidents = _list_open_incidents(dashboard_session, project_id, provider, auth_email)
     counts: dict[str, int] = {}
     near_types: list[str] = []
@@ -309,9 +321,13 @@ def _get_project_req_cap(
     try:
         payload = dashboard_session.request(f"/api/v1/projects/{project_id}/protect")
     except httpx.HTTPError as exc:
-        status_code = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None else None
+        status_code = (
+            exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None else None
+        )
         if status_code in {401, 403}:
-            print(f"[PROTECT] req cap lookup skipped ({status_code} auth error; update dashboard cookie credentials for {auth_email})")
+            print(
+                f"[PROTECT] req cap lookup skipped ({status_code} auth error; update dashboard cookie credentials for {auth_email})"
+            )
             return None
         raise
     value = payload.get("protect_max_req_per_min") if isinstance(payload, dict) else None
@@ -417,12 +433,28 @@ def main() -> None:
         if scenario == "near_cap":
             print("\n[STEP] Seed near-cap traffic then expect warn")
             seed_tokens = int(os.getenv("RHEONIC_NEAR_CAP_SEED_TOKENS", "1600"))
-            _send_ingest_event(transport, ingest_key, provider, model, total_tokens=seed_tokens, feature="near-cap-seed", environment=env)
+            _send_ingest_event(
+                transport,
+                ingest_key,
+                provider,
+                model,
+                total_tokens=seed_tokens,
+                feature="near-cap-seed",
+                environment=env,
+            )
             time.sleep(pause_ms / 1000)
         elif scenario == "cap_breach":
             print("\n[STEP] Seed cap breach then expect block")
             breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
-            _send_ingest_event(transport, ingest_key, provider, model, total_tokens=breach_tokens, feature="cap-breach-seed", environment=env)
+            _send_ingest_event(
+                transport,
+                ingest_key,
+                provider,
+                model,
+                total_tokens=breach_tokens,
+                feature="cap-breach-seed",
+                environment=env,
+            )
             call_max_tokens = max(max_tokens, breach_tokens)
             print(f"[STEP] cap_breach call max_tokens={call_max_tokens}")
             time.sleep(pause_ms / 1000)
@@ -433,7 +465,9 @@ def main() -> None:
             req_cap = _get_project_req_cap(dashboard_session, project_id, auth_email)
             if isinstance(req_cap, int):
                 count = max(count, req_cap + 1)
-            print(f"[STEP] req_cap_breach target events={count} req_cap={req_cap if req_cap is not None else 'unknown'}")
+            print(
+                f"[STEP] req_cap_breach target events={count} req_cap={req_cap if req_cap is not None else 'unknown'}"
+            )
             for i in range(count):
                 _send_ingest_event(
                     transport,
@@ -441,7 +475,7 @@ def main() -> None:
                     provider,
                     model,
                     total_tokens=req_tokens,
-                    feature=f"req-cap-breach-{i+1}",
+                    feature=f"req-cap-breach-{i + 1}",
                     environment=env,
                 )
                 time.sleep(pause_ms / 1000)
@@ -456,7 +490,7 @@ def main() -> None:
                     provider,
                     model,
                     total_tokens=50,
-                    feature=f"retry-{i+1}",
+                    feature=f"retry-{i + 1}",
                     environment=env,
                     status="error",
                     http_status=500,
@@ -467,19 +501,43 @@ def main() -> None:
             print("\n[STEP] Seed loop suspect then expect warn")
             count = int(os.getenv("RHEONIC_LOOP_COUNT", "7"))
             for _ in range(count):
-                _send_ingest_event(transport, ingest_key, provider, model, total_tokens=60, feature="loop-fixed-signature", environment=env)
+                _send_ingest_event(
+                    transport,
+                    ingest_key,
+                    provider,
+                    model,
+                    total_tokens=60,
+                    feature="loop-fixed-signature",
+                    environment=env,
+                )
                 time.sleep(pause_ms / 1000)
         elif scenario == "token_explosion":
             print("\n[STEP] Seed token explosion then expect warn")
             huge = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "9000"))
-            _send_ingest_event(transport, ingest_key, provider, model, total_tokens=huge, feature="token-explosion-seed", environment=env)
+            _send_ingest_event(
+                transport,
+                ingest_key,
+                provider,
+                model,
+                total_tokens=huge,
+                feature="token-explosion-seed",
+                environment=env,
+            )
             call_max_tokens = max(max_tokens, huge)
             print(f"[STEP] token_explosion call max_tokens={call_max_tokens}")
             time.sleep(pause_ms / 1000)
         elif scenario == "cooldown":
             print("\n[STEP] Seed cap breach then verify cooldown blocks repeated call")
             breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
-            _send_ingest_event(transport, ingest_key, provider, model, total_tokens=breach_tokens, feature="cooldown-breach-seed", environment=env)
+            _send_ingest_event(
+                transport,
+                ingest_key,
+                provider,
+                model,
+                total_tokens=breach_tokens,
+                feature="cooldown-breach-seed",
+                environment=env,
+            )
             call_max_tokens = max(max_tokens, breach_tokens)
             print(f"[STEP] cooldown call max_tokens={call_max_tokens}")
             time.sleep(pause_ms / 1000)
@@ -519,7 +577,9 @@ def main() -> None:
         if scenario == "allow":
             _assert_line("allow passed", not blocked and provider_calls_delta >= 1 and decision_value == "allow")
         elif scenario == "near_cap":
-            _assert_line("near_cap warn triggered", decision_value == "warn" and decision_reason == "near_cap" and not blocked)
+            _assert_line(
+                "near_cap warn triggered", decision_value == "warn" and decision_reason == "near_cap" and not blocked
+            )
             clamp_is_recommended = isinstance(clamp_recommended, int) and clamp_recommended > 0
             clamp_should_apply = clamp_is_recommended and isinstance(max_tokens, int) and clamp_recommended < max_tokens
             clamp_used = clamp_is_recommended and used_max_tokens == clamp_recommended and provider_calls_delta >= 1
@@ -534,9 +594,15 @@ def main() -> None:
             _assert_line("req_cap breach blocked", blocked and provider_calls_delta == 0)
             _assert_line("req_cap breach triggered block", blocked and provider_calls_delta == 0)
         elif scenario == "retry_storm":
-            _assert_line("retry_storm warn triggered", decision_value == "warn" and decision_reason == "retry_storm" and not blocked)
+            _assert_line(
+                "retry_storm warn triggered",
+                decision_value == "warn" and decision_reason == "retry_storm" and not blocked,
+            )
         elif scenario == "loop_suspect":
-            _assert_line("loop_suspect warn triggered", decision_value == "warn" and decision_reason == "loop_suspect" and not blocked)
+            _assert_line(
+                "loop_suspect warn triggered",
+                decision_value == "warn" and decision_reason == "loop_suspect" and not blocked,
+            )
         elif scenario == "token_explosion":
             _assert_line(
                 "token_explosion warn triggered",

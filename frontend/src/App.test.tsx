@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "./api/client";
+import { App } from "./App";
 import { TestRouter } from "./test/testRouter";
 
 const {
@@ -52,7 +53,6 @@ vi.mock("./pages/Architecture", () => ({ Architecture: () => <div>Architecture P
 vi.mock("./pages/Incidents", () => ({ Incidents: () => <div>Incidents Page</div> }));
 vi.mock("./pages/NotFound", () => ({ NotFound: () => <div>Page not found</div> }));
 
-import { App } from "./App";
 
 describe("App", () => {
   beforeEach(() => {
@@ -184,7 +184,7 @@ describe("App", () => {
       </TestRouter>,
     );
 
-    expect(await screen.findByRole("button", { name: "Mock Login" })).toBeDefined();
+    expect(await screen.findByText("Dashboard Page")).toBeDefined();
   });
 
   it("renders not found page for unknown non-app routes", async () => {

@@ -1,5 +1,6 @@
 import { useEffect, useState, type PropsWithChildren } from "react";
 import { Link } from "react-router-dom";
+
 import { fetchPublicConfig } from "../api/client";
 import { frontendConfig } from "../config";
 import { RheonicLogoMark } from "./RheonicLogoMark";
@@ -35,7 +36,7 @@ export function PublicLayout({
 
   useEffect(() => {
     if (!isV2Surface) {
-      return;
+      return undefined;
     }
 
     const onScroll = (): void => {

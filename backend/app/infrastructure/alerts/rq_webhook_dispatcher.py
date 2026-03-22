@@ -1,8 +1,8 @@
 # RQ-backed webhook dispatcher.
 from __future__ import annotations
 
-from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
+from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.infrastructure.jobs.transport_job import enqueue_outbox_delivery

@@ -304,7 +304,9 @@ class ProtectService:
         if self._event_repository is not None:
             recent_limit = max(int(app_config.retry_storm_count), int(app_config.loop_count)) + 8
             recent_fetch_started_at = perf_counter()
-            recent_events = self._event_repository.list_recent(project_id=project_id, limit=recent_limit, provider=provider)
+            recent_events = self._event_repository.list_recent(
+                project_id=project_id, limit=recent_limit, provider=provider
+            )
             logger.debug(
                 "Loaded recent events for protect evaluation",
                 extra={
@@ -465,7 +467,9 @@ class ProtectService:
                     "enabled": bool(estimated_next_tokens is not None),
                     "estimated_next_tokens": estimated_next_tokens,
                     "would_exceed_tokens_cap": bool(
-                        max_tok is not None and estimated_next_tokens is not None and (tokens_60s + estimated_next_tokens >= max_tok)
+                        max_tok is not None
+                        and estimated_next_tokens is not None
+                        and (tokens_60s + estimated_next_tokens >= max_tok)
                     ),
                 },
             },
@@ -551,7 +555,7 @@ class ProtectService:
         source: str = "live",
     ) -> None:
         now = self._now_provider()
-        payload = {
+        payload: dict[str, object] = {
             "event": "protection.block",
             "project_id": project_id,
             "provider": provider,
@@ -625,7 +629,7 @@ class ProtectService:
         clamp: dict[str, int | bool] | None,
     ) -> None:
         now = self._now_provider()
-        payload = {
+        payload: dict[str, object] = {
             "event": "protection.warn",
             "project_id": project_id,
             "provider": provider,
@@ -672,7 +676,7 @@ class ProtectService:
             marker=reason,
             ttl_seconds=self._incident_dedup_window_seconds,
         ):
-            clamp_payload = {
+            clamp_payload: dict[str, object] = {
                 "event": "protection.clamp_started",
                 "project_id": project_id,
                 "provider": provider,
@@ -718,7 +722,7 @@ class ProtectService:
             return
         project = self._project_repository.get_project(project_id) if self._project_repository is not None else None
         requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=scoped_id)
-        payload = {
+        payload: dict[str, object] = {
             "event": "protection.block",
             "project_id": project_id,
             "provider": provider,
@@ -764,7 +768,7 @@ class ProtectService:
             ttl_seconds=max(retry_after_seconds, 1),
         ):
             return
-        payload = {
+        payload: dict[str, object] = {
             "event": "protection.block",
             "project_id": project_id,
             "provider": provider,

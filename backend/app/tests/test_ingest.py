@@ -56,11 +56,18 @@ class FakeIncidentRepository:
 
     def get_open_incident_by_type(self, project_id: str, provider: str, incident_type: str) -> Incident | None:
         for row in reversed(self.rows):
-            if row.project_id == project_id and row.provider == provider and row.incident_type == incident_type and row.status == "open":
+            if (
+                row.project_id == project_id
+                and row.provider == provider
+                and row.incident_type == incident_type
+                and row.status == "open"
+            ):
                 return row
         return None
 
-    def get_open_incident_by_fingerprint(self, project_id: str, provider: str, fingerprint: str, created_after: datetime) -> Incident | None:
+    def get_open_incident_by_fingerprint(
+        self, project_id: str, provider: str, fingerprint: str, created_after: datetime
+    ) -> Incident | None:
         for row in reversed(self.rows):
             if (
                 row.project_id == project_id
@@ -72,7 +79,9 @@ class FakeIncidentRepository:
                 return row
         return None
 
-    def update_open_incident_activity(self, incident_id: str, evidence: dict[str, object], last_seen_at: datetime) -> Incident | None:
+    def update_open_incident_activity(
+        self, incident_id: str, evidence: dict[str, object], last_seen_at: datetime
+    ) -> Incident | None:
         for row in self.rows:
             if row.id == incident_id and row.status == "open":
                 row.evidence = evidence
@@ -90,7 +99,11 @@ class FakeIncidentRepository:
         ]
 
     def list_open_by_project_provider(self, project_id: str, provider: str) -> list[Incident]:
-        return [row for row in self.rows if row.project_id == project_id and row.provider == provider and row.status == "open"]
+        return [
+            row
+            for row in self.rows
+            if row.project_id == project_id and row.provider == provider and row.status == "open"
+        ]
 
     def get_by_id(self, incident_id: str) -> Incident | None:
         for row in self.rows:
@@ -129,7 +142,9 @@ class FakeIncidentRepository:
                 resolved.append(row)
         return resolved
 
-    def auto_resolve_stale_open_incidents(self, *, cutoff: datetime, resolved_at: datetime) -> tuple[list[Incident], set[tuple[str, str]]]:
+    def auto_resolve_stale_open_incidents(
+        self, *, cutoff: datetime, resolved_at: datetime
+    ) -> tuple[list[Incident], set[tuple[str, str]]]:
         _ = cutoff
         resolved: list[Incident] = []
         pairs: set[tuple[str, str]] = set()
@@ -176,7 +191,9 @@ class FakeProjectRepository:
     def get_project(self, project_id: str) -> Project | None:
         return self.project if self.project.id == project_id else None
 
-    def record_project_model_first_seen(self, *, project_id: str, provider: str, model: str, first_seen_at: datetime) -> bool:
+    def record_project_model_first_seen(
+        self, *, project_id: str, provider: str, model: str, first_seen_at: datetime
+    ) -> bool:
         _ = first_seen_at
         key = (project_id, provider, model)
         if key in self.seen:
@@ -338,7 +355,9 @@ def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_but_no_email()
 
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "loop_suspect"
-    warn_calls = [(project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"]
+    warn_calls = [
+        (project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"
+    ]
     assert warn_calls
     project_id, payload = warn_calls[0]
     assert project_id == "p1"
@@ -403,7 +422,9 @@ def test_cap_breach_logged_in_observe_mode() -> None:
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "cap_breach"
     assert incidents.rows[0].evidence.get("req_cap_breach") is True
-    warn_calls = [(project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"]
+    warn_calls = [
+        (project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"
+    ]
     assert warn_calls
     project_id, payload = warn_calls[0]
     assert project_id == "p1"
@@ -443,7 +464,9 @@ def test_near_cap_opens_incident_in_observe_with_warn_webhook() -> None:
     assert near_cap_rows[0].evidence.get("req_near_cap") is False
     assert near_cap_rows[0].evidence.get("tok_near_cap") is True
     assert near_cap_rows[0].fingerprint and near_cap_rows[0].fingerprint.endswith(":tok")
-    warn_calls = [(project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"]
+    warn_calls = [
+        (project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"
+    ]
     assert warn_calls
     project_id, payload = warn_calls[0]
     assert project_id == "p1"
@@ -596,7 +619,9 @@ def test_cap_breach_does_not_resolve_old_near_cap_outside_recent_window() -> Non
     service.ingest(_event("p1", total_tokens=900, feature="tok-cap-breach-window", offset_seconds=0))
     near_cap_row = next(row for row in incidents.rows if row.incident_type == "near_cap")
     near_cap_row.created_at = near_cap_row.created_at - timedelta(seconds=301)
-    near_cap_row.last_seen_at = near_cap_row.last_seen_at - timedelta(seconds=301) if near_cap_row.last_seen_at is not None else None
+    near_cap_row.last_seen_at = (
+        near_cap_row.last_seen_at - timedelta(seconds=301) if near_cap_row.last_seen_at is not None else None
+    )
 
     service.ingest(_event("p1", total_tokens=200, feature="tok-cap-breach-window", offset_seconds=1))
 
@@ -610,7 +635,9 @@ def test_cap_breach_does_not_resolve_old_near_cap_outside_recent_window() -> Non
 
 
 def test_dominance_near_cap_suppresses_behavioral_signals() -> None:
-    service, incidents, _, _ = _service(protect_enabled=True, req_cap=100, tok_cap=1000, retry_storm_count=1, loop_count=1)
+    service, incidents, _, _ = _service(
+        protect_enabled=True, req_cap=100, tok_cap=1000, retry_storm_count=1, loop_count=1
+    )
     service.ingest(
         _event(
             "p1",
@@ -629,7 +656,9 @@ def test_dominance_near_cap_suppresses_behavioral_signals() -> None:
 
 
 def test_dominance_behavioral_retry_and_loop_can_coexist() -> None:
-    service, incidents, _, _ = _service(protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, loop_count=1)
+    service, incidents, _, _ = _service(
+        protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, loop_count=1
+    )
     service.ingest(
         _event(
             "p1",
@@ -651,7 +680,9 @@ def test_dominance_behavioral_retry_and_loop_can_coexist() -> None:
 
 
 def test_dominance_behavioral_token_explosion_and_retry_can_coexist_without_caps() -> None:
-    service, incidents, _, _ = _service(protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, token_explosion_abs=1500)
+    service, incidents, _, _ = _service(
+        protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, token_explosion_abs=1500
+    )
     service.ingest(
         _event(
             "p1",

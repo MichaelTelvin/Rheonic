@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
-
+from pathlib import Path
 
 SVG_PATHS = (
     Path("frontend/public/docs/architecture/incident_flow.svg"),

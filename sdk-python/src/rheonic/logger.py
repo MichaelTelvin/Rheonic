@@ -43,9 +43,12 @@ _SENSITIVE_FIELD_MARKERS = ("api_key", "apikey", "authorization", "cookie", "pas
 _EVENT_SANITIZER = re.compile(r"[^a-z0-9_]+")
 
 
-def configure_logging(*, service_name: str = "sdk-python", level: str | None = None, environment: str | None = None) -> None:
+def configure_logging(
+    *, service_name: str = "sdk-python", level: str | None = None, environment: str | None = None
+) -> None:
     global _SERVICE_NAME, _ENV_NAME
-    resolved_level = (level or os.getenv("RHEONIC_LOG_LEVEL", "INFO")).upper()
+    configured_level = level if level is not None else os.getenv("RHEONIC_LOG_LEVEL")
+    resolved_level = (configured_level or "INFO").upper()
     _SERVICE_NAME = service_name
     _ENV_NAME = (environment or os.getenv("RHEONIC_ENV") or sdk_config.default_environment).strip().lower()
     handler = logging.StreamHandler(sys.stdout)
@@ -91,7 +94,9 @@ def get_span_id() -> str:
     return _SPAN_ID.get().strip()
 
 
-def build_log_extra(*, event: str, metadata: dict[str, Any] | None = None, trace_id: str | None = None, span_id: str | None = None) -> dict[str, Any]:
+def build_log_extra(
+    *, event: str, metadata: dict[str, Any] | None = None, trace_id: str | None = None, span_id: str | None = None
+) -> dict[str, Any]:
     return {
         "event": event,
         "metadata": metadata or {},

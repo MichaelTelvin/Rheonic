@@ -5,7 +5,6 @@ import time
 from dataclasses import dataclass
 
 import httpx
-
 from rheonic import RHEONICBlockedError, create_client
 from rheonic.providers.anthropic_adapter import instrument_anthropic
 from rheonic.providers.google_adapter import instrument_google
@@ -95,7 +94,11 @@ def _make_openai_stub():
         @staticmethod
         def create(**kwargs):
             httpx.post(f"{PROVIDER_STUB_URL}/call", json=kwargs, timeout=3.0).raise_for_status()
-            return type("Response", (), {"model": kwargs.get("model", "gpt-4o-mini"), "usage": type("Usage", (), {"total_tokens": 10})()})()
+            return type(
+                "Response",
+                (),
+                {"model": kwargs.get("model", "gpt-4o-mini"), "usage": type("Usage", (), {"total_tokens": 10})()},
+            )()
 
     class Chat:
         completions = Completions()

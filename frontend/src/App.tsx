@@ -2,27 +2,27 @@ import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { ApiError, fetchCurrentUser, logout, setUnauthorizedHandler, type AuthUser } from "./api/client";
+import { AppToastHost } from "./components/AppToastHost";
 import { CurrentProjectBar } from "./components/CurrentProjectBar";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { Sidebar } from "./components/Sidebar";
-import { AppToastHost } from "./components/AppToastHost";
 import { AuthContext } from "./context/AuthContext";
 import { ProjectProvider } from "./context/ProjectContext";
 import { emitFrontendLog } from "./lib/logger";
-import { Architecture } from "./pages/Architecture";
 import { Alerts } from "./pages/Alerts";
+import { Architecture } from "./pages/Architecture";
 import { Dashboard } from "./pages/Dashboard";
+import { DpaPage } from "./pages/DpaPage";
 import { Incidents } from "./pages/Incidents";
-import { LandingPage } from "./pages/LandingPage";
 import { Keys } from "./pages/Keys";
+import { LandingPage } from "./pages/LandingPage";
 import { Login } from "./pages/Login";
 import { NotFound } from "./pages/NotFound";
+import { PrivacyPage } from "./pages/PrivacyPage";
 import { Projects } from "./pages/Projects";
 import { Protect } from "./pages/Protect";
 import { QuickstartPage } from "./pages/QuickstartPage";
-import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
-import { DpaPage } from "./pages/DpaPage";
 
 const authUserCacheStorageKey = "auth_user_cache";
 
@@ -233,7 +233,7 @@ export function App(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [location.pathname, sessionResolved, user]);
+  }, [location.pathname]);
 
   const signOut = useCallback(async (): Promise<void> => {
     try {

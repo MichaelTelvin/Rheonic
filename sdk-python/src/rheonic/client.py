@@ -6,7 +6,7 @@ import random
 import threading
 import time
 from collections import deque
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, cast
 from urllib import error, request
 
 try:
@@ -14,6 +14,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     httpx = None  # type: ignore[assignment]
 
+from rheonic.config import sdk_config
 from rheonic.logger import (
     bind_trace_context,
     build_log_extra,
@@ -24,7 +25,6 @@ from rheonic.logger import (
     get_trace_id,
     reset_trace_context,
 )
-from rheonic.config import sdk_config
 from rheonic.protect_engine import ProtectEngine
 from rheonic.token_estimator import prewarm_token_estimator
 
@@ -124,6 +124,35 @@ class _SimpleResponse:
         self.status_code = status_code
 
 
+class _HttpxTransport:
+    # Adapter that exposes httpx.Client through the local transport protocol.
+
+    def __init__(self, timeout_s: float) -> None:
+        if httpx is None:  # pragma: no cover
+            raise RuntimeError("httpx transport requested but httpx is unavailable")
+        self._client = httpx.Client(timeout=timeout_s)
+
+    def post(
+        self,
+        url: str,
+        json: dict[str, Any],
+        headers: dict[str, str],
+        timeout: float | None = None,
+    ) -> HttpResponse:
+        return cast(HttpResponse, self._client.post(url, json=json, headers=headers, timeout=timeout))
+
+    def get(
+        self,
+        url: str,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> HttpResponse:
+        return cast(HttpResponse, self._client.get(url, headers=headers, timeout=timeout))
+
+    def close(self) -> None:
+        self._client.close()
+
+
 class Client:
     # Primary SDK client used by applications.
 
@@ -150,7 +179,7 @@ class Client:
             )
 
             self.ingest_key = ingest_key
-            resolved_base_url = base_url or os.getenv("RHEONIC_BASE_URL", sdk_config.default_base_url)
+            resolved_base_url = base_url or os.getenv("RHEONIC_BASE_URL") or sdk_config.default_base_url
             self.base_url = resolved_base_url.rstrip("/")
             self.environment = environment
             self.flush_interval_s = flush_interval_s
@@ -172,11 +201,10 @@ class Client:
             if prewarm_model is not None:
                 prewarm_token_estimator(prewarm_model)
 
-            managed_http_client = http_client is None
             if http_client is not None:
                 self._http_client = http_client
             elif httpx is not None:
-                self._http_client = httpx.Client(timeout=self.request_timeout_s)
+                self._http_client = _HttpxTransport(timeout_s=self.request_timeout_s)
             else:
                 self._http_client = _UrllibTransport(timeout_s=self.request_timeout_s)
             self._protect_engine = ProtectEngine(

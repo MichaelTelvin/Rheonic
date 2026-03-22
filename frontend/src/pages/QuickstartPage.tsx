@@ -26,14 +26,14 @@ export function QuickstartPage(): JSX.Element {
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") {
-      return;
+      return undefined;
     }
 
     const sections = sectionIds
       .map((id) => document.getElementById(id))
       .filter((section): section is HTMLElement => section !== null);
     if (sections.length === 0) {
-      return;
+      return undefined;
     }
 
     const observer = new IntersectionObserver(

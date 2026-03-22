@@ -1,5 +1,6 @@
 from app.domain.detectors.contracts import DetectionContext, Signal
 from app.domain.detectors.detector import Detector
+from app.domain.models.event import Event
 
 
 class LoopSuspectDetector(Detector):
@@ -54,7 +55,14 @@ class LoopSuspectDetector(Detector):
         ]
 
 
-def _signature(*, project_id: str, provider: str, model: str | None, environment: str | None, event) -> str:
+def _signature(
+    *,
+    project_id: str,
+    provider: str,
+    model: str | None,
+    environment: str | None,
+    event: Event | None,
+) -> str:
     if event is None:
         return f"{project_id}:{provider}:{model or 'na'}:{environment or 'na'}:na:unknown"
     endpoint = (event.request_endpoint or "na").strip()
@@ -68,7 +76,7 @@ def _context_signature(ctx: DetectionContext) -> str:
     return f"{ctx.project_id}:{ctx.provider}:{ctx.model or 'na'}:{ctx.environment or 'na'}:{endpoint}:{feature}"
 
 
-def _is_error_event(event) -> bool:
+def _is_error_event(event: Event | None) -> bool:
     if event is None:
         return False
     status = (event.status or "").strip().lower()

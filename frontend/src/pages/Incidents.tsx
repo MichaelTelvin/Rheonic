@@ -25,7 +25,7 @@ export function Incidents(): JSX.Element {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState<boolean>(true);
+  const [, setLoading] = useState<boolean>(true);
   const [warning, setWarning] = useState<string | null>(null);
   const providerRequestSeq = useRef<number>(0);
 
@@ -71,7 +71,7 @@ export function Incidents(): JSX.Element {
     if (!projectId) {
       setIncidents([]);
       setLoading(false);
-      return;
+      return undefined;
     }
     let cancelled = false;
     setLoading(true);

@@ -128,7 +128,9 @@ class RollingWindow(RealtimeCounterStore):
             key = incident_open_lock_key(project_id, incident_type)
             return self._client.set_nx_ex(key, "1", ttl_seconds)
         except Exception:
-            logger.exception("Failed acquiring incident lock", extra={"project_id": project_id, "incident_type": incident_type})
+            logger.exception(
+                "Failed acquiring incident lock", extra={"project_id": project_id, "incident_type": incident_type}
+            )
             raise
 
     def release_incident_lock(self, project_id: str, incident_type: str) -> None:
@@ -137,7 +139,9 @@ class RollingWindow(RealtimeCounterStore):
             key = incident_open_lock_key(project_id, incident_type)
             self._client.delete(key)
         except Exception:
-            logger.exception("Failed releasing incident lock", extra={"project_id": project_id, "incident_type": incident_type})
+            logger.exception(
+                "Failed releasing incident lock", extra={"project_id": project_id, "incident_type": incident_type}
+            )
             raise
 
 

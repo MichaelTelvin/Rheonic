@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TestRouter } from "../test/testRouter";
 
 const mocks = vi.hoisted(() => {
   class HoistedApiError extends Error {
@@ -45,6 +44,7 @@ vi.mock("../context/ProjectContext", () => {
 });
 
 import { Dashboard } from "./Dashboard";
+import { TestRouter } from "../test/testRouter";
 
 describe("Dashboard", () => {
   beforeEach(() => {
@@ -88,7 +88,7 @@ describe("Dashboard", () => {
       </TestRouter>,
     );
     expect(await screen.findByText("Setup required")).toBeDefined();
-    expect(screen.getByText("Create your first project to generate an ingest key and follow next steps in Quickstart.")).toBeDefined();
+    expect(screen.getByText("Create your first project, generate an ingest key, then follow Quickstart.")).toBeDefined();
   });
 
   it("loads metrics and incidents for selected project", async () => {
@@ -157,15 +157,14 @@ describe("Dashboard", () => {
     expect((screen.getByLabelText("Provider") as HTMLSelectElement).value).toBe("all");
   });
 
-  it("shows forbidden warning when metrics request fails with 403", async () => {
+  it("shows global forbidden banner when metrics request fails with 403", async () => {
     mocks.fetchMetrics.mockRejectedValue(new mocks.ApiError(403, "forbidden"));
     render(
       <TestRouter>
         <Dashboard />
       </TestRouter>,
     );
-    const metricWarnings = await screen.findAllByText("Metrics request was forbidden.");
-    expect(metricWarnings).toHaveLength(2);
+    expect(await screen.findByText("You do not have access to this project's metrics.")).toBeDefined();
   });
 
   it("renders protect decision counters", async () => {

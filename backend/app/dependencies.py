@@ -1,31 +1,31 @@
 # Dependency wiring for API routes.
 from functools import lru_cache
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 
 from app.application.services.auth_service import AuthService
 from app.application.services.detect_incidents_service import DetectIncidentsService
 from app.application.services.incident_manager import IncidentManager
-from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.ingest_event_service import IngestEventService
+from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.metrics_service import MetricsService
-from app.application.services.protect_service import ProtectService
 from app.application.services.project_service import ProjectService
+from app.application.services.protect_service import ProtectService
 from app.application.services.transport_service import TransportService
 from app.config import Settings
 from app.domain.models.user import User
+from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.repositories.event_repository_impl import EventRepositoryImpl
-from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.incident_repository_impl import IncidentRepositoryImpl
+from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.db.repositories.refresh_session_repository_impl import RefreshSessionRepositoryImpl
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.infrastructure.db.repositories.user_repository_impl import UserRepositoryImpl
-from app.infrastructure.alerts.rq_webhook_dispatcher import RQWebhookDispatcher
 from app.infrastructure.jobs.transport_job import enqueue_outbox_delivery
-from app.infrastructure.redis.redis_client import RedisClient
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
+from app.infrastructure.redis.redis_client import RedisClient
 from app.infrastructure.redis.rolling_window import RollingWindow
 from app.logger import get_logger
 from app.security.jwt_tokens import decode_access_token

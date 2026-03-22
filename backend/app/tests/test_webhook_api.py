@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
+from app.api.v1 import webhook as webhook_api
 from app.application.services.project_service import ProjectService
 from app.dependencies import get_current_user, get_project_service, get_transport_outbox_repository
 from app.domain.models.user import User
@@ -11,7 +12,7 @@ from app.infrastructure.db.models import Base, TransportOutboxRecord
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.main import app
-from app.api.v1 import webhook as webhook_api
+
 
 def _cleanup_overrides() -> None:
     app.dependency_overrides.clear()
@@ -24,12 +25,17 @@ def _make_client(tmp_path, current_user: User | None = None) -> TestClient:
     service = ProjectService(project_repository=ProjectRepositoryImpl(session_factory=session_factory))
 
     app.dependency_overrides[get_project_service] = lambda: service
-    app.dependency_overrides[get_transport_outbox_repository] = lambda: TransportOutboxRepositoryImpl(session_factory=session_factory)
-    app.dependency_overrides[get_current_user] = lambda: current_user or User(
-        id="u1",
-        email="u1@example.com",
-        password_hash="hashed",
-        created_at=datetime.now(timezone.utc),
+    app.dependency_overrides[get_transport_outbox_repository] = lambda: TransportOutboxRepositoryImpl(
+        session_factory=session_factory
+    )
+    app.dependency_overrides[get_current_user] = lambda: (
+        current_user
+        or User(
+            id="u1",
+            email="u1@example.com",
+            password_hash="hashed",
+            created_at=datetime.now(timezone.utc),
+        )
     )
     return TestClient(app)
 
@@ -232,7 +238,9 @@ def test_project_webhook_last_status_ignores_webhook_tests(tmp_path) -> None:
         created_at=datetime.now(timezone.utc),
     )
     app.dependency_overrides[get_project_service] = lambda: service
-    app.dependency_overrides[get_transport_outbox_repository] = lambda: TransportOutboxRepositoryImpl(session_factory=session_factory)
+    app.dependency_overrides[get_transport_outbox_repository] = lambda: TransportOutboxRepositoryImpl(
+        session_factory=session_factory
+    )
     app.dependency_overrides[get_current_user] = lambda: current_user
     client = TestClient(app)
 

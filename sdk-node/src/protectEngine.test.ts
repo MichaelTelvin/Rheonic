@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 
 import {
   createClient,
@@ -57,7 +57,7 @@ function makeGoogleStub() {
 test("preflight decision endpoint is always called before provider request", async () => {
   const originalFetch = globalThis.fetch;
   let decisionCalls = 0;
-  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+  globalThis.fetch = (async (url: string) => {
     if (url.endsWith("/api/v1/protect/decision")) {
       decisionCalls += 1;
       return {

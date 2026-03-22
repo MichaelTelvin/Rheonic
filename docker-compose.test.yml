@@ -126,8 +126,7 @@ services:
       - ./sdk-node:/app
     command: >
       sh -c "npm install --silent --no-fund --no-audit --loglevel=error >/dev/null 2>&1
-      && npm run -s build >/dev/null 2>&1
-      && node --test --test-reporter=spec dist/protectEngine.test.js"
+      && npm test"
 
   sdk_python_unit:
     image: python:3.12-alpine
@@ -136,7 +135,7 @@ services:
       - ./sdk-python:/app
     command: >
       sh -c "pip install -q -e '.[dev]' >/dev/null 2>&1
-      && pytest -v"
+      && pytest -v --cov=rheonic --cov-report=term-missing --cov-fail-under=60"
 
   frontend_test:
     image: node:20-alpine
@@ -152,6 +151,16 @@ services:
       && npm run -s test
       && npm run -s build >/dev/null 2>&1
       && echo 'frontend_build PASSED'"
+
+  check_test:
+    build:
+      context: .
+      dockerfile: Dockerfile.check
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: >
+      sh -c "make check-internal"
 
 volumes:
   postgres-test-data:

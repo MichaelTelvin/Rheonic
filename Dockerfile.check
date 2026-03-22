@@ -1,0 +1,30 @@
+FROM python:3.12-slim
+
+COPY --from=ghcr.io/hadolint/hadolint:latest /bin/hadolint /usr/local/bin/hadolint
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package.json ./
+COPY frontend/package.json ./frontend/package.json
+COPY sdk-node/package.json ./sdk-node/package.json
+COPY backend/pyproject.toml ./backend/pyproject.toml
+COPY sdk-python/pyproject.toml ./sdk-python/pyproject.toml
+
+RUN npm install --no-fund --no-audit \
+    && npm --prefix frontend install --no-fund --no-audit \
+    && npm --prefix sdk-node install --no-fund --no-audit
+
+COPY . .
+
+RUN pip install --no-cache-dir -U pip \
+    && pip install --no-cache-dir -e "./backend[dev]" -e "./sdk-python[dev]"
+
+CMD ["make", "check-internal"]

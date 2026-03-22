@@ -56,12 +56,16 @@ def _register_and_login(client: TestClient, email: str, password: str) -> None:
 def test_register_and_login_happy_path_sets_auth_cookies(tmp_path) -> None:
     # Register/login should succeed, return user info, and set auth cookies.
     with _make_client(tmp_path) as client:
-        register_response = client.post("/api/v1/auth/register", json={"email": "User@Example.com", "password": STRONG_PASSWORD})
+        register_response = client.post(
+            "/api/v1/auth/register", json={"email": "User@Example.com", "password": STRONG_PASSWORD}
+        )
         assert register_response.status_code == 200
         assert register_response.json()["email"] == "user@example.com"
         assert "password_hash" not in register_response.json()
 
-        login_response = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": STRONG_PASSWORD})
+        login_response = client.post(
+            "/api/v1/auth/login", json={"email": "user@example.com", "password": STRONG_PASSWORD}
+        )
         assert login_response.status_code == 200
         login_body = login_response.json()
         assert login_body["user"]["email"] == "user@example.com"
@@ -318,21 +322,29 @@ def test_sanitization_rejects_invalid_email_project_and_key_label(tmp_path) -> N
 def test_register_is_rate_limited_per_client_and_email(tmp_path) -> None:
     with _make_client(tmp_path, redis_client=_FakeRedisClient()) as client:
         for index in range(3):
-            response = client.post("/api/v1/auth/register", json={"email": f"user{index}@example.com", "password": STRONG_PASSWORD})
+            response = client.post(
+                "/api/v1/auth/register", json={"email": f"user{index}@example.com", "password": STRONG_PASSWORD}
+            )
             assert response.status_code == 200
 
-        limited = client.post("/api/v1/auth/register", json={"email": "overflow@example.com", "password": STRONG_PASSWORD})
+        limited = client.post(
+            "/api/v1/auth/register", json={"email": "overflow@example.com", "password": STRONG_PASSWORD}
+        )
         assert limited.status_code == 429
         assert limited.json() == {"error": {"code": "too_many_requests", "message": "rate limit exceeded"}}
 
 
 def test_login_is_rate_limited_after_repeated_failures(tmp_path) -> None:
     with _make_client(tmp_path, redis_client=_FakeRedisClient()) as client:
-        register_response = client.post("/api/v1/auth/register", json={"email": "user@example.com", "password": STRONG_PASSWORD})
+        register_response = client.post(
+            "/api/v1/auth/register", json={"email": "user@example.com", "password": STRONG_PASSWORD}
+        )
         assert register_response.status_code == 200
 
         for _ in range(3):
-            response = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": "wrong-password"})
+            response = client.post(
+                "/api/v1/auth/login", json={"email": "user@example.com", "password": "wrong-password"}
+            )
             assert response.status_code == 401
 
         limited = client.post("/api/v1/auth/login", json={"email": "user@example.com", "password": STRONG_PASSWORD})

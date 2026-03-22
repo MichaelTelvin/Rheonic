@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 
 import { fetchProjectProtect, sendFeedback } from "../api/client";
 import { frontendConfig } from "../config";
-import { useProjectContext } from "../context/ProjectContext";
 import { showAppToast } from "./AppToastHost";
+import { useProjectContext } from "../context/ProjectContext";
 
 interface FeedbackModalProps {
   open: boolean;
@@ -23,7 +23,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps): JSX.Elemen
 
   useEffect(() => {
     if (!open) {
-      return;
+      return undefined;
     }
     setReportType("bug");
     setMessage("");
@@ -33,7 +33,7 @@ export function FeedbackModal({ open, onClose }: FeedbackModalProps): JSX.Elemen
     setScreenshotBase64("");
     if (!projectId) {
       setMode("observe");
-      return;
+      return undefined;
     }
     let cancelled = false;
     const loadMode = async (): Promise<void> => {

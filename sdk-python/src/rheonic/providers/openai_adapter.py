@@ -6,8 +6,8 @@ from typing import Any
 from rheonic.client import Client, get_default_client
 from rheonic.event_builder import build_event
 from rheonic.logger import get_logger
-from rheonic.provider_model_validation import validate_provider_model
 from rheonic.protect_engine import RHEONICBlockedError
+from rheonic.provider_model_validation import validate_provider_model
 from rheonic.token_estimator import estimate_input_tokens
 
 logger = get_logger(__name__)
@@ -41,7 +41,7 @@ def instrument_openai(
 
     if inspect.iscoroutinefunction(original_create):
 
-        async def wrapped_create(*args: Any, **kwargs: Any) -> Any:
+        async def wrapped_create_async(*args: Any, **kwargs: Any) -> Any:
             # Async wrapper for AsyncOpenAI style clients.
             started_at = perf_counter()
             requested_model = _extract_requested_model(args, kwargs)
@@ -101,7 +101,7 @@ def instrument_openai(
                 )
                 raise
 
-        completions.create = wrapped_create
+        completions.create = wrapped_create_async
         return openai_client
 
     def wrapped_create(*args: Any, **kwargs: Any) -> Any:
@@ -126,9 +126,7 @@ def instrument_openai(
                 "environment": environment or resolved_client.environment,
                 "feature": feature,
                 **(
-                    {"input_tokens_estimate": estimated_input_tokens}
-                    if isinstance(estimated_input_tokens, int)
-                    else {}
+                    {"input_tokens_estimate": estimated_input_tokens} if isinstance(estimated_input_tokens, int) else {}
                 ),
                 "max_output_tokens": _extract_max_output_tokens(args, kwargs),
             }
@@ -300,7 +298,8 @@ def _estimate_input_tokens(payload: dict[str, Any]) -> int | None:
     # Compute local token count with deterministic test override.
     try:
         if callable(_token_estimator_override_for_tests):
-            return _token_estimator_override_for_tests(payload)
+            override_value = _token_estimator_override_for_tests(payload)
+            return override_value if isinstance(override_value, int) else None
         explicit = payload.get("input_tokens")
         if isinstance(explicit, int):
             return explicit
@@ -363,7 +362,11 @@ def _apply_openai_clamp(
         next_args[0] = payload
     else:
         next_kwargs["max_tokens"] = recommended
-    _mark_clamp_applied_if_changed(protect_decision, _extract_max_output_tokens(args, kwargs), _extract_max_output_tokens(tuple(next_args), next_kwargs))
+    _mark_clamp_applied_if_changed(
+        protect_decision,
+        _extract_max_output_tokens(args, kwargs),
+        _extract_max_output_tokens(tuple(next_args), next_kwargs),
+    )
     return tuple(next_args), next_kwargs
 
 

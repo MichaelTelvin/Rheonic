@@ -1,18 +1,17 @@
 # Incident resolve endpoint tests.
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app.application.services.detect_incidents_service import DetectIncidentsService
 from app.application.provider_scope import scoped_project_provider_id
-from fastapi import HTTPException
-
+from app.application.services.detect_incidents_service import DetectIncidentsService
 from app.dependencies import get_current_user, get_detect_incidents_service, get_project_service
 from app.domain.models.incident import Incident
 from app.domain.models.project import Project
 from app.domain.models.user import User
-from app.main import app
 from app.infrastructure.redis.rolling_window import incident_open_lock_key
+from app.main import app
 
 
 class FakeIncidentRepository:

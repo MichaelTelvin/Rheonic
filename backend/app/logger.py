@@ -144,7 +144,9 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 
-def build_log_extra(*, event: str, metadata: dict[str, Any] | None = None, trace_id: str | None = None, span_id: str | None = None) -> dict[str, Any]:
+def build_log_extra(
+    *, event: str, metadata: dict[str, Any] | None = None, trace_id: str | None = None, span_id: str | None = None
+) -> dict[str, Any]:
     return {
         "event": event,
         "metadata": metadata or {},

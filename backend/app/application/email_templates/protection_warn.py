@@ -14,7 +14,8 @@ def render_protection_warn(payload: dict[str, object]) -> dict[str, str]:
     req_cap = str(payload.get("req_cap") or "-")
     tok_cap = str(payload.get("tok_cap") or "-")
     estimated_next_tokens = str(payload.get("estimated_next_tokens") or "-")
-    clamp = payload.get("clamp") if isinstance(payload.get("clamp"), dict) else None
+    clamp_value = payload.get("clamp")
+    clamp = clamp_value if isinstance(clamp_value, dict) else None
     clamp_copy = "-"
     if clamp is not None:
         recommended = clamp.get("recommended_max_output_tokens")

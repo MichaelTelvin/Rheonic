@@ -1,14 +1,17 @@
 # Local input token estimation helpers for protect preflight.
 from __future__ import annotations
 
+from types import ModuleType
 from typing import Any
 
 from rheonic.config import sdk_config
 
 try:
-    import tiktoken  # type: ignore[import-not-found]
+    import tiktoken as _tiktoken
 except Exception:  # pragma: no cover - import availability depends on environment
-    tiktoken = None
+    tiktoken: ModuleType | None = None
+else:
+    tiktoken = _tiktoken
 
 _ENCODER_CACHE: dict[str, Any] = {}
 

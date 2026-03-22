@@ -194,9 +194,7 @@ class ProjectRepositoryImpl(ProjectRepository):
         try:
             with self._session_factory.create_session() as session:
                 return int(
-                    session.query(ProjectModelRecord)
-                    .filter(ProjectModelRecord.project_id == project_id)
-                    .count()
+                    session.query(ProjectModelRecord).filter(ProjectModelRecord.project_id == project_id).count()
                 )
         except Exception:
             logger.exception("Failed counting project models", extra={"project_id": project_id})
@@ -225,10 +223,18 @@ class ProjectRepositoryImpl(ProjectRepository):
                 record = session.query(ProjectRecord).filter(ProjectRecord.id == project_id).first()
                 if record is None:
                     return False
-                session.query(EventRecord).filter(EventRecord.project_id == project_id).delete(synchronize_session=False)
-                session.query(IncidentRecord).filter(IncidentRecord.project_id == project_id).delete(synchronize_session=False)
-                session.query(IngestKeyRecord).filter(IngestKeyRecord.project_id == project_id).delete(synchronize_session=False)
-                session.query(ProjectModelRecord).filter(ProjectModelRecord.project_id == project_id).delete(synchronize_session=False)
+                session.query(EventRecord).filter(EventRecord.project_id == project_id).delete(
+                    synchronize_session=False
+                )
+                session.query(IncidentRecord).filter(IncidentRecord.project_id == project_id).delete(
+                    synchronize_session=False
+                )
+                session.query(IngestKeyRecord).filter(IngestKeyRecord.project_id == project_id).delete(
+                    synchronize_session=False
+                )
+                session.query(ProjectModelRecord).filter(ProjectModelRecord.project_id == project_id).delete(
+                    synchronize_session=False
+                )
                 session.delete(record)
                 session.commit()
                 return True
@@ -239,7 +245,6 @@ class ProjectRepositoryImpl(ProjectRepository):
 
 def _to_domain(record: ProjectRecord, settings: Settings | None = None) -> Project:
     # Convert SQLAlchemy project record to domain model.
-    resolved_settings = settings or Settings()
     return Project(
         id=record.id,
         name=record.name,

@@ -8,7 +8,11 @@ from redis import Redis
 from rq import Queue
 
 from app.application.email_templates.registry import render_template
+from app.application.interfaces.email_transport import EmailTransport
+from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 from app.config import Settings, app_config
+from app.domain.models.project import Project
+from app.domain.models.transport_outbox import TransportOutbox
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
@@ -26,7 +30,6 @@ from app.logger import (
     reset_trace_context,
 )
 from app.security.webhook_urls import ensure_webhook_url_is_safe
-from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 
 logger = get_logger(__name__)
 
@@ -77,7 +80,7 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
         else:
             raise RuntimeError(f"unsupported transport kind: {outbox.kind}")
         repository.mark_delivered(outbox_id=outbox.id, now=datetime.now(timezone.utc))
-        success_metadata = {
+        success_metadata: dict[str, object] = {
             "outbox_id": outbox.id,
             "kind": outbox.kind,
             "event_type": outbox.event_type,
@@ -104,7 +107,9 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
         attempts = max(int(outbox.attempts), 1)
         delay_seconds = _retry_delay_seconds(kind=outbox.kind, attempt_number=attempts)
         dead = attempts >= int(outbox.max_attempts) or delay_seconds is None
-        next_attempt_at = None if dead else datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+        next_attempt_at = (
+            None if dead or delay_seconds is None else datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)
+        )
         code, message = _error_details(exc)
         repository.mark_failed(
             outbox_id=outbox.id,
@@ -150,11 +155,16 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
                     ),
                 )
         if not dead and next_attempt_at is not None:
+            retry_delay_seconds = delay_seconds if isinstance(delay_seconds, int) else 0
             queue = Queue(settings.rq_queue_name, connection=Redis.from_url(settings.redis_url))
             queue.enqueue_in(
-                timedelta(seconds=delay_seconds),
+                timedelta(seconds=retry_delay_seconds),
                 process_outbox_delivery,
-                kwargs={"outbox_id": outbox.id, "trace_id": trace_id or generate_trace_id(), "span_id": generate_span_id()},
+                kwargs={
+                    "outbox_id": outbox.id,
+                    "trace_id": trace_id or generate_trace_id(),
+                    "span_id": generate_span_id(),
+                },
             )
             logger.info(
                 "Outbox delivery retry scheduled",
@@ -165,7 +175,7 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
                         "kind": outbox.kind,
                         "event_type": outbox.event_type,
                         "project_id": outbox.project_id,
-                        "retry_delay_seconds": delay_seconds,
+                        "retry_delay_seconds": retry_delay_seconds,
                     },
                 ),
             )
@@ -186,8 +196,10 @@ def _deliver_webhook(*, outbox_id: str) -> dict[str, object]:
         return {"skipped": True, "skip_reason": "project_missing"}
 
     payload = dict(outbox.payload or {})
-    transport_meta = payload.get("__transport_meta") if isinstance(payload.get("__transport_meta"), dict) else {}
-    body_payload = payload.get("body") if isinstance(payload.get("body"), dict) else payload
+    transport_meta_value = payload.get("__transport_meta")
+    transport_meta = transport_meta_value if isinstance(transport_meta_value, dict) else {}
+    body_payload_value = payload.get("body")
+    body_payload = body_payload_value if isinstance(body_payload_value, dict) else payload
     force_send = bool(transport_meta.get("force_send", False))
 
     if not force_send and (not project.webhook_enabled or not project.webhook_url):
@@ -304,7 +316,13 @@ def _retry_delay_seconds(*, kind: str, attempt_number: int) -> int | None:
     return int(intervals[idx])
 
 
-def _resolve_email_destination(*, outbox, project, settings: Settings, user_repository: UserRepositoryImpl) -> str | None:
+def _resolve_email_destination(
+    *,
+    outbox: TransportOutbox,
+    project: Project | None,
+    settings: Settings,
+    user_repository: UserRepositoryImpl,
+) -> str | None:
     explicit_destination = (outbox.destination or "").strip()
     if explicit_destination:
         return explicit_destination
@@ -334,7 +352,7 @@ def _resolve_email_sender(*, settings: Settings, event_type: str) -> str:
     return sender
 
 
-def _build_email_transport(*, settings: Settings):
+def _build_email_transport(*, settings: Settings) -> EmailTransport:
     provider = settings.resolved_email_provider
     if provider == "resend":
         return ResendEmailTransport(api_key=settings.resend_api_key)
@@ -358,7 +376,7 @@ def _extract_email_attachments(payload: dict[str, object]) -> list[dict[str, str
     ]
 
 
-def _enqueue_webhook_failure_email(*, outbox, settings: Settings) -> None:
+def _enqueue_webhook_failure_email(*, outbox: TransportOutbox, settings: Settings) -> None:
     if outbox.event_type == "webhook.test":
         return
     project_repository = ProjectRepositoryImpl(session_factory=DatabaseSessionFactory())
@@ -366,7 +384,7 @@ def _enqueue_webhook_failure_email(*, outbox, settings: Settings) -> None:
     if project is None or not project.protect_enabled or not project.webhook_enabled or not project.email_enabled:
         return
 
-    payload = {
+    payload: dict[str, object] = {
         "project_id": outbox.project_id,
         "event_type": outbox.event_type,
         "destination": outbox.destination or project.webhook_url,

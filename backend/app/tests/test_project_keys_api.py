@@ -8,7 +8,14 @@ from app.application.services.project_service import ProjectService
 from app.dependencies import get_current_user, get_ingest_event_service, get_ingest_key_service, get_project_service
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
-from app.infrastructure.db.models import Base, EventRecord, IncidentRecord, IngestKeyRecord, ProjectModelRecord, ProjectRecord
+from app.infrastructure.db.models import (
+    Base,
+    EventRecord,
+    IncidentRecord,
+    IngestKeyRecord,
+    ProjectModelRecord,
+    ProjectRecord,
+)
 from app.infrastructure.db.repositories.ingest_key_repository_impl import IngestKeyRepositoryImpl
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.main import app
@@ -25,7 +32,9 @@ class FakeIngestService:
         self.ingested.append(event)
 
 
-def _make_client(tmp_path, current_user: User | None = None) -> tuple[TestClient, DatabaseSessionFactory, FakeIngestService]:
+def _make_client(
+    tmp_path, current_user: User | None = None
+) -> tuple[TestClient, DatabaseSessionFactory, FakeIngestService]:
     # Build app client with real project/key services against temporary sqlite DB.
     db_url = f"sqlite:///{tmp_path}/api_test.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
@@ -41,11 +50,14 @@ def _make_client(tmp_path, current_user: User | None = None) -> tuple[TestClient
     app.dependency_overrides[get_project_service] = lambda: project_service
     app.dependency_overrides[get_ingest_key_service] = lambda: ingest_key_service
     app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
-    app.dependency_overrides[get_current_user] = lambda: current_user or User(
-        id="u1",
-        email="u1@example.com",
-        password_hash="hashed",
-        created_at=datetime.now(timezone.utc),
+    app.dependency_overrides[get_current_user] = lambda: (
+        current_user
+        or User(
+            id="u1",
+            email="u1@example.com",
+            password_hash="hashed",
+            created_at=datetime.now(timezone.utc),
+        )
     )
     return TestClient(app), session_factory, ingest_service
 

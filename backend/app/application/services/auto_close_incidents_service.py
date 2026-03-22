@@ -5,8 +5,8 @@ from datetime import datetime, timedelta, timezone
 
 from app.application.interfaces.incident_repository import IncidentRepository
 from app.application.interfaces.project_repository import ProjectRepository
-from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
+from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 from app.domain.models.incident import Incident
 from app.logger import get_logger
 
@@ -48,7 +48,7 @@ class AutoCloseIncidentsService:
         # Email remains protect-only.
         provider, model, environment = _incident_dimensions(incident)
         resolved_at = incident.resolved_at or datetime.now(timezone.utc)
-        payload = {
+        payload: dict[str, object] = {
             "event": "incident.resolved",
             "project_id": incident.project_id,
             "incident_id": incident.id,

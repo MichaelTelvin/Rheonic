@@ -8,10 +8,10 @@ import {
   updateProjectWebhook,
   type ProjectWebhookSettings,
 } from "../api/client";
+import { showAppToast } from "../components/AppToastHost";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
 import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
-import { showAppToast } from "../components/AppToastHost";
 import { useAuthContext } from "../context/AuthContext";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
@@ -156,7 +156,7 @@ export function Alerts(): JSX.Element {
       setWebhookError(null);
       setProtectEnabled(false);
       setLoadingSettings(false);
-      return;
+      return undefined;
     }
 
     let cancelled = false;

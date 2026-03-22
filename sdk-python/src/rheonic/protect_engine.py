@@ -8,7 +8,6 @@ from uuid import uuid4
 from rheonic.config import sdk_config
 from rheonic.logger import (
     bind_trace_context,
-    build_log_extra,
     generate_span_id,
     generate_trace_id,
     get_logger,
@@ -58,9 +57,7 @@ class ProtectEngine:
         self._request_timeout_s = request_timeout_s
         self._fail_mode = fail_mode if fail_mode in {"open", "closed"} else "open"
         self._decision_timeout_ms = (
-            int(decision_timeout_ms)
-            if decision_timeout_ms > 0
-            else sdk_config.internal_protect_decision_timeout_ms
+            int(decision_timeout_ms) if decision_timeout_ms > 0 else sdk_config.internal_protect_decision_timeout_ms
         )
         self._http_client = http_client
         self._debug_logger = debug_logger
@@ -267,7 +264,9 @@ class ProtectEngine:
             return True
         return False
 
-    def _report_decision_timeout_fire_and_forget(self, provider: str | None, model: str | None, request_id: str) -> None:
+    def _report_decision_timeout_fire_and_forget(
+        self, provider: str | None, model: str | None, request_id: str
+    ) -> None:
         # Report decision timeout without blocking caller flow.
         try:
             self._post_with_timeout(
@@ -285,7 +284,9 @@ class ProtectEngine:
         except Exception:
             return
 
-    def _report_decision_unavailable_fire_and_forget(self, provider: str | None, model: str | None, request_id: str) -> None:
+    def _report_decision_unavailable_fire_and_forget(
+        self, provider: str | None, model: str | None, request_id: str
+    ) -> None:
         # Report non-timeout preflight fallback without blocking caller flow.
         try:
             self._post_with_timeout(

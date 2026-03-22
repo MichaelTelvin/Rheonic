@@ -69,9 +69,7 @@ class IncidentRecord(Base):
 class ProjectRecord(Base):
     # Persistence record for projects.
     __tablename__ = "projects"
-    __table_args__ = (
-        UniqueConstraint("user_id", "name", name="uq_projects_user_id_name"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_projects_user_id_name"),)
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -156,7 +154,9 @@ class TransportOutboxRecord(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending", server_default="pending")
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
-    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     last_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

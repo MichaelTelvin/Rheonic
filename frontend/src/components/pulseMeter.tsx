@@ -58,11 +58,11 @@ export function PulseMeter({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) {
-      return;
+      return undefined;
     }
     const parent = canvas.parentElement;
     if (!parent) {
-      return;
+      return undefined;
     }
 
     const ensureBuffers = (): void => {

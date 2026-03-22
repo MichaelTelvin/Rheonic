@@ -1,9 +1,9 @@
 # Project webhook configuration endpoints.
-from datetime import datetime, timezone
 import json
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
 import httpx
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import AnyHttpUrl, BaseModel
 
 from app.application.interfaces.transport_outbox_repository import TransportOutboxRepository
@@ -15,6 +15,7 @@ from app.dependencies import (
     get_settings,
     get_transport_outbox_repository,
 )
+from app.domain.models.transport_outbox import TransportOutbox
 from app.domain.models.user import User
 from app.logger import generate_span_id, generate_trace_id, get_logger, get_trace_id
 from app.security.webhook_urls import ensure_webhook_url_is_safe, normalize_webhook_url
@@ -180,7 +181,10 @@ def _send_webhook_test_request(*, project_id: str, target_url: str, settings: Se
         return response
 
 
-def _latest_terminal(project_id: str, outbox_repository: TransportOutboxRepository):
+def _latest_terminal(
+    project_id: str,
+    outbox_repository: TransportOutboxRepository,
+) -> TransportOutbox | None:
     return outbox_repository.get_latest_terminal_by_project_kind(
         project_id=project_id,
         kind="webhook",
@@ -203,11 +207,13 @@ def _last_at_from_outbox(*, project_id: str, outbox_repository: TransportOutboxR
     latest = _latest_terminal(project_id=project_id, outbox_repository=outbox_repository)
     if latest is None:
         return None
-    return latest.delivered_at or latest.updated_at
+    delivered_at = latest.delivered_at
+    return delivered_at if isinstance(delivered_at, datetime) else latest.updated_at
 
 
 def _last_error_from_outbox(*, project_id: str, outbox_repository: TransportOutboxRepository) -> str | None:
     latest = _latest_terminal(project_id=project_id, outbox_repository=outbox_repository)
     if latest is None:
         return None
-    return latest.last_error_message
+    last_error_message = latest.last_error_message
+    return last_error_message if isinstance(last_error_message, str) else None

@@ -1,5 +1,6 @@
 from app.domain.detectors.contracts import DetectionContext, Signal
 from app.domain.detectors.detector import Detector
+from app.domain.models.event import Event
 
 
 class RetryStormDetector(Detector):
@@ -44,7 +45,7 @@ class RetryStormDetector(Detector):
         ]
 
 
-def _is_failure(event) -> bool:
+def _is_failure(event: Event) -> bool:
     http_status = event.http_status or 0
     if isinstance(http_status, int) and http_status >= 500:
         return True

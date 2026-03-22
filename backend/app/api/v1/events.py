@@ -1,13 +1,13 @@
 # Event ingest endpoints.
-from datetime import datetime, timezone
 import time
+from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.ingest_event_service import IngestEventService
+from app.application.services.ingest_key_service import IngestKeyService
 from app.config import Settings
 from app.dependencies import get_ingest_event_service, get_ingest_key_service, get_redis_client, get_settings
 from app.domain.models.event import Event
@@ -166,8 +166,16 @@ def ingest_event(
             total_tokens=total_tokens,
             latency_ms=(payload.response.latency_ms if payload.response is not None else payload.latency_ms),
             status=payload.status,
-            error_type=(payload.response.error_type if payload.response is not None and payload.response.error_type else payload.error_type),
-            http_status=(payload.response.http_status if payload.response is not None and payload.response.http_status is not None else payload.http_status),
+            error_type=(
+                payload.response.error_type
+                if payload.response is not None and payload.response.error_type
+                else payload.error_type
+            ),
+            http_status=(
+                payload.response.http_status
+                if payload.response is not None and payload.response.http_status is not None
+                else payload.http_status
+            ),
             request_endpoint=(payload.request.endpoint if payload.request is not None else None),
             request_feature=(payload.request.feature if payload.request is not None else None),
             created_at=datetime.now(timezone.utc),
@@ -181,6 +189,8 @@ def ingest_event(
     except Exception:
         logger.exception(
             "Event ingest failed",
-            extra=build_log_extra(event="error", metadata={"project_id": project_id if 'project_id' in locals() else None}),
+            extra=build_log_extra(
+                event="error", metadata={"project_id": project_id if "project_id" in locals() else None}
+            ),
         )
         raise HTTPException(status_code=500, detail="Failed to ingest event")

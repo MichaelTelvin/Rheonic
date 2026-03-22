@@ -82,11 +82,7 @@ class EventRepositoryImpl(EventRepository):
         # Delete events older than cutoff timestamp and return deleted count.
         try:
             with self._session_factory.create_session() as session:
-                deleted = (
-                    session.query(EventRecord)
-                    .filter(EventRecord.ts < cutoff)
-                    .delete(synchronize_session=False)
-                )
+                deleted = session.query(EventRecord).filter(EventRecord.ts < cutoff).delete(synchronize_session=False)
                 session.commit()
                 return int(deleted or 0)
         except Exception:

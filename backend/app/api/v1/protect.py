@@ -5,11 +5,12 @@ from time import perf_counter
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
-from app.application.services.incident_manager import IncidentManager
-from app.application.services.protect_service import ProtectDecisionContext, ProtectService
 from app.application.provider_scope import scoped_project_provider_id
+from app.application.services.incident_manager import IncidentManager
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.project_service import ProjectService
+from app.application.services.protect_service import ProtectDecision, ProtectDecisionContext, ProtectService
+from app.config import app_config
 from app.dependencies import (
     get_current_user,
     get_incident_manager,
@@ -21,7 +22,6 @@ from app.dependencies import (
 from app.domain.detectors.contracts import Signal
 from app.domain.models.user import User
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
-from app.config import app_config
 from app.logger import build_log_extra, get_logger
 
 logger = get_logger(__name__)
@@ -349,7 +349,7 @@ def _record_preflight_incident_if_needed(
     incident_manager: IncidentManager,
     project_id: str,
     payload: ProtectDecisionIn,
-    decision,
+    decision: ProtectDecision,
 ) -> None:
     # Keep user-visible incidents aligned with live preflight warnings that do not originate from ingest.
     if decision.decision != "warn" or decision.reason != app_config.incident_type_near_cap:
@@ -370,7 +370,7 @@ def _build_near_cap_signal_from_decision(
     *,
     project_id: str,
     payload: ProtectDecisionIn,
-    decision,
+    decision: ProtectDecision,
 ) -> Signal:
     # Derive the same near-cap fingerprint and evidence shape from the predictive decision snapshot.
     snapshot = decision.snapshot or {}
@@ -380,8 +380,12 @@ def _build_near_cap_signal_from_decision(
     req_cap = _safe_int(snapshot.get("threshold_req_60s"))
     tok_cap = _safe_int(snapshot.get("threshold_tok_60s"))
     estimated_next_tokens = _safe_int(predictive.get("estimated_next_tokens")) if isinstance(predictive, dict) else None
-    req_ratio = ((requests_60s + 1) / req_cap) if req_cap else None
-    tok_ratio = ((tokens_60s + estimated_next_tokens) / tok_cap) if (tok_cap and estimated_next_tokens is not None) else None
+    req_ratio = ((requests_60s + 1) / req_cap) if (requests_60s is not None and req_cap) else None
+    tok_ratio = (
+        ((tokens_60s + estimated_next_tokens) / tok_cap)
+        if (tokens_60s is not None and tok_cap and estimated_next_tokens is not None)
+        else None
+    )
     req_near_cap = bool(req_ratio is not None and req_ratio >= app_config.protect_near_cap_factor)
     tok_near_cap = bool(tok_ratio is not None and tok_ratio >= app_config.protect_near_cap_factor)
     near_cap_type = "both" if req_near_cap and tok_near_cap else ("req" if req_near_cap else "tok")
@@ -412,7 +416,11 @@ def _build_near_cap_signal_from_decision(
 
 def _safe_int(value: object) -> int | None:
     try:
-        return int(value) if value is not None else None
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, (int, float, str)):
+            return int(value)
+        return None
     except (TypeError, ValueError):
         return None
 

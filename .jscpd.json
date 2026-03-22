@@ -1,0 +1,19 @@
+{
+  "absolute": true,
+  "threshold": 5,
+  "minLines": 10,
+  "minTokens": 80,
+  "ignore": [
+    "**/dist/**",
+    "**/coverage/**",
+    "**/node_modules/**",
+    "**/.git/**",
+    "frontend/public/docs/**",
+    "backend/app/tests/**",
+    "sdk-python/tests/**",
+    "tests/**",
+    "frontend/src/**/*.test.ts",
+    "frontend/src/**/*.test.tsx",
+    "sdk-node/src/**/*.test.ts"
+  ]
+}

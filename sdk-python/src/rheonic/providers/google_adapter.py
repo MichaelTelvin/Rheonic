@@ -6,8 +6,8 @@ from typing import Any
 from rheonic.client import Client, get_default_client
 from rheonic.event_builder import build_event
 from rheonic.logger import get_logger
-from rheonic.provider_model_validation import validate_provider_model
 from rheonic.protect_engine import RHEONICBlockedError
+from rheonic.provider_model_validation import validate_provider_model
 from rheonic.token_estimator import estimate_input_tokens
 
 logger = get_logger(__name__)
@@ -39,7 +39,7 @@ def instrument_google(
 
     if inspect.iscoroutinefunction(original_generate):
 
-        async def wrapped_generate(*args: Any, **kwargs: Any) -> Any:
+        async def wrapped_generate_async(*args: Any, **kwargs: Any) -> Any:
             started_at = perf_counter()
             requested_model = _extract_requested_model(google_model, args, kwargs)
             validate_provider_model("google", requested_model)
@@ -94,7 +94,7 @@ def instrument_google(
                 )
                 raise
 
-        google_model.generate_content = wrapped_generate
+        google_model.generate_content = wrapped_generate_async
         return google_model
 
     def wrapped_generate(*args: Any, **kwargs: Any) -> Any:
@@ -155,6 +155,7 @@ def instrument_google(
     google_model.generate_content = wrapped_generate
     return google_model
 
+
 def _preflight(
     *,
     sdk_client: Client,
@@ -197,7 +198,9 @@ def _capture_success(
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
-                    "input_tokens_estimate": estimated_input_tokens if isinstance(estimated_input_tokens, int) else None,
+                    "input_tokens_estimate": estimated_input_tokens
+                    if isinstance(estimated_input_tokens, int)
+                    else None,
                     "protect_decision": "warn" if protect_decision == "warn" else None,
                     "protect_reason": protect_reason if protect_decision == "warn" else None,
                 },
@@ -233,7 +236,9 @@ def _capture_failure(
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
-                    "input_tokens_estimate": estimated_input_tokens if isinstance(estimated_input_tokens, int) else None,
+                    "input_tokens_estimate": estimated_input_tokens
+                    if isinstance(estimated_input_tokens, int)
+                    else None,
                     "protect_decision": "warn" if protect_decision == "warn" else None,
                     "protect_reason": protect_reason if protect_decision == "warn" else None,
                 },
@@ -296,7 +301,8 @@ def _extract_max_output_tokens(args: tuple[Any, ...], kwargs: dict[str, Any]) ->
 def _estimate_input_tokens(payload: dict[str, Any]) -> int | None:
     try:
         if callable(_token_estimator_override_for_tests):
-            return _token_estimator_override_for_tests(payload)
+            override_value = _token_estimator_override_for_tests(payload)
+            return override_value if isinstance(override_value, int) else None
         explicit = payload.get("input_tokens")
         if isinstance(explicit, int):
             return explicit
@@ -366,25 +372,39 @@ def _apply_google_clamp(
         else:
             generation_config["max_output_tokens"] = recommended
         next_kwargs["generation_config"] = generation_config
-        _mark_clamp_applied_if_changed(protect_decision, _extract_max_output_tokens(args, kwargs), _extract_max_output_tokens(tuple(next_args), next_kwargs))
+        _mark_clamp_applied_if_changed(
+            protect_decision,
+            _extract_max_output_tokens(args, kwargs),
+            _extract_max_output_tokens(tuple(next_args), next_kwargs),
+        )
         return tuple(next_args), next_kwargs
 
     if next_args and isinstance(next_args[0], dict):
         payload = dict(next_args[0])
-        generation_config = dict(payload.get("generation_config")) if isinstance(payload.get("generation_config"), dict) else {}
+        payload_generation_config = payload.get("generation_config")
+        generation_config = dict(payload_generation_config) if isinstance(payload_generation_config, dict) else {}
         if isinstance(generation_config.get("max_output_tokens"), int):
             generation_config["max_output_tokens"] = min(int(generation_config["max_output_tokens"]), recommended)
         else:
             generation_config["max_output_tokens"] = recommended
         payload["generation_config"] = generation_config
         next_args[0] = payload
-        _mark_clamp_applied_if_changed(protect_decision, _extract_max_output_tokens(args, kwargs), _extract_max_output_tokens(tuple(next_args), next_kwargs))
+        _mark_clamp_applied_if_changed(
+            protect_decision,
+            _extract_max_output_tokens(args, kwargs),
+            _extract_max_output_tokens(tuple(next_args), next_kwargs),
+        )
         return tuple(next_args), next_kwargs
 
-    generation_config = dict(next_kwargs.get("generation_config")) if isinstance(next_kwargs.get("generation_config"), dict) else {}
+    next_generation_config = next_kwargs.get("generation_config")
+    generation_config = dict(next_generation_config) if isinstance(next_generation_config, dict) else {}
     generation_config["max_output_tokens"] = recommended
     next_kwargs["generation_config"] = generation_config
-    _mark_clamp_applied_if_changed(protect_decision, _extract_max_output_tokens(args, kwargs), _extract_max_output_tokens(tuple(next_args), next_kwargs))
+    _mark_clamp_applied_if_changed(
+        protect_decision,
+        _extract_max_output_tokens(args, kwargs),
+        _extract_max_output_tokens(tuple(next_args), next_kwargs),
+    )
     return tuple(next_args), next_kwargs
 
 

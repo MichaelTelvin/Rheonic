@@ -57,6 +57,7 @@ class FakeIngestKeyService:
             ),
         ]
         _ = self._records
+
     def resolve_project_id(self, plaintext_key: str) -> str | None:
         key_hash = hash_key(plaintext_key)
         if key_hash in self._revoked_hashes:
@@ -153,7 +154,7 @@ def test_ingest_event_accepts_quoted_and_env_style_ingest_keys() -> None:
     quoted = client.post(
         "/api/v1/events",
         json=_payload(),
-        headers={"X-Project-Ingest-Key": "\"active-test-key\""},
+        headers={"X-Project-Ingest-Key": '"active-test-key"'},
     )
     assert quoted.status_code == 202
 

@@ -9,7 +9,8 @@ def render_protection_clamp_started(payload: dict[str, object]) -> dict[str, str
     model = str(payload.get("model") or "-")
     environment = str(payload.get("environment") or "-")
     reason = humanize_incident_type(payload.get("reason"))
-    clamp = payload.get("clamp") if isinstance(payload.get("clamp"), dict) else {}
+    clamp_value = payload.get("clamp")
+    clamp = clamp_value if isinstance(clamp_value, dict) else {}
     recommended = clamp.get("recommended_max_output_tokens")
     recommended_copy = str(recommended) if isinstance(recommended, int) else "-"
     requests_60s = str(payload.get("requests_60s") or "-")

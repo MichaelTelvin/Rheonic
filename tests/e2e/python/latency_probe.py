@@ -5,7 +5,6 @@ import os
 import statistics
 import time
 from dataclasses import dataclass
-from typing import Any
 
 import httpx
 
@@ -120,12 +119,7 @@ def _run_mode(
                     f"server_ms={result.server_ms} round_trip_ms={result.round_trip_ms:.1f}"
                 )
                 if idx == 0:
-                    print(
-                        "headers:"
-                        f" server={result.server!r}"
-                        f" via={result.via!r}"
-                        f" alt_svc={result.alt_svc!r}"
-                    )
+                    print(f"headers: server={result.server!r} via={result.via!r} alt_svc={result.alt_svc!r}")
             finally:
                 if not reuse_client:
                     client.close()

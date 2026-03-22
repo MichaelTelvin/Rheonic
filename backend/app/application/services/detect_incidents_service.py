@@ -4,9 +4,9 @@ from datetime import datetime, timezone
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.incident_repository import IncidentRepository
 from app.application.interfaces.project_repository import ProjectRepository
+from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.transport_service import TransportService, build_transport_dedupe_key
-from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.domain.models.incident import Incident
 from app.logger import get_logger
 
@@ -80,7 +80,7 @@ class DetectIncidentsService:
         # Email remains protect-only.
         provider, model, environment = _incident_dimensions(incident)
         resolved_at = incident.resolved_at or datetime.now(timezone.utc)
-        payload = {
+        payload: dict[str, object] = {
             "event": "incident.resolved",
             "project_id": incident.project_id,
             "incident_id": incident.id,
@@ -102,7 +102,9 @@ class DetectIncidentsService:
                     event_type="incident.resolved",
                 )
             except Exception:
-                logger.exception("Failed to enqueue manual incident resolved webhook", extra={"incident_id": incident.id})
+                logger.exception(
+                    "Failed to enqueue manual incident resolved webhook", extra={"incident_id": incident.id}
+                )
         if not self._is_protect_mode_enabled(incident.project_id):
             return
         if self._transport_service is None:

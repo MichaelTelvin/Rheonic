@@ -1,4 +1,5 @@
 """Bootstrap recurring RQ scheduler jobs idempotently."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { formatNumber, formatTime } from "./dashboardUtils";
 import {
   ApiError,
   fetchDeliveryFailures,
@@ -18,7 +19,6 @@ import { Card } from "../components/Card";
 import { PulseMeter } from "../components/pulseMeter";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
-import { formatNumber, formatTime } from "./dashboardUtils";
 
 function formatProviderLabel(provider: string): string {
   return provider
@@ -46,7 +46,6 @@ function formatAlertAttemptTime(iso: string | null): string {
 type SetupStage = "checking" | "no_project" | "no_selection" | "no_ingest_key" | "no_events" | "complete";
 type ProtectStatus = "awaiting" | "healthy" | "degraded" | "unavailable";
 const DASHBOARD_BANNER_EXIT_MS = 280;
-const DASHBOARD_METRICS_GAP_PX = 22;
 
 type DashboardCachedState = {
   selectedProvider: string;
@@ -119,11 +118,11 @@ export function Dashboard(): JSX.Element {
   const [requestsSeries, setRequestsSeries] = useState<number[]>([]);
   const [tokensSeries, setTokensSeries] = useState<number[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState<boolean>(false);
-  const [metricsWarning, setMetricsWarning] = useState<string | null>(null);
+  const [, setMetricsWarning] = useState<string | null>(null);
   const [lastMetricsSuccessAt, setLastMetricsSuccessAt] = useState<string | null>(initialDashboardState?.lastMetricsSuccessAt ?? null);
-  const [lastIncidentsSuccessAt, setLastIncidentsSuccessAt] = useState<string | null>(null);
+  const [, setLastIncidentsSuccessAt] = useState<string | null>(null);
   const [lastProtectHealthSuccessAt, setLastProtectHealthSuccessAt] = useState<string | null>(null);
-  const [metricsFetchFailed, setMetricsFetchFailed] = useState<boolean>(false);
+  const [, setMetricsFetchFailed] = useState<boolean>(false);
   const [protectHealthFetchFailed, setProtectHealthFetchFailed] = useState<boolean>(false);
   const [protectHealth, setProtectHealth] = useState<ProtectHealthMetrics | null>(null);
   const [protectDecisionStats, setProtectDecisionStats] = useState<{
@@ -169,7 +168,6 @@ export function Dashboard(): JSX.Element {
     }
     return "complete";
   }, [hasEvents, hasIngestKey, loadingProjects, projectId, projects.length, setupStatusResolved]);
-  const isSetupComplete = setupStage === "complete";
   const showSetupBanner = !loadingProjects && setupStage !== "complete" && setupStage !== "checking" && !setupBannerDismissed;
   const webhookIssueToken = webhookIssue ? `${webhookIssue.lastAt ?? "none"}:${webhookIssue.count}` : null;
   const showWebhookIssueBanner = Boolean(projectId && webhookIssue && webhookIssueToken !== webhookIssueDismissedToken);
@@ -237,21 +235,22 @@ export function Dashboard(): JSX.Element {
 
   useEffect(() => {
     if (setupStage !== "complete") {
-      return;
+      return undefined;
     }
     window.localStorage.removeItem(setupDismissStorageKey);
     setSetupBannerDismissed(false);
+    return undefined;
   }, [setupDismissStorageKey, setupStage]);
 
   useEffect(() => {
     if (loadingProjects) {
-      return;
+      return undefined;
     }
     if (!projectId) {
       setHasIngestKey(false);
       setHasEvents(false);
       setSetupStatusResolved(true);
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -399,7 +398,7 @@ export function Dashboard(): JSX.Element {
 
   useEffect(() => {
     if (!projectId) {
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -435,7 +434,7 @@ export function Dashboard(): JSX.Element {
 
   useEffect(() => {
     if (!projectId) {
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -472,7 +471,7 @@ export function Dashboard(): JSX.Element {
   useEffect(() => {
     if (!projectId) {
       setLoadingMetrics(false);
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -562,7 +561,7 @@ export function Dashboard(): JSX.Element {
 
   useEffect(() => {
     if (!projectId) {
-      return;
+      return undefined;
     }
 
     let cancelled = false;
@@ -601,7 +600,7 @@ export function Dashboard(): JSX.Element {
   useEffect(() => {
     if (!projectId) {
       setWebhookIssue(null);
-      return;
+      return undefined;
     }
 
     let cancelled = false;

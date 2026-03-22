@@ -1,4 +1,4 @@
-.PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e up-deps up-dev down-dev up-test down-test up-staging down-staging up-prod down-prod smoke-staging demo-stg-python demo-stg-node protect-stg-python protect-stg-node backend frontend sdk-node sdk-python e2e diagrams diagrams-check
+.PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e check check-internal coverage coverage-backend coverage-frontend coverage-sdk-node coverage-sdk-python up-deps up-dev down-dev up-test down-test up-staging down-staging up-prod down-prod smoke-staging demo-stg-python demo-stg-node protect-stg-python protect-stg-node backend frontend sdk-node sdk-python e2e diagrams diagrams-check
 
 DOPPLER_DEMO_PROJECT ?= rheonic
 DOPPLER_DEMO_CONFIG ?= stgdemo
@@ -72,9 +72,40 @@ test-e2e:
 	@echo "Running isolated e2e with project rheonic_test using docker-compose.test.yml"
 	@bash -lc "set -euo pipefail; trap 'docker compose -p rheonic_test -f docker-compose.test.yml down -v >/dev/null 2>&1 || true' EXIT; docker compose -p rheonic_test -f docker-compose.test.yml up -d --build postgres_test redis_test backend_test provider_stub_test >/dev/null; docker compose -p rheonic_test -f docker-compose.test.yml run --rm sdk_node_test 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); if (/node protect e2e/) sub(/^.*$$/, \"\\033[36m&\\033[0m\"); print}'; docker compose -p rheonic_test -f docker-compose.test.yml run --rm sdk_python_test 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); if (/python protect e2e/) sub(/^.*$$/, \"\\033[36m&\\033[0m\"); print}'"
 
+check:
+	@bash -lc "set -euo pipefail; docker compose -p rheonic_test -f docker-compose.test.yml run --build --rm check_test && $(MAKE) coverage"
+
+check-internal:
+	@ruff check .
+	@ruff format --check .
+	@mypy
+	@npm run -s lint:eslint
+	@npm run -s lint:tsc
+	@npm run -s lint:style
+	@hadolint $$(find . -name 'Dockerfile*' -not -path '*/node_modules/*')
+	@npm run -s lint:dup
+
+coverage: coverage-backend coverage-sdk-node coverage-sdk-python coverage-frontend
+
+coverage-backend:
+	@echo "Running backend tests with coverage"
+	@bash -lc "set -euo pipefail; trap 'docker compose -p rheonic_test -f docker-compose.test.yml down -v >/dev/null 2>&1 || true' EXIT; docker compose -p rheonic_test -f docker-compose.test.yml up -d --build postgres_test redis_test backend_test >/dev/null; docker compose -p rheonic_test -f docker-compose.test.yml run --rm -v \"$$(pwd):/workspace\" backend_test sh -lc \"cd /workspace/backend && pytest -v --cov=app --cov-report=term-missing --cov-fail-under=70\""
+
+coverage-sdk-node:
+	@echo "Running sdk-node tests with coverage"
+	@bash -lc "set -euo pipefail; docker compose -p rheonic_test -f docker-compose.test.yml run --rm sdk_node_unit"
+
+coverage-sdk-python:
+	@echo "Running sdk-python tests with coverage"
+	@bash -lc "set -euo pipefail; docker compose -p rheonic_test -f docker-compose.test.yml run --rm sdk_python_unit"
+
+coverage-frontend:
+	@echo "Running frontend tests with coverage"
+	@bash -lc "set -euo pipefail; docker compose -p rheonic_test -f docker-compose.test.yml run --rm frontend_test"
+
 test-backend:
 	@echo "Running isolated backend tests with project rheonic_test using docker-compose.test.yml"
-	@bash -lc "set -euo pipefail; trap 'docker compose -p rheonic_test -f docker-compose.test.yml down -v >/dev/null 2>&1 || true' EXIT; docker compose -p rheonic_test -f docker-compose.test.yml up -d postgres_test redis_test backend_test >/dev/null; docker compose -p rheonic_test -f docker-compose.test.yml run --rm -v \"$$(pwd):/workspace\" backend_test sh -lc \"cd /workspace/backend && pytest -v\" 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{if (/^[^ ]+::[^ ]+/) sub(/^([^ ]+::[^ ]+)/, \"\\033[36m&\\033[0m\"); gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); gsub(/FAILED/, \"\\033[31mFAILED\\033[0m\"); gsub(/ERROR/, \"\\033[31mERROR\\033[0m\"); print}'"
+	@bash -lc "set -euo pipefail; trap 'docker compose -p rheonic_test -f docker-compose.test.yml down -v >/dev/null 2>&1 || true' EXIT; docker compose -p rheonic_test -f docker-compose.test.yml up -d --build postgres_test redis_test backend_test >/dev/null; docker compose -p rheonic_test -f docker-compose.test.yml run --rm -v \"$$(pwd):/workspace\" backend_test sh -lc \"cd /workspace/backend && pytest -v --cov=app --cov-report=term-missing --cov-fail-under=70\" 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{if (/^[^ ]+::[^ ]+/) sub(/^([^ ]+::[^ ]+)/, \"\\033[36m&\\033[0m\"); gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); gsub(/FAILED/, \"\\033[31mFAILED\\033[0m\"); gsub(/ERROR/, \"\\033[31mERROR\\033[0m\"); print}'"
 
 test-sdk-node:
 	@bash -lc "set -o pipefail; docker compose -p rheonic_test -f docker-compose.test.yml run --rm sdk_node_unit 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{if (/^✔ /) sub(/^.*$$/, \"\\033[36m&\\033[0m\"); if (/^ℹ pass /) sub(/pass/, \"\\033[32mpass\\033[0m\"); if (/^ℹ fail /) sub(/fail/, \"\\033[31mfail\\033[0m\"); print}'"

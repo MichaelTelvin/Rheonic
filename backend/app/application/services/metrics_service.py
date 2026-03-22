@@ -61,7 +61,9 @@ class MetricsService:
             latest_last: dict[str, str] | None = None
             latest_last_ts = ""
             for scoped_provider in self._project_providers_for_aggregation(project_id=project_id, provider=provider):
-                raw = self._protect_action_store.get_metrics(project_id=scoped_project_provider_id(project_id, scoped_provider))
+                raw = self._protect_action_store.get_metrics(
+                    project_id=scoped_project_provider_id(project_id, scoped_provider)
+                )
                 totals["allowed_60m"] += int(raw.get("allowed_60m", 0) or 0)
                 totals["warned_60m"] += int(raw.get("warned_60m", 0) or 0)
                 totals["blocked_60m"] += int(raw.get("blocked_60m", 0) or 0)
@@ -76,13 +78,17 @@ class MetricsService:
                     if ts and ts >= latest_last_ts:
                         latest_last_ts = ts
                         latest_last = raw_last
-            metrics = {
+            metrics: dict[str, object] = {
                 "allowed_60m": totals["allowed_60m"],
                 "warned_60m": totals["warned_60m"],
                 "blocked_60m": totals["blocked_60m"],
                 "decision_timeouts_60m": totals["decision_timeouts_60m"],
-                "decision_latency_p50_60m_ms": (round(sum(latencies_p50) / len(latencies_p50)) if latencies_p50 else None),
-                "decision_latency_p95_60m_ms": (round(sum(latencies_p95) / len(latencies_p95)) if latencies_p95 else None),
+                "decision_latency_p50_60m_ms": (
+                    round(sum(latencies_p50) / len(latencies_p50)) if latencies_p50 else None
+                ),
+                "decision_latency_p95_60m_ms": (
+                    round(sum(latencies_p95) / len(latencies_p95)) if latencies_p95 else None
+                ),
                 "last": latest_last,
             }
             return metrics
@@ -98,7 +104,9 @@ class MetricsService:
             timeouts_60m = 0
             timeouts_30m = 0
             for scoped_provider in self._project_providers_for_aggregation(project_id=project_id, provider=provider):
-                metrics = self._protect_action_store.get_health(project_id=scoped_project_provider_id(project_id, scoped_provider))
+                metrics = self._protect_action_store.get_health(
+                    project_id=scoped_project_provider_id(project_id, scoped_provider)
+                )
                 if isinstance(metrics.get("p50_ms"), int):
                     p50_values.append(int(metrics["p50_ms"]))
                 if isinstance(metrics.get("p95_ms"), int):
@@ -126,7 +134,9 @@ class MetricsService:
         # Fallback keeps protect counters visible for projects with preflight traffic before first ingest event.
         return ["openai", "anthropic", "google", "unknown"]
 
-    def get_delivery_failures(self, *, project_id: str, kind: Literal["webhook", "email"] = "webhook") -> dict[str, object]:
+    def get_delivery_failures(
+        self, *, project_id: str, kind: Literal["webhook", "email"] = "webhook"
+    ) -> dict[str, object]:
         if self._transport_outbox_repository is None:
             return {"count": 0, "last_attempt_at": None}
         cutoff = datetime.now(timezone.utc) - timedelta(hours=24)

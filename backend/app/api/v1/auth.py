@@ -1,7 +1,8 @@
 # Authentication endpoints.
-from datetime import datetime
 import hashlib
 import time
+from datetime import datetime
+from typing import Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
@@ -11,7 +12,6 @@ from app.config import Settings
 from app.dependencies import get_auth_service, get_current_user, get_redis_client, get_settings
 from app.domain.models.user import User
 from app.infrastructure.redis.redis_client import RedisClient
-
 from app.logger import build_log_extra, get_logger
 
 logger = get_logger(__name__)
@@ -107,12 +107,13 @@ def _enforce_auth_rate_limit(
 
 
 def _set_auth_cookies(response: Response, *, access_token: str, refresh_token: str, settings: Settings) -> None:
+    same_site = _cookie_samesite(settings.auth_cookie_samesite)
     response.set_cookie(
         key=settings.auth_access_cookie_name,
         value=access_token,
         httponly=True,
         secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
+        samesite=same_site,
         max_age=max(int(settings.jwt_expires_min), 1) * 60,
         path="/",
     )
@@ -121,27 +122,35 @@ def _set_auth_cookies(response: Response, *, access_token: str, refresh_token: s
         value=refresh_token,
         httponly=True,
         secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
+        samesite=same_site,
         max_age=max(int(settings.jwt_refresh_expires_min), 1) * 60,
         path=f"{settings.api_prefix}/v1/auth",
     )
 
 
 def _clear_auth_cookies(response: Response, settings: Settings) -> None:
+    same_site = _cookie_samesite(settings.auth_cookie_samesite)
     response.delete_cookie(
         key=settings.auth_access_cookie_name,
         httponly=True,
         secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
+        samesite=same_site,
         path="/",
     )
     response.delete_cookie(
         key=settings.auth_refresh_cookie_name,
         httponly=True,
         secure=settings.auth_cookie_secure,
-        samesite=settings.auth_cookie_samesite,
+        samesite=same_site,
         path=f"{settings.api_prefix}/v1/auth",
     )
+
+
+def _cookie_samesite(value: str) -> Literal["lax", "strict", "none"]:
+    normalized = value.lower()
+    if normalized in {"lax", "strict", "none"}:
+        return cast(Literal["lax", "strict", "none"], normalized)
+    return "lax"
 
 
 @router.post("/register", response_model=UserOut)

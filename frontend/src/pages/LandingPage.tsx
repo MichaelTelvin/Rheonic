@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { Activity, Gauge, ShieldCheck, Workflow, Wrench, Layers, Signal, DatabaseZap } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 import { PublicLayout } from "../components/PublicLayout";
@@ -11,7 +11,7 @@ export function LandingPage(): JSX.Element {
 
   useEffect(() => {
     if (!rootRef.current || typeof IntersectionObserver === "undefined") {
-      return;
+      return undefined;
     }
 
     const targets = rootRef.current.querySelectorAll(".reveal-on-scroll");

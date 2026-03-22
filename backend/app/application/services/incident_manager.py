@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import cast
 from uuid import uuid4
 
 from app.application.interfaces.incident_repository import IncidentRepository
@@ -100,7 +101,7 @@ class IncidentManager:
             return
         event_type = "incident.warn"
         evidence = _build_webhook_evidence(incident.evidence)
-        payload = {
+        payload: dict[str, object] = {
             "event": event_type,
             "project_id": incident.project_id,
             "incident_id": incident.id,
@@ -126,7 +127,7 @@ class IncidentManager:
 
 def _int_value(value: object) -> int:
     try:
-        return int(value)
+        return int(cast(int | str, value))
     except (TypeError, ValueError):
         return 0
 

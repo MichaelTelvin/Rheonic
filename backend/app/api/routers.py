@@ -7,8 +7,8 @@ from app.api.v1.feedback import router as feedback_router
 from app.api.v1.incidents import router as incidents_router
 from app.api.v1.keys import router as keys_router
 from app.api.v1.metrics import router as metrics_router
-from app.api.v1.protect import router as protect_router
 from app.api.v1.projects import router as projects_router
+from app.api.v1.protect import router as protect_router
 from app.api.v1.public_config import router as public_config_router
 from app.api.v1.webhook import router as webhook_router
 

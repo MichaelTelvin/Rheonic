@@ -20,9 +20,7 @@ def test_job_exception_handler_accepts_stack_summary(monkeypatch) -> None:
         func_name="demo.task",
         kwargs={"project_id": "p-1", "trace_id": "trace-1"},
     )
-    stack_summary = traceback.StackSummary.from_list(
-        [("worker.py", 31, "_job_exception_handler", "stack_trace = ...")]
-    )
+    stack_summary = traceback.StackSummary.from_list([("worker.py", 31, "_job_exception_handler", "stack_trace = ...")])
 
     result = worker_module._job_exception_handler(job, RuntimeError, RuntimeError("boom"), stack_summary)
 

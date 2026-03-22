@@ -10,7 +10,9 @@ class DashboardSession:
         self._client = httpx.Client(base_url=base_url.rstrip("/"), timeout=timeout_s)
 
     def login(self, email: str, password: str) -> dict[str, Any]:
-        payload = self.request("/api/v1/auth/login", method="POST", json={"email": email, "password": password}, retry=False)
+        payload = self.request(
+            "/api/v1/auth/login", method="POST", json={"email": email, "password": password}, retry=False
+        )
         return payload if isinstance(payload, dict) else {}
 
     def request(

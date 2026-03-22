@@ -14,6 +14,28 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+def _metric_int(value: object, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float, str)):
+        return int(value)
+    return default
+
+
+def _metric_optional_int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float, str)):
+        return int(value)
+    return None
+
+
+def _metric_last(value: object) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    return {str(key): str(item) for key, item in value.items()}
+
+
 class ProtectMetricsOut(BaseModel):
     # Protect action counters for dashboard visibility.
     allowed_60m: int
@@ -72,13 +94,13 @@ def get_protect_metrics(
         project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
         metrics = service.get_protect_metrics(project_id=project_id, provider=provider)
         return ProtectMetricsOut(
-            allowed_60m=metrics["allowed_60m"],
-            warned_60m=metrics["warned_60m"],
-            blocked_60m=metrics["blocked_60m"],
-            decision_timeouts_60m=metrics["decision_timeouts_60m"],
-            last=metrics["last"],
-            decision_latency_p50_60m_ms=metrics["decision_latency_p50_60m_ms"],
-            decision_latency_p95_60m_ms=metrics["decision_latency_p95_60m_ms"],
+            allowed_60m=_metric_int(metrics.get("allowed_60m")),
+            warned_60m=_metric_int(metrics.get("warned_60m")),
+            blocked_60m=_metric_int(metrics.get("blocked_60m")),
+            decision_timeouts_60m=_metric_int(metrics.get("decision_timeouts_60m")),
+            last=_metric_last(metrics.get("last")),
+            decision_latency_p50_60m_ms=_metric_optional_int(metrics.get("decision_latency_p50_60m_ms")),
+            decision_latency_p95_60m_ms=_metric_optional_int(metrics.get("decision_latency_p95_60m_ms")),
         )
     except HTTPException:
         raise
@@ -100,10 +122,10 @@ def get_protect_health(
         project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
         metrics = service.get_protect_health(project_id=project_id, provider=provider)
         return ProtectHealthOut(
-            p50_ms=int(metrics["p50_ms"]) if isinstance(metrics.get("p50_ms"), int) else None,
-            p95_ms=int(metrics["p95_ms"]) if isinstance(metrics.get("p95_ms"), int) else None,
-            timeouts_30m=int(metrics.get("timeouts_30m", 0)),
-            timeouts_60m=int(metrics.get("timeouts_60m", 0)),
+            p50_ms=_metric_optional_int(metrics.get("p50_ms")),
+            p95_ms=_metric_optional_int(metrics.get("p95_ms")),
+            timeouts_30m=_metric_int(metrics.get("timeouts_30m", 0)),
+            timeouts_60m=_metric_int(metrics.get("timeouts_60m", 0)),
         )
     except HTTPException:
         raise
@@ -125,7 +147,7 @@ def get_delivery_failures(
         resolved_kind: Literal["webhook", "email"] = "email" if kind == "email" else "webhook"
         payload = service.get_delivery_failures(project_id=project_id, kind=resolved_kind)
         return DeliveryFailuresOut(
-            count=int(payload.get("count", 0) or 0),
+            count=_metric_int(payload.get("count", 0)),
             last_attempt_at=str(payload.get("last_attempt_at")) if payload.get("last_attempt_at") else None,
         )
     except HTTPException:

@@ -82,7 +82,9 @@ class IngestEventService:
             )
             requests_60s, tokens_60s = self._realtime_counters.get_project_60s(project_id=scoped_id)
             self._detect_policy_gap_if_needed(event=event)
-            project = self._project_repository.get_project(event.project_id) if self._project_repository is not None else None
+            project = (
+                self._project_repository.get_project(event.project_id) if self._project_repository is not None else None
+            )
             req_cap = project.protect_max_req_per_min if project is not None else None
             tok_cap = project.protect_max_tok_per_min if project is not None else None
             protect_enabled = bool(project.protect_enabled) if project is not None else False

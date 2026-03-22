@@ -1,7 +1,12 @@
-from app.application.email_templates.base_layout import format_timestamp
-from app.application.email_templates.base_layout import format_evidence, format_page_location, humanize_incident_type
-from app.application.email_templates.registry import render_template
 import pytest
+
+from app.application.email_templates.base_layout import (
+    format_evidence,
+    format_page_location,
+    format_timestamp,
+    humanize_incident_type,
+)
+from app.application.email_templates.registry import render_template
 
 
 def test_format_timestamp_renders_human_readable_utc() -> None:
@@ -15,11 +20,13 @@ def test_email_template_helpers_render_human_readable_values() -> None:
     assert humanize_incident_type("retry_storm") == "Retry storm"
     assert humanize_incident_type("cap_breach") == "Cap breach"
     assert format_page_location("/app/alerts") == "Dashboard / Alerts"
-    evidence_copy = format_evidence({
-        "count": 1,
-        "provider": "openai",
-        "last_seen_at": "2026-03-15T18:28:46.668971+00:00",
-    })
+    evidence_copy = format_evidence(
+        {
+            "count": 1,
+            "provider": "openai",
+            "last_seen_at": "2026-03-15T18:28:46.668971+00:00",
+        }
+    )
     assert "Count: 1" in evidence_copy
     assert "Provider: openai" in evidence_copy
     assert "Last Seen At: Mar 15, 2026 18:28 UTC" in evidence_copy

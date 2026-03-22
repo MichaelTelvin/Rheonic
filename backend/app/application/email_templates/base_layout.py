@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from html import escape
-import json
 
 from app.config import Settings
 
@@ -130,14 +130,14 @@ def render_base_email(
     )
     html = (
         "<!doctype html>"
-        "<html><body style=\"margin:0;padding:0;background:#f4f4f5;\">"
-        "<div style=\"margin:0;padding:32px 16px;\">"
-        "<div style=\"max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e4e7ec;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(16,24,40,0.08);\">"
-        "<div style=\"padding:24px 28px 18px;background:linear-gradient(135deg,#101828 0%,#1d2939 100%);\">"
-        "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;\">"
+        '<html><body style="margin:0;padding:0;background:#f4f4f5;">'
+        '<div style="margin:0;padding:32px 16px;">'
+        '<div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e4e7ec;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(16,24,40,0.08);">'
+        '<div style="padding:24px 28px 18px;background:linear-gradient(135deg,#101828 0%,#1d2939 100%);">'
+        '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
         "<tr>"
-        f"<td style=\"width:28px;height:28px;vertical-align:middle;\"><img src=\"{escape(_public_logo_url(), quote=True)}\" width=\"28\" height=\"28\" alt=\"Rheonic\" style=\"display:block;width:28px;height:28px;border:0;outline:none;text-decoration:none;\" /></td>"
-        "<td style=\"width:10px;font-size:0;line-height:0;\">&nbsp;</td>"
+        f'<td style="width:28px;height:28px;vertical-align:middle;"><img src="{escape(_public_logo_url(), quote=True)}" width="28" height="28" alt="Rheonic" style="display:block;width:28px;height:28px;border:0;outline:none;text-decoration:none;" /></td>'
+        '<td style="width:10px;font-size:0;line-height:0;">&nbsp;</td>'
         "<td style=\"font:700 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#7a7dff;\">RHEONIC</td>"
         "</tr>"
         "</table>"
@@ -145,8 +145,8 @@ def render_base_email(
         f"<h1 style=\"margin:10px 0 0;font:700 28px/1.15 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#ffffff;\">{safe_title}</h1>"
         f"<p style=\"margin:14px 0 0;font:400 15px/1.7 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#d0d5dd;\">{safe_subtitle}</p>"
         "</div>"
-        "<div style=\"padding:20px 28px 28px;\">"
-        "<table style=\"width:100%;border-collapse:collapse;border-spacing:0;background:#fcfcfd;border:1px solid #eaecf0;border-radius:14px;overflow:hidden;\">"
+        '<div style="padding:20px 28px 28px;">'
+        '<table style="width:100%;border-collapse:collapse;border-spacing:0;background:#fcfcfd;border:1px solid #eaecf0;border-radius:14px;overflow:hidden;">'
         f"{rows_html}"
         "</table>"
         f"{footer_html}"
@@ -197,12 +197,7 @@ def _public_logo_url() -> str:
     settings = Settings()
     base_url = (settings.rheonic_base_url or "").strip().rstrip("/")
     lowered = base_url.lower()
-    is_local = (
-        not base_url
-        or "localhost" in lowered
-        or "127.0.0.1" in lowered
-        or lowered.startswith("http://")
-    )
+    is_local = not base_url or "localhost" in lowered or "127.0.0.1" in lowered or lowered.startswith("http://")
     if is_local:
         base_url = "https://staging.rheonic.dev" if settings.app_env_normalized == "staging" else "https://rheonic.dev"
     return f"{base_url}/assets/logo/logo-48.png"

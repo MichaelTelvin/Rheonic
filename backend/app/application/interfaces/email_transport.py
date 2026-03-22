@@ -11,5 +11,5 @@ class EmailTransport(Protocol):
         text: str | None = None,
         from_email: str,
         reply_to: str | None = None,
-    ) -> None:
-        ...
+        attachments: list[dict[str, str]] | None = None,
+    ) -> None: ...

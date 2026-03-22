@@ -15,7 +15,7 @@ class TransportService:
         self,
         *,
         outbox_repository: TransportOutboxRepository,
-        enqueue_job: Callable[[str], None],
+        enqueue_job: Callable[..., None],
         now_provider: Callable[[], datetime] | None = None,
     ) -> None:
         self._outbox_repository = outbox_repository
@@ -28,7 +28,7 @@ class TransportService:
         project_id: str,
         kind: Literal["webhook", "email"],
         event_type: str,
-        payload: dict,
+        payload: dict[str, object],
         dedupe_key: str,
         trace_id: str | None = None,
         span_id: str | None = None,
@@ -42,7 +42,7 @@ class TransportService:
         if not dedupe_key or not dedupe_key.strip():
             raise ValueError("dedupe_key is required")
         now = self._now_provider()
-        normalized_payload = dict(payload)
+        normalized_payload: dict[str, object] = dict(payload)
         if severity is not None:
             normalized_payload.setdefault("severity", severity)
         if provider is not None:

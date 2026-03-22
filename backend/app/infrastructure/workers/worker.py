@@ -1,15 +1,29 @@
 import traceback
+from types import TracebackType
+from typing import Any
 
 from redis import Redis
-from rq import Worker, Queue
+from rq import Worker
+from rq.job import Job
 
 from app.config import Settings
-from app.logger import bind_trace_context, build_log_extra, configure_logging, generate_trace_id, get_logger, reset_trace_context
+from app.logger import (
+    bind_trace_context,
+    build_log_extra,
+    configure_logging,
+    generate_trace_id,
+    get_logger,
+    reset_trace_context,
+)
 
 logger = get_logger(__name__)
 
 
-def _format_worker_exception(exc_type, exc_value, tb) -> str:
+def _format_worker_exception(
+    exc_type: type[BaseException] | None,
+    exc_value: BaseException | None,
+    tb: TracebackType | traceback.StackSummary | None,
+) -> str:
     # RQ registry cleanup can pass a StackSummary instead of a traceback object.
     if isinstance(tb, traceback.StackSummary):
         return "".join(tb.format())
@@ -21,11 +35,16 @@ def _format_worker_exception(exc_type, exc_value, tb) -> str:
         return "".join(traceback.format_exception_only(exc_type, exc_value))
 
 
-def _job_exception_handler(job, exc_type, exc_value, tb) -> bool:
+def _job_exception_handler(
+    job: Job,
+    exc_type: type[BaseException],
+    exc_value: BaseException,
+    tb: TracebackType | traceback.StackSummary | None,
+) -> bool:
     # Log failed jobs with contextual information and traceback.
     project_id = None
     trace_id = None
-    kwargs = getattr(job, "kwargs", {}) or {}
+    kwargs: Any = getattr(job, "kwargs", {}) or {}
     if isinstance(kwargs, dict):
         project_id = kwargs.get("project_id")
         trace_id = kwargs.get("trace_id")

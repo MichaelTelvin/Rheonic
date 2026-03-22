@@ -3,10 +3,10 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.metrics_service import MetricsService
-from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.project_service import ProjectService
 from app.config import Settings
 from app.dependencies import (
@@ -75,7 +75,9 @@ class FakeRedisClient:
 
     def zremrangebyscore(self, key: str, min_score: int | float, max_score: int | float) -> int:
         zset = self.zsets.get(key, {})
-        to_delete = [member for member, score in zset.items() if score >= float(min_score) and score <= float(max_score)]
+        to_delete = [
+            member for member, score in zset.items() if score >= float(min_score) and score <= float(max_score)
+        ]
         for member in to_delete:
             del zset[member]
         return len(to_delete)

@@ -1,22 +1,23 @@
 import os
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
-import sys
 from typing import Any
 
-import httpx
-
-repo_root = Path(__file__).resolve().parents[3]
-sdk_src = repo_root / "sdk-python" / "src"
-tests_src = repo_root / "tests" / "e2e" / "python"
-if str(sdk_src) not in sys.path:
-    sys.path.insert(0, str(sdk_src))
-if str(tests_src) not in sys.path:
-    sys.path.insert(0, str(tests_src))
-
-from rheonic import build_event, capture_event, create_client
-from dashboard_session import DashboardSession
+try:
+    from dashboard_session import DashboardSession
+    from rheonic import build_event, capture_event, create_client
+except ModuleNotFoundError:
+    repo_root = Path(__file__).resolve().parents[3]
+    sdk_src = repo_root / "sdk-python" / "src"
+    tests_src = repo_root / "tests" / "e2e" / "python"
+    if str(sdk_src) not in sys.path:
+        sys.path.insert(0, str(sdk_src))
+    if str(tests_src) not in sys.path:
+        sys.path.insert(0, str(tests_src))
+    from dashboard_session import DashboardSession
+    from rheonic import build_event, capture_event, create_client
 
 VERBOSE = (os.getenv("RHEONIC_VERBOSE", "") or "").lower() in {"1", "true", "yes"}
 
@@ -60,7 +61,9 @@ def _send_event(
     capture_event(event)
 
 
-def _print_realtime_snapshot(dashboard_session: DashboardSession | None, project_id: str, provider: str, phase: str) -> None:
+def _print_realtime_snapshot(
+    dashboard_session: DashboardSession | None, project_id: str, provider: str, phase: str
+) -> None:
     if not VERBOSE:
         return
     if dashboard_session is None or not project_id:
@@ -74,9 +77,7 @@ def _print_realtime_snapshot(dashboard_session: DashboardSession | None, project
         if not isinstance(payload, dict):
             print(f"[SNAPSHOT] {phase}: unavailable (unexpected payload)")
             return
-        print(
-            f"[SNAPSHOT] {phase}: req60={payload.get('requests_60s')} tok60={payload.get('tokens_60s')}"
-        )
+        print(f"[SNAPSHOT] {phase}: req60={payload.get('requests_60s')} tok60={payload.get('tokens_60s')}")
     except Exception as error:
         print(f"[SNAPSHOT] {phase}: unavailable ({error})")
 
@@ -186,7 +187,9 @@ def _usage() -> None:
     print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
     print("  RHEONIC_NEAR_CAP_TOKENS=3200")
     print("  Optional snapshot/incident summary: RHEONIC_AUTH_EMAIL, RHEONIC_AUTH_PASSWORD, RHEONIC_PROJECT_ID")
-    print("  Run: make demo-stg-python RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach")
+    print(
+        "  Run: make demo-stg-python RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach"
+    )
 
 
 def main() -> None:
@@ -296,7 +299,7 @@ def main() -> None:
                     model,
                     endpoint,
                     50,
-                    f"retry-{i+1}",
+                    f"retry-{i + 1}",
                     environment,
                     status="error",
                     http_status=500,
@@ -364,7 +367,7 @@ def main() -> None:
                     model,
                     endpoint,
                     cap_breach_req_tokens,
-                    f"req-cap-breach-{i+1}",
+                    f"req-cap-breach-{i + 1}",
                     environment,
                     status="ok",
                     http_status=200,

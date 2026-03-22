@@ -1,29 +1,34 @@
 # Tests for protect preflight behavior in OpenAI instrumentation.
-from datetime import datetime, timezone
-from concurrent.futures import ThreadPoolExecutor
 import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from typing import Any
 
 import pytest
-
 from rheonic.client import Client
 from rheonic.protect_engine import RHEONICBlockedError, RHEONICValidationError
-from rheonic.providers.openai_adapter import instrument_openai, _set_token_estimator_for_tests
+from rheonic.provider_model_validation import validate_provider_model
+from rheonic.providers.anthropic_adapter import (
+    _set_token_estimator_for_tests as _set_anthropic_token_estimator_for_tests,
+)
 from rheonic.providers.anthropic_adapter import (
     instrument_anthropic,
-    _set_token_estimator_for_tests as _set_anthropic_token_estimator_for_tests,
+)
+from rheonic.providers.google_adapter import (
+    _set_token_estimator_for_tests as _set_google_token_estimator_for_tests,
 )
 from rheonic.providers.google_adapter import (
     instrument_google,
-    _set_token_estimator_for_tests as _set_google_token_estimator_for_tests,
 )
-from rheonic.provider_model_validation import validate_provider_model
+from rheonic.providers.openai_adapter import _set_token_estimator_for_tests, instrument_openai
 
 
 class FakeResponse:
     # Minimal response object for SDK transport tests.
 
-    def __init__(self, status_code: int, payload: dict[str, Any] | None = None, json_error: Exception | None = None) -> None:
+    def __init__(
+        self, status_code: int, payload: dict[str, Any] | None = None, json_error: Exception | None = None
+    ) -> None:
         self.status_code = status_code
         self._payload = payload or {}
         self._json_error = json_error

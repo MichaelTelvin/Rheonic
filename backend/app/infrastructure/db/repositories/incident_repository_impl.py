@@ -163,7 +163,9 @@ class IncidentRepositoryImpl(IncidentRepository):
                 )
             return [_to_domain(record) for record in records]
         except Exception:
-            logger.exception("Failed listing open incidents by provider", extra={"project_id": project_id, "provider": provider})
+            logger.exception(
+                "Failed listing open incidents by provider", extra={"project_id": project_id, "provider": provider}
+            )
             raise
 
     def get_by_id(self, incident_id: str) -> Incident | None:

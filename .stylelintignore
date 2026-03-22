@@ -1,0 +1,5 @@
+dist/**
+frontend/dist/**
+frontend/coverage/**
+node_modules/**
+frontend/public/docs/**

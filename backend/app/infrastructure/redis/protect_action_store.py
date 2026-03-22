@@ -89,7 +89,9 @@ class ProtectActionStore:
                             },
                         )
                         return
-                    self._remove_outcome_counters(project_id=project_id, payload=existing_payload, request_id=request_id)
+                    self._remove_outcome_counters(
+                        project_id=project_id, payload=existing_payload, request_id=request_id
+                    )
                 self._redis_client.set(
                     _outcome_key(project_id, request_id),
                     json.dumps(payload),
@@ -232,7 +234,9 @@ class ProtectActionStore:
             return
         self._redis_client.incrby(key, -1)
 
-    def _apply_outcome_counters(self, *, project_id: str, payload: dict[str, str], request_id: str | None = None) -> None:
+    def _apply_outcome_counters(
+        self, *, project_id: str, payload: dict[str, str], request_id: str | None = None
+    ) -> None:
         counter_key = self._counter_key_for_decision(project_id=project_id, decision=payload["decision"])
         if counter_key is not None:
             self._increment_with_ttl(counter_key)
@@ -241,7 +245,9 @@ class ProtectActionStore:
             if request_id:
                 self._record_timeout_event(project_id=project_id, request_id=request_id, ts=payload["ts"])
 
-    def _remove_outcome_counters(self, *, project_id: str, payload: dict[str, str], request_id: str | None = None) -> None:
+    def _remove_outcome_counters(
+        self, *, project_id: str, payload: dict[str, str], request_id: str | None = None
+    ) -> None:
         self._decrement_counter_for_decision(project_id=project_id, decision=payload["decision"])
         if payload["source"] == app_config.protect_outcome_source_timeout_fallback:
             current = self._read_int(_timeout_key(project_id))
@@ -276,6 +282,8 @@ class ProtectActionStore:
             return 0
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8")
+        if not isinstance(raw, (str, int, float)):
+            return 0
         try:
             return int(raw)
         except (TypeError, ValueError):

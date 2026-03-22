@@ -32,7 +32,7 @@ export function useUnsavedChangesGuard({
 
   useEffect(() => {
     if (!isDirty) {
-      return;
+      return undefined;
     }
     const onBeforeUnload = (event: BeforeUnloadEvent): void => {
       event.preventDefault();
@@ -47,7 +47,7 @@ export function useUnsavedChangesGuard({
   useEffect(() => {
     if (!isDirty) {
       setPendingPath(null);
-      return;
+      return undefined;
     }
     const onDocumentClick = (event: MouseEvent): void => {
       if (event.defaultPrevented) {

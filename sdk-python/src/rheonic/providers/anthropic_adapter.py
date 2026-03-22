@@ -6,8 +6,8 @@ from typing import Any
 from rheonic.client import Client, get_default_client
 from rheonic.event_builder import build_event
 from rheonic.logger import get_logger
-from rheonic.provider_model_validation import validate_provider_model
 from rheonic.protect_engine import RHEONICBlockedError
+from rheonic.provider_model_validation import validate_provider_model
 from rheonic.token_estimator import estimate_input_tokens
 
 logger = get_logger(__name__)
@@ -40,7 +40,7 @@ def instrument_anthropic(
 
     if inspect.iscoroutinefunction(original_create):
 
-        async def wrapped_create(*args: Any, **kwargs: Any) -> Any:
+        async def wrapped_create_async(*args: Any, **kwargs: Any) -> Any:
             started_at = perf_counter()
             request_payload = _extract_request_payload(args, kwargs)
             requested_model = _extract_requested_model(args, kwargs)
@@ -95,7 +95,7 @@ def instrument_anthropic(
                 )
                 raise
 
-        messages.create = wrapped_create
+        messages.create = wrapped_create_async
         return anthropic_client
 
     def wrapped_create(*args: Any, **kwargs: Any) -> Any:
@@ -207,7 +207,9 @@ def _capture_success(
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
-                    "input_tokens_estimate": estimated_input_tokens if isinstance(estimated_input_tokens, int) else None,
+                    "input_tokens_estimate": estimated_input_tokens
+                    if isinstance(estimated_input_tokens, int)
+                    else None,
                     "protect_decision": "warn" if protect_decision == "warn" else None,
                     "protect_reason": protect_reason if protect_decision == "warn" else None,
                 },
@@ -243,7 +245,9 @@ def _capture_failure(
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
-                    "input_tokens_estimate": estimated_input_tokens if isinstance(estimated_input_tokens, int) else None,
+                    "input_tokens_estimate": estimated_input_tokens
+                    if isinstance(estimated_input_tokens, int)
+                    else None,
                     "protect_decision": "warn" if protect_decision == "warn" else None,
                     "protect_reason": protect_reason if protect_decision == "warn" else None,
                 },
@@ -291,7 +295,8 @@ def _extract_max_output_tokens(args: tuple[Any, ...], kwargs: dict[str, Any]) ->
 def _estimate_input_tokens(payload: dict[str, Any]) -> int | None:
     try:
         if callable(_token_estimator_override_for_tests):
-            return _token_estimator_override_for_tests(payload)
+            override_value = _token_estimator_override_for_tests(payload)
+            return override_value if isinstance(override_value, int) else None
         explicit = payload.get("input_tokens")
         if isinstance(explicit, int):
             return explicit
@@ -346,7 +351,11 @@ def _apply_anthropic_clamp(
         next_args[0] = payload
     else:
         next_kwargs["max_tokens"] = recommended
-    _mark_clamp_applied_if_changed(protect_decision, _extract_max_output_tokens(args, kwargs), _extract_max_output_tokens(tuple(next_args), next_kwargs))
+    _mark_clamp_applied_if_changed(
+        protect_decision,
+        _extract_max_output_tokens(args, kwargs),
+        _extract_max_output_tokens(tuple(next_args), next_kwargs),
+    )
     return tuple(next_args), next_kwargs
 
 

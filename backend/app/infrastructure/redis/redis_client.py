@@ -1,4 +1,7 @@
 # Redis client scaffolding.
+from __future__ import annotations
+
+from typing import Any, cast
 
 from redis import Redis
 
@@ -17,7 +20,7 @@ class RedisClient:
             resolved_redis_url = redis_url or Settings().redis_url
             if not resolved_redis_url:
                 raise ValueError("REDIS_URL is not set")
-            self._redis = Redis.from_url(resolved_redis_url)
+            self._redis = cast(Any, Redis.from_url(resolved_redis_url))
         except Exception:
             logger.exception("Failed to initialize Redis client")
             raise
@@ -25,7 +28,7 @@ class RedisClient:
     def get(self, key: str) -> object | None:
         # Get value by key from Redis.
         try:
-            return self._redis.get(key)
+            return cast(object | None, self._redis.get(key))
         except Exception:
             logger.exception("Redis GET failed", extra={"key": key})
             raise
@@ -33,7 +36,7 @@ class RedisClient:
     def set(self, key: str, value: object, ttl_seconds: int) -> None:
         # Set value with TTL in Redis.
         try:
-            self._redis.set(key, value, ex=ttl_seconds)
+            self._redis.set(key, str(value), ex=ttl_seconds)
         except Exception:
             logger.exception("Redis SET failed", extra={"key": key, "ttl_seconds": ttl_seconds})
             raise
@@ -41,7 +44,7 @@ class RedisClient:
     def set_persistent(self, key: str, value: object) -> None:
         # Set value without expiration.
         try:
-            self._redis.set(key, value)
+            self._redis.set(key, str(value))
         except Exception:
             logger.exception("Redis SET persistent failed", extra={"key": key})
             raise
@@ -49,7 +52,7 @@ class RedisClient:
     def set_nx_ex(self, key: str, value: object, ttl_seconds: int) -> bool:
         # Set key only when absent and apply TTL.
         try:
-            return bool(self._redis.set(key, value, nx=True, ex=ttl_seconds))
+            return bool(self._redis.set(key, str(value), nx=True, ex=ttl_seconds))
         except Exception:
             logger.exception("Redis SET NX EX failed", extra={"key": key, "ttl_seconds": ttl_seconds})
             raise
@@ -57,7 +60,7 @@ class RedisClient:
     def zadd(self, key: str, mapping: dict[str, int]) -> int:
         # Add scored members to sorted set.
         try:
-            return int(self._redis.zadd(key, mapping))
+            return int(cast(int, self._redis.zadd(key, mapping)))
         except Exception:
             logger.exception("Redis ZADD failed", extra={"key": key})
             raise
@@ -65,7 +68,7 @@ class RedisClient:
     def zremrangebyscore(self, key: str, min_score: int | float, max_score: int | float) -> int:
         # Remove sorted set members by score range.
         try:
-            return int(self._redis.zremrangebyscore(key, min_score, max_score))
+            return int(cast(int, self._redis.zremrangebyscore(key, min_score, max_score)))
         except Exception:
             logger.exception("Redis ZREMRANGEBYSCORE failed", extra={"key": key})
             raise
@@ -73,7 +76,7 @@ class RedisClient:
     def zcard(self, key: str) -> int:
         # Return sorted set cardinality.
         try:
-            return int(self._redis.zcard(key))
+            return int(cast(int, self._redis.zcard(key)))
         except Exception:
             logger.exception("Redis ZCARD failed", extra={"key": key})
             raise
@@ -81,23 +84,23 @@ class RedisClient:
     def zrangebyscore(self, key: str, min_score: int | float, max_score: int | float) -> list[object]:
         # Return sorted set members by score range.
         try:
-            return list(self._redis.zrangebyscore(key, min_score, max_score))
+            return list(cast(list[object], self._redis.zrangebyscore(key, min_score, max_score)))
         except Exception:
             logger.exception("Redis ZRANGEBYSCORE failed", extra={"key": key})
             raise
 
-    def zrem(self, key: str, *members: object) -> int:
+    def zrem(self, key: str, *members: str | int | float) -> int:
         # Remove sorted set members.
         try:
-            return int(self._redis.zrem(key, *members))
+            return int(cast(int, self._redis.zrem(key, *members)))
         except Exception:
             logger.exception("Redis ZREM failed", extra={"key": key})
             raise
 
-    def lpush(self, key: str, value: object) -> int:
+    def lpush(self, key: str, value: str | int | float) -> int:
         # Push value to the head of a list and return the list length.
         try:
-            return int(self._redis.lpush(key, value))
+            return int(cast(int, self._redis.lpush(key, value)))
         except Exception:
             logger.exception("Redis LPUSH failed", extra={"key": key})
             raise
@@ -113,7 +116,7 @@ class RedisClient:
     def lrange(self, key: str, start: int, stop: int) -> list[object]:
         # Return list values for inclusive start/stop range.
         try:
-            return list(self._redis.lrange(key, start, stop))
+            return list(cast(list[object], self._redis.lrange(key, start, stop)))
         except Exception:
             logger.exception("Redis LRANGE failed", extra={"key": key, "start": start, "stop": stop})
             raise
@@ -121,7 +124,7 @@ class RedisClient:
     def incr(self, key: str) -> int:
         # Increment a key by one and return its value.
         try:
-            return int(self._redis.incr(key))
+            return int(cast(int, self._redis.incr(key)))
         except Exception:
             logger.exception("Redis INCR failed", extra={"key": key})
             raise
@@ -129,7 +132,7 @@ class RedisClient:
     def incrby(self, key: str, amount: int) -> int:
         # Increment a key by amount and return its value.
         try:
-            return int(self._redis.incrby(key, amount))
+            return int(cast(int, self._redis.incrby(key, amount)))
         except Exception:
             logger.exception("Redis INCRBY failed", extra={"key": key, "amount": amount})
             raise
@@ -145,7 +148,7 @@ class RedisClient:
     def delete(self, key: str) -> int:
         # Delete key and return deletion count.
         try:
-            return int(self._redis.delete(key))
+            return int(cast(int, self._redis.delete(key)))
         except Exception:
             logger.exception("Redis DELETE failed", extra={"key": key})
             raise

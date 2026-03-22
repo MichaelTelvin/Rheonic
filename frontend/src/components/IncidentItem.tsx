@@ -1,9 +1,10 @@
 import { useState } from "react";
 
-import type { IncidentItem as Incident } from "../api/client";
-import { formatRelative, formatTime, humanizeIncidentType } from "../pages/dashboardUtils";
 import { Badge } from "./Badge";
 import { Card } from "./Card";
+import { formatRelative, formatTime, humanizeIncidentType } from "../pages/dashboardUtils";
+
+import type { IncidentItem as Incident } from "../api/client";
 
 export interface IncidentItemProps {
   incident: Incident;

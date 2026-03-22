@@ -57,7 +57,9 @@ def test_email_outbox_delivery_marks_failed_when_provider_not_configured(tmp_pat
         template="feedback_submitted",
     )
 
-    settings = transport_job.Settings(database_url=db_url, redis_url="redis://localhost:6379/15", email_provider_enabled=False)
+    settings = transport_job.Settings(
+        database_url=db_url, redis_url="redis://localhost:6379/15", email_provider_enabled=False
+    )
     monkeypatch.setattr(transport_job, "Settings", lambda: settings)
     monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
     monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
@@ -311,9 +313,7 @@ def test_alert_email_delivery_is_skipped_when_project_email_alerts_are_disabled(
         assert row.status == "delivered"
 
 
-def test_alert_email_skip_logs_outbox_skipped_instead_of_outbox_delivered(
-    tmp_path, monkeypatch, capsys
-) -> None:
+def test_alert_email_skip_logs_outbox_skipped_instead_of_outbox_delivered(tmp_path, monkeypatch, capsys) -> None:
     db_url = f"sqlite:///{tmp_path}/transport_email_alert_skip_logs.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)
@@ -376,11 +376,7 @@ def test_alert_email_skip_logs_outbox_skipped_instead_of_outbox_delivered(
 
     transport_job.process_outbox_delivery(outbox_id, trace_id="trace-email-skip", span_id="span-email-skip")
 
-    emitted = [
-        json.loads(line)
-        for line in capsys.readouterr().out.splitlines()
-        if line.strip().startswith("{")
-    ]
+    emitted = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip().startswith("{")]
     skipped_log = next(payload for payload in emitted if payload.get("event") == "outbox_skipped")
     assert skipped_log["metadata"]["skip_reason"] == "email_disabled_or_missing_project"
     assert not any(payload.get("event") == "outbox_delivered" for payload in emitted)

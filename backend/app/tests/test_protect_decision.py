@@ -5,9 +5,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
+from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.metrics_service import MetricsService
-from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.project_service import ProjectService
 from app.application.services.protect_service import ProtectService
 from app.dependencies import (
@@ -305,7 +305,9 @@ def _protect_metrics(client: TestClient, project_id: str, provider: str = "opena
     return response.json()
 
 
-def _incidents(client: TestClient, project_id: str, provider: str = "openai", status: str = "open") -> list[dict[str, object]]:
+def _incidents(
+    client: TestClient, project_id: str, provider: str = "openai", status: str = "open"
+) -> list[dict[str, object]]:
     response = client.get(f"/api/v1/incidents?project_id={project_id}&status={status}&provider={provider}")
     assert response.status_code == 200
     return response.json()
@@ -315,7 +317,9 @@ def test_protect_disabled_returns_allow_and_predictive_disabled(tmp_path) -> Non
     client, _, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Disabled")
     _set_protect(client, project_id, protect_enabled=False, protect_max_tok_per_min=100)
-    decision = _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 90})
+    decision = _decision(
+        client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 90}
+    )
     assert decision["decision"] == "allow"
     assert decision["reason"] == "ok"
     assert decision["snapshot"]["predictive"]["enabled"] is False
@@ -327,7 +331,9 @@ def test_caps_breach_blocks_with_cap_reason(tmp_path) -> None:
     project_id, ingest_key = _create_project_and_key(client, "Protect Caps")
     _set_protect(client, project_id, protect_enabled=True, protect_max_req_per_min=2, protect_max_tok_per_min=1000)
     for _ in range(2):
-        rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
+        rolling_window.increment_project_60s(
+            project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10
+        )
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "block"
     assert decision["reason"] == "req_cap_breach"
@@ -340,7 +346,9 @@ def test_caps_breach_enqueues_protection_block_email(tmp_path) -> None:
     project_id, ingest_key = _create_project_and_key(client, "Protect Caps Email")
     _set_protect(client, project_id, protect_enabled=True, protect_max_req_per_min=2, protect_max_tok_per_min=1000)
     for _ in range(2):
-        rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
+        rolling_window.increment_project_60s(
+            project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10
+        )
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "block"
     assert len(transport.calls) == 1
@@ -570,11 +578,53 @@ def test_retry_storm_warns_in_preflight(tmp_path) -> None:
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
     now = datetime.now(timezone.utc)
-    events.add_recent(_event(project_id, "openai", "gpt-4o-mini", status="error", http_status=500, total_tokens=50, created_at=now - timedelta(seconds=4)))
-    events.add_recent(_event(project_id, "openai", "gpt-4o-mini", status="error", http_status=501, total_tokens=50, created_at=now - timedelta(seconds=3)))
-    events.add_recent(_event(project_id, "openai", "gpt-4o-mini", status="error", http_status=502, total_tokens=50, created_at=now - timedelta(seconds=2)))
-    events.add_recent(_event(project_id, "openai", "gpt-4o-mini", status="error", http_status=503, total_tokens=50, created_at=now - timedelta(seconds=1)))
-    events.add_recent(_event(project_id, "openai", "gpt-4o-mini", status="error", http_status=504, total_tokens=50, created_at=now))
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="error",
+            http_status=500,
+            total_tokens=50,
+            created_at=now - timedelta(seconds=4),
+        )
+    )
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="error",
+            http_status=501,
+            total_tokens=50,
+            created_at=now - timedelta(seconds=3),
+        )
+    )
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="error",
+            http_status=502,
+            total_tokens=50,
+            created_at=now - timedelta(seconds=2),
+        )
+    )
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="error",
+            http_status=503,
+            total_tokens=50,
+            created_at=now - timedelta(seconds=1),
+        )
+    )
+    events.add_recent(
+        _event(project_id, "openai", "gpt-4o-mini", status="error", http_status=504, total_tokens=50, created_at=now)
+    )
 
     decision = _decision(client, ingest_key)
     assert decision["decision"] == "warn"
@@ -621,7 +671,9 @@ def test_protect_decision_records_allow_warn_block_outcomes(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
 
     allow_project_id, allow_ingest_key = _create_project_and_key(client, "Protect Outcome Allow")
-    _set_protect(client, allow_project_id, protect_enabled=True, protect_max_req_per_min=1000, protect_max_tok_per_min=1000)
+    _set_protect(
+        client, allow_project_id, protect_enabled=True, protect_max_req_per_min=1000, protect_max_tok_per_min=1000
+    )
     allow_before = int(_protect_metrics(client, allow_project_id)["allowed_60m"])
     _decision(client, allow_ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
     allow_metrics = _protect_metrics(client, allow_project_id)
@@ -636,7 +688,9 @@ def test_protect_decision_records_allow_warn_block_outcomes(tmp_path) -> None:
 
     warn_project_id, warn_ingest_key = _create_project_and_key(client, "Protect Outcome Warn")
     _set_protect(client, warn_project_id, protect_enabled=True, protect_max_tok_per_min=200)
-    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(warn_project_id, "openai"), total_tokens=170)
+    rolling_window.increment_project_60s(
+        project_id=scoped_project_provider_id(warn_project_id, "openai"), total_tokens=170
+    )
     warn_before = int(_protect_metrics(client, warn_project_id)["warned_60m"])
     _decision(
         client,
@@ -654,8 +708,12 @@ def test_protect_decision_records_allow_warn_block_outcomes(tmp_path) -> None:
     }
 
     block_project_id, block_ingest_key = _create_project_and_key(client, "Protect Outcome Block")
-    _set_protect(client, block_project_id, protect_enabled=True, protect_max_req_per_min=1, protect_max_tok_per_min=1000)
-    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(block_project_id, "openai"), total_tokens=1)
+    _set_protect(
+        client, block_project_id, protect_enabled=True, protect_max_req_per_min=1, protect_max_tok_per_min=1000
+    )
+    rolling_window.increment_project_60s(
+        project_id=scoped_project_provider_id(block_project_id, "openai"), total_tokens=1
+    )
     block_before = int(_protect_metrics(client, block_project_id)["blocked_60m"])
     _decision(client, block_ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
     block_metrics = _protect_metrics(client, block_project_id)
@@ -694,9 +752,13 @@ def test_protect_metrics_support_provider_filter_with_same_schema(tmp_path) -> N
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
 
     _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})  # allow
-    _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 180})  # warn
+    _decision(
+        client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 180}
+    )  # warn
 
-    _decision(client, ingest_key, body={"provider": "anthropic", "model": "claude-3-5-sonnet", "input_tokens_estimate": 180})  # warn
+    _decision(
+        client, ingest_key, body={"provider": "anthropic", "model": "claude-3-5-sonnet", "input_tokens_estimate": 180}
+    )  # warn
 
     all_metrics = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
     assert all_metrics.status_code == 200

@@ -143,11 +143,7 @@ def test_process_outbox_delivery_webhook_success_logs_destination_in_outbox_deli
 
     transport_job.process_outbox_delivery(outbox_id, trace_id="trace-log", span_id="span-log")
 
-    emitted = [
-        json.loads(line)
-        for line in capsys.readouterr().out.splitlines()
-        if line.strip().startswith("{")
-    ]
+    emitted = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip().startswith("{")]
     delivered_log = next(payload for payload in emitted if payload.get("event") == "outbox_delivered")
 
     assert delivered_log["metadata"]["destination"] == "https://example.test/hook"
@@ -182,11 +178,7 @@ def test_process_outbox_delivery_webhook_disabled_logs_skip_reason_instead_of_de
 
     assert captured == []
 
-    emitted = [
-        json.loads(line)
-        for line in capsys.readouterr().out.splitlines()
-        if line.strip().startswith("{")
-    ]
+    emitted = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.strip().startswith("{")]
     skipped_log = next(payload for payload in emitted if payload.get("event") == "outbox_skipped")
 
     assert skipped_log["metadata"]["skip_reason"] == "webhook_disabled_or_missing_url"
@@ -195,7 +187,9 @@ def test_process_outbox_delivery_webhook_disabled_logs_skip_reason_instead_of_de
     assert not any(payload.get("event") == "outbox_delivered" for payload in emitted)
 
 
-def test_process_outbox_delivery_webhook_sends_in_observe_mode_when_webhook_is_enabled(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_outbox_delivery_webhook_sends_in_observe_mode_when_webhook_is_enabled(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     db_url = f"sqlite:///{tmp_path}/transport_webhook_observe_success.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)
@@ -222,7 +216,9 @@ def test_process_outbox_delivery_webhook_sends_in_observe_mode_when_webhook_is_e
         assert row.status == "delivered"
 
 
-def test_process_outbox_delivery_webhook_does_not_add_signature_header(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_outbox_delivery_webhook_does_not_add_signature_header(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     db_url = f"sqlite:///{tmp_path}/transport_webhook_no_signature.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)
@@ -242,7 +238,9 @@ def test_process_outbox_delivery_webhook_does_not_add_signature_header(tmp_path,
     assert "X-RHEONIC-Signature" not in captured[0]["headers"]
 
 
-def test_process_outbox_delivery_webhook_failure_retries_then_dead_letters(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_outbox_delivery_webhook_failure_retries_then_dead_letters(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     db_url = f"sqlite:///{tmp_path}/transport_webhook_failure.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)
@@ -325,7 +323,9 @@ def test_terminal_webhook_failure_enqueues_delivery_failure_email(tmp_path, monk
         assert failure_email.payload["last_error_code"] == "webhook_http_error"
 
 
-def test_terminal_webhook_test_failure_does_not_enqueue_delivery_failure_email(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_terminal_webhook_test_failure_does_not_enqueue_delivery_failure_email(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     db_url = f"sqlite:///{tmp_path}/transport_webhook_test_dead_email.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)

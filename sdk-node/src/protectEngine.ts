@@ -1,7 +1,8 @@
-import { sdkNodeConfig } from "./config.js";
 import { randomUUID } from "node:crypto";
+
+import { sdkNodeConfig } from "./config.js";
 import { requestJson } from "./httpTransport.js";
-import { bindTraceContext, generateSpanId, generateTraceId, getSpanId, getTraceId } from "./logger.js";
+import { bindTraceContext, generateSpanId, generateTraceId, getTraceId } from "./logger.js";
 
 export type ProtectDecision = "allow" | "warn" | "block";
 export type ProtectFailMode = "open" | "closed";

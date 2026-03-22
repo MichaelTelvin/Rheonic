@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import uuid
-import subprocess
 import os
+import subprocess
+import uuid
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
@@ -58,11 +58,7 @@ def test_alembic_upgrade_head_creates_current_schema_on_fresh_database() -> None
     finally:
         with admin_engine.connect() as connection:
             connection.execute(
-                text(
-                    "SELECT pg_terminate_backend(pid) "
-                    "FROM pg_stat_activity "
-                    "WHERE datname = :db_name"
-                ),
+                text("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :db_name"),
                 {"db_name": db_name},
             )
             connection.execute(text(f'DROP DATABASE IF EXISTS "{db_name}"'))

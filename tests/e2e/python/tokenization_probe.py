@@ -93,10 +93,7 @@ def main() -> None:
             f"first tokens={first_value} first_ms={first_latency_ms:.3f} "
             f"second tokens={second_value} second_ms={second_latency_ms:.3f}"
         )
-        print(
-            f"repeated tokens={repeated_value} "
-            f"{_summary(repeated_latencies)}"
-        )
+        print(f"repeated tokens={repeated_value} {_summary(repeated_latencies)}")
 
 
 if __name__ == "__main__":
