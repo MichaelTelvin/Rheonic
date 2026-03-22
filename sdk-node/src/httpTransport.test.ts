@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import http from "node:http";
+import https from "node:https";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 
@@ -77,4 +78,52 @@ test("requestJson aborts when the signal is already aborted", async () => {
     async () => await requestJson("http://127.0.0.1:1/abort", { method: "GET", signal: controller.signal }),
     (error: unknown) => error instanceof Error && error.name === "AbortError",
   );
+});
+
+test("requestJson performs native https requests and writes the request body", async () => {
+  const originalRequest = https.request;
+  const originalFetch = globalThis.fetch;
+  let writtenBody = "";
+  const requestSpy = ((options: unknown, callback: (res: EventEmitter & { statusCode?: number }) => void) => {
+    const req = new EventEmitter() as EventEmitter & {
+      write: (chunk: string) => void;
+      end: () => void;
+      destroy: (error?: Error) => void;
+    };
+    req.write = (chunk: string) => {
+      writtenBody = chunk;
+    };
+    req.destroy = (error?: Error) => {
+      if (error) {
+        req.emit("error", error);
+      }
+    };
+    req.end = () => {
+      void options;
+      const res = new EventEmitter() as EventEmitter & { statusCode?: number };
+      res.statusCode = 200;
+      callback(res);
+      res.emit("data", JSON.stringify({ ok: true }));
+      res.emit("end");
+      req.emit("close");
+    };
+    return req;
+  }) as typeof https.request;
+  https.request = requestSpy;
+  Object.defineProperty(globalThis, "fetch", {
+    configurable: true,
+    value: undefined,
+  });
+
+  try {
+    const response = await requestJson("https://example.test/events", { method: "POST", body: "{\"hello\":\"world\"}" });
+    assert.equal(writtenBody, "{\"hello\":\"world\"}");
+    assert.deepEqual(await response.json(), { ok: true });
+  } finally {
+    https.request = originalRequest;
+    Object.defineProperty(globalThis, "fetch", {
+      configurable: true,
+      value: originalFetch,
+    });
+  }
 });

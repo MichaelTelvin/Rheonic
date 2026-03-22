@@ -6,7 +6,8 @@ from typing import Any
 
 import pytest
 from rheonic.client import Client
-from rheonic.protect_engine import RHEONICBlockedError, RHEONICValidationError
+from rheonic import protect_engine as protect_engine_module
+from rheonic.protect_engine import ProtectEngine, RHEONICBlockedError, RHEONICValidationError, _parse_blocked_until_ms
 from rheonic.provider_model_validation import validate_provider_model
 from rheonic.providers.anthropic_adapter import (
     _set_token_estimator_for_tests as _set_anthropic_token_estimator_for_tests,
@@ -819,3 +820,136 @@ def test_provider_model_validation_rejects_missing_provider() -> None:
 def test_provider_model_validation_rejects_unknown_provider() -> None:
     with pytest.raises(RHEONICValidationError):
         validate_provider_model("cohere", "command-r")
+
+
+def test_protect_engine_bootstrap_ignores_non_success_and_updates_config_on_success() -> None:
+    engine = ProtectEngine(
+        base_url="http://localhost:8000",
+        ingest_key="p1",
+        environment="dev",
+        request_timeout_s=0.5,
+        http_client=FakeHttpClient({}, decision_status=500),
+    )
+    engine.bootstrap()
+    assert engine._fail_mode == "open"
+
+    class BootstrapHttpClient(FakeHttpClient):
+        def get(self, url: str, headers: dict[str, str] | None = None, **kwargs: Any) -> FakeResponse:
+            _ = url, headers, kwargs
+            return FakeResponse(
+                200,
+                {
+                    "protect_fail_mode": "closed",
+                    "protect_decision_timeout_ms": 321,
+                },
+            )
+
+    engine = ProtectEngine(
+        base_url="http://localhost:8000",
+        ingest_key="p1",
+        environment="dev",
+        request_timeout_s=0.5,
+        http_client=BootstrapHttpClient({}),
+    )
+    engine.bootstrap()
+    assert engine._fail_mode == "closed"
+    assert engine._decision_timeout_ms == 321
+
+
+def test_protect_engine_timeout_helpers_fall_back_across_transport_signatures() -> None:
+    class TimeoutSOnlyClient:
+        def post(self, url: str, json: dict[str, object], headers: dict[str, str], timeout_s: float) -> str:
+            _ = url, json, headers
+            return f"post:{timeout_s}"
+
+        def get(self, url: str, headers: dict[str, str], timeout_s: float) -> str:
+            _ = url, headers
+            return f"get:{timeout_s}"
+
+    engine = ProtectEngine(
+        base_url="http://localhost:8000",
+        ingest_key="p1",
+        environment="dev",
+        request_timeout_s=0.5,
+        http_client=TimeoutSOnlyClient(),
+    )
+    assert engine._post_with_timeout("http://localhost", {}, {}, 0.2) == "post:0.2"
+    assert engine._get_with_timeout("http://localhost", {}, 0.3) == "get:0.3"
+
+    class NoTimeoutClient:
+        def post(self, url: str, json: dict[str, object], headers: dict[str, str]) -> str:
+            _ = url, json, headers
+            return "post:no-timeout"
+
+        def get(self, url: str, headers: dict[str, str]) -> str:
+            _ = url, headers
+            return "get:no-timeout"
+
+    engine = ProtectEngine(
+        base_url="http://localhost:8000",
+        ingest_key="p1",
+        environment="dev",
+        request_timeout_s=0.5,
+        http_client=NoTimeoutClient(),
+    )
+    assert engine._post_with_timeout("http://localhost", {}, {}, 0.2) == "post:no-timeout"
+    assert engine._get_with_timeout("http://localhost", {}, 0.3) == "get:no-timeout"
+
+
+def test_protect_engine_json_and_fallback_helpers_cover_invalid_shapes() -> None:
+    engine = ProtectEngine(
+        base_url="http://localhost:8000",
+        ingest_key="p1",
+        environment="dev",
+        request_timeout_s=0.5,
+        fail_mode="closed",
+        http_client=FakeHttpClient({}),
+    )
+
+    assert engine._parse_json_payload(object()) == {}
+    assert engine._parse_json_payload(type("Response", (), {"json": lambda self: []})()) == {}
+    assert engine._fallback_decision() == {"decision": "block", "reason": "decision_unavailable"}
+    engine._fail_mode = "open"
+    assert engine._fallback_decision() == {"decision": "allow", "reason": "decision_unavailable"}
+
+
+def test_protect_engine_debug_uses_fallback_logger_when_debug_logger_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    engine = ProtectEngine(
+        base_url="http://localhost:8000",
+        ingest_key="p1",
+        environment="dev",
+        request_timeout_s=0.5,
+        http_client=FakeHttpClient({}),
+        debug_logger=lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    exceptions: list[str] = []
+    debugs: list[tuple[str, object]] = []
+    monkeypatch.setattr(protect_engine_module.logger, "exception", lambda message: exceptions.append(message))
+    monkeypatch.setattr(protect_engine_module.logger, "debug", lambda message, extra=None: debugs.append((message, extra)))
+
+    engine._debug("hello", provider="openai")
+
+    assert exceptions == ["Protect engine debug logger failed"]
+    assert debugs == [("hello", {"provider": "openai"})]
+
+
+def test_parse_blocked_until_ms_handles_invalid_naive_and_zulu_values() -> None:
+    assert _parse_blocked_until_ms(None) is None
+    assert _parse_blocked_until_ms("") is None
+    assert _parse_blocked_until_ms("not-a-date") is None
+    assert _parse_blocked_until_ms("2026-03-22T00:00:00") is not None
+    assert _parse_blocked_until_ms("2026-03-22T00:00:00Z") is not None
+
+
+def test_is_timeout_error_handles_builtin_timeout() -> None:
+    engine = ProtectEngine(
+        base_url="http://localhost:8000",
+        ingest_key="p1",
+        environment="dev",
+        request_timeout_s=0.5,
+        http_client=FakeHttpClient({}),
+    )
+    try:
+        raise TimeoutError("slow")
+    except TimeoutError:
+        assert engine._is_timeout_error() is True

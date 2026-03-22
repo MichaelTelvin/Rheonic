@@ -135,7 +135,8 @@ services:
       - ./sdk-python:/app
     command: >
       sh -c "pip install -q -e '.[dev]' >/dev/null 2>&1
-      && pytest -v --cov=rheonic --cov-report=term-missing --cov-fail-under=60"
+      && pytest -v --cov=rheonic --cov-branch --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
+      && python -c \"import json; report=json.load(open('coverage.json')); total=report['totals']; branches=total.get('num_branches', 0); covered=total.get('covered_branches', 0); assert branches and covered / branches >= 0.8, f'branch coverage below 80%: {covered}/{branches}'\""
 
   frontend_test:
     image: node:20-alpine

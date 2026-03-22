@@ -1337,7 +1337,6 @@ body {
   grid-template-columns: minmax(320px, 1.2fr) clamp(300px, 28vw, 420px);
   gap: clamp(24px, 2vw, 36px);
   align-items: start;
-  margin-bottom: 40px;
   position: relative;
 }
 
@@ -1862,7 +1861,7 @@ select {
   grid-template-columns: minmax(0, 1fr) clamp(420px, 42vw, 760px);
   gap: clamp(24px, 2vw, 34px);
   align-items: start;
-  margin: 4px 0 24px;
+  min-height: clamp(80px, 10vh, 90px);
 }
 
 .dashboard-banner-slot--banner-only {
@@ -2643,7 +2642,6 @@ pre {
   .dashboard-hero {
     grid-template-columns: 1fr;
     gap: 14px;
-    margin-bottom: 34px;
   }
 
   .dashboard-hero-right {
@@ -5225,7 +5223,6 @@ html {
   .dashboard-hero {
     gap: clamp(30px, 2.4vw, 44px);
     margin-top: 10px;
-    margin-bottom: 44px;
   }
 
   .dashboard-controls-main {

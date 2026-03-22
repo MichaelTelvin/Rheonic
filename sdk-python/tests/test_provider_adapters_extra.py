@@ -90,6 +90,56 @@ def test_openai_failure_capture_reads_http_status_from_exception_response() -> N
     client.close()
 
 
+def test_openai_async_wrapper_supports_success_and_clamp() -> None:
+    client = _client_with_decision(
+        {
+            "decision": "warn",
+            "reason": "near_cap",
+            "apply_clamp_enabled": True,
+            "clamp": {"recommended_max_output_tokens": 12, "applied": False},
+        }
+    )
+    calls: list[dict[str, Any]] = []
+
+    class _Completions:
+        async def create(self, **kwargs: Any) -> Any:
+            calls.append(kwargs)
+            usage = type("Usage", (), {"total_tokens": 22})()
+            return type("Response", (), {"model": "gpt-4o-mini", "usage": usage})()
+
+    openai = type("OpenAI", (), {"chat": type("Chat", (), {"completions": _Completions()})()})()
+    instrument_openai(openai, client=client)
+
+    asyncio.run(openai.chat.completions.create(model="gpt-4o-mini", max_tokens=40))
+    assert calls[0]["max_tokens"] == 12
+    client.close()
+
+
+def test_openai_async_wrapper_captures_failure() -> None:
+    client = _client_with_decision({"decision": "allow", "reason": "ok"})
+
+    class _Response:
+        status_code = 500
+
+    class _OpenAIError(RuntimeError):
+        response = _Response()
+
+    class _Completions:
+        async def create(self, **kwargs: Any) -> Any:
+            _ = kwargs
+            raise _OpenAIError("boom")
+
+    openai = type("OpenAI", (), {"chat": type("Chat", (), {"completions": _Completions()})()})()
+    instrument_openai(openai, client=client)
+
+    with pytest.raises(_OpenAIError):
+        asyncio.run(openai.chat.completions.create(model="gpt-4o-mini"))
+
+    client.flush(timeout_s=0.5)
+    assert client.stats()["sent"] == 1
+    client.close()
+
+
 def test_anthropic_async_wrapper_blocks_and_supports_clamp() -> None:
     client = _client_with_decision(
         {
@@ -162,4 +212,84 @@ def test_google_clamp_inserts_generation_config_and_extracts_nested_usage() -> N
     google.generate_content({"prompt": "hi"})
     payload = calls[0][0][0]
     assert payload["generation_config"]["max_output_tokens"] == 15
+    client.close()
+
+
+def test_google_async_wrapper_supports_success_and_clamp() -> None:
+    client = _client_with_decision(
+        {
+            "decision": "warn",
+            "reason": "near_cap",
+            "apply_clamp_enabled": True,
+            "clamp": {"recommended_max_output_tokens": 9, "applied": False},
+        }
+    )
+    calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    class _GoogleModel:
+        model_name = "gemini-1.5-pro"
+
+        async def generate_content(self, *args: Any, **kwargs: Any) -> Any:
+            calls.append((args, kwargs))
+            usage_metadata = type("Usage", (), {"total_token_count": 14})()
+            return type("Response", (), {"usage_metadata": usage_metadata})()
+
+    google = _GoogleModel()
+    instrument_google(google, client=client)
+
+    asyncio.run(google.generate_content({"prompt": "hi"}))
+    payload = calls[0][0][0]
+    assert payload["generation_config"]["max_output_tokens"] == 9
+    client.close()
+
+
+def test_google_async_wrapper_captures_failure() -> None:
+    client = _client_with_decision({"decision": "allow", "reason": "ok"})
+
+    class _Response:
+        status_code = 503
+
+    class _GoogleError(RuntimeError):
+        response = _Response()
+
+    class _GoogleModel:
+        model_name = "gemini-1.5-pro"
+
+        async def generate_content(self, *args: Any, **kwargs: Any) -> Any:
+            _ = args, kwargs
+            raise _GoogleError("boom")
+
+    google = _GoogleModel()
+    instrument_google(google, client=client)
+
+    with pytest.raises(_GoogleError):
+        asyncio.run(google.generate_content("hi"))
+
+    client.flush(timeout_s=0.5)
+    assert client.stats()["sent"] == 1
+    client.close()
+
+
+def test_anthropic_async_wrapper_captures_failure() -> None:
+    client = _client_with_decision({"decision": "allow", "reason": "ok"})
+
+    class _Response:
+        status_code = 429
+
+    class _AnthropicError(RuntimeError):
+        response = _Response()
+
+    class _Messages:
+        async def create(self, **kwargs: Any) -> Any:
+            _ = kwargs
+            raise _AnthropicError("boom")
+
+    anthropic_client = type("Anthropic", (), {"messages": _Messages()})()
+    instrument_anthropic(anthropic_client, client=client)
+
+    with pytest.raises(_AnthropicError):
+        asyncio.run(anthropic_client.messages.create(model="claude-3-5-sonnet", max_tokens=12))
+
+    client.flush(timeout_s=0.5)
+    assert client.stats()["sent"] == 1
     client.close()
