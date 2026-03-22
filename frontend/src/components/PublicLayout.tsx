@@ -30,9 +30,9 @@ export function PublicLayout({
   const docsHref = "/login";
   const [scrolled, setScrolled] = useState(false);
   const [publicContactEmail, setPublicContactEmail] = useState<string>(frontendConfig.publicContactEmail || "feedback@example.com");
-  const isV2Surface = shellClassName?.includes("public-shell-marketing") || shellClassName?.includes("quickstart-v2-shell");
-  const isLandingFooter = shellClassName?.includes("public-shell-marketing");
-  const isQuickstartFooter = shellClassName?.includes("quickstart-v2-shell");
+  const isV2Surface = shellClassName?.includes("public-shell--marketing") || shellClassName?.includes("public-shell--quickstart");
+  const isLandingFooter = shellClassName?.includes("public-shell--marketing");
+  const isQuickstartFooter = shellClassName?.includes("public-shell--quickstart");
 
   useEffect(() => {
     if (!isV2Surface) {
@@ -69,7 +69,7 @@ export function PublicLayout({
   }, []);
 
   return (
-    <main className={`public-page${isV2Surface ? " public-page-v2" : ""}`}>
+    <main className={`public-page${isV2Surface ? " public-surface" : ""}`}>
       <div className={`public-shell${shellClassName ? ` ${shellClassName}` : ""}`}>
         <header className={`public-nav public-nav-sticky${scrolled ? " is-scrolled" : ""}`}>
           <Link className="public-brand" to="/">

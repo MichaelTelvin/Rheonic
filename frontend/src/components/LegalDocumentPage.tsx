@@ -226,7 +226,7 @@ export function LegalDocumentPage({
   }, [markdownPath]);
 
   return (
-    <PublicLayout navAuthHref="/login" navAuthLabel="Sign in" shellClassName="public-shell-marketing" showDocsLink={false}>
+    <PublicLayout navAuthHref="/login" navAuthLabel="Sign in" shellClassName="public-shell--marketing" showDocsLink={false}>
       <Seo title={`${title} | Rheonic`} description={description} path={path} />
       <section className="landing-marketing">
         <div className="docs-article-shell">

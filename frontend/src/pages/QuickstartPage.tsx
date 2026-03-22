@@ -264,7 +264,7 @@ except RHEONICBlockedError:
     <PublicLayout
       navAuthHref="/login"
       navAuthLabel="Sign in"
-      shellClassName="quickstart-v2-shell"
+      shellClassName="public-shell--quickstart"
       showHomeLink
       showQuickstartLink={false}
       showDocsLink
@@ -285,11 +285,11 @@ except RHEONICBlockedError:
           mainEntityOfPage: `${window.location.origin}/quickstart`,
         }}
       />
-      <section className="quickstart-page quickstart-v2">
+      <section className="quickstart-page quickstart">
         <div className="quickstart-docs-layout">
           <article className="quickstart-docs-content">
             <h1>Quickstart</h1>
-            <p className="quickstart-v2-lede">
+            <p className="quickstart-lede">
               Follow these steps to start in Observe mode, verify traffic,
               <br />
               then enable Protect once caps are configured.
@@ -457,7 +457,7 @@ RHEONIC_BACKEND_URL=<value_shown_in_dashboard>`}
                 {stepIcon}
                 <h2>Next step</h2>
               </div>
-              <p className="quickstart-v2-next-copy">
+              <p className="quickstart-next-copy">
                 Create a project, generate an ingest key, and run your first instrumented call.
               </p>
               <div className="quickstart-actions-row">
