@@ -436,9 +436,12 @@ class Client:
             if status_code >= 500:
                 return False, True
             return False, False
-        except Exception:
+        except Exception as error:
             if self._debug_enabled:
-                logger.debug("SDK send failed; retrying once", exc_info=True, extra=build_log_extra(event="http_retry"))
+                logger.debug(
+                    "SDK send failed; retrying once",
+                    extra=build_log_extra(event="http_retry", metadata={"error_message": str(error)}),
+                )
             return False, True
         finally:
             reset_trace_context(context_tokens)

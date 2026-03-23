@@ -4197,8 +4197,8 @@ pre {
 
 .unsaved-changes-toast {
   position: fixed;
-  right: max(24px, calc(var(--app-shell-gutter) + 8px));
-  top: 92px;
+  right: max(56px, calc(var(--app-shell-gutter) + 44px));
+  top: 116px;
   z-index: 70;
   display: flex;
   align-items: center;
