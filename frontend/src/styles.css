@@ -1171,7 +1171,8 @@ body {
 
 @media (max-width: 980px) {
   .landing-hero {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    justify-items: stretch;
   }
 
   .landing-two-col,
@@ -5091,7 +5092,9 @@ html {
 
 .landing h2 {
   margin: 0 0 22px;
-  font-size: clamp(2.25rem, 3.4vw, 2.5rem);
+  font-size: clamp(1.7rem, 2.35vw, 1.92rem);
+  line-height: 1.1;
+  font-weight: 550;
   letter-spacing: -0.02em;
   color: #f5f8ff;
 }
@@ -5111,6 +5114,7 @@ html {
   margin: 0;
   max-width: min(720px, 100%);
   font-size: clamp(3.35rem, 4.8vw, 3.95rem);
+  font-weight: 700;
   line-height: 0.97;
   letter-spacing: -0.018em;
   color: #f7faff;
@@ -5302,7 +5306,7 @@ html {
 
   .landing h2 {
     margin-bottom: 24px;
-    font-size: clamp(2.35rem, 2.6vw, 2.85rem);
+    font-size: clamp(1.82rem, 1.95vw, 2.08rem);
   }
 
   .landing-section,
@@ -5945,10 +5949,10 @@ html {
   padding: 10px 14px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
   flex-wrap: nowrap;
-  overflow-x: auto;
+  overflow: hidden;
   white-space: nowrap;
   scrollbar-width: none;
   background: linear-gradient(180deg, rgba(24, 37, 63, 0.54), rgba(18, 29, 53, 0.48));
@@ -5962,6 +5966,7 @@ html {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: 0 1 auto;
   color: rgba(219, 230, 250, 0.86);
 }
 
@@ -5977,13 +5982,15 @@ html {
 
 .landing-pain-mini-node em {
   font-style: normal;
-  font-size: 0.81rem;
+  font-size: 0.86rem;
   font-weight: 580;
 }
 
 .landing-pain-mini-arrow {
   color: rgba(167, 184, 218, 0.7);
-  font-size: 0.8rem;
+  font-size: 0.88rem;
+  line-height: 1;
+  flex: 0 0 auto;
 }
 
 .landing-capabilities {
@@ -7014,7 +7021,8 @@ html {
 
 @media (max-width: 1024px) {
   .landing-hero {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    justify-items: stretch;
   }
 
   .landing-dashboard-mock {
@@ -7118,8 +7126,20 @@ html {
   }
 
   .landing-pain-mini-flow {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
+    justify-content: center;
+    gap: 8px 6px;
+    flex-wrap: wrap;
+    overflow: visible;
+    white-space: normal;
+    padding: 10px 12px;
+  }
+
+  .landing-pain-mini-node em {
+    font-size: 0.78rem;
+  }
+
+  .landing-pain-mini-arrow {
+    font-size: 0.74rem;
   }
 
   .landing-pain-step {
@@ -7243,25 +7263,35 @@ html {
   }
 
   .landing h2 {
-    font-size: clamp(1.8rem, 8vw, 2.1rem);
+    max-width: none;
+    font-size: clamp(1.38rem, 5vw, 1.58rem);
     margin-bottom: 16px;
+    text-align: center;
   }
 
   .landing-hero-cta {
     gap: 14px;
-    align-items: flex-start;
+    align-items: center;
     flex-direction: column;
   }
 
   .landing-hero-cta .landing-link-button {
-    width: auto;
-    min-width: min(100%, 220px);
-    max-width: min(100%, 320px);
+    width: min(100%, 232px);
+    min-width: 0;
+    max-width: min(100%, 232px);
+    font-size: 0.9rem;
+    text-align: center;
   }
 
   .landing-dashboard-mock {
     border-radius: 16px;
     padding: 8px;
+  }
+
+  .landing-hero-copy,
+  .landing-hero-copy p,
+  .landing-hero-beta {
+    text-align: center;
   }
 
   .landing-flow {
@@ -7320,15 +7350,19 @@ html {
 
   .public-shell.public-shell--marketing .public-footer-landing-legal,
   .public-shell.public-shell--quickstart .public-footer-quickstart-legal {
+    width: 100%;
     gap: 10px;
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .public-shell.public-shell--marketing .public-footer-landing-legal .public-footer-links,
   .public-shell.public-shell--quickstart .public-footer-quickstart-legal .public-footer-links {
     width: 100%;
+    flex-direction: column;
     row-gap: 8px;
     justify-content: flex-start;
-    align-items: center;
+    align-items: flex-start;
   }
 
   .public-shell.public-shell--marketing .public-footer-landing-legal .public-footer-dot,
@@ -7339,6 +7373,8 @@ html {
   .public-shell.public-shell--marketing .public-footer-landing-legal p,
   .public-shell.public-shell--quickstart .public-footer-quickstart-legal p {
     width: 100%;
+    justify-content: center;
+    text-align: center;
   }
 }
 
@@ -7439,14 +7475,18 @@ html {
   }
 
   .landing h2 {
-    font-size: clamp(1.56rem, 8.6vw, 1.85rem);
+    max-width: none;
+    font-size: clamp(1.24rem, 6.2vw, 1.42rem);
   }
 
   .landing-hero-cta .landing-link-button {
     min-height: 44px !important;
     height: 44px !important;
-    font-size: 0.93rem;
+    width: min(100%, 220px);
+    max-width: min(100%, 220px);
+    font-size: 0.88rem;
   }
+
 
   .quickstart .quickstart-docs-content {
     padding: 12px;

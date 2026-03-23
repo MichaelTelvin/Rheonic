@@ -139,7 +139,7 @@ export function LandingPage(): JSX.Element {
         </section>
 
         <section className="landing-section reveal-on-scroll">
-          <h2>Agentic systems don’t fail quietly.</h2>
+          <h2>Agentic systems don’t fail quietly</h2>
           <div className="landing-pain-grid">
             <article className="landing-pain-timeline">
               <p className="landing-pain-kicker">Failure sequence</p>
@@ -221,7 +221,7 @@ export function LandingPage(): JSX.Element {
         </section>
 
         <section className="landing-section reveal-on-scroll">
-          <h2>A control layer between your agents and model providers.</h2>
+          <h2>A control layer between your agents and model providers</h2>
           <div className="landing-capabilities">
             <article className="landing-cap-card">
               <div className="landing-cap-head">
@@ -345,7 +345,7 @@ export function LandingPage(): JSX.Element {
         </section>
 
         <section className="landing-final-cta reveal-on-scroll">
-          <h2>Add guardrails before your next agent experiment.</h2>
+          <h2>Add guardrails before your next agent experiment</h2>
           <Link className="landing-link-button modal-primary" to="/login">
             Start beta testing
           </Link>
