@@ -158,51 +158,12 @@ export function App(): JSX.Element {
           cancelled = true;
         };
       }
-      if (authEntryRoutes.has(location.pathname)) {
+      if (authEntryRoutes.has(location.pathname) || publicRoutes.has(location.pathname)) {
         setSessionResolved(true);
         return () => {
           cancelled = true;
         };
       }
-      if (sessionResolved) {
-        return () => {
-          cancelled = true;
-        };
-      }
-
-      const restorePublicSession = async (): Promise<void> => {
-        try {
-          const currentUser = await fetchCurrentUser();
-          if (!cancelled) {
-            writeCachedAuthUser(currentUser);
-            setUser(currentUser);
-          }
-        } catch (error) {
-          if (cancelled) {
-            return;
-          }
-          if (!(error instanceof ApiError) || error.status !== 401) {
-            emitFrontendLog({
-              level: "error",
-              event: "http_response",
-              message: "Failed to restore browser session",
-              metadata: { error },
-            });
-          } else {
-            writeCachedAuthUser(null);
-            setUser(null);
-          }
-        } finally {
-          if (!cancelled) {
-            setSessionResolved(true);
-          }
-        }
-      };
-
-      void restorePublicSession();
-      return () => {
-        cancelled = true;
-      };
     }
 
     const restoreSession = async (): Promise<void> => {

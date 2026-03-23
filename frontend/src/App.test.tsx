@@ -173,6 +173,17 @@ describe("App", () => {
     expect(mockFetchCurrentUser).not.toHaveBeenCalled();
   });
 
+  it("does not probe auth on a cold landing-page refresh", async () => {
+    render(
+      <TestRouter initialEntries={["/"]}>
+        <App />
+      </TestRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Control your agent traffic before it controls your bill." })).toBeDefined();
+    expect(mockFetchCurrentUser).not.toHaveBeenCalled();
+  });
+
   it("redirects unauthenticated user from /app to /login", async () => {
     render(
       <TestRouter initialEntries={["/app"]}>
