@@ -1944,6 +1944,10 @@ select {
   color: rgba(226, 232, 240, 0.82);
 }
 
+.setup-banner-text br {
+  display: none;
+}
+
 .setup-banner .dashboard-alert-banner-layout {
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
@@ -4645,6 +4649,10 @@ pre {
   .dashboard-alert-banner-summary,
   .setup-banner .dashboard-alert-banner-summary {
     white-space: normal;
+  }
+
+  .setup-banner-text br {
+    display: block;
   }
 
   .dashboard-alert-card .modal-actions.form-actions,

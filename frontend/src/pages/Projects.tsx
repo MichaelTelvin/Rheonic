@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { formatRelative } from "./dashboardUtils";
 import { createProject } from "../api/client";
 import { showAppToast } from "../components/AppToastHost";
 import { Card } from "../components/Card";
 import { FormColumn } from "../components/FormColumn";
+import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 
 const NAME_REGEX = new RegExp(frontendConfig.dashboardNamePattern);
 const NAME_MAX = frontendConfig.dashboardNameMaxLength;
@@ -19,6 +21,7 @@ export function Projects(): JSX.Element {
   const shortId = (value: string): string => (value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value);
   const backendBaseUrl = frontendConfig.apiBaseUrl.trim();
   const hasBackendBaseUrl = backendBaseUrl.length > 0;
+  const hasUnsavedChanges = useMemo(() => newProjectName.trim().length > 0, [newProjectName]);
 
   const onCopyBackendUrl = async (): Promise<void> => {
     if (!hasBackendBaseUrl || !navigator.clipboard) {
@@ -83,6 +86,21 @@ export function Projects(): JSX.Element {
       setCreatingProject(false);
     }
   };
+
+  const discardUnsavedChanges = (): void => {
+    setNewProjectName("");
+    setCreateProjectError(null);
+  };
+
+  const {
+    showPrompt: showUnsavedPrompt,
+    onSaveAndContinue,
+    onDiscardAndContinue,
+  } = useUnsavedChangesGuard({
+    isDirty: hasUnsavedChanges,
+    onSave: onCreateProject,
+    onDiscard: discardUnsavedChanges,
+  });
 
   return (
     <main className="dashboard">
@@ -194,6 +212,12 @@ export function Projects(): JSX.Element {
             ) : null}
           </Card>
         </div>
+        <UnsavedChangesToast
+          open={showUnsavedPrompt}
+          busy={creatingProject}
+          onSave={() => void onSaveAndContinue()}
+          onDiscard={onDiscardAndContinue}
+        />
       </div>
     </main>
   );

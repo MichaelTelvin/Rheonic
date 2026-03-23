@@ -26,6 +26,34 @@ import { QuickstartPage } from "./pages/QuickstartPage";
 import { TermsPage } from "./pages/TermsPage";
 
 const authUserCacheStorageKey = "auth_user_cache";
+const legacyAuthStorageKeys = ["rheonic_token", "rheonic_refresh_token", "rheonic_user"];
+const sensitiveSessionCachePrefixes = ["rheonic:alerts:", "rheonic:dashboard:"];
+
+function clearLegacyAuthStorage(): void {
+  try {
+    for (const key of legacyAuthStorageKeys) {
+      window.localStorage.removeItem(key);
+      window.sessionStorage.removeItem(key);
+    }
+    for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith("rheonic:setupBannerDismissed:")) {
+        window.localStorage.removeItem(key);
+      }
+    }
+    for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.sessionStorage.key(index);
+      if (key?.startsWith("rheonic:setupBannerDismissed:")) {
+        window.sessionStorage.removeItem(key);
+      }
+      if (key && sensitiveSessionCachePrefixes.some((prefix) => key.startsWith(prefix))) {
+        window.sessionStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Ignore storage cleanup failures.
+  }
+}
 
 function readCachedAuthUser(): AuthUser | null {
   try {
@@ -156,6 +184,10 @@ export function App(): JSX.Element {
   const location = useLocation();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionResolved, setSessionResolved] = useState<boolean>(false);
+
+  useEffect(() => {
+    clearLegacyAuthStorage();
+  }, []);
 
   const clearSession = useCallback((): void => {
     writeCachedAuthUser(null);

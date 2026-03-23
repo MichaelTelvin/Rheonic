@@ -52,7 +52,7 @@ const SAMPLE_WARN_PAYLOAD = JSON.stringify(
 );
 
 type AlertsCacheState = {
-  webhookSettings: ProjectWebhookSettings | null;
+  webhookSettings: Pick<ProjectWebhookSettings, "enabled" | "email_enabled" | "last_status" | "last_at"> | null;
   protectEnabled: boolean;
 };
 
@@ -71,7 +71,14 @@ function readAlertsCache(projectId: string | null): AlertsCacheState | null {
     }
     const parsed = JSON.parse(raw) as Partial<AlertsCacheState>;
     return {
-      webhookSettings: parsed.webhookSettings ?? null,
+      webhookSettings: parsed.webhookSettings
+        ? {
+          enabled: Boolean(parsed.webhookSettings.enabled),
+          email_enabled: Boolean(parsed.webhookSettings.email_enabled),
+          last_status: parsed.webhookSettings.last_status ?? null,
+          last_at: parsed.webhookSettings.last_at ?? null,
+        }
+        : null,
       protectEnabled: Boolean(parsed.protectEnabled),
     };
   } catch {
@@ -88,7 +95,7 @@ export function Alerts(): JSX.Element {
   const [webhookSettings, setWebhookSettings] = useState<ProjectWebhookSettings | null>(initialCache?.webhookSettings ?? null);
   const [webhookEnabledInput, setWebhookEnabledInput] = useState<boolean>(initialCache?.webhookSettings?.enabled ?? false);
   const [emailEnabledInput, setEmailEnabledInput] = useState<boolean>(Boolean(initialCache?.webhookSettings?.email_enabled));
-  const [webhookUrlInput, setWebhookUrlInput] = useState<string>(initialCache?.webhookSettings?.url ?? "");
+  const [webhookUrlInput, setWebhookUrlInput] = useState<string>("");
   const [webhookSaving, setWebhookSaving] = useState<boolean>(false);
   const [webhookTesting, setWebhookTesting] = useState<boolean>(false);
   const [webhookError, setWebhookError] = useState<string | null>(null);
@@ -104,7 +111,7 @@ export function Alerts(): JSX.Element {
     setWebhookSettings(cachedSettings);
     setWebhookEnabledInput(cachedSettings?.enabled ?? false);
     setEmailEnabledInput(Boolean(cachedSettings?.email_enabled));
-    setWebhookUrlInput(cachedSettings?.url ?? "");
+    setWebhookUrlInput("");
     setProtectEnabled(cached?.protectEnabled ?? false);
     setLoadingSettings(projectId ? cached === null : false);
     setWebhookError(null);
@@ -118,7 +125,14 @@ export function Alerts(): JSX.Element {
       window.sessionStorage.setItem(
         alertsCacheKey(projectId),
         JSON.stringify({
-          webhookSettings,
+          webhookSettings: webhookSettings
+            ? {
+              enabled: webhookSettings.enabled,
+              email_enabled: Boolean(webhookSettings.email_enabled),
+              last_status: webhookSettings.last_status ?? null,
+              last_at: webhookSettings.last_at ?? null,
+            }
+            : null,
           protectEnabled,
         } satisfies AlertsCacheState),
       );

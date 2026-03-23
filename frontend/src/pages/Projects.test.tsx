@@ -77,4 +77,22 @@ describe("Projects page", () => {
 
     await waitFor(() => expect(mocks.showAppToast).toHaveBeenCalledWith("Project ID copied"));
   });
+
+  it("shows unsaved changes prompt when navigating away with a typed project name", async () => {
+    render(
+      <>
+        <a href="/app/keys">Keys</a>
+        <Projects />
+      </>,
+    );
+
+    fireEvent.change(screen.getByLabelText("Project name"), {
+      target: { value: "prod" },
+    });
+    fireEvent.click(screen.getByRole("link", { name: "Keys" }));
+
+    expect(await screen.findByText("There are unsaved changes")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Discard" })).toBeTruthy();
+  });
 });

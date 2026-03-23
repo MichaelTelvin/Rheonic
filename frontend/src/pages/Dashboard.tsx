@@ -59,7 +59,6 @@ type DashboardCachedState = {
     warned_60m: number | null;
     blocked_60m: number | null;
   } | null;
-  incidents: IncidentItem[];
 };
 
 function buildInitialDashboardState(projectId: string | null | undefined): DashboardCachedState | null {
@@ -85,7 +84,6 @@ function readDashboardCache(projectId: string): DashboardCachedState | null {
       metrics: parsed.metrics ?? null,
       lastMetricsSuccessAt: parsed.lastMetricsSuccessAt ?? null,
       protectDecisionStats: parsed.protectDecisionStats ?? null,
-      incidents: Array.isArray(parsed.incidents) ? parsed.incidents : [],
     };
   } catch {
     return null;
@@ -106,7 +104,7 @@ export function Dashboard(): JSX.Element {
   const initialDashboardState = buildInitialDashboardState(projectId);
 
   const [metrics, setMetrics] = useState<RealtimeMetrics | null>(initialDashboardState?.metrics ?? null);
-  const [incidents, setIncidents] = useState<IncidentItem[]>(initialDashboardState?.incidents ?? []);
+  const [incidents, setIncidents] = useState<IncidentItem[]>([]);
   const [requestsSeries, setRequestsSeries] = useState<number[]>([]);
   const [tokensSeries, setTokensSeries] = useState<number[]>([]);
   const [loadingMetrics, setLoadingMetrics] = useState<boolean>(false);
@@ -178,7 +176,7 @@ export function Dashboard(): JSX.Element {
   useLayoutEffect(() => {
     const cached = projectId ? readDashboardCache(projectId) : null;
     setMetrics(cached?.metrics ?? null);
-    setIncidents(cached?.incidents ?? []);
+    setIncidents([]);
     setRequestsSeries([]);
     setTokensSeries([]);
     seriesByScopeRef.current = {};
@@ -213,9 +211,8 @@ export function Dashboard(): JSX.Element {
       metrics,
       lastMetricsSuccessAt,
       protectDecisionStats,
-      incidents,
     });
-  }, [hasEvents, hasIngestKey, incidents, lastMetricsSuccessAt, metrics, projectId, protectDecisionStats, selectedProvider, setupStatusResolved]);
+  }, [hasEvents, hasIngestKey, lastMetricsSuccessAt, metrics, projectId, protectDecisionStats, selectedProvider, setupStatusResolved]);
 
   useEffect(() => {
     const dismissed = window.localStorage.getItem(webhookIssueDismissStorageKey);
