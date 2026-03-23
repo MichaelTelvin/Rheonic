@@ -226,7 +226,7 @@ export function Keys(): JSX.Element {
           <p className="page-subtitle">Manage API keys</p>
         </section>
 
-        <Card className="form-card card--form">
+        <Card className="form-card projects-shell-width">
           <h2 className="section-title">Create key</h2>
           <FormColumn testId="keys-form-column">
             <div className="form-field">

@@ -1248,7 +1248,7 @@ body {
 .dashboard-home-content {
   min-height: calc(100vh - 112px);
   width: 100%;
-  max-width: var(--dashboard-home-max);
+  max-width: min(var(--dashboard-home-max), 1260px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -1367,7 +1367,7 @@ body {
 
 .dashboard-hero-right {
   justify-self: end;
-  width: clamp(300px, 28vw, 420px);
+  width: clamp(252px, 20vw, 328px);
   padding-top: 6px;
 }
 
@@ -1856,8 +1856,8 @@ select {
   width: 100%;
   display: grid;
   gap: 12px;
-  min-height: clamp(104px, 11vw, 134px);
-  align-content: start;
+  min-height: clamp(88px, 9vw, 112px);
+  align-content: center;
 }
 
 .dashboard-banner-slot {
@@ -1865,7 +1865,7 @@ select {
   grid-template-columns: minmax(0, 1fr) clamp(420px, 42vw, 760px);
   gap: clamp(24px, 2vw, 34px);
   align-items: start;
-  min-height: clamp(104px, 11vw, 134px);
+  min-height: clamp(88px, 9vw, 112px);
 }
 
 .dashboard-banner-slot--banner-only {
@@ -4185,8 +4185,8 @@ pre {
 
 .unsaved-changes-toast {
   position: fixed;
-  right: 24px;
-  top: 74px;
+  right: max(24px, calc(var(--app-shell-gutter) + 8px));
+  top: 92px;
   z-index: 70;
   display: flex;
   align-items: center;
@@ -4198,6 +4198,7 @@ pre {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
   color: rgba(229, 231, 235, 0.95);
   animation: unsaved-toast-slide-in 180ms ease-out;
+  max-width: min(360px, calc(100vw - var(--sidebar-width) - var(--app-shell-gutter) - 24px));
 }
 
 .unsaved-changes-actions {
@@ -4231,7 +4232,7 @@ pre {
   .unsaved-changes-toast {
     left: 12px;
     right: 12px;
-    top: 64px;
+    top: 72px;
     flex-wrap: wrap;
     justify-content: space-between;
   }
@@ -4318,7 +4319,7 @@ pre {
     grid-template-columns: 1fr;
     gap: 0;
     margin: 8px 0 18px;
-    min-height: clamp(116px, 16vw, 154px);
+    min-height: clamp(100px, 13vw, 128px);
   }
 
   .dashboard-banner-slot-spacer {
@@ -4327,7 +4328,7 @@ pre {
 
   .dashboard-banner-rail {
     max-width: 100%;
-    min-height: clamp(116px, 16vw, 154px);
+    min-height: clamp(100px, 13vw, 128px);
   }
 
   .current-project-bar {
