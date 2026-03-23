@@ -18,7 +18,9 @@ class RecordingHttpClient:
         self.gets: list[dict[str, Any]] = []
         self.closed = False
 
-    def post(self, url: str, json: dict[str, Any], headers: dict[str, str], timeout: float | None = None) -> FakeResponse:
+    def post(
+        self, url: str, json: dict[str, Any], headers: dict[str, str], timeout: float | None = None
+    ) -> FakeResponse:
         _ = timeout
         if self.fail_post:
             raise RuntimeError("post failed")

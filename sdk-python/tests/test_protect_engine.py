@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pytest
-from rheonic.client import Client
 from rheonic import protect_engine as protect_engine_module
+from rheonic.client import Client
 from rheonic.protect_engine import ProtectEngine, RHEONICBlockedError, RHEONICValidationError, _parse_blocked_until_ms
 from rheonic.provider_model_validation import validate_provider_model
 from rheonic.providers.anthropic_adapter import (
@@ -925,7 +925,9 @@ def test_protect_engine_debug_uses_fallback_logger_when_debug_logger_fails(monke
     exceptions: list[str] = []
     debugs: list[tuple[str, object]] = []
     monkeypatch.setattr(protect_engine_module.logger, "exception", lambda message: exceptions.append(message))
-    monkeypatch.setattr(protect_engine_module.logger, "debug", lambda message, extra=None: debugs.append((message, extra)))
+    monkeypatch.setattr(
+        protect_engine_module.logger, "debug", lambda message, extra=None: debugs.append((message, extra))
+    )
 
     engine._debug("hello", provider="openai")
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import http from "node:http";
 import https from "node:https";
-import { EventEmitter } from "node:events";
 import test from "node:test";
 
 import { requestJson } from "./httpTransport.js";

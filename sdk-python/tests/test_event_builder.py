@@ -1,6 +1,5 @@
 # Unit tests for SDK event builder.
 import pytest
-
 from rheonic import event_builder as event_builder_module
 from rheonic.event_builder import EventBuilder, build_event
 
@@ -42,7 +41,9 @@ def test_event_builder_normalizes_optional_fields() -> None:
 
 
 def test_event_builder_reraises_and_logs_when_build_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(event_builder_module, "build_event", lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        event_builder_module, "build_event", lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
     logged: list[str] = []
     monkeypatch.setattr(event_builder_module.logger, "exception", lambda message: logged.append(message))
 

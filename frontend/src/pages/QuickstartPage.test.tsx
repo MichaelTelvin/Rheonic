@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TestRouter } from "../test/testRouter";
 import { QuickstartPage } from "./QuickstartPage";
+import { TestRouter } from "../test/testRouter";
 
 class MockIntersectionObserver {
   public static instance: MockIntersectionObserver | null = null;

@@ -4,7 +4,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
 from rheonic import token_estimator as te
 from rheonic.providers import anthropic_adapter as anthropic
 from rheonic.providers import google_adapter as google
@@ -167,7 +166,10 @@ def test_google_extractors_cover_request_payload_and_usage_shapes() -> None:
 
     assert google._extract_request_payload("gemini", ("prompt",), {}) == {"model": "gemini", "prompt": "prompt"}
     assert google._extract_request_payload("gemini", ({"contents": "x"},), {}) == {"contents": "x", "model": "gemini"}
-    assert google._extract_request_payload("gemini", (), {"temperature": 0.1}) == {"temperature": 0.1, "model": "gemini"}
+    assert google._extract_request_payload("gemini", (), {"temperature": 0.1}) == {
+        "temperature": 0.1,
+        "model": "gemini",
+    }
 
     assert google._extract_max_output_tokens((), {"generation_config": {"max_output_tokens": 12}}) == 12
     assert google._extract_max_output_tokens(({"generation_config": {"max_output_tokens": 13}},), {}) == 13
@@ -176,7 +178,9 @@ def test_google_extractors_cover_request_payload_and_usage_shapes() -> None:
     assert google._extract_total_tokens(SimpleNamespace(usage_metadata=SimpleNamespace(total_token_count=8))) == 8
     assert (
         google._extract_total_tokens(
-            SimpleNamespace(response=SimpleNamespace(usage_metadata=SimpleNamespace(prompt_token_count=3, candidates_token_count=5)))
+            SimpleNamespace(
+                response=SimpleNamespace(usage_metadata=SimpleNamespace(prompt_token_count=3, candidates_token_count=5))
+            )
         )
         == 8
     )
@@ -242,7 +246,9 @@ def test_anthropic_extractors_and_estimator_cover_fallbacks(monkeypatch: pytest.
     assert anthropic._estimate_input_tokens({"prompt": "hello"}) is None
     anthropic._set_token_estimator_for_tests(None)
     assert anthropic._estimate_input_tokens({"input_tokens": 6}) == 6
-    monkeypatch.setattr(anthropic, "estimate_input_tokens", lambda _payload: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        anthropic, "estimate_input_tokens", lambda _payload: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
     assert anthropic._estimate_input_tokens({"prompt": "hello"}) is None
 
 

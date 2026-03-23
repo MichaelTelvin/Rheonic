@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { frontendConfig } from "../config";
+import { Projects } from "./Projects";
 
 const mocks = vi.hoisted(() => ({
   useProjectContext: vi.fn(),
@@ -23,8 +25,6 @@ vi.mock("../api/client", async () => {
 vi.mock("../components/AppToastHost", () => ({
   showAppToast: (...args: unknown[]) => mocks.showAppToast(...args),
 }));
-
-import { Projects } from "./Projects";
 
 describe("Projects page", () => {
   beforeEach(() => {
