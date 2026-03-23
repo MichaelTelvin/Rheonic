@@ -255,7 +255,7 @@ export function Keys(): JSX.Element {
         </Card>
 
         {latestPlaintextKey ? (
-          <Card className="card--form">
+          <Card className="card--table">
             <h2 className="section-title">New key (shown once)</h2>
             <div className="secret-box">
               <p className="warning-text">Copy this key now. It will not be visible again.</p>

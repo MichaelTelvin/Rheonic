@@ -1990,12 +1990,13 @@ select {
 }
 
 .dashboard-alert-card {
-  border: 1px solid rgba(255, 180, 80, 0.35);
-  background: #27211e;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
+  border: 1px solid rgba(109, 85, 62, 0.34);
+  background: rgba(66, 54, 46, 0.58);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12), 0 0 14px rgba(251, 191, 36, 0.06);
+  border-radius: 5px;
   padding: 10px 13px;
   min-height: 0;
+  animation: none !important;
 }
 
 .dashboard-alert-card::before {
@@ -2054,7 +2055,16 @@ select {
   padding: 5px 12px;
   font-size: 0.74rem;
   line-height: 1.2;
-  border-radius: 10px;
+  border-radius: 8px;
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.26);
+  box-shadow: none;
+}
+
+.dashboard-alert-card .modal-actions.form-actions .modal-button.modal-primary {
+  border-color: rgba(251, 191, 36, 0.22);
+  background: rgba(251, 191, 36, 0.18);
+  box-shadow: none;
 }
 
 @media (max-width: 1280px) {
@@ -2438,6 +2448,8 @@ pre {
 
 .secret-box {
   margin-top: 6px;
+  width: 100%;
+  max-width: 460px;
   padding: 10px;
   border: 1px solid rgba(167, 139, 250, 0.35);
   border-radius: 12px;
