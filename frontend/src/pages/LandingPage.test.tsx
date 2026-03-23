@@ -41,7 +41,7 @@ describe("LandingPage", () => {
     expect(screen.getAllByRole("link", { name: "Start beta testing" })[0]?.getAttribute("href")).toBe("/login");
     expect(screen.getAllByRole("link", { name: "View quickstart" })[0]?.getAttribute("href")).toBe("/quickstart");
 
-    const revealedSection = screen.getByText("Agentic systems don’t fail quietly.").closest(".reveal-on-scroll");
+    const revealedSection = screen.getByText("Agentic systems don’t fail quietly").closest(".reveal-on-scroll");
     expect(revealedSection).not.toBeNull();
     MockIntersectionObserver.instance?.trigger(revealedSection!);
 

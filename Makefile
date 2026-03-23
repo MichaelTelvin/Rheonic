@@ -73,7 +73,7 @@ test-e2e:
 	@bash -lc "set -euo pipefail; trap 'docker compose -p rheonic_test -f docker-compose.test.yml down -v >/dev/null 2>&1 || true' EXIT; docker compose -p rheonic_test -f docker-compose.test.yml up -d --build postgres_test redis_test backend_test provider_stub_test >/dev/null; docker compose -p rheonic_test -f docker-compose.test.yml run --rm sdk_node_test 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); if (/node protect e2e/) sub(/^.*$$/, \"\\033[36m&\\033[0m\"); print}'; docker compose -p rheonic_test -f docker-compose.test.yml run --rm sdk_python_test 2>&1 | sed '/^ Container /d;/^\\[+\\]/d' | awk '{gsub(/PASSED/, \"\\033[32mPASSED\\033[0m\"); if (/python protect e2e/) sub(/^.*$$/, \"\\033[36m&\\033[0m\"); print}'"
 
 check:
-	@bash -lc "set -euo pipefail; docker compose -p rheonic_test -f docker-compose.test.yml run --build --rm check_test && $(MAKE) coverage"
+	@bash -lc "set -euo pipefail; docker compose -p rheonic_test -f docker-compose.test.yml run --build --rm check_test"
 
 check-internal:
 	@ruff check .

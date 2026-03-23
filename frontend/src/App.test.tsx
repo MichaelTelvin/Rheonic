@@ -257,7 +257,7 @@ describe("App", () => {
     );
 
     expect(await screen.findByText("Dashboard Page")).toBeDefined();
-    expect(screen.getByRole("link", { name: "Visit site" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("link", { name: "Site" }).getAttribute("href")).toBe("/");
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
     await waitFor(() => {

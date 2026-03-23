@@ -8,11 +8,7 @@ interface SidebarProps {
   onSendFeedback: () => void;
 }
 
-type NavIconProps = {
-  title: string;
-};
-
-function iconProps(title: string): JSX.IntrinsicElements["svg"] {
+function iconProps(): JSX.IntrinsicElements["svg"] {
   return {
     "aria-hidden": "true",
     focusable: "false",
@@ -34,9 +30,9 @@ function iconProps(title: string): JSX.IntrinsicElements["svg"] {
   };
 }
 
-function DashboardIcon({ title }: NavIconProps): JSX.Element {
+function DashboardIcon(): JSX.Element {
   return (
-    <svg {...iconProps(title)}>
+    <svg {...iconProps()}>
       <rect x="4.5" y="11" width="3" height="7.5" rx="0.9" />
       <rect x="10.5" y="7.5" width="3" height="11" rx="0.9" />
       <rect x="16.5" y="4.5" width="3" height="14" rx="0.9" />
@@ -44,9 +40,9 @@ function DashboardIcon({ title }: NavIconProps): JSX.Element {
   );
 }
 
-function ProjectsIcon({ title }: NavIconProps): JSX.Element {
+function ProjectsIcon(): JSX.Element {
   return (
-    <svg {...iconProps(title)}>
+    <svg {...iconProps()}>
       <path d="M8.25 4.25H6.75a2.5 2.5 0 0 0-2.5 2.5v1.5" />
       <path d="M15.75 4.25h1.5a2.5 2.5 0 0 1 2.5 2.5v1.5" />
       <path d="M8.25 19.75h-1.5a2.5 2.5 0 0 1-2.5-2.5v-1.5" />
@@ -60,9 +56,9 @@ function ProjectsIcon({ title }: NavIconProps): JSX.Element {
   );
 }
 
-function IncidentsIcon({ title }: NavIconProps): JSX.Element {
+function IncidentsIcon(): JSX.Element {
   return (
-    <svg {...iconProps(title)}>
+    <svg {...iconProps()}>
       <rect x="4" y="6.5" width="16" height="8.5" rx="1.9" />
       <path d="M6 18h12" />
       <path d="M6 3.75h12" />
@@ -70,9 +66,9 @@ function IncidentsIcon({ title }: NavIconProps): JSX.Element {
   );
 }
 
-function SettingsIcon({ title }: NavIconProps): JSX.Element {
+function SettingsIcon(): JSX.Element {
   return (
-    <svg {...iconProps(title)}>
+    <svg {...iconProps()}>
       <path d="M4 7h8" />
       <circle cx="15.75" cy="7" r="2.25" />
       <path d="M18 7h2" />
@@ -83,9 +79,9 @@ function SettingsIcon({ title }: NavIconProps): JSX.Element {
   );
 }
 
-function KeysIcon({ title }: NavIconProps): JSX.Element {
+function KeysIcon(): JSX.Element {
   return (
-    <svg {...iconProps(title)}>
+    <svg {...iconProps()}>
       <path d="M7.25 10.25V8.5a4.75 4.75 0 0 1 9.5 0v1.75" />
       <rect x="5" y="10.25" width="14" height="10.5" rx="2.1" />
       <path d="M12 14v3" />
@@ -94,9 +90,9 @@ function KeysIcon({ title }: NavIconProps): JSX.Element {
   );
 }
 
-function AlertsIcon({ title }: NavIconProps): JSX.Element {
+function AlertsIcon(): JSX.Element {
   return (
-    <svg {...iconProps(title)}>
+    <svg {...iconProps()}>
       <path d="M12 9v4" />
       <path d="M12 16h.01" />
       <path d="M10.363 3.591 2.257 17.125A1.914 1.914 0 0 0 3.893 20h16.214a1.914 1.914 0 0 0 1.636-2.87L13.637 3.59a1.914 1.914 0 0 0-3.274 0" />
@@ -104,9 +100,9 @@ function AlertsIcon({ title }: NavIconProps): JSX.Element {
   );
 }
 
-function DocsIcon({ title }: NavIconProps): JSX.Element {
+function DocsIcon(): JSX.Element {
   return (
-    <svg {...iconProps(title)}>
+    <svg {...iconProps()}>
       <path d="M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1" />
       <path d="M9 4v16" />
       <path d="M13 8h2" />
@@ -115,9 +111,9 @@ function DocsIcon({ title }: NavIconProps): JSX.Element {
   );
 }
 
-function SiteIcon({ title }: NavIconProps): JSX.Element {
+function SiteIcon(): JSX.Element {
   return (
-    <svg {...iconProps(title)}>
+    <svg {...iconProps()}>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M3.5 12h17" />
       <path d="M12 3.5c2.2 2.7 3.5 5.6 3.5 8.5s-1.3 5.8-3.5 8.5" />
@@ -155,7 +151,7 @@ export function Sidebar({ userEmail, onSignOut, onSendFeedback }: SidebarProps):
               end={item.to === "/app"}
               className={({ isActive }) => `sidebar-link${isActive ? " is-active" : ""}`}
             >
-              <item.Icon title={item.label} />
+              <item.Icon />
               <span>{item.label}</span>
             </NavLink>
           ))}
