@@ -367,4 +367,4 @@ def test_register_rejects_weak_password(tmp_path) -> None:
     with _make_client(tmp_path) as client:
         response = client.post("/api/v1/auth/register", json={"email": "weak@example.com", "password": "password123"})
         assert response.status_code == 400
-        assert response.json()["error"]["message"] == "password must be at least 12 characters"
+        assert response.json()["error"]["message"] == "password must include an uppercase letter"

@@ -92,6 +92,19 @@ describe("Login", () => {
     expect(await screen.findByText("Invalid email or password.")).toBeDefined();
   });
 
+  it("validates register password with the relaxed policy", async () => {
+    const user = userEvent.setup();
+    render(<Login onAuthSuccess={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    await user.type(screen.getByLabelText("Email"), "user@example.com");
+    await user.type(screen.getByLabelText("Password"), "password");
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByText("Password must include an uppercase letter.")).toBeDefined();
+    expect(mockRegister).not.toHaveBeenCalled();
+  });
+
   it("submits form on Enter key", async () => {
     const user = userEvent.setup();
     mockLogin.mockResolvedValue({

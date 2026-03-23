@@ -132,16 +132,12 @@ class AuthService:
         )
 
     def _validate_password(self, password: str) -> None:
-        if len(password) < 12:
-            raise HTTPException(status_code=400, detail="password must be at least 12 characters")
-        if not any(char.islower() for char in password):
-            raise HTTPException(status_code=400, detail="password must include a lowercase letter")
+        if len(password) < 8:
+            raise HTTPException(status_code=400, detail="password must be at least 8 characters")
         if not any(char.isupper() for char in password):
             raise HTTPException(status_code=400, detail="password must include an uppercase letter")
         if not any(char.isdigit() for char in password):
             raise HTTPException(status_code=400, detail="password must include a number")
-        if not any(not char.isalnum() for char in password):
-            raise HTTPException(status_code=400, detail="password must include a symbol")
 
     def _build_refresh_session(self, *, user_id: str) -> RefreshSession:
         issued_at = datetime.now(timezone.utc)
