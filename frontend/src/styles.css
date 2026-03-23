@@ -2772,7 +2772,7 @@ pre {
 }
 
 .sidebar-brand {
-  margin: 0;
+  margin: 10px 0 0;
   font-size: 0.86rem;
   letter-spacing: 0.02em;
   text-transform: none;
@@ -3649,7 +3649,7 @@ pre {
 
 .projects-shell-width {
   width: min(100%, var(--projects-page-max));
-  max-width: var(--projects-page-max);
+  max-width: var(--projects-page-max) !important;
   margin-inline: auto;
 }
 
@@ -5219,6 +5219,7 @@ html {
   .sidebar-brand {
     min-height: 64px;
     font-size: 0.92rem;
+    margin-top: 12px;
   }
 
   .sidebar-nav {

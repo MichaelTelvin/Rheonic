@@ -336,7 +336,7 @@ export function Alerts(): JSX.Element {
         </section>
 
         <div className="alerts-cards-grid">
-          <Card className={`form-card card--form alerts-webhook-card${initialLoading ? " card-loading-shell" : ""}`}>
+          <Card className={`form-card card--form projects-shell-width alerts-webhook-card${initialLoading ? " card-loading-shell" : ""}`}>
             {initialLoading ? (
               <>
                 <h2 className="section-title">Alert routes</h2>

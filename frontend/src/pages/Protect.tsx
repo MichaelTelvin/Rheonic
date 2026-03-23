@@ -480,7 +480,7 @@ export function Protect(): JSX.Element {
           <p className="page-subtitle">Configure limits and protection behavior</p>
         </section>
 
-        <Card className={`form-card card--form${initialLoading ? " card-loading-shell" : ""}`}>
+        <Card className={`form-card card--form projects-shell-width${initialLoading ? " card-loading-shell" : ""}`}>
           <h2 className="section-title">Project configuration</h2>
           {initialLoading ? (
             <p className="subtle card-loading-copy">Loading project settings...</p>
@@ -618,7 +618,7 @@ export function Protect(): JSX.Element {
           )}
         </Card>
 
-        <Card className={`form-card card--form danger-zone-card${initialLoading ? " card-loading-shell" : ""}`}>
+        <Card className={`form-card card--form projects-shell-width danger-zone-card${initialLoading ? " card-loading-shell" : ""}`}>
           <h2 className="section-title">Delete project</h2>
           {initialLoading ? (
             <p className="subtle card-loading-copy">Loading project settings...</p>
