@@ -2772,7 +2772,7 @@ pre {
 
 .sidebar-brand-divider {
   height: 1px;
-  margin: 0 2px 14px;
+  margin: 0 2px 22px;
   background: linear-gradient(to right,
       rgba(148, 163, 184, 0.34) 0%,
       rgba(148, 163, 184, 0.22) 55%,
@@ -2782,7 +2782,7 @@ pre {
 
 .sidebar-nav {
   display: grid;
-  gap: 8px;
+  gap: 3px;
 }
 
 .sidebar-link {
@@ -2791,21 +2791,23 @@ pre {
   gap: 8px;
   border: 1px solid transparent;
   border-radius: 10px;
-  padding: 10px 12px;
-  color: rgba(229, 231, 235, 0.8);
+  padding: 9px 12px;
+  color: rgba(229, 231, 235, 0.68);
   text-decoration: none;
-  font-size: 0.95rem;
+  font-size: 0.91rem;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 .sidebar-link:hover {
-  border-color: rgba(167, 139, 250, 0.32);
-  background: rgba(167, 139, 250, 0.12);
+  border-color: transparent;
+  background: rgba(167, 139, 250, 0.07);
+  color: rgba(245, 247, 255, 0.94);
 }
 
 .sidebar-link.is-active {
-  border-color: rgba(167, 139, 250, 0.58);
-  background: rgba(167, 139, 250, 0.2);
-  color: #ede9fe;
+  border-color: transparent;
+  background: rgba(167, 139, 250, 0.14);
+  color: rgba(245, 247, 255, 0.9);
 }
 
 .sidebar-bottom {
@@ -2824,7 +2826,9 @@ pre {
 }
 
 .sidebar-feedback-button {
-  width: 100%;
+  width: auto;
+  min-width: 168px;
+  max-width: 210px;
   margin-bottom: 14px;
   border: 1px solid rgba(125, 211, 252, 0.24);
   border-radius: 10px;
@@ -2832,7 +2836,7 @@ pre {
   text-align: left;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 10px;
   color: rgba(125, 211, 252, 0.62);
   background: rgba(125, 211, 252, 0.07);
@@ -2857,7 +2861,8 @@ pre {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 0 2px 14px;
+  margin: 0 0 14px;
+  padding: 0 12px;
   color: rgba(229, 231, 235, 0.62);
   text-decoration: none;
   font-size: 0.88rem;
@@ -4233,7 +4238,7 @@ pre {
 
   .sidebar-brand-divider,
   .sidebar-footer-divider {
-    margin: 0 2px 10px;
+    margin: 0 2px 14px;
   }
 
   .sidebar-top {
@@ -4244,12 +4249,12 @@ pre {
   .sidebar-nav {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 3px;
   }
 
   .sidebar-link {
-    padding: 8px 10px;
-    font-size: 0.9rem;
+    padding: 7px 10px;
+    font-size: 0.87rem;
     white-space: nowrap;
   }
 
@@ -4264,7 +4269,7 @@ pre {
   .sidebar-feedback-button {
     width: auto;
     min-width: 0;
-    max-width: none;
+    max-width: 210px;
     margin-bottom: 10px;
     align-self: flex-start;
     justify-content: center;
@@ -5177,21 +5182,23 @@ html {
   }
 
   .sidebar-nav {
-    gap: 10px;
+    gap: 4px;
   }
 
   .sidebar-link {
-    padding: 12px 14px;
-    font-size: 1rem;
+    padding: 10px 14px;
+    font-size: 0.96rem;
   }
 
   .sidebar-feedback-button {
     padding: 12px 14px;
     font-size: 0.98rem;
+    max-width: 224px;
   }
 
   .sidebar-site-link {
     font-size: 0.92rem;
+    padding: 0 14px;
   }
 
   .sidebar-user-email {
@@ -5345,13 +5352,14 @@ html {
   }
 
   .sidebar-link {
-    padding: 13px 16px;
-    font-size: 1.02rem;
+    padding: 11px 16px;
+    font-size: 0.98rem;
   }
 
   .sidebar-feedback-button {
     padding: 13px 16px;
     font-size: 1rem;
+    max-width: 236px;
   }
 
   .current-project-bar-inner {
