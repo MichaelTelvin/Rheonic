@@ -3011,9 +3011,9 @@ pre {
   margin-inline: auto;
 }
 
-.page-stack > .card--form,
-.page-stack > .card--table,
-.page-stack > .card--content {
+.page-stack>.card--form,
+.page-stack>.card--table,
+.page-stack>.card--content {
   margin-inline: 0;
 }
 
@@ -3081,7 +3081,7 @@ pre {
   align-items: start;
 }
 
-.alerts-cards-grid > .card--form {
+.alerts-cards-grid>.card--form {
   margin-inline: 0;
 }
 
@@ -5279,7 +5279,7 @@ html {
   }
 
   .dashboard-controls-main {
-    margin-top: 14px;
+    margin-top: 10px;
   }
 
   .metrics-grid {
