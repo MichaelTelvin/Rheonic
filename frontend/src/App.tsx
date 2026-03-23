@@ -141,6 +141,7 @@ export function App(): JSX.Element {
   useEffect(() => {
     let cancelled = false;
     const publicRoutes = new Set(["/", "/quickstart", "/privacy", "/terms", "/dpa", "/login", "/signup"]);
+    const authEntryRoutes = new Set(["/login", "/signup"]);
 
     if (publicRoutes.has(location.pathname)) {
       if (user) {
@@ -152,6 +153,12 @@ export function App(): JSX.Element {
       const cachedUser = readCachedAuthUser();
       if (cachedUser) {
         setUser(cachedUser);
+        setSessionResolved(true);
+        return () => {
+          cancelled = true;
+        };
+      }
+      if (authEntryRoutes.has(location.pathname)) {
         setSessionResolved(true);
         return () => {
           cancelled = true;

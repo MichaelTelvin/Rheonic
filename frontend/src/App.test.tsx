@@ -162,6 +162,17 @@ describe("App", () => {
     expect(await screen.findByText("Dashboard Page")).toBeDefined();
   });
 
+  it("does not probe auth on a cold login-page refresh", async () => {
+    render(
+      <TestRouter initialEntries={["/login"]}>
+        <App />
+      </TestRouter>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Mock Login" })).toBeDefined();
+    expect(mockFetchCurrentUser).not.toHaveBeenCalled();
+  });
+
   it("redirects unauthenticated user from /app to /login", async () => {
     render(
       <TestRouter initialEntries={["/app"]}>
@@ -172,6 +183,14 @@ describe("App", () => {
   });
 
   it("redirects authenticated user from /login to /app", async () => {
+    window.sessionStorage.setItem(
+      "auth_user_cache",
+      JSON.stringify({
+        id: "u1",
+        email: "persisted@example.com",
+        created_at: new Date().toISOString(),
+      }),
+    );
     mockFetchCurrentUser.mockResolvedValue({
       id: "u1",
       email: "persisted@example.com",
