@@ -297,7 +297,7 @@ export function Dashboard(): JSX.Element {
 
   const setupBannerContent = useMemo<{
     title: string;
-    text: string;
+    text: JSX.Element | string;
     primaryLabel?: string;
     primaryTo?: string;
     secondaryLabel?: string;
@@ -306,7 +306,13 @@ export function Dashboard(): JSX.Element {
     if (setupStage === "no_project") {
       return {
         title: "Setup required",
-        text: "Create your first project, generate an ingest key, then follow Quickstart.",
+        text: (
+          <>
+            Create your first project
+            <br />
+            generate an ingest key, then follow Quickstart.
+          </>
+        ),
         primaryLabel: "Projects",
         primaryTo: "/app/projects",
         secondaryLabel: "Quickstart",
@@ -326,7 +332,13 @@ export function Dashboard(): JSX.Element {
     if (setupStage === "no_ingest_key") {
       return {
         title: "Setup required",
-        text: "Generate an ingest key, then follow Quickstart to instrument your SDK.",
+        text: (
+          <>
+            Generate an ingest key
+            <br />
+            then follow Quickstart to instrument your SDK.
+          </>
+        ),
         primaryLabel: "Keys",
         primaryTo: "/app/keys",
         secondaryLabel: "Quickstart",
@@ -336,7 +348,13 @@ export function Dashboard(): JSX.Element {
     if (setupStage === "no_events") {
       return {
         title: "Setup required",
-        text: "Waiting for first event. Run one instrumented provider call to verify integration.",
+        text: (
+          <>
+            Waiting for first event
+            <br />
+            Run one instrumented provider call to verify integration.
+          </>
+        ),
         primaryLabel: "Quickstart",
         primaryTo: "/quickstart",
       };

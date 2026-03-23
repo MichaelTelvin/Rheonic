@@ -6,6 +6,8 @@ interface SidebarProps {
   userEmail: string | null;
   onSignOut: () => void | Promise<void>;
   onSendFeedback: () => void;
+  isMobileOpen: boolean;
+  onRequestClose: () => void;
 }
 
 function iconProps(): JSX.IntrinsicElements["svg"] {
@@ -133,10 +135,15 @@ const navItems = [
   { to: "/", label: "Site", Icon: SiteIcon },
 ];
 
-export function Sidebar({ userEmail, onSignOut, onSendFeedback }: SidebarProps): JSX.Element {
+export function Sidebar({ userEmail, onSignOut, onSendFeedback, isMobileOpen, onRequestClose }: SidebarProps): JSX.Element {
   return (
-    <aside className="sidebar" aria-label="Primary navigation">
+    <aside className={`sidebar${isMobileOpen ? " is-mobile-open" : ""}`} aria-label="Primary navigation">
       <div className="sidebar-top">
+        <div className="sidebar-mobile-close-row">
+          <button type="button" className="sidebar-mobile-close" aria-label="Close navigation" onClick={onRequestClose}>
+            Close
+          </button>
+        </div>
         <Link className="sidebar-brand" to="/" aria-label="Go to Rheonic site">
           <RheonicLogoMark className="brand-logo-icon" />
           <span className="dashboard-brand-word">Rheonic</span>
@@ -150,6 +157,7 @@ export function Sidebar({ userEmail, onSignOut, onSendFeedback }: SidebarProps):
               to={item.to}
               end={item.to === "/app"}
               className={({ isActive }) => `sidebar-link${isActive ? " is-active" : ""}`}
+              onClick={onRequestClose}
             >
               <item.Icon />
               <span>{item.label}</span>

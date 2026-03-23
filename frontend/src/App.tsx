@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { ApiError, fetchCurrentUser, logout, setUnauthorizedHandler, type AuthUser } from "./api/client";
 import { AppToastHost } from "./components/AppToastHost";
 import { CurrentProjectBar } from "./components/CurrentProjectBar";
 import { FeedbackModal } from "./components/FeedbackModal";
+import { RheonicLogoMark } from "./components/RheonicLogoMark";
 import { Sidebar } from "./components/Sidebar";
 import { AuthContext } from "./context/AuthContext";
 import { ProjectProvider } from "./context/ProjectContext";
@@ -65,11 +66,42 @@ interface AuthenticatedAppLayoutProps {
 
 function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayoutProps): JSX.Element {
   const [feedbackModalOpen, setFeedbackModalOpen] = useState<boolean>(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="app-shell">
-      <Sidebar userEmail={userEmail} onSignOut={onSignOut} onSendFeedback={() => setFeedbackModalOpen(true)} />
+      <Sidebar
+        userEmail={userEmail}
+        onSignOut={onSignOut}
+        onSendFeedback={() => setFeedbackModalOpen(true)}
+        isMobileOpen={mobileSidebarOpen}
+        onRequestClose={() => setMobileSidebarOpen(false)}
+      />
+      {mobileSidebarOpen ? <button type="button" className="mobile-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileSidebarOpen(false)} /> : null}
       <div className="app-main app-main-content">
+        <div className="mobile-app-bar">
+          <Link className="mobile-app-brand" to="/" aria-label="Go to Rheonic site">
+            <RheonicLogoMark className="brand-logo-icon" />
+            <span className="dashboard-brand-word">Rheonic</span>
+            <span className="dashboard-beta-badge">BETA</span>
+          </Link>
+          <button
+            type="button"
+            className="mobile-nav-toggle"
+            aria-label={mobileSidebarOpen ? "Close navigation" : "Open navigation"}
+            aria-expanded={mobileSidebarOpen}
+            onClick={() => setMobileSidebarOpen((open) => !open)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        </div>
         <CurrentProjectBar />
         <div className="app-routes">
           <Routes>
