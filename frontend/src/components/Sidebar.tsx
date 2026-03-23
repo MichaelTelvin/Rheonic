@@ -31,7 +31,6 @@ function iconProps(title: string): JSX.IntrinsicElements["svg"] {
       opacity: 0.98,
     },
     role: "img",
-    "data-icon": title,
   };
 }
 
