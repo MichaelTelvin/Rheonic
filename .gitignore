@@ -18,6 +18,9 @@ dist/
 venv/
 pip-wheel-metadata/
 .pytest_cache/
+.coverage
+.coverage.*
+coverage.json
 htmlcov/
 coverage/
 
