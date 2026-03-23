@@ -1862,7 +1862,7 @@ select {
 
 .dashboard-banner-slot {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(420px, 42vw, 760px);
+  grid-template-columns: minmax(0, 1fr) clamp(420px, 38vw, 620px);
   gap: clamp(24px, 2vw, 34px);
   align-items: start;
   min-height: clamp(88px, 9vw, 112px);
@@ -1990,9 +1990,9 @@ select {
 }
 
 .dashboard-alert-card {
-  border: 1px solid rgba(109, 85, 62, 0.34);
-  background: rgba(66, 54, 46, 0.58);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12), 0 0 14px rgba(251, 191, 36, 0.06);
+  border: 1px solid rgba(95, 77, 60, 0.28);
+  background: rgba(66, 54, 46, 0.6);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12), 0 0 14px rgba(251, 191, 36, 0.05);
   border-radius: 5px;
   padding: 10px 13px;
   min-height: 0;
@@ -2930,20 +2930,22 @@ pre {
 }
 
 .current-project-bar-inner {
-  max-width: var(--app-content-max);
+  max-width: 1260px;
   margin: 0 auto;
-  padding: 0 var(--app-shell-gutter);
+  padding: 0;
 }
 
 .current-project-select-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 420px) 1fr auto;
   align-items: center;
   gap: 12px;
+  width: 100%;
 }
 
 .current-project-select-row select {
   width: 100%;
-  max-width: clamp(360px, 30vw, 560px);
+  max-width: 100%;
 }
 
 .mode-indicator-group {
@@ -5249,7 +5251,7 @@ html {
   }
 
   .current-project-bar-inner {
-    padding: 0 clamp(44px, 3vw, 72px);
+    padding: 0;
   }
 
   .current-project-select-row {
@@ -5401,12 +5403,12 @@ html {
   }
 
   .current-project-bar-inner {
-    padding: 0 clamp(52px, 3.4vw, 84px);
+    padding: 0;
   }
 
   .current-project-select-row select {
     min-height: 48px;
-    max-width: min(620px, 30vw);
+    max-width: 100%;
     font-size: 1rem;
   }
 
