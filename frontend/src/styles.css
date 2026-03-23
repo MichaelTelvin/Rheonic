@@ -1349,16 +1349,16 @@ body {
 }
 
 .page-title {
-  margin: 0 0 14px;
+  margin: 0 0 10px;
 }
 
 .page-subtitle {
-  margin: 0 0 16px;
+  margin: 0 0 8px;
   color: rgba(229, 231, 235, 0.88);
 }
 
 .hero-subtitle-divider {
-  margin-top: auto;
+  margin-top: 3px;
   width: 94%;
   height: 1px;
   background: transparent;
@@ -1856,8 +1856,8 @@ select {
   width: 100%;
   display: grid;
   gap: 12px;
-  min-height: clamp(88px, 9vw, 112px);
-  align-content: center;
+  min-height: clamp(62px, 6.2vw, 82px);
+  align-content: start;
 }
 
 .dashboard-banner-slot {
@@ -1865,7 +1865,7 @@ select {
   grid-template-columns: minmax(0, 1fr) clamp(420px, 38vw, 620px);
   gap: clamp(24px, 2vw, 34px);
   align-items: start;
-  min-height: clamp(88px, 9vw, 112px);
+  min-height: clamp(62px, 6.2vw, 82px);
 }
 
 .dashboard-banner-slot--banner-only {
@@ -2772,12 +2772,12 @@ pre {
 }
 
 .sidebar-brand {
-  margin: 10px 0 0;
+  margin: 6px 0 0;
   font-size: 0.86rem;
   letter-spacing: 0.02em;
   text-transform: none;
   color: rgba(229, 231, 235, 0.9);
-  min-height: 57px;
+  min-height: 53px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2932,7 +2932,7 @@ pre {
 .current-project-bar-inner {
   max-width: 1260px;
   margin: 0 auto;
-  padding: 0;
+  padding: 0 clamp(22px, 2.4vw, 38px);
 }
 
 .current-project-select-row {

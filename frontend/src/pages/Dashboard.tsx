@@ -658,29 +658,31 @@ export function Dashboard(): JSX.Element {
   return (
     <main className="dashboard">
       <div className="dashboard-content dashboard-home-content">
-        {hideDashboardHero ? null : (
-          <section className="dashboard-hero">
-            <div className="dashboard-hero-left">
-              <h1 className="page-title">LLM Control Center</h1>
-              <p className="page-subtitle">Real-time monitoring and protection</p>
-              <div className="hero-subtitle-divider" aria-hidden="true" />
-            </div>
-            <div className="dashboard-hero-right">
-              <div className="status-panel status-panel--accent" aria-live="polite">
-                <div className="status-row">
-                  <span className="status-row-label">System status</span>
-                  <span className={`status-row-value status-${protectStatus.tone}`}>
-                    {protectStatus.label}
-                  </span>
-                </div>
-                <div className="status-row">
-                  <span className="status-row-label">Dashboard sync</span>
-                  <span className="status-row-value time-value">{formatTime(lastMetricsSuccessAt)}</span>
-                </div>
+        <section
+          className="dashboard-hero"
+          aria-hidden={hideDashboardHero || undefined}
+          style={hideDashboardHero ? { visibility: "hidden", pointerEvents: "none" } : undefined}
+        >
+          <div className="dashboard-hero-left">
+            <h1 className="page-title">LLM Control Center</h1>
+            <p className="page-subtitle">Real-time monitoring and protection</p>
+            <div className="hero-subtitle-divider" aria-hidden="true" />
+          </div>
+          <div className="dashboard-hero-right">
+            <div className="status-panel status-panel--accent" aria-live="polite">
+              <div className="status-row">
+                <span className="status-row-label">System status</span>
+                <span className={`status-row-value status-${protectStatus.tone}`}>
+                  {protectStatus.label}
+                </span>
+              </div>
+              <div className="status-row">
+                <span className="status-row-label">Dashboard sync</span>
+                <span className="status-row-value time-value">{formatTime(lastMetricsSuccessAt)}</span>
               </div>
             </div>
-          </section>
-        )}
+          </div>
+        </section>
 
         <section className={`dashboard-banner-slot${!projectId || useFullWidthSetupBanner ? " dashboard-banner-slot--banner-only" : ""}`} aria-live="polite">
           {projectId && !useFullWidthSetupBanner ? <div className="dashboard-banner-slot-spacer" aria-hidden="true" /> : null}
