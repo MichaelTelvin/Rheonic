@@ -43,18 +43,18 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: clamp(56px, 10vh, 140px) 24px 24px;
+  padding: clamp(56px, 10vh, 140px) clamp(20px, 4vw, 32px) 24px;
 }
 
 .auth-card {
-  width: min(440px, 100%);
+  width: min(560px, 100%);
   background: linear-gradient(180deg, rgba(21, 28, 43, 0.98), rgba(17, 24, 39, 0.96));
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 22px;
+  padding: clamp(28px, 4vw, 36px);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
 
 .landing-link-button {
@@ -1230,12 +1230,13 @@ body {
 .auth-actions {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
-  margin-top: 20px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin-top: 30px;
 }
 
 .auth-actions .modal-button {
-  width: 116px;
+  width: clamp(124px, 24vw, 156px);
   justify-content: center;
 }
 
@@ -1537,11 +1538,11 @@ body {
 
 .auth-card form label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .auth-card form .text-input {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .subtle {
@@ -1834,7 +1835,7 @@ select {
 }
 
 .input-error-slot {
-  margin: 2px 0 14px;
+  margin: 2px 0 20px;
   min-height: 20px;
   font-size: 0.79rem;
   line-height: 1.2;
