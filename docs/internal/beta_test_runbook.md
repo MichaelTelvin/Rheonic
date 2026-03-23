@@ -31,6 +31,7 @@ make test-sdk-python
 make test-sdk-node
 make test-frontend
 make test-e2e
+make check
 
 make down-test  -> to tear down test containers
 ```
