@@ -784,6 +784,7 @@ export function Dashboard(): JSX.Element {
                 <h2 className="card-title">Requests (60s)</h2>
                 <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.requests_60s ?? 0)}</p>
                 <PulseMeter
+                  key={`${projectId ?? "none"}:${selectedProvider}:requests`}
                   values={requestsSeries}
                   color="var(--req)"
                   mode="requests"
@@ -795,6 +796,7 @@ export function Dashboard(): JSX.Element {
                 <h2 className="card-title">Tokens (60s)</h2>
                 <p className="metric-value">{loadingMetrics && !metrics ? "..." : formatNumber(metrics?.tokens_60s ?? 0)}</p>
                 <PulseMeter
+                  key={`${projectId ?? "none"}:${selectedProvider}:tokens`}
                   values={tokensSeries}
                   color="var(--accent)"
                   mode="tokens"

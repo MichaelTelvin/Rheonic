@@ -230,7 +230,7 @@ Expected:
 Repro values that should force a real clamp with the current staging defaults:
 
 ```bash
-make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=near_cap RHEONIC_NEAR_CAP_SEED_TOKENS=1680
+make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=near_cap RHEONIC_NEAR_CAP_SEED_TOKENS=1870
 ```
 
 Expected:

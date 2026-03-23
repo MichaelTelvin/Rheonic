@@ -138,6 +138,14 @@ class IngestEventService:
                 if near_cap_signals:
                     # Dominance L2: near_cap suppresses behavioral signals for this ingest event.
                     signals = near_cap_signals
+                else:
+                    behavioral_signals = [
+                        signal for signal in signals if signal.detector in {"retry_storm", "loop_suspect"}
+                    ]
+                    if behavioral_signals:
+                        # Dominance L1: pick one primary behavioral reason so ingest incidents match
+                        # protect preflight's single returned reason and notification semantics.
+                        signals = [behavioral_signals[0]]
                 # Dominance L1: behavioral signals may coexist.
             self._incident_manager.process_signals(
                 project_id=event.project_id,

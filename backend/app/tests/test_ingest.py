@@ -655,7 +655,7 @@ def test_dominance_near_cap_suppresses_behavioral_signals() -> None:
     assert all(row.incident_type not in {"retry_storm", "loop_suspect", "token_explosion"} for row in incidents.rows)
 
 
-def test_dominance_behavioral_retry_and_loop_can_coexist() -> None:
+def test_dominance_behavioral_retry_suppresses_loop_suspect() -> None:
     service, incidents, _, _ = _service(
         protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, loop_count=1
     )
@@ -673,13 +673,12 @@ def test_dominance_behavioral_retry_and_loop_can_coexist() -> None:
     service.ingest(_event("p1", total_tokens=60, feature="dominance-retry-loop", offset_seconds=1))
 
     incident_types = sorted({row.incident_type for row in incidents.rows})
-    assert "retry_storm" in incident_types
-    assert "loop_suspect" in incident_types
+    assert incident_types == ["retry_storm"]
     assert all(row.incident_type != "near_cap" for row in incidents.rows)
     assert all(row.incident_type != "cap_breach" for row in incidents.rows)
 
 
-def test_dominance_behavioral_token_explosion_and_retry_can_coexist_without_caps() -> None:
+def test_dominance_behavioral_retry_suppresses_token_explosion_without_caps() -> None:
     service, incidents, _, _ = _service(
         protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, token_explosion_abs=1500
     )
@@ -696,7 +695,7 @@ def test_dominance_behavioral_token_explosion_and_retry_can_coexist_without_caps
     )
 
     incident_types = sorted(row.incident_type for row in incidents.rows)
-    assert incident_types == ["retry_storm", "token_explosion"]
+    assert incident_types == ["retry_storm"]
     assert all(row.incident_type != "near_cap" for row in incidents.rows)
     assert all(row.incident_type != "cap_breach" for row in incidents.rows)
 
