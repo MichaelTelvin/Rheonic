@@ -2106,6 +2106,7 @@ select {
   display: grid;
   gap: 12px;
   width: min(100%, 1260px);
+  margin-inline: auto;
 }
 
 .incidents-filters-shell {
@@ -2141,7 +2142,8 @@ select {
   border-radius: 0;
   padding: 0;
   background: transparent;
-  width: min(100%, 1120px);
+  width: 100%;
+  margin-inline: auto;
 }
 
 .incidents-scroll-panel {
@@ -2151,8 +2153,8 @@ select {
 }
 
 .incidents-scroll-panel .empty {
-  width: min(100%, 760px);
-  margin-right: auto;
+  width: 100%;
+  margin-inline: 0;
 }
 
 .list {
@@ -2985,6 +2987,9 @@ pre {
 .page-stack {
   display: grid;
   gap: 30px;
+  width: min(100%, 1260px);
+  max-width: 1260px;
+  margin-inline: auto;
 }
 
 .alerts-page-stack {
@@ -3616,13 +3621,13 @@ pre {
 .projects-shell-width {
   width: min(100%, var(--projects-page-max));
   max-width: var(--projects-page-max);
-  margin-inline: 0;
+  margin-inline: auto;
 }
 
 .projects-page-shell {
   width: min(100%, var(--projects-page-max));
   max-width: var(--projects-page-max);
-  margin-inline: 0;
+  margin-inline: auto;
   display: grid;
   gap: 30px;
 }
@@ -3632,7 +3637,7 @@ pre {
 }
 
 .incidents-list-shell .empty {
-  width: min(100%, 760px);
+  width: 100%;
 }
 
 .projects-create-card,
@@ -3917,16 +3922,19 @@ pre {
 .card--form {
   width: 100%;
   max-width: 920px;
+  margin-inline: auto;
 }
 
 .card--table {
   width: 100%;
   max-width: 1260px;
+  margin-inline: auto;
 }
 
 .card--content {
   width: 100%;
   max-width: 1260px;
+  margin-inline: auto;
 }
 
 .card-loading-shell {
