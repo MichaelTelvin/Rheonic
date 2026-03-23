@@ -100,14 +100,6 @@ function writeDashboardCache(projectId: string, state: DashboardCachedState): vo
   }
 }
 
-function readDismissedFlag(storageKey: string): boolean {
-  try {
-    return window.localStorage.getItem(storageKey) === "1";
-  } catch {
-    return false;
-  }
-}
-
 export function Dashboard(): JSX.Element {
   const { loadingProjects, projects, projectId } = useProjectContext();
   const navigate = useNavigate();
@@ -139,13 +131,12 @@ export function Dashboard(): JSX.Element {
   const [hasIngestKey, setHasIngestKey] = useState<boolean>(initialDashboardState?.hasIngestKey ?? false);
   const [hasEvents, setHasEvents] = useState<boolean>(initialDashboardState?.hasEvents ?? false);
   const [setupStatusResolved, setSetupStatusResolved] = useState<boolean>(initialDashboardState?.setupStatusResolved ?? false);
-  const [setupBannerDismissed, setSetupBannerDismissed] = useState<boolean>(() => readDismissedFlag(`rheonic:setupBannerDismissed:${projectId ?? "none"}`));
+  const [setupBannerDismissed, setSetupBannerDismissed] = useState<boolean>(false);
   const [webhookIssue, setWebhookIssue] = useState<{ count: number; lastAt: string | null } | null>(null);
   const [webhookIssueDismissedToken, setWebhookIssueDismissedToken] = useState<string | null>(null);
   const [setupBannerClosing, setSetupBannerClosing] = useState<boolean>(false);
   const [webhookIssueBannerClosing, setWebhookIssueBannerClosing] = useState<boolean>(false);
 
-  const setupDismissStorageKey = useMemo<string>(() => `rheonic:setupBannerDismissed:${projectId ?? "none"}`, [projectId]);
   const webhookIssueDismissStorageKey = useMemo<string>(() => `rheonic:webhookIssueDismissed:${projectId ?? "none"}`, [projectId]);
   const setupStage = useMemo<SetupStage>(() => {
     if (loadingProjects) {
@@ -227,10 +218,6 @@ export function Dashboard(): JSX.Element {
   }, [hasEvents, hasIngestKey, incidents, lastMetricsSuccessAt, metrics, projectId, protectDecisionStats, selectedProvider, setupStatusResolved]);
 
   useEffect(() => {
-    setSetupBannerDismissed(readDismissedFlag(setupDismissStorageKey));
-  }, [setupDismissStorageKey]);
-
-  useEffect(() => {
     const dismissed = window.localStorage.getItem(webhookIssueDismissStorageKey);
     setWebhookIssueDismissedToken(dismissed);
   }, [webhookIssueDismissStorageKey]);
@@ -239,10 +226,9 @@ export function Dashboard(): JSX.Element {
     if (setupStage !== "complete") {
       return undefined;
     }
-    window.localStorage.removeItem(setupDismissStorageKey);
     setSetupBannerDismissed(false);
     return undefined;
-  }, [setupDismissStorageKey, setupStage]);
+  }, [setupStage]);
 
   useEffect(() => {
     if (loadingProjects) {
@@ -292,11 +278,10 @@ export function Dashboard(): JSX.Element {
   const dismissSetupBanner = useCallback((): void => {
     setSetupBannerClosing(true);
     window.setTimeout(() => {
-      window.localStorage.setItem(setupDismissStorageKey, "1");
       setSetupBannerDismissed(true);
       setSetupBannerClosing(false);
     }, DASHBOARD_BANNER_EXIT_MS);
-  }, [setupDismissStorageKey]);
+  }, []);
 
   const dismissWebhookIssueBanner = useCallback((): void => {
     if (!webhookIssueToken) {
