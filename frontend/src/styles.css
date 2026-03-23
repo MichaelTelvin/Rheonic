@@ -7554,16 +7554,18 @@ html {
     width: 100%;
     gap: 10px;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .public-shell.public-shell--marketing .public-footer-landing-legal .public-footer-links,
   .public-shell.public-shell--quickstart .public-footer-quickstart-legal .public-footer-links {
     width: 100%;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     row-gap: 8px;
-    justify-content: flex-start;
-    align-items: flex-start;
+    column-gap: 10px;
+    justify-content: center;
+    align-items: center;
   }
 
   .public-shell.public-shell--marketing .public-footer-landing-legal .public-footer-dot,
@@ -7602,6 +7604,13 @@ html {
     min-height: 16px;
     padding: 0 6px;
     font-size: 0.56rem;
+  }
+
+  .public-shell.public-shell--marketing .public-beta-badge,
+  .public-shell.public-shell--quickstart .public-beta-badge {
+    min-height: 14px;
+    padding: 0 5px;
+    font-size: 0.5rem;
   }
 
   .public-shell.public-shell--marketing,
@@ -7875,9 +7884,9 @@ html {
   }
 
   .public-beta-badge {
-    min-height: 14px;
-    padding: 0 5px;
-    font-size: 0.5rem;
+    min-height: 13px;
+    padding: 0 4px;
+    font-size: 0.47rem;
   }
 
   .public-nav-links {
@@ -7901,11 +7910,12 @@ html {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 32px;
-    padding-inline: 10px;
-    padding-top: 5px;
-    padding-bottom: 4px;
-    font-size: 0.84rem;
+    min-height: auto;
+    padding: 5px 7px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.82rem;
     line-height: 1.05;
     text-align: center;
     white-space: nowrap;
