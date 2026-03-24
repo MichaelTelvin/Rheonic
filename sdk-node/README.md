@@ -8,6 +8,19 @@ The Rheonic Node SDK runs inside your app process, captures provider telemetry, 
 npm install rheonic-node
 ```
 
+Beta prerelease install:
+
+```bash
+npm install rheonic-node@next
+```
+
+Compatibility:
+- Node.js 18+
+- One of the supported provider SDKs: `openai`, `@anthropic-ai/sdk`, or `@google/generative-ai`
+
+Beta note:
+- Public beta releases may add guardrail fields and provider wrappers before `1.0.0`.
+
 ## Configuration
 
 - Required: `ingestKey`
@@ -63,6 +76,18 @@ await client.captureEvent(
 ```
 
 Initialize `client` once during app startup, then reuse that same instance for manual capture and provider instrumentation.
+
+Minimal protect preflight usage:
+
+```ts
+const decision = await client.protect({
+  provider: "openai",
+  model: "gpt-4o-mini",
+  feature: "assistant",
+  inputTokensEstimate: 32,
+  maxOutputTokens: 256,
+});
+```
 
 ## Integration Path 2: OpenAI instrumentation (convenience wrapper)
 
@@ -121,3 +146,9 @@ If you are working inside the Rheonic source repository, the demo entrypoints li
 
 - `tests/e2e/node/demo.mjs`
 - `tests/e2e/node/demo_protect.mjs`
+
+## Publishing notes
+
+- Root repo `VERSION` is the source of truth.
+- Run `python3 scripts/sync_version.py` from the repo root before packing or publishing.
+- Beta prereleases should use semver prerelease format such as `0.2.0-beta.1`.

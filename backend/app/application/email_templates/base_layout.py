@@ -195,9 +195,5 @@ def _humanize_segment(value: str) -> str:
 
 def _public_logo_url() -> str:
     settings = Settings()
-    base_url = (settings.rheonic_base_url or "").strip().rstrip("/")
-    lowered = base_url.lower()
-    is_local = not base_url or "localhost" in lowered or "127.0.0.1" in lowered or lowered.startswith("http://")
-    if is_local:
-        base_url = "https://staging.rheonic.dev" if settings.app_env_normalized == "staging" else "https://rheonic.dev"
+    base_url = settings.resolved_public_app_base_url
     return f"{base_url}/assets/logo/logo-48.png"

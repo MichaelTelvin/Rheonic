@@ -48,6 +48,7 @@ _RESERVED_EXTRA_FIELDS = {
 _EVENT_SANITIZER = re.compile(r"[^a-z0-9_]+")
 _SERVICE_NAME = "backend"
 _ENV_NAME = "dev"
+_APP_VERSION = "0.0.0"
 
 
 def generate_trace_id() -> str:
@@ -92,6 +93,7 @@ class _JsonLogFormatter(logging.Formatter):
             "level": _normalize_level(record.levelname),
             "service": getattr(record, "service", None) or _SERVICE_NAME,
             "env": getattr(record, "env", None) or _ENV_NAME,
+            "app_version": getattr(record, "app_version", None) or _APP_VERSION,
             "trace_id": _resolve_string(getattr(record, "trace_id", None)) or get_trace_id(),
             "span_id": _resolve_string(getattr(record, "span_id", None)) or get_span_id(),
             "event": _resolve_event(record, message),
@@ -102,11 +104,12 @@ class _JsonLogFormatter(logging.Formatter):
 
 
 def configure_logging(*, service_name: str = "backend", level: str | None = None) -> None:
-    global _SERVICE_NAME, _ENV_NAME
+    global _SERVICE_NAME, _ENV_NAME, _APP_VERSION
 
     settings = Settings()
     _SERVICE_NAME = service_name.strip() or "backend"
     _ENV_NAME = settings.app_env_normalized
+    _APP_VERSION = settings.app_version
     resolved_level = (level or settings.log_level).upper()
 
     handler = logging.StreamHandler(sys.stdout)

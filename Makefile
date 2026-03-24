@@ -1,4 +1,4 @@
-.PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e check check-internal coverage coverage-backend coverage-frontend coverage-sdk-node coverage-sdk-python up-deps up-dev down-dev up-test down-test up-staging down-staging up-prod down-prod smoke-staging demo-stg-python demo-stg-node protect-stg-python protect-stg-node backend frontend sdk-node sdk-python e2e diagrams diagrams-check
+.PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e check check-internal coverage coverage-backend coverage-frontend coverage-sdk-node coverage-sdk-python up-deps up-dev down-dev up-test down-test up-staging down-staging up-prod down-prod migrate-prod promtail-prod smoke-staging demo-stg-python demo-stg-node protect-stg-python protect-stg-node backend frontend sdk-node sdk-python e2e diagrams diagrams-check sync-version
 
 DOPPLER_DEMO_PROJECT ?= rheonic
 DOPPLER_DEMO_CONFIG ?= stgdemo
@@ -45,6 +45,15 @@ up-prod:
 
 down-prod:
 	@bash deploy/prod_doppler.sh down
+
+migrate-prod:
+	@bash deploy/prod_migrate.sh
+
+promtail-prod:
+	@bash deploy/prod_promtail.sh up -d
+
+sync-version:
+	@python3 scripts/sync_version.py
 
 smoke-staging:
 	@bash -lc "set -euo pipefail; bash deploy/staging_doppler.sh ps; bash deploy/staging_doppler.sh exec backend python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)\" >/dev/null; bash deploy/staging_doppler.sh exec backend python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2)\" >/dev/null; bash deploy/staging_doppler.sh logs --tail=80 backend worker scheduler"

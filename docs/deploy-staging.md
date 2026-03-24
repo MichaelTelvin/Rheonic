@@ -1,5 +1,7 @@
 # Staging Deployment
 
+> Superseded by [`/DEPLOY.md`](../DEPLOY.md) for the current beta-production topology. Keep this file only for older staging setup notes.
+
 ## Prerequisites
 - VPS with Docker + Docker Compose plugin.
 - Doppler CLI installed on the VPS.

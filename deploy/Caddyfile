@@ -1,0 +1,23 @@
+staging.rheonic.dev {
+  encode gzip zstd
+
+  handle /api/* {
+    reverse_proxy staging-backend:8000
+  }
+
+  handle {
+    reverse_proxy staging-frontend:80
+  }
+}
+
+beta.rheonic.dev {
+  encode gzip zstd
+
+  handle /api/* {
+    reverse_proxy prod-backend:8000
+  }
+
+  handle {
+    reverse_proxy prod-frontend:80
+  }
+}

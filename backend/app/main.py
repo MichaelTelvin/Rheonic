@@ -5,12 +5,12 @@ from typing import AsyncIterator, Awaitable, Callable
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from sqlalchemy import text
 
 from app.api.error_responses import build_error_response, default_code_for_status
 from app.api.routers import api_router
 from app.config import Settings
-from app.dependencies import get_db_session_factory, get_redis_client
+from app.dependencies import get_db_session_factory
+from app.health_checks import assert_critical_dependencies_ready
 from app.logger import (
     bind_trace_context,
     build_log_extra,
@@ -77,6 +77,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers.setdefault("X-Trace-ID", trace_id)
         response.headers.setdefault("X-Span-ID", span_id)
         response.headers.setdefault("X-Request-ID", trace_id)
+        response.headers.setdefault("X-App-Version", _settings.app_version)
         reset_trace_context(context_tokens)
         return response
 
@@ -149,10 +150,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def ready() -> dict[str, str]:
         # Readiness endpoint verifies DB and Redis dependencies.
         try:
-            with get_db_session_factory().create_session() as session:
-                session.execute(text("SELECT 1"))
-            if not get_redis_client().ping():
-                raise RuntimeError("redis ping failed")
+            assert_critical_dependencies_ready()
             return {"status": "ready"}
         except Exception as exc:
             logger.exception("Readiness check failed")
@@ -162,7 +160,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(api_router, prefix=_settings.api_prefix)
     logger.info(
         "FastAPI app initialized",
-        extra={"api_prefix": _settings.api_prefix, "app_env": _settings.app_env_normalized},
+        extra={
+            "api_prefix": _settings.api_prefix,
+            "app_env": _settings.app_env_normalized,
+            "app_version": _settings.app_version,
+        },
     )
     return app
 

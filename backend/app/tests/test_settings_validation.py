@@ -40,10 +40,12 @@ def test_settings_prod_valid_configuration(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("JWT_SECRET", "x" * 48)
     monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com,https://ops.example.com")
+    monkeypatch.setenv("PUBLIC_APP_BASE_URL", "https://beta.example.com")
 
     settings = Settings()
     assert settings.is_production_like
     assert settings.cors_origin_list == ["https://app.example.com", "https://ops.example.com"]
+    assert settings.resolved_public_app_base_url == "https://beta.example.com"
 
 
 def test_settings_prod_cookie_names_use_valid_secure_prefixes(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -51,10 +53,22 @@ def test_settings_prod_cookie_names_use_valid_secure_prefixes(monkeypatch: pytes
     monkeypatch.setenv("APP_ENV", "staging")
     monkeypatch.setenv("JWT_SECRET", "x" * 48)
     monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
+    monkeypatch.setenv("PUBLIC_APP_BASE_URL", "https://staging.example.com")
 
     settings = Settings()
     assert settings.auth_access_cookie_name == "__Host-rheonic_access"
     assert settings.auth_refresh_cookie_name == "__Secure-rheonic_refresh"
+
+
+def test_settings_prod_requires_https_public_app_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    _base_required_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "prod")
+    monkeypatch.setenv("JWT_SECRET", "x" * 48)
+    monkeypatch.setenv("CORS_ORIGINS", "https://app.example.com")
+    monkeypatch.setenv("PUBLIC_APP_BASE_URL", "http://localhost:5173")
+
+    with pytest.raises(ValueError, match="PUBLIC_APP_BASE_URL"):
+        Settings()
 
 
 def test_settings_email_delivery_requires_sender_configuration(monkeypatch: pytest.MonkeyPatch) -> None:

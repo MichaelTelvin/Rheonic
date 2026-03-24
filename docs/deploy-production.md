@@ -1,5 +1,7 @@
 # Production Deployment
 
+> Superseded by [`/DEPLOY.md`](../DEPLOY.md) for the current single-VPS beta-production topology. Keep this file only for older production notes.
+
 ## Prerequisites
 - VPS with Docker + Docker Compose plugin.
 - DNS configured for frontend and API domains.

@@ -243,6 +243,29 @@ describe("App", () => {
     expect(await screen.findByText("Page not found")).toBeDefined();
   });
 
+  it("toggles the mobile navigation drawer from the authenticated app shell", async () => {
+    mockFetchCurrentUser.mockResolvedValueOnce({
+      id: "u1",
+      email: "persisted@example.com",
+      created_at: new Date().toISOString(),
+    });
+
+    render(
+      <TestRouter initialEntries={["/app"]}>
+        <App />
+      </TestRouter>,
+    );
+
+    expect(await screen.findByText("Dashboard Page")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+    expect(screen.getAllByRole("button", { name: "Close navigation" }).length).toBeGreaterThan(1);
+
+    fireEvent.click(document.querySelector(".mobile-nav-backdrop") as HTMLButtonElement);
+    await waitFor(() => expect(document.querySelector(".mobile-nav-backdrop")).toBeNull());
+    expect(screen.getByRole("button", { name: "Open navigation" })).toBeDefined();
+  });
+
   it("restores authenticated session and signs out through backend logout", async () => {
     mockFetchCurrentUser.mockResolvedValueOnce({
       id: "u1",

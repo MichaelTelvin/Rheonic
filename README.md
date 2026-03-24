@@ -19,11 +19,13 @@ curl -fsS http://localhost:8000/ready
 ```
 
 ## Deployment docs
+- Release: [`RELEASE.md`](RELEASE.md)
+- Deploy: [`DEPLOY.md`](DEPLOY.md)
+- SDK release: [`SDK_RELEASE.md`](SDK_RELEASE.md)
 - Audit: [`docs/deploy-readiness-audit.md`](docs/deploy-readiness-audit.md)
-- Staging: [`docs/deploy-staging.md`](docs/deploy-staging.md)
-- Production: [`docs/deploy-production.md`](docs/deploy-production.md)
-- Rollback: [`docs/rollback.md`](docs/rollback.md)
-- Operations: [`docs/operations.md`](docs/operations.md)
+- Legacy staging guide: [`docs/deploy-staging.md`](docs/deploy-staging.md)
+- Legacy production guide: [`docs/deploy-production.md`](docs/deploy-production.md)
+- Rollback details: [`docs/rollback.md`](docs/rollback.md)
 
 ## Transport notifications
 - Notification catalog: [`NOTIFICATION_CATALOG.md`](NOTIFICATION_CATALOG.md)

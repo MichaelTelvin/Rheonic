@@ -1,5 +1,7 @@
 # Application configuration objects.
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from pydantic import model_validator
@@ -54,6 +56,13 @@ class AppConfig:
 app_config = AppConfig()
 
 
+def _default_backend_version() -> str:
+    try:
+        return package_version("rheonic-backend")
+    except PackageNotFoundError:
+        return "0.0.0"
+
+
 class Settings(BaseSettings):
     # Runtime settings container for the backend service.
     model_config = SettingsConfigDict(extra="ignore")
@@ -61,6 +70,7 @@ class Settings(BaseSettings):
     app_name: str = "Rheonic API"
     api_prefix: str = "/api"
     app_env: str = "dev"
+    app_version: str = _default_backend_version()
     log_level: str = "INFO"
 
     # Database settings.
@@ -123,6 +133,9 @@ class Settings(BaseSettings):
     email_reply_to: str = ""
     public_contact_email: str = "contact@rheonic.dev"
     feedback_report_email: str = "feedback@rheonic.dev"
+    public_app_base_url: str = ""
+    auth_cookie_domain: str = ""
+    auth_cookie_samesite_value: str = "lax"
     rq_queue_name: str = "rheonic"
     rq_scheduler_interval_seconds: int = 15
     trust_proxy_headers: bool = False
@@ -142,7 +155,18 @@ class Settings(BaseSettings):
 
     @property
     def auth_cookie_samesite(self) -> str:
-        return "lax"
+        normalized = (self.auth_cookie_samesite_value or "lax").strip().lower()
+        return normalized if normalized in {"lax", "strict", "none"} else "lax"
+
+    @property
+    def resolved_public_app_base_url(self) -> str:
+        explicit = (self.public_app_base_url or "").strip().rstrip("/")
+        if explicit:
+            return explicit
+        origins = self.cors_origin_list
+        if origins:
+            return origins[0].rstrip("/")
+        return "http://localhost:5173"
 
     @property
     def auth_access_cookie_name(self) -> str:
@@ -214,6 +238,9 @@ class Settings(BaseSettings):
             lowered = ",".join(self.cors_origin_list).lower()
             if "localhost" in lowered or "127.0.0.1" in lowered:
                 raise ValueError("CORS_ORIGINS must not contain localhost in staging/production")
+            public_base = self.resolved_public_app_base_url.lower()
+            if "localhost" in public_base or "127.0.0.1" in public_base or not public_base.startswith("https://"):
+                raise ValueError("PUBLIC_APP_BASE_URL must be https and non-localhost in staging/production")
         return self
 
     @model_validator(mode="after")

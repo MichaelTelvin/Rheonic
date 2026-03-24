@@ -10,12 +10,14 @@ from app.api.v1.metrics import router as metrics_router
 from app.api.v1.projects import router as projects_router
 from app.api.v1.protect import router as protect_router
 from app.api.v1.public_config import router as public_config_router
+from app.api.v1.system import router as system_router
 from app.api.v1.webhook import router as webhook_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router, prefix="/v1/auth", tags=["auth"])
 api_router.include_router(events_router, prefix="/v1/events", tags=["events"])
 api_router.include_router(feedback_router, prefix="/v1", tags=["feedback"])
+api_router.include_router(system_router, prefix="/v1", tags=["system"])
 api_router.include_router(incidents_router, prefix="/v1/incidents", tags=["incidents"])
 api_router.include_router(keys_router, prefix="/v1", tags=["keys"])
 api_router.include_router(metrics_router, prefix="/v1/metrics", tags=["metrics"])

@@ -7,6 +7,7 @@ import { CurrentProjectBar } from "./components/CurrentProjectBar";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { RheonicLogoMark } from "./components/RheonicLogoMark";
 import { Sidebar } from "./components/Sidebar";
+import { frontendConfig } from "./config";
 import { AuthContext } from "./context/AuthContext";
 import { ProjectProvider } from "./context/ProjectContext";
 import { emitFrontendLog } from "./lib/logger";
@@ -143,6 +144,7 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
             <Route path="*" element={<NotFound inApp />} />
           </Routes>
         </div>
+        {frontendConfig.appVersion ? <div className="app-version-badge">v{frontendConfig.appVersion}</div> : null}
       </div>
       <AppToastHost />
       <FeedbackModal open={feedbackModalOpen} onClose={() => setFeedbackModalOpen(false)} />

@@ -1,0 +1,37 @@
+name: rheonic_proxy
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - staging-edge
+      - prod-edge
+    logging: *default-logging
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+    name: rheonic_proxy_caddy_data
+  caddy-config:
+    name: rheonic_proxy_caddy_config
+
+networks:
+  staging-edge:
+    external: true
+    name: rheonic_staging_edge
+  prod-edge:
+    external: true
+    name: rheonic_prod_edge

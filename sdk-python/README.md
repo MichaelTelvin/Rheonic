@@ -8,6 +8,12 @@ The Rheonic Python SDK runs inside your app process, captures provider telemetry
 pip install rheonic
 ```
 
+Beta prerelease install:
+
+```bash
+pip install --pre rheonic
+```
+
 Optional provider extras:
 
 ```bash
@@ -22,6 +28,13 @@ pip install "rheonic[providers]"
 - Required: `ingest_key`
 - Optional: `base_url` (defaults to `RHEONIC_BASE_URL`, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
+
+Compatibility:
+- Python 3.11+
+- One of the supported provider SDKs: `openai`, `anthropic`, or `google-generativeai`
+
+Beta note:
+- Public beta releases may add guardrail fields and provider wrappers before `1.0.0`.
 
 Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
 
@@ -74,6 +87,18 @@ client.capture_event(
 ```
 
 Initialize `client` once during app startup, then reuse that same instance when you capture events or instrument provider SDKs.
+
+Minimal protect preflight usage:
+
+```python
+decision = client.protect(
+    provider="openai",
+    model="gpt-4o-mini",
+    feature="assistant",
+    input_tokens_estimate=32,
+    max_output_tokens=256,
+)
+```
 
 ## Integration Path 2: OpenAI instrumentation (convenience wrapper)
 
@@ -139,3 +164,9 @@ If you are working inside the Rheonic source repository, the demo entrypoints li
 - `tests/e2e/python/demo_protect.py`
 - `tests/e2e/python/latency_probe.py`
 - `tests/e2e/python/tokenization_probe.py`
+
+## Publishing notes
+
+- Root repo `VERSION` is the source of truth.
+- Run `python3 scripts/sync_version.py` from the repo root before building or publishing.
+- Beta prereleases should use PEP 440 prerelease format such as `0.2.0b1`.

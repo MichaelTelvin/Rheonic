@@ -3040,6 +3040,17 @@ pre {
   max-width: var(--app-content-max);
 }
 
+.app-version-badge {
+  position: fixed;
+  right: 22px;
+  bottom: 16px;
+  z-index: 9;
+  color: rgba(148, 163, 184, 0.62);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
 .alerts-routes-card,
 .alerts-payload-card {
   max-width: none;
@@ -4453,6 +4464,12 @@ pre {
 
   .app-routes .dashboard {
     padding: 22px var(--app-shell-gutter) 34px;
+  }
+
+  .app-version-badge {
+    right: 14px;
+    bottom: 12px;
+    font-size: 0.68rem;
   }
 
   .current-project-bar-inner {

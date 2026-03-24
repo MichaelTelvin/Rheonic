@@ -8,6 +8,7 @@ x-default-logging: &default-logging
 
 x-runtime-env: &runtime-env
   APP_ENV: ${APP_ENV}
+  APP_VERSION: ${APP_VERSION}
   DATABASE_URL: ${DATABASE_URL}
   REDIS_URL: ${REDIS_URL}
   JWT_SECRET: ${JWT_SECRET}
@@ -19,6 +20,9 @@ x-runtime-env: &runtime-env
   EMAIL_FROM_ALERTS: ${EMAIL_FROM_ALERTS:-}
   EMAIL_FROM_SYSTEM: ${EMAIL_FROM_SYSTEM:-}
   EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
+  FEEDBACK_REPORT_EMAIL: ${FEEDBACK_REPORT_EMAIL:-}
+  PUBLIC_APP_BASE_URL: ${PUBLIC_APP_BASE_URL:-}
+  AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
   RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
 
 services:
@@ -28,10 +32,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-staging-data:/var/lib/postgresql/data
+    networks:
+      - app
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -50,10 +54,10 @@ services:
         "-c",
         "if [ -n \"$REDIS_PASSWORD\" ]; then exec redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\"; else exec redis-server --appendonly yes; fi",
       ]
-    ports:
-      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-staging-data:/data
+    networks:
+      - app
     healthcheck:
       test:
         [
@@ -78,6 +82,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - app
     command: >
       sh -c "python -m app.infrastructure.db.migrate && echo 'db_init complete'"
     logging: *default-logging
@@ -99,6 +105,11 @@ services:
         condition: service_healthy
       db_init:
         condition: service_completed_successfully
+    networks:
+      app:
+      edge:
+        aliases:
+          - staging-backend
     command: >
       sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips \"$${FORWARDED_ALLOW_IPS:-*}\""
     healthcheck:
@@ -123,6 +134,8 @@ services:
         condition: service_healthy
       db_init:
         condition: service_completed_successfully
+    networks:
+      - app
     command: >
       sh -c "python -m app.infrastructure.workers.worker"
     healthcheck:
@@ -153,6 +166,8 @@ services:
         condition: service_healthy
       db_init:
         condition: service_completed_successfully
+    networks:
+      - app
     command: >
       sh -c "python -m app.workers.scheduler_bootstrap && python -m app.workers.scheduler"
     healthcheck:
@@ -174,10 +189,15 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL}
         VITE_PUBLIC_CONTACT_EMAIL: ${VITE_PUBLIC_CONTACT_EMAIL:-support@example.com}
-        VITE_APP_VERSION: ${VITE_APP_VERSION:-staging}
+        VITE_APP_VERSION: ${VITE_APP_VERSION:-}
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      app:
+      edge:
+        aliases:
+          - staging-frontend
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
       interval: 15s
@@ -186,25 +206,15 @@ services:
     logging: *default-logging
     restart: unless-stopped
 
-  caddy:
-    image: caddy:2-alpine
-    depends_on:
-      backend:
-        condition: service_healthy
-      frontend:
-        condition: service_healthy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./deploy/Caddyfile.staging:/etc/caddy/Caddyfile:ro
-      - caddy-staging-data:/data
-      - caddy-staging-config:/config
-    logging: *default-logging
-    restart: unless-stopped
-
 volumes:
   postgres-staging-data:
+    name: rheonic_staging_postgres_data
   redis-staging-data:
-  caddy-staging-data:
-  caddy-staging-config:
+    name: rheonic_staging_redis_data
+
+networks:
+  app:
+    name: rheonic_staging_app
+  edge:
+    external: true
+    name: rheonic_staging_edge
