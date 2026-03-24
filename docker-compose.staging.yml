@@ -32,6 +32,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "55432:5432"
     volumes:
       - postgres-staging-data:/var/lib/postgresql/data
     networks:
