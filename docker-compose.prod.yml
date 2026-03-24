@@ -48,6 +48,8 @@ services:
 
   redis:
     image: redis:7-alpine
+    ports:
+      - "56380:6379"
     command:
       [
         "sh",
