@@ -125,3 +125,7 @@ client.capture_event(
 
 Full quickstart:
 - `https://beta.rheonic.dev/quickstart`
+
+## Support
+
+support@rheonic.dev
