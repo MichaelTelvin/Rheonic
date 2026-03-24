@@ -25,13 +25,13 @@ export RHEONIC_BASE_URL="http://localhost:8000"
 Node:
 
 ```bash
-npm install rheonic-node
+npm install @rheonic/sdk
 ```
 
 Python:
 
 ```bash
-pip install rheonic
+pip install rheonic-sdk --pre
 ```
 
 ## 4. Instrument provider calls

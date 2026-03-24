@@ -64,7 +64,7 @@ export function QuickstartPage(): JSX.Element {
 
   const install = useMemo(
     () =>
-      runtime === "node" ? "npm install rheonic-node" : "pip install rheonic",
+      runtime === "node" ? "npm install @rheonic/sdk" : "pip install rheonic-sdk --pre",
     [runtime],
   );
 
@@ -324,22 +324,21 @@ except RHEONICBlockedError:
               <CodeBlock code={install} language="bash" />
               <div className="quickstart-download-row" aria-label="SDK download options">
                 <a
-                  href="https://github.com/rheonic/rheonic/tree/main/sdk-node"
+                  href="https://www.npmjs.com/package/@rheonic/sdk"
                   className={`landing-link-button${runtime === "node" ? " modal-primary" : ""}`}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  View Node SDK
+                  Open Node package
                 </a>
                 <a
-                  href="https://github.com/rheonic/rheonic/tree/main/sdk-python"
+                  href="https://pypi.org/project/rheonic-sdk"
                   className={`landing-link-button${runtime === "python" ? " modal-primary" : ""}`}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  View Python SDK
+                  Open Python package
                 </a>
-                <span className="quickstart-download-note">Package pages go live with the beta publish</span>
               </div>
             </section>
 
