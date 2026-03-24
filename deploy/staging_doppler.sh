@@ -4,9 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-token_file="${DOPPLER_TOKEN_FILE:-$HOME/.config/rheonic/doppler.env}"
+token_file="${DOPPLER_TOKEN_FILE:-$HOME/.config/rheonic/doppler.stg.env}"
 project="${DOPPLER_PROJECT:-rheonic}"
 config="${DOPPLER_CONFIG:-stg}"
+
+if [[ -z "${DOPPLER_TOKEN:-}" && ! -f "$token_file" && -f "$HOME/.config/rheonic/doppler.env" ]]; then
+  token_file="$HOME/.config/rheonic/doppler.env"
+fi
 
 if [[ -z "${DOPPLER_TOKEN:-}" && -f "$token_file" ]]; then
   set -a
