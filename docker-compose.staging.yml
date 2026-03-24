@@ -208,7 +208,7 @@ services:
 
 volumes:
   postgres-staging-data:
-    name: rheonic_staging_postgres_data
+    name: rheonic_staging_postgres-staging-data
   redis-staging-data:
     name: rheonic_staging_redis_data
 
