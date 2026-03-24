@@ -51,8 +51,10 @@ const SAMPLE_WARN_PAYLOAD = JSON.stringify(
   2,
 );
 
+type AlertsStoredWebhookSettings = Pick<ProjectWebhookSettings, "enabled" | "email_enabled" | "last_status" | "last_at">;
+
 type AlertsCacheState = {
-  webhookSettings: Pick<ProjectWebhookSettings, "enabled" | "email_enabled" | "last_status" | "last_at"> | null;
+  webhookSettings: AlertsStoredWebhookSettings | null;
   protectEnabled: boolean;
 };
 
@@ -67,7 +69,7 @@ function alertsCacheKey(projectId: string): string {
   return `rheonic:alerts:${projectId}`;
 }
 
-function readAlertsCache(projectId: string | null): AlertsCacheState | null {
+function readAlertsCache(projectId: string | null): AlertsMemoryState | null {
   if (!projectId) {
     return null;
   }
@@ -82,8 +84,10 @@ function readAlertsCache(projectId: string | null): AlertsCacheState | null {
         ? {
           enabled: Boolean(parsed.webhookSettings.enabled),
           email_enabled: Boolean(parsed.webhookSettings.email_enabled),
+          url: null,
           last_status: parsed.webhookSettings.last_status ?? null,
           last_at: parsed.webhookSettings.last_at ?? null,
+          last_error: null,
         }
         : null,
       protectEnabled: Boolean(parsed.protectEnabled),

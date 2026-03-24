@@ -38,6 +38,7 @@ import { Alerts } from "./Alerts";
 
 describe("Alerts webhook settings", () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     mocks.useProjectContext.mockReturnValue({
       projectId: "p1",
       projects: [{ id: "p1", name: "Demo", created_at: new Date().toISOString() }],
@@ -176,5 +177,41 @@ describe("Alerts webhook settings", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Copy JSON" }));
     await waitFor(() => expect(writeText).toHaveBeenCalled());
+  });
+
+  it("hydrates non-sensitive settings from session cache on first render", async () => {
+    mocks.useProjectContext.mockReturnValue({
+      projectId: "p-cache",
+      projects: [{ id: "p-cache", name: "Cached Demo", created_at: new Date().toISOString() }],
+      projectError: null,
+      loadingProjects: false,
+      setProjectId: vi.fn(),
+      reloadProjects: vi.fn(),
+    });
+    window.sessionStorage.setItem(
+      "rheonic:alerts:p-cache",
+      JSON.stringify({
+        webhookSettings: {
+          enabled: true,
+          email_enabled: false,
+          last_status: "success",
+          last_at: "2026-03-24T00:00:00Z",
+        },
+        protectEnabled: true,
+      }),
+    );
+    mocks.fetchProjectWebhook.mockImplementation(() => new Promise(() => {}));
+    mocks.fetchProjectProtect.mockImplementation(() => new Promise(() => {}));
+
+    render(<Alerts />);
+
+    const emailToggle = document.getElementById("alerts-email-enabled-toggle") as HTMLInputElement | null;
+    const webhookToggle = document.getElementById("alerts-enabled-toggle") as HTMLInputElement | null;
+    expect(emailToggle).toBeTruthy();
+    expect(webhookToggle).toBeTruthy();
+    expect(emailToggle?.checked).toBe(false);
+    expect(webhookToggle?.checked).toBe(true);
+    expect(screen.getByText("Protect mode only. Sends lifecycle alerts to your account email.")).toBeTruthy();
+    expect((screen.getByLabelText("Webhook URL") as HTMLInputElement).value).toBe("");
   });
 });
