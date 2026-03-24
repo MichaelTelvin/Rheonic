@@ -1,8 +1,8 @@
 .PHONY: test test-backend test-frontend test-sdk-node test-sdk-python test-e2e check check-internal coverage coverage-backend coverage-frontend coverage-sdk-node coverage-sdk-python up-deps up-dev down-dev up-test down-test up-staging down-staging up-prod down-prod migrate-prod promtail-prod smoke-staging demo-stg-python demo-stg-node protect-stg-python protect-stg-node demo-prod-python demo-prod-node protect-prod-python protect-prod-node backend frontend sdk-node sdk-python e2e diagrams diagrams-check sync-version
 
 DOPPLER_DEMO_PROJECT ?= rheonic
-DOPPLER_STG_DEMO_CONFIG ?= stgdemo
-DOPPLER_PROD_DEMO_CONFIG ?= proddemo
+DOPPLER_STG_DEMO_CONFIG ?= stg_demo
+DOPPLER_PROD_DEMO_CONFIG ?= prod_demo
 RHEONIC_STEP_SLEEP_MS ?= 200
 RHEONIC_RETRY_STORM_COUNT ?= 6
 RHEONIC_LOOP_COUNT ?= 7
