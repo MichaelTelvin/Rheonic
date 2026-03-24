@@ -312,9 +312,9 @@ export function Dashboard(): JSX.Element {
         title: "Setup required",
         text: (
           <>
-            Create your first project
+            Create your first project.
             <br />
-            generate an ingest key, then follow Quickstart.
+            Generate an ingest key, then follow Quickstart.
           </>
         ),
         primaryLabel: "Projects",
@@ -338,9 +338,9 @@ export function Dashboard(): JSX.Element {
         title: "Setup required",
         text: (
           <>
-            Generate an ingest key
+            Generate an ingest key.
             <br />
-            then follow Quickstart to instrument your SDK.
+            Then follow Quickstart to instrument your SDK.
           </>
         ),
         primaryLabel: "Keys",
@@ -354,7 +354,7 @@ export function Dashboard(): JSX.Element {
         title: "Setup required",
         text: (
           <>
-            Waiting for first event
+            Waiting for first event.
             <br />
             Run one instrumented provider call to verify integration.
           </>

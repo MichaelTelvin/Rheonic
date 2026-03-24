@@ -3,6 +3,7 @@ from collections.abc import Generator
 from time import perf_counter
 
 from sqlalchemy import Engine, create_engine, event
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import Settings, app_config
@@ -94,6 +95,8 @@ def _register_engine_logging(engine: Engine) -> None:
 
     @event.listens_for(engine, "handle_error")
     def handle_error(exception_context):  # type: ignore[no-untyped-def]
+        if _is_expected_project_model_duplicate(exception_context):
+            return
         logger.exception(
             "Database query failed",
             extra=build_log_extra(
@@ -111,3 +114,15 @@ def _extract_sql_operation(statement: str | None) -> str:
         return "unknown"
     token = statement.strip().split(None, 1)[0].lower()
     return token or "unknown"
+
+
+def _is_expected_project_model_duplicate(exception_context) -> bool:  # type: ignore[no-untyped-def]
+    original_exception = getattr(exception_context, "original_exception", None)
+    sqlalchemy_exception = getattr(exception_context, "sqlalchemy_exception", None)
+    if not isinstance(sqlalchemy_exception, IntegrityError):
+        return False
+    statement = getattr(exception_context, "statement", "") or ""
+    if "project_models" not in statement:
+        return False
+    message = str(original_exception or sqlalchemy_exception)
+    return "uq_project_models_project_provider_model" in message
