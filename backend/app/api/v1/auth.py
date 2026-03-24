@@ -108,7 +108,6 @@ def _enforce_auth_rate_limit(
 
 def _set_auth_cookies(response: Response, *, access_token: str, refresh_token: str, settings: Settings) -> None:
     same_site = _cookie_samesite(settings.auth_cookie_samesite)
-    cookie_domain = (settings.auth_cookie_domain or "").strip() or None
     response.set_cookie(
         key=settings.auth_access_cookie_name,
         value=access_token,
@@ -117,7 +116,6 @@ def _set_auth_cookies(response: Response, *, access_token: str, refresh_token: s
         samesite=same_site,
         max_age=max(int(settings.jwt_expires_min), 1) * 60,
         path="/",
-        domain=cookie_domain,
     )
     response.set_cookie(
         key=settings.auth_refresh_cookie_name,
@@ -127,20 +125,17 @@ def _set_auth_cookies(response: Response, *, access_token: str, refresh_token: s
         samesite=same_site,
         max_age=max(int(settings.jwt_refresh_expires_min), 1) * 60,
         path=f"{settings.api_prefix}/v1/auth",
-        domain=cookie_domain,
     )
 
 
 def _clear_auth_cookies(response: Response, settings: Settings) -> None:
     same_site = _cookie_samesite(settings.auth_cookie_samesite)
-    cookie_domain = (settings.auth_cookie_domain or "").strip() or None
     response.delete_cookie(
         key=settings.auth_access_cookie_name,
         httponly=True,
         secure=settings.auth_cookie_secure,
         samesite=same_site,
         path="/",
-        domain=cookie_domain,
     )
     response.delete_cookie(
         key=settings.auth_refresh_cookie_name,
@@ -148,7 +143,6 @@ def _clear_auth_cookies(response: Response, settings: Settings) -> None:
         secure=settings.auth_cookie_secure,
         samesite=same_site,
         path=f"{settings.api_prefix}/v1/auth",
-        domain=cookie_domain,
     )
 
 
