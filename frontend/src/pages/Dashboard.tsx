@@ -54,6 +54,8 @@ type DashboardCachedState = {
   setupStatusResolved: boolean;
   metrics: RealtimeMetrics | null;
   lastMetricsSuccessAt: string | null;
+  protectHealth: ProtectHealthMetrics | null;
+  lastProtectHealthSuccessAt: string | null;
   protectDecisionStats: {
     allowed_60m: number | null;
     warned_60m: number | null;
@@ -83,6 +85,8 @@ function readDashboardCache(projectId: string): DashboardCachedState | null {
       setupStatusResolved: Boolean(parsed.setupStatusResolved),
       metrics: parsed.metrics ?? null,
       lastMetricsSuccessAt: parsed.lastMetricsSuccessAt ?? null,
+      protectHealth: parsed.protectHealth ?? null,
+      lastProtectHealthSuccessAt: parsed.lastProtectHealthSuccessAt ?? null,
       protectDecisionStats: parsed.protectDecisionStats ?? null,
     };
   } catch {
@@ -111,10 +115,10 @@ export function Dashboard(): JSX.Element {
   const [, setMetricsWarning] = useState<string | null>(null);
   const [lastMetricsSuccessAt, setLastMetricsSuccessAt] = useState<string | null>(initialDashboardState?.lastMetricsSuccessAt ?? null);
   const [, setLastIncidentsSuccessAt] = useState<string | null>(null);
-  const [lastProtectHealthSuccessAt, setLastProtectHealthSuccessAt] = useState<string | null>(null);
+  const [lastProtectHealthSuccessAt, setLastProtectHealthSuccessAt] = useState<string | null>(initialDashboardState?.lastProtectHealthSuccessAt ?? null);
   const [, setMetricsFetchFailed] = useState<boolean>(false);
   const [protectHealthFetchFailed, setProtectHealthFetchFailed] = useState<boolean>(false);
-  const [protectHealth, setProtectHealth] = useState<ProtectHealthMetrics | null>(null);
+  const [protectHealth, setProtectHealth] = useState<ProtectHealthMetrics | null>(initialDashboardState?.protectHealth ?? null);
   const [protectDecisionStats, setProtectDecisionStats] = useState<{
     allowed_60m: number | null;
     warned_60m: number | null;
@@ -184,8 +188,8 @@ export function Dashboard(): JSX.Element {
     setMetricsWarning(null);
     setGlobalBanner(null);
     setProtectDecisionStats(cached?.protectDecisionStats ?? null);
-    setProtectHealth(null);
-    setLastProtectHealthSuccessAt(null);
+    setProtectHealth(cached?.protectHealth ?? null);
+    setLastProtectHealthSuccessAt(cached?.lastProtectHealthSuccessAt ?? null);
     setProtectHealthFetchFailed(false);
     setProviders([]);
     setSelectedProvider(cached?.selectedProvider ?? "all");
@@ -211,9 +215,11 @@ export function Dashboard(): JSX.Element {
       setupStatusResolved,
       metrics,
       lastMetricsSuccessAt,
+      protectHealth,
+      lastProtectHealthSuccessAt,
       protectDecisionStats,
     });
-  }, [hasEvents, hasIngestKey, lastMetricsSuccessAt, metrics, projectId, protectDecisionStats, selectedProvider, setupStatusResolved]);
+  }, [hasEvents, hasIngestKey, lastMetricsSuccessAt, lastProtectHealthSuccessAt, metrics, projectId, protectDecisionStats, protectHealth, selectedProvider, setupStatusResolved]);
 
   useEffect(() => {
     const dismissed = window.localStorage.getItem(webhookIssueDismissStorageKey);

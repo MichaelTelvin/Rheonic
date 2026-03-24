@@ -357,7 +357,10 @@ Confirm:
 - no old webhook editor wording remains
 - no old `decision.warn` / `incident.block` transport wording remains
 
-## 17. Final Sign-Off
+
+## 17. Perform the same checks with multiple projects
+
+## 18. Final Sign-Off
 
 Beta is ready only if all are true:
 
