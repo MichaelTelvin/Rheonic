@@ -1,6 +1,6 @@
 {
-  "name": "rheonic-node",
-  "version": "0.1.0",
+  "name": "@rheonic/sdk",
+  "version": "0.1.0-beta.1",
   "description": "Node.js SDK for Rheonic observability and protect preflight enforcement.",
   "author": "Rheonic <founder@rheonic.dev>",
   "license": "MIT",
@@ -37,14 +37,9 @@
     "anthropic",
     "google"
   ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rheonic/rheonic.git",
-    "directory": "sdk-node"
-  },
-  "homepage": "https://rheonic.dev",
+  "homepage": "https://beta.rheonic.dev",
   "bugs": {
-    "url": "https://github.com/rheonic/rheonic/issues"
+    "url": "mailto:support@rheonic.dev"
   },
   "publishConfig": {
     "access": "public"

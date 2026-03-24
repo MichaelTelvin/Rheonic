@@ -4,23 +4,19 @@ The Rheonic Python SDK runs inside your app process, captures provider telemetry
 
 ## Install
 
-```bash
-pip install rheonic
-```
-
 Beta prerelease install:
 
 ```bash
-pip install --pre rheonic
+pip install rheonic-sdk --pre
 ```
 
 Optional provider extras:
 
 ```bash
-pip install "rheonic[openai]"
-pip install "rheonic[anthropic]"
-pip install "rheonic[google]"
-pip install "rheonic[providers]"
+pip install "rheonic-sdk[openai]"
+pip install "rheonic-sdk[anthropic]"
+pip install "rheonic-sdk[google]"
+pip install "rheonic-sdk[providers]"
 ```
 
 ## Configuration

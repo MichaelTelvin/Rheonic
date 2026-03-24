@@ -1,15 +1,15 @@
 [project]
-name = "rheonic"
-version = "0.1.0"
+name = "rheonic-sdk"
+version = "0.1.0b1"
 description = "Python SDK for Rheonic observability and protect preflight enforcement."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-  {name = "Rheonic", email = "founder@rheonic.dev"}
+  {name = "Michael Telvin", email = "founder@rheonic.dev"}
 ]
 maintainers = [
-  {name = "Rheonic", email = "founder@rheonic.dev"}
+  {name = "Michael Telvin", email = "founder@rheonic.dev"}
 ]
 keywords = ["llm", "ai", "observability", "guardrails", "openai", "anthropic", "google"]
 classifiers = [
@@ -54,10 +54,8 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project.urls]
-Homepage = "https://rheonic.dev"
-Repository = "https://github.com/rheonic/rheonic"
-Issues = "https://github.com/rheonic/rheonic/issues"
-Changelog = "https://github.com/rheonic/rheonic/blob/main/sdk-python/CHANGELOG.md"
+Homepage = "https://beta.rheonic.dev"
+Support = "mailto:support@rheonic.dev"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
