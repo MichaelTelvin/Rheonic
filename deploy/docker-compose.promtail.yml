@@ -8,6 +8,8 @@ services:
       - -config.expand-env=true
     environment:
       LOKI_PUSH_URL: ${LOKI_PUSH_URL}
+      LOKI_USERNAME: ${LOKI_USERNAME}
+      LOKI_API_KEY: ${LOKI_API_KEY}
     volumes:
       - ./promtail-config.prod.yml:/etc/promtail/config.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
