@@ -7,7 +7,7 @@ The Rheonic Node SDK runs inside your app process, captures provider telemetry, 
 Beta prerelease install:
 
 ```bash
-npm install rheonic-node@next
+npm install @rheonic/sdk
 ```
 
 Compatibility:
