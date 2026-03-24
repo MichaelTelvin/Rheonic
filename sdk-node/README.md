@@ -24,8 +24,10 @@ Beta note:
 ## Configuration
 
 - Required: `ingestKey`
-- Optional: `baseUrl` (defaults to `RHEONIC_BASE_URL`, else `http://localhost:8000`)
+- Optional for local development: `baseUrl` (defaults to `RHEONIC_BASE_URL`, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
+
+For hosted beta, staging, or production deployments, set `RHEONIC_BASE_URL` or pass `baseUrl` explicitly. The localhost default is intended only for local development.
 
 Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
 
@@ -63,7 +65,10 @@ Notes:
 ```ts
 import { buildEvent, createClient } from "rheonic-node";
 
-const client = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
+const client = createClient({
+  baseUrl: process.env.RHEONIC_BASE_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
 
 await client.captureEvent(
   buildEvent({
@@ -95,7 +100,10 @@ const decision = await client.protect({
 import OpenAI from "openai";
 import { createClient, instrumentOpenAI } from "rheonic-node";
 
-const rheonicClient = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
+const rheonicClient = createClient({
+  baseUrl: process.env.RHEONIC_BASE_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
 const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
   client: rheonicClient,
   endpoint: "/chat/completions",
@@ -110,7 +118,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "rheonic-node";
 
-const client = createClient({ ingestKey: process.env.RHEONIC_INGEST_KEY! });
+const client = createClient({
+  baseUrl: process.env.RHEONIC_BASE_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
 
 const anthropic = client.instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }));
 await anthropic.messages.create({
@@ -132,7 +143,7 @@ Runtime call path:
 
 ## Provider SDKs
 
-Install only the provider SDKs you use:
+Install only the provider SDKs you actually use alongside `rheonic-node`:
 
 ```bash
 npm install openai
@@ -140,15 +151,4 @@ npm install @anthropic-ai/sdk
 npm install @google/generative-ai
 ```
 
-## Source Repo E2E Utilities
-
-If you are working inside the Rheonic source repository, the demo entrypoints live under:
-
-- `tests/e2e/node/demo.mjs`
-- `tests/e2e/node/demo_protect.mjs`
-
-## Publishing notes
-
-- Root repo `VERSION` is the source of truth.
-- Run `python3 scripts/sync_version.py` from the repo root before packing or publishing.
-- Beta prereleases should use semver prerelease format such as `0.2.0-beta.1`.
+Beta prereleases use semver prerelease format such as `0.2.0-beta.1` and are published under the `next` tag.

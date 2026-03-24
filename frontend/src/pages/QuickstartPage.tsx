@@ -84,7 +84,7 @@ export function QuickstartPage(): JSX.Element {
         ? `import { createClient, buildEvent } from "rheonic-node";
 
 const client = createClient({
-  baseUrl: process.env.RHEONIC_BACKEND_URL!,
+  baseUrl: process.env.RHEONIC_BASE_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
@@ -100,7 +100,7 @@ await client.captureEvent(
 from rheonic import create_client, build_event
 
 client = create_client(
-    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    base_url=os.environ["RHEONIC_BASE_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
 )
 
@@ -122,7 +122,7 @@ client.capture_event(
 import { createClient, instrumentOpenAI, RHEONICBlockedError } from "rheonic-node";
 
 const rheonic = createClient({
-  baseUrl: process.env.RHEONIC_BACKEND_URL!,
+  baseUrl: process.env.RHEONIC_BASE_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
@@ -149,7 +149,7 @@ try {
 import { createClient, RHEONICBlockedError } from "rheonic-node";
 
 const rheonic = createClient({
-  baseUrl: process.env.RHEONIC_BACKEND_URL!,
+  baseUrl: process.env.RHEONIC_BASE_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
@@ -172,7 +172,7 @@ try {
 import { createClient, RHEONICBlockedError } from "rheonic-node";
 
 const rheonic = createClient({
-  baseUrl: process.env.RHEONIC_BACKEND_URL!,
+  baseUrl: process.env.RHEONIC_BASE_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
@@ -193,7 +193,7 @@ from anthropic import Anthropic
 from rheonic import create_client, RHEONICBlockedError
 
 rheonic = create_client(
-    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    base_url=os.environ["RHEONIC_BASE_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
 )
 anthropic_client = rheonic.instrument_anthropic(
@@ -215,7 +215,7 @@ import google.generativeai as genai
 from rheonic import create_client, RHEONICBlockedError
 
 rheonic = create_client(
-    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    base_url=os.environ["RHEONIC_BASE_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
 )
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
@@ -231,7 +231,7 @@ from openai import OpenAI
 from rheonic import create_client, instrument_openai, RHEONICBlockedError
 
 rheonic = create_client(
-    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    base_url=os.environ["RHEONIC_BASE_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
 )
 openai_client = instrument_openai(
@@ -323,23 +323,23 @@ except RHEONICBlockedError:
               </div>
               <CodeBlock code={install} language="bash" />
               <div className="quickstart-download-row" aria-label="SDK download options">
-                <button
-                  type="button"
+                <a
+                  href="https://github.com/rheonic/rheonic/tree/main/sdk-node"
                   className={`landing-link-button${runtime === "node" ? " modal-primary" : ""}`}
-                  disabled
-                  aria-disabled="true"
+                  target="_blank"
+                  rel="noreferrer"
                 >
-                  Download Node SDK
-                </button>
-                <button
-                  type="button"
+                  View Node SDK
+                </a>
+                <a
+                  href="https://github.com/rheonic/rheonic/tree/main/sdk-python"
                   className={`landing-link-button${runtime === "python" ? " modal-primary" : ""}`}
-                  disabled
-                  aria-disabled="true"
+                  target="_blank"
+                  rel="noreferrer"
                 >
-                  Download Python SDK
-                </button>
-                <span className="quickstart-download-note">Package downloads coming soon</span>
+                  View Python SDK
+                </a>
+                <span className="quickstart-download-note">Package pages go live with the beta publish</span>
               </div>
             </section>
 
@@ -350,7 +350,7 @@ except RHEONICBlockedError:
               </div>
               <CodeBlock
                 code={`RHEONIC_INGEST_KEY=<your_project_ingest_key>
-RHEONIC_BACKEND_URL=<value_shown_in_dashboard>`}
+RHEONIC_BASE_URL=<value_shown_in_dashboard>`}
                 language="bash"
               />
             </section>

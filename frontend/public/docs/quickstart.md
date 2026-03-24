@@ -18,7 +18,7 @@ Set it in your app environment:
 
 ```bash
 export RHEONIC_INGEST_KEY="your-ingest-key"
-export RHEONIC_BACKEND_URL="http://localhost:8000"
+export RHEONIC_BASE_URL="http://localhost:8000"
 ```
 
 ## 3. Install an SDK
@@ -41,7 +41,7 @@ Node:
 import { createClient, buildEvent } from "rheonic-node";
 
 const client = createClient({
-  baseUrl: process.env.RHEONIC_BACKEND_URL!,
+  baseUrl: process.env.RHEONIC_BASE_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
@@ -62,7 +62,7 @@ import os
 from rheonic import create_client, build_event
 
 client = create_client(
-    base_url=os.environ["RHEONIC_BACKEND_URL"],
+    base_url=os.environ["RHEONIC_BASE_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
 )
 

@@ -26,8 +26,10 @@ pip install "rheonic[providers]"
 ## Configuration
 
 - Required: `ingest_key`
-- Optional: `base_url` (defaults to `RHEONIC_BASE_URL`, else `http://localhost:8000`)
+- Optional for local development: `base_url` (defaults to `RHEONIC_BASE_URL`, else `http://localhost:8000`)
 - Optional: `environment` (default `dev`)
+
+For hosted beta, staging, or production deployments, set `RHEONIC_BASE_URL` or pass `base_url` explicitly. The localhost default is intended only for local development.
 
 Compatibility:
 - Python 3.11+
@@ -74,7 +76,10 @@ import os
 
 from rheonic import build_event, create_client
 
-client = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"])
+client = create_client(
+    base_url=os.environ["RHEONIC_BASE_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
+)
 
 client.capture_event(
     build_event(
@@ -108,7 +113,10 @@ import os
 from openai import OpenAI
 from rheonic import create_client, instrument_openai
 
-rheonic_client = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"])
+rheonic_client = create_client(
+    base_url=os.environ["RHEONIC_BASE_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
+)
 openai_client = instrument_openai(
     OpenAI(api_key="..."),
     client=rheonic_client,
@@ -126,7 +134,10 @@ import google.generativeai as genai
 
 from rheonic import create_client
 
-client = create_client(ingest_key=os.environ["RHEONIC_INGEST_KEY"])
+client = create_client(
+    base_url=os.environ["RHEONIC_BASE_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
+)
 
 anthropic_client = client.instrument_anthropic(Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]))
 anthropic_client.messages.create(
@@ -148,7 +159,7 @@ Runtime call path:
 
 ## Provider SDKs
 
-Install only the provider SDKs you use, either directly or through extras:
+Install only the provider SDKs you actually use, either directly or through extras:
 
 ```bash
 pip install openai
@@ -156,17 +167,4 @@ pip install anthropic
 pip install google-generativeai
 ```
 
-## Source Repo E2E Utilities
-
-If you are working inside the Rheonic source repository, the demo entrypoints live under:
-
-- `tests/e2e/python/demo.py`
-- `tests/e2e/python/demo_protect.py`
-- `tests/e2e/python/latency_probe.py`
-- `tests/e2e/python/tokenization_probe.py`
-
-## Publishing notes
-
-- Root repo `VERSION` is the source of truth.
-- Run `python3 scripts/sync_version.py` from the repo root before building or publishing.
-- Beta prereleases should use PEP 440 prerelease format such as `0.2.0b1`.
+Beta prereleases use PEP 440 prerelease format such as `0.2.0b1`.
