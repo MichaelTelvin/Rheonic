@@ -6,6 +6,18 @@ import { IncidentItem as IncidentRow } from "../components/IncidentItem";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
 
+type IncidentsViewCacheState = {
+  providers: string[];
+  incidents: IncidentItem[];
+};
+
+const incidentsViewCache = new Map<string, IncidentsViewCacheState>();
+const incidentProvidersCache = new Map<string, string[]>();
+
+function incidentsViewCacheKey(projectId: string, provider: string, status: string, type: string): string {
+  return `${projectId}:${provider}:${status}:${type}`;
+}
+
 function formatProviderLabel(provider: string): string {
   return provider
     .split(/[_-]/g)
@@ -18,14 +30,16 @@ export function Incidents(): JSX.Element {
   const { projectId } = useProjectContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialProvider = (searchParams.get("provider") ?? "all").toLowerCase();
+  const initialCache = projectId ? incidentsViewCache.get(incidentsViewCacheKey(projectId, initialProvider, "open", "all")) ?? null : null;
+  const initialProviders = projectId ? incidentProvidersCache.get(projectId) ?? [] : [];
 
-  const [providers, setProviders] = useState<string[]>([]);
+  const [providers, setProviders] = useState<string[]>(initialProviders.length > 0 ? initialProviders : (initialCache?.providers ?? []));
   const [selectedProvider, setSelectedProvider] = useState<string>(initialProvider);
   const [selectedStatus, setSelectedStatus] = useState<"all" | "open" | "resolved">("open");
   const [selectedType, setSelectedType] = useState<string>("all");
-  const [incidents, setIncidents] = useState<IncidentItem[]>([]);
+  const [incidents, setIncidents] = useState<IncidentItem[]>(initialCache?.incidents ?? []);
   const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
-  const [, setLoading] = useState<boolean>(true);
+  const [, setLoading] = useState<boolean>(projectId ? initialCache === null : false);
   const [warning, setWarning] = useState<string | null>(null);
   const providerRequestSeq = useRef<number>(0);
 
@@ -39,6 +53,11 @@ export function Incidents(): JSX.Element {
     setSelectedType("all");
     setSelectedStatus("open");
     setSelectedProvider((searchParams.get("provider") ?? "all").toLowerCase());
+    const cache = projectId
+      ? incidentsViewCache.get(incidentsViewCacheKey(projectId, (searchParams.get("provider") ?? "all").toLowerCase(), "open", "all")) ?? null
+      : null;
+    setProviders(projectId ? incidentProvidersCache.get(projectId) ?? (cache?.providers ?? []) : []);
+    setIncidents(cache?.incidents ?? []);
   }, [projectId, searchParams]);
 
   const refreshProviders = useCallback(async (): Promise<void> => {
@@ -53,6 +72,7 @@ export function Incidents(): JSX.Element {
         return;
       }
       setProviders(items);
+      incidentProvidersCache.set(projectId, items);
       setSelectedProvider((current) => (current !== "all" && !items.includes(current) ? "all" : current));
     } catch {
       if (requestSeq !== providerRequestSeq.current) {
@@ -74,7 +94,9 @@ export function Incidents(): JSX.Element {
       return undefined;
     }
     let cancelled = false;
-    setLoading(true);
+    const cacheKey = incidentsViewCacheKey(projectId, selectedProvider, selectedStatus, selectedType);
+    const cached = incidentsViewCache.get(cacheKey) ?? null;
+    setLoading(cached === null);
     const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
     const statusQuery = selectedStatus === "all" ? "all" : selectedStatus;
 
@@ -84,7 +106,12 @@ export function Incidents(): JSX.Element {
         if (cancelled) {
           return;
         }
-        setIncidents(selectedType === "all" ? rows : rows.filter((row) => row.type === selectedType));
+        const filteredRows = selectedType === "all" ? rows : rows.filter((row) => row.type === selectedType);
+        setIncidents(filteredRows);
+        incidentsViewCache.set(cacheKey, {
+          providers,
+          incidents: filteredRows,
+        });
         setWarning(null);
       } catch (error) {
         if (!cancelled) {
@@ -124,7 +151,12 @@ export function Incidents(): JSX.Element {
       const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
       const statusQuery = selectedStatus === "all" ? "all" : selectedStatus;
       const updated = await fetchIncidents(projectId, providerQuery, statusQuery);
-      setIncidents(selectedType === "all" ? updated : updated.filter((row) => row.type === selectedType));
+      const filteredRows = selectedType === "all" ? updated : updated.filter((row) => row.type === selectedType);
+      setIncidents(filteredRows);
+      incidentsViewCache.set(incidentsViewCacheKey(projectId, selectedProvider, selectedStatus, selectedType), {
+        providers,
+        incidents: filteredRows,
+      });
       setWarning(null);
     } catch {
       setIncidents(previous);

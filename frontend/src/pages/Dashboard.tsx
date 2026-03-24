@@ -125,6 +125,7 @@ export function Dashboard(): JSX.Element {
   const [selectedProvider, setSelectedProvider] = useState<string>(initialDashboardState?.selectedProvider ?? "all");
   const providerRequestSeq = useRef<number>(0);
   const metricsRequestSeq = useRef<number>(0);
+  const activeMetricsScopeRef = useRef<string | null>(null);
   const seriesByScopeRef = useRef<Record<string, { requests: number[]; tokens: number[] }>>({});
   const [hasIngestKey, setHasIngestKey] = useState<boolean>(initialDashboardState?.hasIngestKey ?? false);
   const [hasEvents, setHasEvents] = useState<boolean>(initialDashboardState?.hasEvents ?? false);
@@ -481,9 +482,11 @@ export function Dashboard(): JSX.Element {
     const requestSeq = metricsRequestSeq.current;
     setLoadingMetrics(true);
     const scopeKey = `${projectId}:${selectedProvider}`;
+    const scopeChanged = activeMetricsScopeRef.current !== scopeKey;
+    activeMetricsScopeRef.current = scopeKey;
     const cachedSeries = seriesByScopeRef.current[scopeKey];
-    setRequestsSeries(cachedSeries?.requests ?? []);
-    setTokensSeries(cachedSeries?.tokens ?? []);
+    setRequestsSeries(scopeChanged ? [] : (cachedSeries?.requests ?? []));
+    setTokensSeries(scopeChanged ? [] : (cachedSeries?.tokens ?? []));
     const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
     const providerKeys = providers.filter((provider) => provider !== "all");
 
@@ -503,8 +506,12 @@ export function Dashboard(): JSX.Element {
         setMetricsFetchFailed(false);
         setLastMetricsSuccessAt(new Date().toISOString());
         const currentSeries = seriesByScopeRef.current[scopeKey] ?? { requests: [], tokens: [] };
-        const nextRequests = [...currentSeries.requests.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.requests_60s];
-        const nextTokens = [...currentSeries.tokens.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.tokens_60s];
+        const nextRequests = scopeChanged
+          ? [data.requests_60s]
+          : [...currentSeries.requests.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.requests_60s];
+        const nextTokens = scopeChanged
+          ? [data.tokens_60s]
+          : [...currentSeries.tokens.slice(-(frontendConfig.dashboardMaxSeriesPoints - 1)), data.tokens_60s];
         seriesByScopeRef.current[scopeKey] = {
           requests: nextRequests,
           tokens: nextTokens,
