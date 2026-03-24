@@ -86,7 +86,8 @@ function resolveSimulatedTotalTokens(payload, fallback = 10) {
 }
 
 function printConfigHint() {
-  console.log("Run: make protect-stg-node RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach");
+  const targetHint = (process.env.RHEONIC_DEMO_TARGET_HINT ?? "").trim() || "protect-prod-node";
+  console.log(`Run: make ${targetHint} RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach`);
   console.log("Optional exact provider-call visibility: python3 tests/e2e/provider_stub.py");
 }
 

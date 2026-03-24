@@ -14,7 +14,8 @@ function logVerbose(message) {
 }
 
 function printConfigHint() {
-  console.log("  Run: make demo-stg-node RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach");
+  const targetHint = (process.env.RHEONIC_DEMO_TARGET_HINT ?? "").trim() || "demo-prod-node";
+  console.log(`  Run: make ${targetHint} RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach`);
 }
 
 function printUsageExamples() {

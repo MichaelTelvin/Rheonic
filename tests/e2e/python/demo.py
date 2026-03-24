@@ -174,6 +174,7 @@ def _print_phase(
 
 
 def _usage() -> None:
+    target_hint = (os.getenv("RHEONIC_DEMO_TARGET_HINT") or "").strip() or "demo-prod-python"
     print("Example:")
     print("  RHEONIC_PROVIDER=openai")
     print("  RHEONIC_MODEL=gpt-4o-mini")
@@ -187,9 +188,7 @@ def _usage() -> None:
     print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
     print("  RHEONIC_NEAR_CAP_TOKENS=3200")
     print("  Optional snapshot/incident summary: RHEONIC_AUTH_EMAIL, RHEONIC_AUTH_PASSWORD, RHEONIC_PROJECT_ID")
-    print(
-        "  Run: make demo-stg-python RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach"
-    )
+    print(f"  Run: make {target_hint} RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach")
 
 
 def main() -> None:

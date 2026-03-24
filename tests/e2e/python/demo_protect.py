@@ -167,7 +167,8 @@ def _assert_line(label: str, passed: bool) -> None:
 
 
 def _print_config_hint() -> None:
-    print("Run: make protect-stg-python RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach")
+    target_hint = (os.getenv("RHEONIC_DEMO_TARGET_HINT") or "").strip() or "protect-prod-python"
+    print(f"Run: make {target_hint} RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach")
     print("Optional exact provider-call visibility: python3 tests/e2e/provider_stub.py")
 
 
