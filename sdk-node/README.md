@@ -1,65 +1,115 @@
 # Rheonic Node SDK
 
-The Rheonic Node SDK runs inside your app process, captures provider telemetry, and can request protect preflight decisions before provider calls.
+Rheonic captures provider telemetry and applies protect preflight decisions before provider calls.
 
 ## Install
-
-Install:
 
 ```bash
 npm install @rheonic/sdk
 ```
 
-Compatibility:
-- Node.js 18+
-- One of the supported provider SDKs: `openai`, `@anthropic-ai/sdk`, or `@google/generative-ai`
+## Required environment variables
 
-Beta note:
-- Public beta releases may add guardrail fields and provider wrappers before `1.0.0`.
+```bash
+RHEONIC_INGEST_KEY=<your_project_ingest_key>
+RHEONIC_BASE_URL=<value_shown_in_dashboard>
+```
 
-## Configuration
+## Instrument provider calls
 
-- Required: `ingestKey`
-- Optional for local development: `baseUrl` (defaults to `RHEONIC_BASE_URL`, else `http://localhost:8000`)
-- Optional: `environment` (default `dev`)
+Wrap your provider SDK once.
 
-For hosted beta, staging, or production deployments, set `RHEONIC_BASE_URL` or pass `baseUrl` explicitly. The localhost default is intended only for local development.
+Telemetry is captured automatically after each provider call.
 
-Provider/model validation: SDK wrappers fail fast with `RHEONICValidationError` when provider is missing/unsupported or model is missing/empty. Supported providers are `openai`, `anthropic`, and `google`. Model naming is not pattern-validated so future vendor naming changes remain compatible.
+Enforcement follows Project mode in the dashboard (`Observe` / `Protect`).
 
-## Integration Recommendation
+OpenAI:
 
-Create one long-lived SDK client at app startup and reuse it for all provider calls. The SDK prewarms tokenizer state and the backend connection on client initialization, so reusing a single client avoids paying protect cold-start cost on every request.
+```ts
+import OpenAI from "openai";
+import { createClient, instrumentOpenAI, RHEONICBlockedError } from "@rheonic/sdk";
 
-## Logging
+const rheonic = createClient({
+  baseUrl: process.env.RHEONIC_BASE_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
 
-The SDK emits structured JSON logs to stdout. You do not need to configure file logging.
+const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY! }), {
+  client: rheonic,
+  endpoint: "/chat/completions",
+  feature: "assistant",
+});
 
-Example log:
-
-```json
-{
-  "timestamp": "2026-03-18T09:20:15.145102+00:00",
-  "level": "info",
-  "service": "sdk-node",
-  "env": "staging",
-  "trace_id": "f4ac8b6b-6f8d-4f4c-b54f-3c2c2f76a27b",
-  "span_id": "9f12db3a1d204f8f",
-  "event": "sdk_client_initialized",
-  "message": "SDK client initialized",
-  "metadata": {}
+try {
+  await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "hello" }],
+    max_tokens: 256,
+  });
+} catch (error) {
+  if (error instanceof RHEONICBlockedError) {
+    console.log("Blocked by protect preflight");
+  }
 }
 ```
 
-Notes:
-- backend requests automatically include `X-Trace-ID`,
-- SDK logs share that `trace_id` so you can correlate SDK, backend, worker, and webhook activity,
-- sensitive fields such as API keys and tokens are redacted.
-
-## Integration Path 1: Manual Capture (generic)
+Anthropic:
 
 ```ts
-import { buildEvent, createClient } from "@rheonic/sdk";
+import Anthropic from "@anthropic-ai/sdk";
+import { createClient, RHEONICBlockedError } from "@rheonic/sdk";
+
+const rheonic = createClient({
+  baseUrl: process.env.RHEONIC_BASE_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
+
+const anthropic = rheonic.instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }));
+
+try {
+  await anthropic.messages.create({
+    model: "claude-3-5-sonnet-latest",
+    max_tokens: 256,
+    messages: [{ role: "user", content: "hello" }],
+  });
+} catch (error) {
+  if (error instanceof RHEONICBlockedError) {
+    console.log("Blocked by protect preflight");
+  }
+}
+```
+
+Google:
+
+```ts
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createClient, RHEONICBlockedError } from "@rheonic/sdk";
+
+const rheonic = createClient({
+  baseUrl: process.env.RHEONIC_BASE_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
+
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+const model = rheonic.instrumentGoogle(genAI.getGenerativeModel({ model: "gemini-1.5-pro" }));
+
+try {
+  await model.generateContent("hello");
+} catch (error) {
+  if (error instanceof RHEONICBlockedError) {
+    console.log("Blocked by protect preflight");
+  }
+}
+```
+
+Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all capture and instrumentation calls so Rheonic can avoid repeated protect cold-start latency.
+
+## Optional: custom event capture
+
+Use this only if you can't instrument a provider SDK or need custom events.
+
+```ts
+import { createClient, buildEvent } from "@rheonic/sdk";
 
 const client = createClient({
   baseUrl: process.env.RHEONIC_BASE_URL!,
@@ -70,81 +120,13 @@ await client.captureEvent(
   buildEvent({
     provider: "openai",
     model: "gpt-4o-mini",
-    request: { endpoint: "/chat", input_tokens: 12 },
-    response: { total_tokens: 32, latency_ms: 140, http_status: 200 },
+    request: { endpoint: "/chat/completions", feature: "assistant" },
+    response: { total_tokens: 64, latency_ms: 120, http_status: 200 },
   }),
 );
 ```
 
-Initialize `client` once during app startup, then reuse that same instance for manual capture and provider instrumentation.
+## Reference
 
-Minimal protect preflight usage:
-
-```ts
-const decision = await client.protect({
-  provider: "openai",
-  model: "gpt-4o-mini",
-  feature: "assistant",
-  inputTokensEstimate: 32,
-  maxOutputTokens: 256,
-});
-```
-
-## Integration Path 2: OpenAI instrumentation (convenience wrapper)
-
-```ts
-import OpenAI from "openai";
-import { createClient, instrumentOpenAI } from "rheonic-node";
-
-const rheonicClient = createClient({
-  baseUrl: process.env.RHEONIC_BASE_URL!,
-  ingestKey: process.env.RHEONIC_INGEST_KEY!,
-});
-const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), {
-  client: rheonicClient,
-  endpoint: "/chat/completions",
-  feature: "assistant",
-});
-```
-
-## Integration Path 3: Anthropic and Google wrappers
-
-```ts
-import Anthropic from "@anthropic-ai/sdk";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { createClient } from "rheonic-node";
-
-const client = createClient({
-  baseUrl: process.env.RHEONIC_BASE_URL!,
-  ingestKey: process.env.RHEONIC_INGEST_KEY!,
-});
-
-const anthropic = client.instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }));
-await anthropic.messages.create({
-  model: "claude-3-5-sonnet-latest",
-  max_tokens: 256,
-  messages: [{ role: "user", content: "Hello Claude" }],
-});
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-const googleModel = client.instrumentGoogle(genAI.getGenerativeModel({ model: "gemini-1.5-pro" }));
-await googleModel.generateContent("Hello Google model");
-```
-
-Runtime call path:
-- SDK instrumentation calls `POST /api/v1/protect/decision` then `POST /api/v1/events`.
-- Project mode in dashboard controls decision behavior:
-  - Observe: allow only.
-  - Protect: allow/warn/block with cooldown.
-
-## Provider SDKs
-
-Install only the provider SDKs you actually use alongside `rheonic-node`:
-
-```bash
-npm install openai
-npm install @anthropic-ai/sdk
-npm install @google/generative-ai
-```
-
-Beta prereleases use semver prerelease format such as `0.2.0-beta.1` and are published under the `next` tag.
+Full quickstart:
+- `https://beta.rheonic.dev/quickstart`

@@ -34,7 +34,96 @@ Python:
 pip install rheonic
 ```
 
-## 4. Send Your First Event
+## 4. Instrument provider calls
+
+Wrap your provider SDK once.
+
+Telemetry is captured automatically after each provider call.
+
+Enforcement follows Project mode in the dashboard (Observe / Protect).
+
+Node OpenAI:
+
+```ts
+import OpenAI from "openai";
+import { createClient, instrumentOpenAI, RHEONICBlockedError } from "rheonic-node";
+
+const rheonic = createClient({
+  baseUrl: process.env.RHEONIC_BASE_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
+
+const openai = instrumentOpenAI(new OpenAI({ apiKey: process.env.OPENAI_API_KEY! }), {
+  client: rheonic,
+  endpoint: "/chat/completions",
+  feature: "assistant",
+});
+
+try {
+  await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: "hello" }],
+    max_tokens: 256,
+  });
+} catch (error) {
+  if (error instanceof RHEONICBlockedError) {
+    console.log("Blocked by protect preflight");
+  }
+}
+```
+
+Python OpenAI:
+
+```python
+import os
+from openai import OpenAI
+from rheonic import create_client, instrument_openai, RHEONICBlockedError
+
+rheonic = create_client(
+    base_url=os.environ["RHEONIC_BASE_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
+)
+openai_client = instrument_openai(
+    OpenAI(api_key=os.environ["OPENAI_API_KEY"]),
+    client=rheonic,
+    endpoint="/chat/completions",
+    feature="assistant",
+)
+
+try:
+    openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "hello"}],
+        max_tokens=256,
+    )
+except RHEONICBlockedError:
+    print("Blocked by protect preflight")
+```
+
+Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all capture and instrumentation calls so Rheonic can avoid repeated protect cold-start latency.
+
+## 5. Verify in Observe mode
+
+Make one provider call. Open the dashboard and confirm traffic appears.
+
+Dashboard path: `Dashboard → Metrics` or `Incidents`
+
+## 6. Set request and token limits
+
+In Project Settings, configure request and token limits per provider.
+
+Dashboard path: `Dashboard → Project Settings → Limits`
+
+## 7. Enable Protect mode
+
+Switch Project mode from Observe to Protect to activate enforcement.
+
+Dashboard path: `Dashboard → Project Settings → Mode`
+
+## 8. Optional: custom event capture
+
+Use this only if you can't instrument a provider SDK or need custom events.
+
 Node:
 
 ```ts
@@ -75,64 +164,3 @@ client.capture_event(
     )
 )
 ```
-
-Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all capture/instrumentation calls. Rheonic prewarms tokenizer state and the backend connection when the client starts, so reusing that client avoids repeated protect cold-start latency.
-
-## 4.1 SDK Logging
-The SDK emits structured JSON logs to stdout. You do not need to configure file logging.
-
-Typical SDK log object:
-
-```json
-{
-  "timestamp": "2026-03-18T09:20:15.145102+00:00",
-  "level": "info",
-  "service": "sdk-python",
-  "env": "staging",
-  "trace_id": "f4ac8b6b-6f8d-4f4c-b54f-3c2c2f76a27b",
-  "span_id": "9f12db3a1d204f8f",
-  "event": "sdk_client_initialized",
-  "message": "SDK client initialized",
-  "metadata": {}
-}
-```
-
-What to expect:
-- backend requests automatically carry `X-Trace-ID`,
-- SDK logs share that `trace_id` so you can correlate app, backend, worker, and webhook activity,
-- sensitive fields such as tokens or API keys are redacted and should not appear in logs.
-
-If you already collect stdout logs into Grafana Loki or another aggregator, the SDK logs are ready to ingest as-is.
-
-## 5. Verify in the Dashboard
-After your first event:
-- `Dashboard` should show non-zero request and token activity.
-- `Projects` should list the providers that have sent traffic.
-- `Incidents` remains empty until detector conditions are met.
-
-If nothing appears:
-- make sure you are viewing the same project where you created the ingest key,
-- send one more test event after copying the new key, so you know traffic was generated after setup,
-- check your app logs or terminal output for SDK errors, failed requests, or missing environment variables,
-- confirm your app is using the backend URL you configured for Rheonic. If you are self-hosting, this should be your reachable Rheonic backend address, not a placeholder value.
-
-If you are still not seeing data, open `Keys` and create a fresh ingest key, update your app environment, restart the app, and send another test event.
-
-## 6. Enable Protect Mode
-When you are ready to enforce runtime limits:
-1. Open `Protect`.
-2. Set request and token caps.
-3. Choose a fail mode.
-4. Save the settings and switch from Observe to Protect.
-
-Rheonic will continue collecting telemetry in both modes. The difference is that Protect mode can return `warn` or `block` before a provider call is made.
-
-## 7. Configure Alerts
-Open `Alerts` to:
-- send notifications to your account email,
-- enable a webhook destination,
-- test webhook delivery before relying on it in production.
-
-## Next Steps
-- Read `Protect Mode` before rollout.
-- Read `Alerts` if you want email or webhook notifications.
