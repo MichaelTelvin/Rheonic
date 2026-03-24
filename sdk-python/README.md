@@ -4,7 +4,7 @@ The Rheonic Python SDK runs inside your app process, captures provider telemetry
 
 ## Install
 
-Beta prerelease install:
+Install:
 
 ```bash
 pip install rheonic-sdk --pre

@@ -4,7 +4,7 @@ The Rheonic Node SDK runs inside your app process, captures provider telemetry, 
 
 ## Install
 
-Beta prerelease install:
+Install:
 
 ```bash
 npm install @rheonic/sdk
