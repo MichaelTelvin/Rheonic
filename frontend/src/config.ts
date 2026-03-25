@@ -1,7 +1,12 @@
+const rawAppVersion = import.meta.env.VITE_APP_VERSION ?? "";
+const normalizedAppVersion = /^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(rawAppVersion)
+  ? rawAppVersion
+  : "";
+
 export const frontendConfig = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "",
   publicContactEmail: import.meta.env.VITE_PUBLIC_CONTACT_EMAIL ?? "contact@rheonic.dev",
-  appVersion: import.meta.env.VITE_APP_VERSION ?? "",
+  appVersion: normalizedAppVersion,
   dashboardSelectedProjectStorageKey: "selected_project_id",
   dashboardMaxSeriesPoints: 60,
   dashboardClockTickMs: 1000,

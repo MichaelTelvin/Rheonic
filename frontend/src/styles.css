@@ -3043,7 +3043,7 @@ pre {
 .app-version-badge {
   position: fixed;
   right: 22px;
-  bottom: 16px;
+  bottom: 28px;
   z-index: 9;
   color: rgba(148, 163, 184, 0.62);
   font-size: 0.74rem;
@@ -4468,7 +4468,7 @@ pre {
 
   .app-version-badge {
     right: 14px;
-    bottom: 12px;
+    bottom: 20px;
     font-size: 0.68rem;
   }
 

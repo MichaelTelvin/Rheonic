@@ -28,6 +28,7 @@ x-runtime-env: &runtime-env
 services:
   postgres:
     image: postgres:16-alpine
+    command: ["postgres", "-c", "log_checkpoints=off"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -56,7 +57,7 @@ services:
       [
         "sh",
         "-c",
-        "if [ -n \"$REDIS_PASSWORD\" ]; then exec redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\"; else exec redis-server --appendonly yes; fi",
+        "if [ -n \"$REDIS_PASSWORD\" ]; then exec redis-server --appendonly yes --loglevel warning --requirepass \"$REDIS_PASSWORD\"; else exec redis-server --appendonly yes --loglevel warning; fi",
       ]
     volumes:
       - redis-staging-data:/data
@@ -203,7 +204,7 @@ services:
         aliases:
           - staging-frontend
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
       interval: 15s
       timeout: 3s
       retries: 10

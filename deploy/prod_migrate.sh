@@ -25,8 +25,8 @@ if [[ -z "${DOPPLER_TOKEN:-}" ]]; then
 fi
 
 version_value="$(tr -d '[:space:]' < "${ROOT_DIR}/VERSION")"
-export APP_VERSION="${APP_VERSION:-$version_value}"
-export VITE_APP_VERSION="${VITE_APP_VERSION:-$version_value}"
+export APP_VERSION="$version_value"
+export VITE_APP_VERSION="$version_value"
 
 doppler run --token "$DOPPLER_TOKEN" --project "$project" --config "$config" -- \
   docker compose -p rheonic_prod -f docker-compose.prod.yml up -d postgres redis

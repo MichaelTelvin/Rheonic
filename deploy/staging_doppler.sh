@@ -25,8 +25,8 @@ if [[ -z "${DOPPLER_TOKEN:-}" ]]; then
 fi
 
 version_value="$(tr -d '[:space:]' < "${ROOT_DIR}/VERSION")"
-export APP_VERSION="${APP_VERSION:-$version_value}"
-export VITE_APP_VERSION="${VITE_APP_VERSION:-$version_value}"
+export APP_VERSION="$version_value"
+export VITE_APP_VERSION="$version_value"
 
 app_compose=(docker compose -p rheonic_staging -f docker-compose.staging.yml)
 proxy_compose=(docker compose -p rheonic_proxy -f docker-compose.proxy.yml)
