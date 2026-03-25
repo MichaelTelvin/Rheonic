@@ -136,6 +136,11 @@ export interface PublicConfigResponse {
   public_contact_email: string;
 }
 
+export interface ApiVersionResponse {
+  version: string;
+  environment: string;
+}
+
 export class ApiError extends Error {
   status: number;
   code?: string;
@@ -425,4 +430,8 @@ export async function sendFeedback(payload: FeedbackInput): Promise<{ status: st
 
 export async function fetchPublicConfig(): Promise<PublicConfigResponse> {
   return request<PublicConfigResponse>("/api/v1/public-config");
+}
+
+export async function fetchApiVersion(): Promise<ApiVersionResponse> {
+  return request<ApiVersionResponse>("/api/v1/version");
 }

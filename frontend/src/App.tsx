@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
-import { ApiError, fetchCurrentUser, logout, setUnauthorizedHandler, type AuthUser } from "./api/client";
+import { ApiError, fetchApiVersion, fetchCurrentUser, logout, setUnauthorizedHandler, type AuthUser } from "./api/client";
 import { AppToastHost } from "./components/AppToastHost";
 import { CurrentProjectBar } from "./components/CurrentProjectBar";
 import { FeedbackModal } from "./components/FeedbackModal";
@@ -96,11 +96,31 @@ interface AuthenticatedAppLayoutProps {
 function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayoutProps): JSX.Element {
   const [feedbackModalOpen, setFeedbackModalOpen] = useState<boolean>(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
+  const [appVersion, setAppVersion] = useState<string>(frontendConfig.appVersion);
   const location = useLocation();
 
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadVersion = async (): Promise<void> => {
+      try {
+        const payload = await fetchApiVersion();
+        const nextVersion = payload.version.trim();
+        if (!cancelled && nextVersion) {
+          setAppVersion(nextVersion);
+        }
+      } catch {
+        // Keep the build-time fallback when the API version endpoint is unavailable.
+      }
+    };
+    void loadVersion();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="app-shell">
@@ -144,7 +164,7 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
             <Route path="*" element={<NotFound inApp />} />
           </Routes>
         </div>
-        {frontendConfig.appVersion ? <div className="app-version-badge">v{frontendConfig.appVersion}</div> : null}
+        {appVersion ? <div className="app-version-badge">v{appVersion}</div> : null}
       </div>
       <AppToastHost />
       <FeedbackModal open={feedbackModalOpen} onClose={() => setFeedbackModalOpen(false)} />
