@@ -6,15 +6,19 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app.application.provider_scope import scoped_project_provider_id
-from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.incident_manager import IncidentManager
+from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.project_service import ProjectService
-from app.application.services.protect_service import ProtectDecision, ProtectDecisionContext, ProtectService
+from app.application.services.protect_service import (
+    ProtectDecision,
+    ProtectDecisionContext,
+    ProtectService,
+)
 from app.config import app_config
 from app.dependencies import (
     get_current_user,
-    get_ingest_key_service,
     get_incident_manager,
+    get_ingest_key_service,
     get_project_service,
     get_protect_action_store,
     get_protect_service,

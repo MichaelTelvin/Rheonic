@@ -78,11 +78,7 @@ class LoggingHttpClient:
             round_trip_latency_ms = int((time.perf_counter() - started_at) * 1000)
             print("=== PROTECT DECISION RESPONSE ===")
             if header_latency_ms is not None:
-                print(
-                    "[LATENCY] "
-                    f"protect_server_ms={header_latency_ms} "
-                    f"protect_round_trip_ms={round_trip_latency_ms}"
-                )
+                print(f"[LATENCY] protect_server_ms={header_latency_ms} protect_round_trip_ms={round_trip_latency_ms}")
             print(json_lib.dumps(payload, indent=2, sort_keys=True))
         return response
 
@@ -104,9 +100,7 @@ def _set_provider_stub_available(value: bool) -> None:
     _PROVIDER_STUB_AVAILABLE = value
 
 
-def _provider_stub_request(
-    method: str, path: str, **kwargs: Any
-) -> httpx.Response | None:
+def _provider_stub_request(method: str, path: str, **kwargs: Any) -> httpx.Response | None:
     global _PROVIDER_STUB_AVAILABLE
     try:
         response = httpx.request(
@@ -118,10 +112,7 @@ def _provider_stub_request(
         response.raise_for_status()
     except Exception:
         if _PROVIDER_STUB_AVAILABLE is not False:
-            print(
-                f"[PROVIDER] stub unavailable at {PROVIDER_STUB_URL}; "
-                "using in-process call tracking"
-            )
+            print(f"[PROVIDER] stub unavailable at {PROVIDER_STUB_URL}; using in-process call tracking")
         _set_provider_stub_available(False)
         return None
     _set_provider_stub_available(True)
@@ -178,9 +169,7 @@ def _extract_used_max_tokens(payload: dict[str, Any] | None) -> int | None:
     return None
 
 
-def _resolve_simulated_total_tokens(
-    payload: dict[str, Any] | None, fallback: int = 10
-) -> int:
+def _resolve_simulated_total_tokens(payload: dict[str, Any] | None, fallback: int = 10) -> int:
     used_max_tokens = _extract_used_max_tokens(payload)
     if isinstance(used_max_tokens, int) and used_max_tokens > 0:
         return used_max_tokens
@@ -199,20 +188,13 @@ def _assert_delivery(client: Client, *, expected_min_sent: int = 0) -> None:
     queued = int(stats.get("queued", 0))
     if sent < expected_min_sent or failed > 0 or queued > 0:
         raise RuntimeError(
-            "protect demo did not fully deliver SDK events "
-            f"(sent={sent}, failed={failed}, queued={queued})"
+            f"protect demo did not fully deliver SDK events (sent={sent}, failed={failed}, queued={queued})"
         )
 
 
 def _print_config_hint() -> None:
-    target_hint = (
-        (os.getenv("RHEONIC_DEMO_TARGET_HINT") or "").strip()
-        or "protect-prod-python"
-    )
-    print(
-        f"Run: make {target_hint} RHEONIC_PROVIDER=openai "
-        "RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach"
-    )
+    target_hint = (os.getenv("RHEONIC_DEMO_TARGET_HINT") or "").strip() or "protect-prod-python"
+    print(f"Run: make {target_hint} RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach")
     print("Optional exact provider-call visibility: python3 tests/e2e/provider_stub.py")
 
 
@@ -335,10 +317,7 @@ def _list_open_incidents(
     auth_email: str,
 ) -> list[dict[str, Any]]:
     if dashboard_session is None or not project_id:
-        print(
-            "[INCIDENTS] skipped "
-            "(missing dashboard cookie session or RHEONIC_PROJECT_ID)"
-        )
+        print("[INCIDENTS] skipped (missing dashboard cookie session or RHEONIC_PROJECT_ID)")
         return []
     params = {"project_id": project_id, "status": "open", "provider": provider}
     try:
@@ -346,15 +325,11 @@ def _list_open_incidents(
         return payload if isinstance(payload, list) else []
     except httpx.HTTPError as exc:
         status_code = (
-            exc.response.status_code
-            if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None
-            else None
+            exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None else None
         )
         if status_code in {401, 403}:
             print(
-                "[INCIDENTS] skipped "
-                f"({status_code} auth error; update dashboard cookie "
-                f"credentials for {auth_email})"
+                f"[INCIDENTS] skipped ({status_code} auth error; update dashboard cookie credentials for {auth_email})"
             )
             return []
         raise
@@ -366,9 +341,7 @@ def _print_incidents(
     provider: str,
     auth_email: str,
 ) -> None:
-    incidents = _list_open_incidents(
-        dashboard_session, project_id, provider, auth_email
-    )
+    incidents = _list_open_incidents(dashboard_session, project_id, provider, auth_email)
     counts: dict[str, int] = {}
     near_types: list[str] = []
     for incident in incidents:
@@ -380,17 +353,10 @@ def _print_incidents(
                 near_type = str(evidence.get("near_cap_type", "")).strip()
                 if near_type:
                     near_types.append(near_type)
-    compact = (
-        ", ".join(f"{k}={counts[k]}" for k in sorted(counts))
-        if counts
-        else "none"
-    )
+    compact = ", ".join(f"{k}={counts[k]}" for k in sorted(counts)) if counts else "none"
     if near_types:
         near_compact = ",".join(sorted(set(near_types)))
-        print(
-            f"[INCIDENTS] open={len(incidents)} "
-            f"types={compact} near_cap_types={near_compact}"
-        )
+        print(f"[INCIDENTS] open={len(incidents)} types={compact} near_cap_types={near_compact}")
         return
     print(f"[INCIDENTS] open={len(incidents)} types={compact}")
 
@@ -406,9 +372,7 @@ def _get_project_req_cap(
         payload = dashboard_session.request(f"/api/v1/projects/{project_id}/protect")
     except httpx.HTTPError as exc:
         status_code = (
-            exc.response.status_code
-            if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None
-            else None
+            exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None else None
         )
         if status_code in {401, 403}:
             print(
@@ -418,9 +382,7 @@ def _get_project_req_cap(
             )
             return None
         raise
-    value = (
-        payload.get("protect_max_req_per_min") if isinstance(payload, dict) else None
-    )
+    value = payload.get("protect_max_req_per_min") if isinstance(payload, dict) else None
     return value if isinstance(value, int) and value > 0 else None
 
 
@@ -435,9 +397,7 @@ def _assert_project_is_in_protect_mode(
         payload = dashboard_session.request(f"/api/v1/projects/{project_id}/protect")
     except httpx.HTTPError as exc:
         status_code = (
-            exc.response.status_code
-            if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None
-            else None
+            exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None else None
         )
         if status_code in {401, 403}:
             print(
@@ -510,10 +470,7 @@ def main() -> None:
         sys.exit(1)
 
     scenario = (os.getenv("RHEONIC_SCENARIO") or "allow").strip().lower()
-    env = (
-        (os.getenv("RHEONIC_ENVIRONMENT") or "").strip()
-        or f"protect-{int(time.time())}"
-    )
+    env = (os.getenv("RHEONIC_ENVIRONMENT") or "").strip() or f"protect-{int(time.time())}"
     pause_ms = int(os.getenv("RHEONIC_STEP_SLEEP_MS", "200"))
     decision_timeout_ms = int(os.getenv("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", "250"))
     project_id = os.getenv("RHEONIC_PROJECT_ID", "")
@@ -545,11 +502,7 @@ def main() -> None:
     google = _make_google_stub()
     google.model_name = model
 
-    decision_feature = (
-        "loop-fixed-signature"
-        if scenario == "loop_suspect"
-        else "manual-protect-demo"
-    )
+    decision_feature = "loop-fixed-signature" if scenario == "loop_suspect" else "manual-protect-demo"
     instrument_openai(openai, client=client, feature=decision_feature, environment=env)
     instrument_anthropic(
         anthropic,
@@ -622,10 +575,7 @@ def main() -> None:
                     environment=env,
                 )
                 time.sleep(pause_ms / 1000)
-            print(
-                f"[STEP] req_cap_breach ingest events sent={count} "
-                "(provider_calls_delta tracks provider calls only)"
-            )
+            print(f"[STEP] req_cap_breach ingest events sent={count} (provider_calls_delta tracks provider calls only)")
         elif scenario == "retry_storm":
             print("\n[STEP] Seed retry storm then expect warn")
             count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "6"))
@@ -689,25 +639,15 @@ def main() -> None:
             time.sleep(pause_ms / 1000)
 
         if scenario == "cooldown":
-            first_blocked = _run_provider_call(
-                provider, model, call_max_tokens, openai, anthropic, google
-            )
-            second_blocked = _run_provider_call(
-                provider, model, call_max_tokens, openai, anthropic, google
-            )
+            first_blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
+            second_blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
             blocked = first_blocked and second_blocked
         else:
-            blocked = _run_provider_call(
-                provider, model, call_max_tokens, openai, anthropic, google
-            )
+            blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
         client.flush()
         after_calls = _provider_count()
         provider_calls_delta = after_calls - before_calls
-        decision_payload = (
-            transport.last_decision_payload
-            if isinstance(transport.last_decision_payload, dict)
-            else {}
-        )
+        decision_payload = transport.last_decision_payload if isinstance(transport.last_decision_payload, dict) else {}
         decision_reason = str(decision_payload.get("reason", ""))
         decision_value = str(decision_payload.get("decision", "")).lower()
         clamp = decision_payload.get("clamp")
@@ -724,51 +664,27 @@ def main() -> None:
 
         print(f"[RESULT] blocked={blocked} provider_calls_delta={provider_calls_delta}")
         if scenario == "near_cap":
-            print(
-                f"[CLAMP] recommended={clamp_recommended} "
-                f"applied={clamp_applied} used_max_tokens={used_max_tokens}"
-            )
+            print(f"[CLAMP] recommended={clamp_recommended} applied={clamp_applied} used_max_tokens={used_max_tokens}")
         if project_id and dashboard_session is not None:
             _print_incidents(dashboard_session, project_id, provider, auth_email)
         else:
-            print(
-                "[INCIDENTS] skipped "
-                "(set RHEONIC_PROJECT_ID, RHEONIC_AUTH_EMAIL, "
-                "and RHEONIC_AUTH_PASSWORD)"
-            )
+            print("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID, RHEONIC_AUTH_EMAIL, and RHEONIC_AUTH_PASSWORD)")
 
         if scenario == "allow":
             _assert_line(
                 "allow passed",
-                not blocked
-                and provider_calls_delta >= 1
-                and decision_value == "allow",
+                not blocked and provider_calls_delta >= 1 and decision_value == "allow",
             )
         elif scenario == "near_cap":
             _assert_line(
                 "near_cap warn triggered",
-                decision_value == "warn"
-                and decision_reason == "near_cap"
-                and not blocked,
+                decision_value == "warn" and decision_reason == "near_cap" and not blocked,
             )
-            clamp_is_recommended = (
-                isinstance(clamp_recommended, int) and clamp_recommended > 0
-            )
-            clamp_should_apply = (
-                clamp_is_recommended
-                and isinstance(max_tokens, int)
-                and clamp_recommended < max_tokens
-            )
-            clamp_used = (
-                clamp_is_recommended
-                and used_max_tokens == clamp_recommended
-                and provider_calls_delta >= 1
-            )
+            clamp_is_recommended = isinstance(clamp_recommended, int) and clamp_recommended > 0
+            clamp_should_apply = clamp_is_recommended and isinstance(max_tokens, int) and clamp_recommended < max_tokens
+            clamp_used = clamp_is_recommended and used_max_tokens == clamp_recommended and provider_calls_delta >= 1
             _assert_line("clamp suggested", clamp_is_recommended)
-            if (
-                decision_payload.get("apply_clamp_enabled") is True
-                and clamp_should_apply
-            ):
+            if decision_payload.get("apply_clamp_enabled") is True and clamp_should_apply:
                 _assert_line("clamp applied", clamp_used)
             else:
                 _assert_line(
@@ -778,9 +694,7 @@ def main() -> None:
         elif scenario == "cap_breach":
             _assert_line("cap breach blocked", blocked and provider_calls_delta == 0)
         elif scenario == "req_cap_breach":
-            _assert_line(
-                "req_cap breach blocked", blocked and provider_calls_delta == 0
-            )
+            _assert_line("req_cap breach blocked", blocked and provider_calls_delta == 0)
             _assert_line(
                 "req_cap breach triggered block",
                 blocked and provider_calls_delta == 0,
@@ -788,23 +702,17 @@ def main() -> None:
         elif scenario == "retry_storm":
             _assert_line(
                 "retry_storm warn triggered",
-                decision_value == "warn"
-                and decision_reason == "retry_storm"
-                and not blocked,
+                decision_value == "warn" and decision_reason == "retry_storm" and not blocked,
             )
         elif scenario == "loop_suspect":
             _assert_line(
                 "loop_suspect warn triggered",
-                decision_value == "warn"
-                and decision_reason == "loop_suspect"
-                and not blocked,
+                decision_value == "warn" and decision_reason == "loop_suspect" and not blocked,
             )
         elif scenario == "token_explosion":
             _assert_line(
                 "token_explosion warn triggered",
-                decision_value == "warn"
-                and decision_reason in {"token_explosion", "near_cap"}
-                and not blocked,
+                decision_value == "warn" and decision_reason in {"token_explosion", "near_cap"} and not blocked,
             )
         elif scenario == "cooldown":
             _assert_line("cooldown active", blocked and provider_calls_delta == 0)

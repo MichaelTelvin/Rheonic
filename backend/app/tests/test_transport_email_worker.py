@@ -143,7 +143,9 @@ def test_feedback_email_delivery_falls_back_to_default_destination_when_setting_
         database_url=db_url,
         redis_url="redis://localhost:6379/15",
         resend_api_key="re_test",
+        email_from_alerts="Rheonic Alerts <alerts@mail.rheonic.dev>",
         email_from_system="Rheonic System <system@mail.rheonic.dev>",
+        email_reply_to="contact@rheonic.dev",
         feedback_report_email="",
     )
     monkeypatch.setattr(transport_job, "Settings", lambda: settings)

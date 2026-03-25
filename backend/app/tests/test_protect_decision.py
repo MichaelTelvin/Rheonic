@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from app.application.services import protect_service as protect_service_module
 from fastapi.testclient import TestClient
 
 from app.application.provider_scope import scoped_project_provider_id
+from app.application.services import protect_service as protect_service_module
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.metrics_service import MetricsService
 from app.application.services.project_service import ProjectService
@@ -368,7 +368,7 @@ def test_late_block_decision_does_not_enqueue_protection_block_notifications(tmp
     )
     project_id, ingest_key = _create_project_and_key(client, "Protect Late Block Suppression")
     _set_protect(client, project_id, protect_enabled=True, protect_max_req_per_min=1)
-    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_requests=1)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
 
     calls = {"count": 0}
 

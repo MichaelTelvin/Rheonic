@@ -65,9 +65,7 @@ class IncidentManager:
         evidence["environment"] = environment
         evidence["last_seen_at"] = now.isoformat()
         dedup_after = now - timedelta(
-            seconds=_signal_episode_window_seconds(
-                signal, self._incident_dedup_window_seconds
-            )
+            seconds=_signal_episode_window_seconds(signal, self._incident_dedup_window_seconds)
         )
         open_incident = self._incident_repository.get_open_incident_by_fingerprint(
             project_id=project_id,
@@ -104,9 +102,7 @@ class IncidentManager:
         self._incident_repository.create_incident(incident=incident)
         self._enqueue_detection_notifications(incident=incident, mode=mode)
 
-    def _enqueue_detection_notifications(
-        self, *, incident: Incident, mode: str
-    ) -> None:
+    def _enqueue_detection_notifications(self, *, incident: Incident, mode: str) -> None:
         if mode != "observe":
             return
         event_type = "incident.warn"
@@ -120,11 +116,7 @@ class IncidentManager:
             "model": _string_or_none(incident.evidence.get("model")),
             "environment": _string_or_none(incident.evidence.get("environment")),
             "created_at": incident.created_at.isoformat(),
-            "last_seen_at": (
-                incident.last_seen_at.isoformat()
-                if incident.last_seen_at is not None
-                else None
-            ),
+            "last_seen_at": (incident.last_seen_at.isoformat() if incident.last_seen_at is not None else None),
             "sent_at": datetime.now(timezone.utc).isoformat(),
             "evidence": evidence,
         }
