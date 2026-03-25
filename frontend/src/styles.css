@@ -2763,7 +2763,6 @@ pre {
 
 .app-shell {
   min-height: 100vh;
-  position: relative;
 }
 
 .sidebar {
@@ -3016,7 +3015,7 @@ pre {
   max-width: var(--app-content-max);
   width: min(100%, var(--app-content-max));
   margin: 0 auto;
-  padding: 36px var(--app-shell-gutter) 88px;
+  padding: 36px var(--app-shell-gutter) 44px;
 }
 
 .page-stack {
@@ -3043,16 +3042,13 @@ pre {
 
 .app-version-badge {
   position: fixed;
-  right: max(
-    var(--app-shell-gutter),
-    calc((100% - var(--app-content-max)) / 2 + var(--app-shell-gutter))
-  );
-  bottom: 20px;
+  right: 50px;
+  bottom: 28px;
+  z-index: 9;
   color: rgba(148, 163, 184, 0.62);
   font-size: 0.74rem;
   letter-spacing: 0.02em;
   pointer-events: none;
-  z-index: 8;
 }
 
 .alerts-routes-card,
@@ -4467,12 +4463,12 @@ pre {
   }
 
   .app-routes .dashboard {
-    padding: 22px var(--app-shell-gutter) 74px;
+    padding: 22px var(--app-shell-gutter) 34px;
   }
 
   .app-version-badge {
     right: var(--app-shell-gutter);
-    bottom: 16px;
+    bottom: 20px;
     font-size: 0.68rem;
   }
 
@@ -4647,7 +4643,7 @@ pre {
   }
 
   .app-routes .dashboard {
-    padding: 22px var(--app-shell-gutter) 68px;
+    padding: 22px var(--app-shell-gutter) 26px;
   }
 
   .current-project-bar {
