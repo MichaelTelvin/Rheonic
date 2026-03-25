@@ -100,6 +100,7 @@ class ProtectService:
         ingest_key: str,
         context: ProtectDecisionContext | None = None,
     ) -> tuple[str | None, ProtectDecision | None]:
+        evaluation_started_at = perf_counter()
         project = self._ingest_key_service.resolve_project(plaintext_key=ingest_key)
         if project is None:
             return None, None
@@ -146,19 +147,26 @@ class ProtectService:
         if cooldown_until_ms is not None and now_ms < cooldown_until_ms:
             retry_after_seconds = max(0, ceil((cooldown_until_ms - now_ms) / 1000))
             blocked_until = datetime.fromtimestamp(cooldown_until_ms / 1000, tz=timezone.utc).isoformat()
-            self._enqueue_cooldown_block_if_needed(
+            if self._should_emit_live_notifications(
+                evaluation_started_at=evaluation_started_at,
+                decision_timeout_ms=decision_timeout_ms,
                 project_id=project_id,
-                scoped_id=scoped_id,
                 provider=provider,
-                model=ctx.model,
-                environment=ctx.environment,
-                requests_60s=requests_60s,
-                tokens_60s=tokens_60s,
-                max_req=max_req,
-                max_tok=max_tok,
-                blocked_until=blocked_until,
-                retry_after_seconds=retry_after_seconds,
-            )
+                reason="cooldown_active",
+            ):
+                self._enqueue_cooldown_block_if_needed(
+                    project_id=project_id,
+                    scoped_id=scoped_id,
+                    provider=provider,
+                    model=ctx.model,
+                    environment=ctx.environment,
+                    requests_60s=requests_60s,
+                    tokens_60s=tokens_60s,
+                    max_req=max_req,
+                    max_tok=max_tok,
+                    blocked_until=blocked_until,
+                    retry_after_seconds=retry_after_seconds,
+                )
             return project_id, ProtectDecision(
                 decision="block",
                 reason="cooldown_active",
@@ -198,6 +206,13 @@ class ProtectService:
                 decision_timeout_ms=decision_timeout_ms,
                 now_ms=now_ms,
                 apply_clamp_enabled=apply_clamp_enabled,
+                emit_notifications=self._should_emit_live_notifications(
+                    evaluation_started_at=evaluation_started_at,
+                    decision_timeout_ms=decision_timeout_ms,
+                    project_id=project_id,
+                    provider=provider,
+                    reason="tok_cap_breach",
+                ),
             )
         if max_req is not None and requests_60s >= max_req:
             return project_id, self._build_block_decision(
@@ -215,6 +230,13 @@ class ProtectService:
                 decision_timeout_ms=decision_timeout_ms,
                 now_ms=now_ms,
                 apply_clamp_enabled=apply_clamp_enabled,
+                emit_notifications=self._should_emit_live_notifications(
+                    evaluation_started_at=evaluation_started_at,
+                    decision_timeout_ms=decision_timeout_ms,
+                    project_id=project_id,
+                    provider=provider,
+                    reason="req_cap_breach",
+                ),
             )
 
         estimated_next_tokens: int | None = None
@@ -257,22 +279,29 @@ class ProtectService:
                 max_output_tokens=ctx.max_output_tokens,
                 estimated_next_tokens=estimated_next_tokens,
             )
-            self._enqueue_warn_notifications(
+            if self._should_emit_live_notifications(
+                evaluation_started_at=evaluation_started_at,
+                decision_timeout_ms=decision_timeout_ms,
                 project_id=project_id,
-                scoped_id=scoped_id,
                 provider=provider,
-                model=ctx.model,
-                environment=ctx.environment,
                 reason=reason,
-                requests_60s=requests_60s,
-                tokens_60s=tokens_60s,
-                max_req=max_req,
-                max_tok=max_tok,
-                estimated_next_tokens=estimated_next_tokens,
-                max_output_tokens=ctx.max_output_tokens,
-                apply_clamp_enabled=apply_clamp_enabled,
-                clamp=clamp,
-            )
+            ):
+                self._enqueue_warn_notifications(
+                    project_id=project_id,
+                    scoped_id=scoped_id,
+                    provider=provider,
+                    model=ctx.model,
+                    environment=ctx.environment,
+                    reason=reason,
+                    requests_60s=requests_60s,
+                    tokens_60s=tokens_60s,
+                    max_req=max_req,
+                    max_tok=max_tok,
+                    estimated_next_tokens=estimated_next_tokens,
+                    max_output_tokens=ctx.max_output_tokens,
+                    apply_clamp_enabled=apply_clamp_enabled,
+                    clamp=clamp,
+                )
             return project_id, ProtectDecision(
                 decision="warn",
                 reason=reason,
@@ -351,22 +380,29 @@ class ProtectService:
                 max_output_tokens=ctx.max_output_tokens,
                 estimated_next_tokens=estimated_next_tokens,
             )
-            self._enqueue_warn_notifications(
+            if self._should_emit_live_notifications(
+                evaluation_started_at=evaluation_started_at,
+                decision_timeout_ms=decision_timeout_ms,
                 project_id=project_id,
-                scoped_id=scoped_id,
                 provider=provider,
-                model=ctx.model,
-                environment=ctx.environment,
                 reason=reason,
-                requests_60s=requests_60s,
-                tokens_60s=tokens_60s,
-                max_req=max_req,
-                max_tok=max_tok,
-                estimated_next_tokens=estimated_next_tokens,
-                max_output_tokens=ctx.max_output_tokens,
-                apply_clamp_enabled=apply_clamp_enabled,
-                clamp=clamp,
-            )
+            ):
+                self._enqueue_warn_notifications(
+                    project_id=project_id,
+                    scoped_id=scoped_id,
+                    provider=provider,
+                    model=ctx.model,
+                    environment=ctx.environment,
+                    reason=reason,
+                    requests_60s=requests_60s,
+                    tokens_60s=tokens_60s,
+                    max_req=max_req,
+                    max_tok=max_tok,
+                    estimated_next_tokens=estimated_next_tokens,
+                    max_output_tokens=ctx.max_output_tokens,
+                    apply_clamp_enabled=apply_clamp_enabled,
+                    clamp=clamp,
+                )
             return project_id, ProtectDecision(
                 decision="warn",
                 reason=reason,
@@ -405,22 +441,29 @@ class ProtectService:
                 max_output_tokens=ctx.max_output_tokens,
                 estimated_next_tokens=estimated_next_tokens,
             )
-            self._enqueue_warn_notifications(
+            if self._should_emit_live_notifications(
+                evaluation_started_at=evaluation_started_at,
+                decision_timeout_ms=decision_timeout_ms,
                 project_id=project_id,
-                scoped_id=scoped_id,
                 provider=provider,
-                model=ctx.model,
-                environment=ctx.environment,
                 reason=reason,
-                requests_60s=requests_60s,
-                tokens_60s=tokens_60s,
-                max_req=max_req,
-                max_tok=max_tok,
-                estimated_next_tokens=estimated_next_tokens,
-                max_output_tokens=ctx.max_output_tokens,
-                apply_clamp_enabled=apply_clamp_enabled,
-                clamp=clamp,
-            )
+            ):
+                self._enqueue_warn_notifications(
+                    project_id=project_id,
+                    scoped_id=scoped_id,
+                    provider=provider,
+                    model=ctx.model,
+                    environment=ctx.environment,
+                    reason=reason,
+                    requests_60s=requests_60s,
+                    tokens_60s=tokens_60s,
+                    max_req=max_req,
+                    max_tok=max_tok,
+                    estimated_next_tokens=estimated_next_tokens,
+                    max_output_tokens=ctx.max_output_tokens,
+                    apply_clamp_enabled=apply_clamp_enabled,
+                    clamp=clamp,
+                )
             return project_id, ProtectDecision(
                 decision="warn",
                 reason=reason,
@@ -493,6 +536,7 @@ class ProtectService:
         decision_timeout_ms: int,
         now_ms: int,
         apply_clamp_enabled: bool,
+        emit_notifications: bool,
     ) -> ProtectDecision:
         cooldown_seconds = max(int(self._protect_block_cooldown_seconds), 1)
         blocked_until_ms = now_ms + (cooldown_seconds * 1000)
@@ -503,19 +547,20 @@ class ProtectService:
             blocked_until_ms=blocked_until_ms,
             cooldown_seconds=cooldown_seconds,
         )
-        self._enqueue_block_notifications(
-            project_id=project_id,
-            provider=provider,
-            model=model,
-            environment=environment,
-            detail_reason=reason,
-            requests_60s=requests_60s,
-            tokens_60s=tokens_60s,
-            max_req=max_req,
-            max_tok=max_tok,
-            blocked_until=blocked_until,
-            retry_after_seconds=retry_after_seconds,
-        )
+        if emit_notifications:
+            self._enqueue_block_notifications(
+                project_id=project_id,
+                provider=provider,
+                model=model,
+                environment=environment,
+                detail_reason=reason,
+                requests_60s=requests_60s,
+                tokens_60s=tokens_60s,
+                max_req=max_req,
+                max_tok=max_tok,
+                blocked_until=blocked_until,
+                retry_after_seconds=retry_after_seconds,
+            )
         return ProtectDecision(
             decision="block",
             reason=reason,
@@ -537,6 +582,30 @@ class ProtectService:
             },
             apply_clamp_enabled=apply_clamp_enabled,
         )
+
+    def _should_emit_live_notifications(
+        self,
+        *,
+        evaluation_started_at: float,
+        decision_timeout_ms: int,
+        project_id: str,
+        provider: str,
+        reason: str,
+    ) -> bool:
+        elapsed_ms = int((perf_counter() - evaluation_started_at) * 1000)
+        should_emit = elapsed_ms <= max(int(decision_timeout_ms), 0)
+        if not should_emit:
+            logger.info(
+                "Suppressed late protect notification after SDK timeout budget",
+                extra={
+                    "project_id": project_id,
+                    "provider": provider,
+                    "reason": reason,
+                    "elapsed_ms": elapsed_ms,
+                    "decision_timeout_ms": decision_timeout_ms,
+                },
+            )
+        return should_emit
 
     def _enqueue_block_notifications(
         self,

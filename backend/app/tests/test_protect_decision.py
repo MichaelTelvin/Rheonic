@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from app.application.services import protect_service as protect_service_module
 from fastapi.testclient import TestClient
 
 from app.application.provider_scope import scoped_project_provider_id
@@ -354,6 +355,37 @@ def test_caps_breach_enqueues_protection_block_email(tmp_path) -> None:
     assert len(transport.calls) == 1
     assert transport.calls[0]["event_type"] == "protection.block"
     assert transport.calls[0]["template"] == "protection_block"
+    _cleanup_overrides()
+
+
+def test_late_block_decision_does_not_enqueue_protection_block_notifications(tmp_path, monkeypatch) -> None:
+    dispatcher = FakeWebhookDispatcher()
+    transport = FakeTransportService()
+    client, rolling_window, _ = _make_client(
+        tmp_path,
+        webhook_dispatcher=dispatcher,
+        transport_service=transport,
+    )
+    project_id, ingest_key = _create_project_and_key(client, "Protect Late Block Suppression")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_req_per_min=1)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_requests=1)
+
+    ticks = iter([0.0, 0.2])
+    monkeypatch.setattr(protect_service_module, "perf_counter", lambda: next(ticks))
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+        },
+    )
+    assert decision["decision"] == "block"
+    assert decision["reason"] == "req_cap_breach"
+    assert dispatcher.calls == []
+    assert transport.calls == []
     _cleanup_overrides()
 
 
