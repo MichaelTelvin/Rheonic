@@ -164,8 +164,8 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
             <Route path="*" element={<NotFound inApp />} />
           </Routes>
         </div>
-        {appVersion ? <div className="app-version-badge">v{appVersion}</div> : null}
       </div>
+      {appVersion ? <div className="app-version-badge">v{appVersion}</div> : null}
       <AppToastHost />
       <FeedbackModal open={feedbackModalOpen} onClose={() => setFeedbackModalOpen(false)} />
     </div>
