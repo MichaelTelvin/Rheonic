@@ -13,6 +13,19 @@ function logVerbose(message) {
   }
 }
 
+function assertDelivery(client, expectedMinSent = 1) {
+  const stats = client.getStats();
+  log(`[DEMO] sdk delivery stats: ${JSON.stringify(stats)}`);
+  const sent = Number(stats.sent ?? 0);
+  const failed = Number(stats.failed ?? 0);
+  const queued = Number(stats.queued ?? 0);
+  if (sent < expectedMinSent || failed > 0 || queued > 0) {
+    throw new Error(
+      `observe demo did not fully deliver events (sent=${sent}, failed=${failed}, queued=${queued})`,
+    );
+  }
+}
+
 function printConfigHint() {
   const targetHint = (process.env.RHEONIC_DEMO_TARGET_HINT ?? "").trim() || "demo-prod-node";
   console.log(`  Run: make ${targetHint} RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach`);
@@ -271,10 +284,13 @@ async function runDemo() {
     console.error(`Unsupported RHEONIC_DEMO_CASE: ${demoCase}`);
     printUsageExamples();
     process.exitCode = 1;
+    client.close();
+    return;
   }
 
+  const expectedSent = demoCase === "all" ? 7 : 1;
+  assertDelivery(client, expectedSent);
   log("[DONE] observe demo complete");
-  logVerbose(JSON.stringify(client.getStats()));
   client.close();
 }
 

@@ -31,6 +31,19 @@ def _log_verbose(message: str) -> None:
         print(message)
 
 
+def _assert_delivery(client: Any, *, expected_min_sent: int = 1) -> None:
+    stats = client.stats()
+    _log(f"[DEMO] sdk delivery stats: {stats}")
+    sent = int(stats.get("sent", 0))
+    failed = int(stats.get("failed", 0))
+    queued = int(stats.get("queued", 0))
+    if sent < expected_min_sent or failed > 0 or queued > 0:
+        raise RuntimeError(
+            "observe demo did not fully deliver events "
+            f"(sent={sent}, failed={failed}, queued={queued})"
+        )
+
+
 def _send_event(
     provider: str,
     model: str,
@@ -227,6 +240,9 @@ def main() -> None:
     backend_base_url = os.getenv(
         "RHEONIC_BACKEND_URL", "http://localhost:8000"
     ).rstrip("/")
+    ingest_base_url = (
+        (os.getenv("RHEONIC_BASE_URL") or "").strip().rstrip("/") or backend_base_url
+    )
 
     ingest_key = os.getenv("RHEONIC_INGEST_KEY")
     if not ingest_key:
@@ -282,7 +298,7 @@ def main() -> None:
     client = None
     try:
         client = create_client(
-            base_url=os.getenv("RHEONIC_BASE_URL"),
+            base_url=ingest_base_url,
             ingest_key=ingest_key,
             environment=environment,
             debug=os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"},
@@ -292,6 +308,7 @@ def main() -> None:
             f"[DEMO] observe {demo_case} provider={provider} "
             f"model={model} environment={environment}"
         )
+        _log_verbose(f"[DEMO] ingest_base_url={ingest_base_url}")
         _log_verbose(
             "[DEMO] params "
             f"retry_storm_count={retry_storm_count} loop_count={loop_count} "
@@ -481,8 +498,9 @@ def main() -> None:
             _usage()
             return
 
+        expected_sent = 7 if demo_case == "all" else 1
+        _assert_delivery(client, expected_min_sent=expected_sent)
         _log("[DONE] observe demo complete")
-        _log_verbose(str(client.stats()))
     finally:
         if client is not None:
             client.close()
