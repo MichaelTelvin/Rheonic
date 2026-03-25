@@ -53,7 +53,7 @@ export function IncidentItem({ incident, resolving, onResolve }: IncidentItemPro
       </p>
       <p className="incident-meta">
         <span>Provider {(incident.evidence.provider as string | undefined) ?? "unknown"}</span>
-        <span>· Count {String((incident.evidence.count as number | undefined) ?? 1)}</span>
+        <span>· Occurrences {String((incident.evidence.count as number | undefined) ?? 1)}</span>
       </p>
 
       <div className="incident-actions">

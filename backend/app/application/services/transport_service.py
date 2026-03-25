@@ -43,6 +43,13 @@ class TransportService:
             raise ValueError("dedupe_key is required")
         now = self._now_provider()
         normalized_payload: dict[str, object] = dict(payload)
+        transport_meta_value = normalized_payload.get("__transport_meta")
+        transport_meta = dict(transport_meta_value) if isinstance(transport_meta_value, dict) else {}
+        origin_trace_id = (trace_id or get_trace_id() or "").strip()
+        if origin_trace_id:
+            transport_meta.setdefault("origin_trace_id", origin_trace_id)
+        if transport_meta:
+            normalized_payload["__transport_meta"] = transport_meta
         if severity is not None:
             normalized_payload.setdefault("severity", severity)
         if provider is not None:
@@ -87,11 +94,25 @@ def build_transport_dedupe_key(
         "kind": kind,
         "event_type": event_type,
         "destination": destination,
-        "payload": payload,
+        "payload": _dedupe_safe_payload(payload),
         "seed": seed,
     }
     encoded = json.dumps(source, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _dedupe_safe_payload(payload: dict[str, object]) -> dict[str, object]:
+    sanitized = dict(payload)
+    transport_meta_value = sanitized.get("__transport_meta")
+    if not isinstance(transport_meta_value, dict):
+        return sanitized
+    transport_meta = dict(transport_meta_value)
+    transport_meta.pop("origin_trace_id", None)
+    if transport_meta:
+        sanitized["__transport_meta"] = transport_meta
+    else:
+        sanitized.pop("__transport_meta", None)
+    return sanitized
 
 
 def _max_attempts(kind: Literal["webhook", "email"]) -> int:

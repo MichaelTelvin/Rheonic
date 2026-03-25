@@ -72,6 +72,7 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
         return
 
     delivery_metadata: dict[str, object] = {}
+    correlation_metadata = _outbox_correlation_metadata(outbox)
     try:
         if outbox.kind == "webhook":
             delivery_metadata = _deliver_webhook(outbox_id=outbox.id)
@@ -86,6 +87,7 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
             "event_type": outbox.event_type,
             "project_id": outbox.project_id,
         }
+        success_metadata.update(correlation_metadata)
         success_metadata.update(delivery_metadata)
         if bool(success_metadata.pop("skipped", False)):
             logger.info(
@@ -130,6 +132,7 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
                     "project_id": outbox.project_id,
                     "attempts": attempts,
                     "max_attempts": int(outbox.max_attempts),
+                    **correlation_metadata,
                     "error_code": code,
                     "error_message": message,
                     "dead": dead,
@@ -181,6 +184,23 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
             )
     finally:
         reset_trace_context(context_tokens)
+
+
+def _outbox_correlation_metadata(outbox: TransportOutbox) -> dict[str, object]:
+    payload = dict(outbox.payload or {})
+    transport_meta_value = payload.get("__transport_meta")
+    transport_meta = transport_meta_value if isinstance(transport_meta_value, dict) else {}
+    body_payload_value = payload.get("body")
+    body_payload = body_payload_value if isinstance(body_payload_value, dict) else payload
+    metadata: dict[str, object] = {}
+    origin_trace_id = transport_meta.get("origin_trace_id")
+    if isinstance(origin_trace_id, str) and origin_trace_id.strip():
+        metadata["origin_trace_id"] = origin_trace_id.strip()
+    for field in ("incident_id", "provider", "model", "environment"):
+        value = body_payload.get(field)
+        if isinstance(value, str) and value.strip():
+            metadata[field] = value.strip()
+    return metadata
 
 
 def _deliver_webhook(*, outbox_id: str) -> dict[str, object]:
