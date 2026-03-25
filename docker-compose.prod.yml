@@ -26,6 +26,14 @@ x-runtime-env: &runtime-env
   RQ_QUEUE_NAME: ${RQ_QUEUE_NAME:-rheonic}
 
 services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    restart: always
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./uptime-kuma:/app/data
   postgres:
     image: postgres:16-alpine
     command: ["postgres", "-c", "log_checkpoints=off"]
