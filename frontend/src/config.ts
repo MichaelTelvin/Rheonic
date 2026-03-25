@@ -1,7 +1,14 @@
-const rawAppVersion = import.meta.env.VITE_APP_VERSION ?? "";
-const normalizedAppVersion = /^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(rawAppVersion)
-  ? rawAppVersion
-  : "";
+const rawAppVersion = (import.meta.env.VITE_APP_VERSION ?? "").trim();
+const suppressedVersionLabels = new Set([
+  "dev",
+  "development",
+  "test",
+  "stage",
+  "staging",
+  "prod",
+  "production",
+]);
+const normalizedAppVersion = suppressedVersionLabels.has(rawAppVersion.toLowerCase()) ? "" : rawAppVersion;
 
 export const frontendConfig = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "",
