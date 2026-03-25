@@ -3042,7 +3042,7 @@ pre {
 
 .app-version-badge {
   position: fixed;
-  right: 22px;
+  right: max(var(--app-shell-gutter), calc((100vw - var(--sidebar-width) - var(--app-content-max)) / 2 + var(--app-shell-gutter)));
   bottom: 28px;
   z-index: 9;
   color: rgba(148, 163, 184, 0.62);
@@ -4467,7 +4467,7 @@ pre {
   }
 
   .app-version-badge {
-    right: 14px;
+    right: var(--app-shell-gutter);
     bottom: 20px;
     font-size: 0.68rem;
   }
