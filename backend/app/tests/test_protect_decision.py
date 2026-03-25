@@ -547,7 +547,7 @@ def test_near_cap_warn_with_clamp_enabled_but_no_reduction_keeps_warn_email_only
     _cleanup_overrides()
 
 
-def test_near_cap_warn_does_not_create_visible_incident_from_preflight(tmp_path) -> None:
+def test_near_cap_warn_creates_visible_incident_from_preflight(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Incident")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
@@ -566,7 +566,9 @@ def test_near_cap_warn_does_not_create_visible_incident_from_preflight(tmp_path)
     )
     assert decision["decision"] == "warn"
     incidents = _incidents(client, project_id, provider="openai")
-    assert incidents == []
+    assert len(incidents) == 1
+    assert incidents[0]["type"] == "near_cap"
+    assert incidents[0]["evidence"]["near_cap_type"] == "tok"
     _cleanup_overrides()
 
 

@@ -45,7 +45,7 @@ This map reflects the deterministic anomaly model now used by ingest and protect
   - `near_cap(req)` -> `req_near_cap=true`, `tok_near_cap=false`, `near_cap_type="req"`
   - `near_cap(both)` -> both booleans true, `near_cap_type="both"`
 - When it applies:
-  - Protect preflight: decision `warn` and Protect reporting event `protection.warn`.
+  - Protect preflight: decision `warn`, visible `near_cap` incident upsert, and Protect reporting event `protection.warn`.
 - Ingest (observe/protect): emits `near_cap` incident only when no `cap_breach` dominates that same event. If a later `cap_breach` is reached for the same provider, only still-active open `near_cap` incidents are resolved.
 
 ## Retry Storm Detector

@@ -86,7 +86,7 @@ For a single ingested event, incident emission follows this dominance:
    - `retry_storm`, `loop_suspect`, `token_explosion` may coexist
 
 For ingest incident emission, near-cap uses observed counters after the current event is counted.
-Protect preflight does not create incidents directly. Visible incidents come from the ingest pipeline after the provider call, keeping incident precedence and lifecycle in one backend path.
+For protect preflight, a live near_cap warn also upserts a visible near_cap incident from the decision snapshot so the warning stays explainable in the dashboard.
 
 ## Webhooks
 - Observe mode:
