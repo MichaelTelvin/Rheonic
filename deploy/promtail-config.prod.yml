@@ -20,11 +20,14 @@ scrape_configs:
       - docker: {}
     relabel_configs:
       - source_labels: ["__meta_docker_container_label_com_docker_compose_project"]
-        regex: rheonic_prod|rheonic_proxy
+        regex: rheonic_prod
         action: keep
       - source_labels: ["__meta_docker_container_label_com_docker_compose_oneoff"]
         regex: "True"
         action: drop
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
+        regex: backend|worker|scheduler
+        action: keep
       - source_labels: ["__meta_docker_container_name"]
         regex: "/(.*)"
         target_label: container
