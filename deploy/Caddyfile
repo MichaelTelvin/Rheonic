@@ -13,6 +13,11 @@ staging.rheonic.dev {
 beta.rheonic.dev {
   encode gzip zstd
 
+  log {
+    output stdout
+    format json
+  }
+
   handle /api/* {
     reverse_proxy prod-backend:8000
   }
