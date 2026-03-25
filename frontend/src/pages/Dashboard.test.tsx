@@ -88,11 +88,8 @@ describe("Dashboard", () => {
       </TestRouter>,
     );
     expect(await screen.findByText("Setup required")).toBeDefined();
-    expect(
-      screen.getByText((_, element) =>
-        element?.textContent === "Create your first projectgenerate an ingest key, then follow Quickstart.",
-      ),
-    ).toBeDefined();
+    expect(screen.getByText(/Create your first project\./i)).toBeDefined();
+    expect(screen.getByText(/Generate an ingest key, then follow Quickstart\./i)).toBeDefined();
   });
 
   it("loads metrics and incidents for selected project", async () => {

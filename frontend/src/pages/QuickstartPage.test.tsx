@@ -43,10 +43,10 @@ describe("QuickstartPage", () => {
       </TestRouter>,
     );
 
-    expect(screen.getByText(/npm install rheonic-node/i)).toBeDefined();
+    expect(screen.getByText(/npm install @rheonic\/sdk/i)).toBeDefined();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Python" })[0]);
-    expect(screen.getByText(/pip install rheonic/i)).toBeDefined();
+    expect(screen.getByText(/pip install rheonic-sdk --pre/i)).toBeDefined();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Anthropic" })[0]);
     expect(screen.getAllByText(/claude-3-5-sonnet-latest/i).length).toBeGreaterThan(0);
