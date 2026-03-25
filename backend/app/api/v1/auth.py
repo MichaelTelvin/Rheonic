@@ -144,6 +144,23 @@ def _clear_auth_cookies(response: Response, settings: Settings) -> None:
         samesite=same_site,
         path=f"{settings.api_prefix}/v1/auth",
     )
+    for legacy_domain in _legacy_cookie_domains(settings):
+        response.delete_cookie(
+            key=settings.auth_access_cookie_name,
+            httponly=True,
+            secure=settings.auth_cookie_secure,
+            samesite=same_site,
+            path="/",
+            domain=legacy_domain,
+        )
+        response.delete_cookie(
+            key=settings.auth_refresh_cookie_name,
+            httponly=True,
+            secure=settings.auth_cookie_secure,
+            samesite=same_site,
+            path=f"{settings.api_prefix}/v1/auth",
+            domain=legacy_domain,
+        )
 
 
 def _cookie_samesite(value: str) -> Literal["lax", "strict", "none"]:
@@ -151,6 +168,15 @@ def _cookie_samesite(value: str) -> Literal["lax", "strict", "none"]:
     if normalized in {"lax", "strict", "none"}:
         return cast(Literal["lax", "strict", "none"], normalized)
     return "lax"
+
+
+def _legacy_cookie_domains(settings: Settings) -> tuple[str, ...]:
+    configured = (settings.auth_cookie_domain or "").strip()
+    if not configured:
+        return ()
+    normalized = configured.lstrip(".")
+    candidates = {normalized, f".{normalized}"}
+    return tuple(domain for domain in candidates if domain)
 
 
 @router.post("/register", response_model=UserOut)
@@ -199,6 +225,7 @@ async def login(
             email=payload.email,
         )
         access_token, refresh_token, user = service.login(email=payload.email, password=payload.password)
+        _clear_auth_cookies(response, settings)
         _set_auth_cookies(response, access_token=access_token, refresh_token=refresh_token, settings=settings)
         logger.info("Login succeeded", extra={"user_id": user.id})
         return LoginOut(
@@ -233,6 +260,7 @@ async def refresh(
             logger.warning("Refresh rejected due to missing refresh cookie")
             raise HTTPException(status_code=401, detail="invalid refresh token")
         access_token, next_refresh_token, user = service.refresh(refresh_token=refresh_token)
+        _clear_auth_cookies(response, settings)
         _set_auth_cookies(response, access_token=access_token, refresh_token=next_refresh_token, settings=settings)
         logger.info("Session refreshed", extra={"user_id": user.id})
         return LoginOut(

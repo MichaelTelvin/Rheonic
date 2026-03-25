@@ -7787,7 +7787,6 @@ html {
 .docs-article-shell {
   width: min(880px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 6.75rem 0 4rem;
 }
 
 .docs-article {
@@ -7887,7 +7886,6 @@ html {
 @media (max-width: 720px) {
   .docs-article-shell {
     width: min(100% - 1.25rem, 100%);
-    padding: 5.9rem 0 3rem;
   }
 
   .docs-article {
