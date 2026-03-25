@@ -119,6 +119,45 @@ def test_feedback_email_delivery_uses_system_sender_and_reply_to(tmp_path, monke
     assert payload["subject"] == "Rheonic beta bug report"
 
 
+def test_feedback_email_delivery_falls_back_to_default_destination_when_setting_is_blank(tmp_path, monkeypatch) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_email_feedback_default_destination.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id: None,
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+    outbox_id = service.enqueue(
+        project_id="p1",
+        kind="email",
+        event_type="feedback.submitted",
+        payload={"report_type": "feedback", "message": "test", "timestamp": "2026-03-15T10:00:00Z"},
+        dedupe_key="feedback-email-default-destination",
+        template="feedback_submitted",
+    )
+
+    sent: list[dict[str, object]] = []
+    settings = transport_job.Settings(
+        database_url=db_url,
+        redis_url="redis://localhost:6379/15",
+        resend_api_key="re_test",
+        email_from_system="Rheonic System <system@mail.rheonic.dev>",
+        feedback_report_email="",
+    )
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeEmailClient(sent))
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id)
+
+    assert len(sent) == 1
+    payload = sent[0]["json"]
+    assert payload["to"] == ["feedback@rheonic.dev"]
+
+
 def test_feedback_email_delivery_passes_screenshot_attachment_to_provider(tmp_path, monkeypatch) -> None:
     db_url = f"sqlite:///{tmp_path}/transport_email_feedback_attachment.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)

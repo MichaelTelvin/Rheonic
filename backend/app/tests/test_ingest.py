@@ -720,7 +720,7 @@ def test_dominance_near_cap_suppresses_token_explosion_for_same_event() -> None:
     service.ingest(
         _event(
             "p1",
-            total_tokens=3200,
+            total_tokens=3400,
             feature="dominance-near-token-explosion",
             offset_seconds=0,
         )

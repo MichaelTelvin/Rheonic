@@ -347,7 +347,7 @@ def _resolve_email_destination(
     if explicit_destination:
         return explicit_destination
     if outbox.event_type == "feedback.submitted":
-        return (settings.feedback_report_email or "").strip()
+        return (settings.feedback_report_email or "feedback@rheonic.dev").strip()
     if project is None:
         return None
     if not project.protect_enabled or not project.email_enabled:

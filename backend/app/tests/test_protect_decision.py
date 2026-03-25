@@ -370,8 +370,13 @@ def test_late_block_decision_does_not_enqueue_protection_block_notifications(tmp
     _set_protect(client, project_id, protect_enabled=True, protect_max_req_per_min=1)
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_requests=1)
 
-    ticks = iter([0.0, 0.2])
-    monkeypatch.setattr(protect_service_module, "perf_counter", lambda: next(ticks))
+    calls = {"count": 0}
+
+    def _fake_perf_counter() -> float:
+        calls["count"] += 1
+        return 0.0 if calls["count"] == 1 else 0.2
+
+    monkeypatch.setattr(protect_service_module, "perf_counter", _fake_perf_counter)
 
     decision = _decision(
         client,
