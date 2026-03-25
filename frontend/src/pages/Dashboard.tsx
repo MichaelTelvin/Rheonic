@@ -256,6 +256,7 @@ export function Dashboard(): JSX.Element {
         setupSignalsLoaded = true;
         setHasIngestKey(keys.some((key) => key.status === "active"));
         setHasEvents(projectProviders.length > 0);
+        applyProviders(projectProviders);
       } catch {
         if (cancelled) {
           return;
@@ -277,7 +278,7 @@ export function Dashboard(): JSX.Element {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [loadingProjects, projectId]);
+  }, [applyProviders, loadingProjects, projectId]);
 
   const dismissSetupBanner = useCallback((): void => {
     setSetupBannerClosing(true);
@@ -378,6 +379,12 @@ export function Dashboard(): JSX.Element {
     : null;
   const visibleWebhookIssue = renderWebhookIssueBanner && webhookIssue ? webhookIssue : null;
 
+  const applyProviders = useCallback((items: string[]): void => {
+    const normalized = Array.from(new Set(items.map((provider) => normalizeProviderValue(provider)).filter(Boolean)));
+    setProviders(normalized);
+    setSelectedProvider((current) => (current !== "all" && !normalized.includes(normalizeProviderValue(current)) ? "all" : current));
+  }, []);
+
   const refreshProviders = useCallback(async (): Promise<void> => {
     if (!projectId) {
       return;
@@ -389,9 +396,7 @@ export function Dashboard(): JSX.Element {
       if (requestSeq !== providerRequestSeq.current) {
         return;
       }
-      const normalized = Array.from(new Set(items.map((provider) => normalizeProviderValue(provider)).filter(Boolean)));
-      setProviders(normalized);
-      setSelectedProvider((current) => (current !== "all" && !normalized.includes(normalizeProviderValue(current)) ? "all" : current));
+      applyProviders(items);
     } catch {
       if (requestSeq !== providerRequestSeq.current) {
         return;
@@ -399,7 +404,7 @@ export function Dashboard(): JSX.Element {
       setProviders([]);
       setSelectedProvider("all");
     }
-  }, [projectId]);
+  }, [applyProviders, projectId]);
 
   useEffect(() => {
     void refreshProviders();
