@@ -2999,6 +2999,7 @@ pre {
 
 .app-main-content {
   min-height: 100vh;
+  position: relative;
 }
 
 .mobile-app-bar,
@@ -3041,10 +3042,12 @@ pre {
 }
 
 .app-version-badge {
-  position: fixed;
-  right: max(var(--app-shell-gutter), calc((100vw - var(--sidebar-width) - var(--app-content-max)) / 2 + var(--app-shell-gutter)));
+  position: absolute;
+  right: max(
+    var(--app-shell-gutter),
+    calc((100% - var(--app-content-max)) / 2 + var(--app-shell-gutter))
+  );
   bottom: 28px;
-  z-index: 9;
   color: rgba(148, 163, 184, 0.62);
   font-size: 0.74rem;
   letter-spacing: 0.02em;
