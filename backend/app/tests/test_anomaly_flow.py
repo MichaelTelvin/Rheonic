@@ -123,7 +123,7 @@ def test_incident_dedup_updates_existing_row_count() -> None:
     assert len(rows.json()) >= 1
     retry_rows = [row for row in rows.json() if row["type"] == "retry_storm"]
     assert retry_rows
-    assert int(retry_rows[0]["evidence"].get("count", 0)) >= 1
+    assert "count" not in retry_rows[0]["evidence"]
 
 
 def test_retry_storm_ingest_returns_202_and_incident_is_listed() -> None:

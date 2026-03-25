@@ -24,6 +24,12 @@ class IncidentOut(BaseModel):
     evidence: dict[str, object]
 
 
+def _public_incident_evidence(evidence: dict[str, object] | None) -> dict[str, object]:
+    sanitized = dict(evidence or {})
+    sanitized.pop("count", None)
+    return sanitized
+
+
 @router.get("", response_model=list[IncidentOut])
 def list_incidents(
     project_id: str = Query(..., min_length=1),
@@ -48,7 +54,7 @@ def list_incidents(
                 status=incident.status,
                 created_at=incident.created_at,
                 resolved_at=incident.resolved_at,
-                evidence=incident.evidence,
+                evidence=_public_incident_evidence(incident.evidence),
             )
             for incident in incidents
         ]
