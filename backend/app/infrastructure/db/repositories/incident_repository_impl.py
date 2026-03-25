@@ -71,9 +71,9 @@ class IncidentRepositoryImpl(IncidentRepository):
         project_id: str,
         provider: str,
         fingerprint: str,
-        created_after: datetime,
+        active_after: datetime,
     ) -> Incident | None:
-        # Return open incident by fingerprint created within dedup window.
+        # Return open incident by fingerprint still active inside the episode window.
         try:
             with self._session_factory.create_session() as session:
                 record = (
@@ -82,7 +82,12 @@ class IncidentRepositoryImpl(IncidentRepository):
                     .filter(IncidentRecord.provider == provider)
                     .filter(IncidentRecord.status == "open")
                     .filter(IncidentRecord.fingerprint == fingerprint)
-                    .filter(IncidentRecord.created_at >= created_after)
+                    .filter(
+                        or_(
+                            IncidentRecord.last_seen_at >= active_after,
+                            and_(IncidentRecord.last_seen_at.is_(None), IncidentRecord.created_at >= active_after),
+                        )
+                    )
                     .order_by(IncidentRecord.created_at.desc())
                     .first()
                 )
@@ -92,7 +97,12 @@ class IncidentRepositoryImpl(IncidentRepository):
         except Exception:
             logger.exception(
                 "Failed fetching open incident by fingerprint",
-                extra={"project_id": project_id, "provider": provider, "fingerprint": fingerprint},
+                extra={
+                    "project_id": project_id,
+                    "provider": provider,
+                    "fingerprint": fingerprint,
+                    "active_after": active_after.isoformat(),
+                },
             )
             raise
 

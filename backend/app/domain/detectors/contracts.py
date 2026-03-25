@@ -11,6 +11,7 @@ class Signal:
     scope_provider: str
     fingerprint: str
     evidence: dict[str, object]
+    episode_window_seconds: int | None = None
     tags: dict[str, str] = field(default_factory=dict)
 
 

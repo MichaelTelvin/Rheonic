@@ -157,7 +157,9 @@ def _print_recent_incident_summary(
     if not VERBOSE:
         return
     if dashboard_session is None or not project_id:
-        print("[OBSERVE] recent incidents: (skipped: no dashboard session/project id)")
+        print(
+            "[OBSERVE] recent incidents: (skipped: no dashboard session/project id)"
+        )
         return
     params = {"project_id": project_id, "status": "open"}
     if provider != "all":

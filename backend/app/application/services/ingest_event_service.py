@@ -185,6 +185,7 @@ class IngestEventService:
                 scope_provider=ctx.provider,
                 fingerprint=f"{ctx.project_id}:{ctx.provider}:cap_breach",
                 evidence=evidence,
+                episode_window_seconds=60,
             )
         ]
 

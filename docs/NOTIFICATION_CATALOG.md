@@ -64,6 +64,13 @@ This catalog reflects the implemented notification contract.
 
 ## Protect Reporting Rules
 
+- `incident.warn`
+  - emitted once when a fresh observe-mode incident episode opens
+  - not emitted again while the same incident row is merely being updated
+  - a fresh `incident.warn` is emitted again only after the prior episode has gone cold and a new incident row is opened
+  - the incident row `evidence.count` tracks repeated matches within that same active episode
+  - dashboard incident cards count open rows, not `evidence.count`
+
 - `protection.warn`
   - emitted by the decision engine for Protect warn outcomes
   - reasons: `near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`

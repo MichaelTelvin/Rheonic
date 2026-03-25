@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from app.application.services.ingest_event_service import IngestEventService
@@ -66,15 +67,16 @@ class FakeIncidentRepository:
         return None
 
     def get_open_incident_by_fingerprint(
-        self, project_id: str, provider: str, fingerprint: str, created_after: datetime
+        self, project_id: str, provider: str, fingerprint: str, active_after: datetime
     ) -> Incident | None:
         for row in reversed(self.rows):
+            row_active_at = row.last_seen_at or row.created_at
             if (
                 row.project_id == project_id
                 and row.provider == provider
                 and row.fingerprint == fingerprint
                 and row.status == "open"
-                and row.created_at >= created_after
+                and row_active_at >= active_after
             ):
                 return row
         return None
@@ -300,6 +302,7 @@ def _service(
     retry_storm_count: int = 3,
     loop_count: int = 6,
     token_explosion_abs: int = 6000,
+    now_provider: Callable[[], datetime] | None = None,
 ) -> tuple[IngestEventService, FakeIncidentRepository, FakeWebhookDispatcher, FakeTransportService]:
     incidents = FakeIncidentRepository()
     webhook = FakeWebhookDispatcher()
@@ -328,8 +331,23 @@ def _service(
         loop_window_seconds=30,
         token_explosion_abs=token_explosion_abs,
         token_explosion_ratio=0.8,
+        now_provider=now_provider,
     )
     return service, incidents, webhook, transport
+
+
+def _clock(start: datetime | None = None) -> tuple[dict[str, datetime], Callable[[], datetime]]:
+    state = {"now": start or datetime(2026, 3, 25, 10, 47, 0, tzinfo=timezone.utc)}
+
+    def _now() -> datetime:
+        return state["now"]
+
+    return state, _now
+
+
+def _ingest_at(service: IngestEventService, clock: dict[str, datetime], event: Event) -> None:
+    clock["now"] = event.created_at
+    service.ingest(event)
 
 
 def test_retry_storm_opens_incident_and_updates_dedup_count() -> None:
@@ -452,6 +470,43 @@ def test_cap_breach_repeated_events_update_same_incident_within_dedup_window() -
     cap_rows = [row for row in incidents.rows if row.incident_type == "cap_breach" and row.provider == "openai"]
     assert len(cap_rows) == 1
     assert int(cap_rows[0].evidence.get("count", 0)) == 2
+
+
+def test_loop_suspect_opens_new_incident_after_episode_window_expires() -> None:
+    clock, now_provider = _clock()
+    service, incidents, webhook, _ = _service(protect_enabled=False, loop_count=3, now_provider=now_provider)
+
+    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=0))
+    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=1))
+    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=2))
+    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=35))
+    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=36))
+    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=37))
+
+    loop_rows = [row for row in incidents.rows if row.incident_type == "loop_suspect"]
+    assert len(loop_rows) == 2
+    assert all(int(row.evidence.get("count", 0)) == 1 for row in loop_rows)
+    warn_calls = [payload for _, event_type, payload in webhook.calls if event_type == "incident.warn"]
+    assert len(warn_calls) == 2
+
+
+def test_token_explosion_opens_new_incident_after_episode_window_expires() -> None:
+    clock, now_provider = _clock()
+    service, incidents, webhook, _ = _service(
+        protect_enabled=False,
+        tok_cap=None,
+        token_explosion_abs=1500,
+        now_provider=now_provider,
+    )
+
+    _ingest_at(service, clock, _event("p1", total_tokens=2000, feature="token-explosion-a", offset_seconds=0))
+    _ingest_at(service, clock, _event("p1", total_tokens=2000, feature="token-explosion-b", offset_seconds=61))
+
+    explosion_rows = [row for row in incidents.rows if row.incident_type == "token_explosion"]
+    assert len(explosion_rows) == 2
+    assert all(int(row.evidence.get("count", 0)) == 1 for row in explosion_rows)
+    warn_calls = [payload for _, event_type, payload in webhook.calls if event_type == "incident.warn"]
+    assert len(warn_calls) == 2
 
 
 def test_near_cap_opens_incident_in_observe_with_warn_webhook() -> None:

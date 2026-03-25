@@ -18,8 +18,9 @@ Open `Incidents` in the dashboard. You can filter by:
 ## Incident Lifecycle
 1. Rheonic detects a qualifying pattern from ingested events.
 2. An incident opens for the matching project and provider scope.
-3. Repeat detections within the dedup window update the existing incident instead of creating a new one.
-4. The incident can be resolved manually, or auto-resolved after inactivity.
+3. Repeat detections during the same active incident episode update the existing incident instead of creating a new one.
+4. Once that detector episode has gone cold, the next clearly separated trigger opens a fresh incident row and can emit a fresh `incident.warn`.
+5. The incident can be resolved manually, or auto-resolved after inactivity.
 
 ## Observe and Protect Behavior
 - In Observe mode, incidents still open and appear in the dashboard.

@@ -40,6 +40,7 @@ class TokenExplosionDetector(Detector):
                 scope_provider=ctx.provider,
                 fingerprint=f"{ctx.project_id}:{ctx.provider}:token_explosion",
                 evidence=evidence,
+                episode_window_seconds=60,
                 tags=_tags(ctx),
             )
         ]

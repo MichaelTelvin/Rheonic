@@ -50,6 +50,7 @@ class LoopSuspectDetector(Detector):
                 scope_provider=ctx.provider,
                 fingerprint=f"{ctx.project_id}:{ctx.provider}:loop_suspect:{signature}",
                 evidence=evidence,
+                episode_window_seconds=ctx.loop_window_seconds,
                 tags=_tags(ctx),
             )
         ]

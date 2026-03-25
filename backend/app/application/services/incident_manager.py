@@ -64,16 +64,24 @@ class IncidentManager:
         evidence["model"] = model
         evidence["environment"] = environment
         evidence["last_seen_at"] = now.isoformat()
-        dedup_after = now - timedelta(seconds=self._incident_dedup_window_seconds)
+        dedup_after = now - timedelta(
+            seconds=_signal_episode_window_seconds(
+                signal, self._incident_dedup_window_seconds
+            )
+        )
         open_incident = self._incident_repository.get_open_incident_by_fingerprint(
             project_id=project_id,
             provider=provider,
             fingerprint=signal.fingerprint,
-            created_after=dedup_after,
+            active_after=dedup_after,
         )
         if open_incident is not None:
             next_count = _int_value(open_incident.evidence.get("count")) + 1
-            merged_evidence = {**open_incident.evidence, **evidence, "count": next_count}
+            merged_evidence = {
+                **open_incident.evidence,
+                **evidence,
+                "count": next_count,
+            }
             self._incident_repository.update_open_incident_activity(
                 incident_id=open_incident.id,
                 evidence=merged_evidence,
@@ -96,7 +104,9 @@ class IncidentManager:
         self._incident_repository.create_incident(incident=incident)
         self._enqueue_detection_notifications(incident=incident, mode=mode)
 
-    def _enqueue_detection_notifications(self, *, incident: Incident, mode: str) -> None:
+    def _enqueue_detection_notifications(
+        self, *, incident: Incident, mode: str
+    ) -> None:
         if mode != "observe":
             return
         event_type = "incident.warn"
@@ -110,7 +120,11 @@ class IncidentManager:
             "model": _string_or_none(incident.evidence.get("model")),
             "environment": _string_or_none(incident.evidence.get("environment")),
             "created_at": incident.created_at.isoformat(),
-            "last_seen_at": incident.last_seen_at.isoformat() if incident.last_seen_at is not None else None,
+            "last_seen_at": (
+                incident.last_seen_at.isoformat()
+                if incident.last_seen_at is not None
+                else None
+            ),
             "sent_at": datetime.now(timezone.utc).isoformat(),
             "evidence": evidence,
         }
@@ -122,7 +136,17 @@ class IncidentManager:
                     event_type=event_type,
                 )
             except Exception:
-                logger.exception("Failed to enqueue incident webhook", extra={"incident_id": incident.id})
+                logger.exception(
+                    "Failed to enqueue incident webhook",
+                    extra={"incident_id": incident.id},
+                )
+
+
+def _signal_episode_window_seconds(signal: Signal, fallback_seconds: int) -> int:
+    value = signal.episode_window_seconds
+    if isinstance(value, int) and value > 0:
+        return value
+    return max(int(fallback_seconds), 1)
 
 
 def _int_value(value: object) -> int:
@@ -140,7 +164,8 @@ def _string_or_none(value: object) -> str | None:
 
 
 def _build_webhook_evidence(evidence: dict[str, object]) -> dict[str, object]:
-    # Keep detailed detector context nested, but remove fields already promoted to the top level.
+    # Keep detailed detector context nested, but remove fields already
+    # promoted to the top level.
     sanitized = dict(evidence)
     for key in ("provider", "model", "environment", "last_seen_at", "reason"):
         sanitized.pop(key, None)

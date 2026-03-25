@@ -40,6 +40,7 @@ class RetryStormDetector(Detector):
                 scope_provider=ctx.provider,
                 fingerprint=f"{ctx.project_id}:{ctx.provider}:retry_storm",
                 evidence=evidence,
+                episode_window_seconds=ctx.retry_storm_window_seconds,
                 tags=_tags(ctx),
             )
         ]

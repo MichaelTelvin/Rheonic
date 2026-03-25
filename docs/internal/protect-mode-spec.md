@@ -70,7 +70,8 @@ Evidence fields include:
 
 Incident behavior:
 - create on first detection
-- dedup+update within `incident_dedup_window_seconds`
+- dedup+update only while the same detector episode is still active
+- when the detector episode window has gone cold, the next trigger opens a fresh incident row
 - increment count in evidence
 - manual resolve and auto-resolve supported
 
@@ -78,7 +79,7 @@ Incident behavior:
 For a single ingested event, incident emission follows this dominance:
 1. `cap_breach` dominates all
    - suppresses `near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`
-   - resolves only recent open `near_cap` incidents for the same `(project_id, provider)` inside the dedup window
+   - resolves only still-active open `near_cap` incidents for the same `(project_id, provider)`
 2. `near_cap` dominates behavioral signals when no cap breach exists
    - suppresses `retry_storm`, `loop_suspect`, `token_explosion`
 3. Behavioral coexistence is allowed

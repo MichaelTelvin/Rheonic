@@ -24,9 +24,9 @@ class IncidentRepository(ABC):
         project_id: str,
         provider: str,
         fingerprint: str,
-        created_after: datetime,
+        active_after: datetime,
     ) -> Incident | None:
-        # Return an open incident for a project/fingerprint created after timestamp.
+        # Return an open incident for a project/fingerprint active after timestamp.
         raise NotImplementedError
 
     @abstractmethod

@@ -10,14 +10,23 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - Dashboard behavior: totals are aggregated across providers unless provider filter is set.
 
 ## Incident Dedup and Lifecycle
-- `incident_dedup_window_seconds`: if an open incident with same `(project_id, provider, incident_type)` is inside the window, update it instead of creating a new row.
+- `incident_dedup_window_seconds`: fallback episode window only when a signal does not define its own active episode.
+- Incident reuse now follows the signal episode window plus incident `last_seen_at`:
+  - same still-active episode -> update existing open row and increment `evidence.count`
+  - new separated episode after the detector window cools down -> open a fresh row and emit a fresh `incident.warn`
+- Current signal episode windows:
+  - `retry_storm`: `retry_storm_window_seconds`
+  - `loop_suspect`: `loop_window_seconds`
+  - `near_cap`: 60 seconds
+  - `token_explosion`: 60 seconds
+  - `cap_breach`: 60 seconds
 - `incident_auto_close_seconds`: inactivity cooldown before open incidents are auto-resolved. Default: 60 minutes.
 - `auto_close_run_interval_seconds`: scheduler cadence for running auto-close.
 
 ## Ingest Dominance (per event)
 - Dominance level 3: `cap_breach`
   - suppresses: `near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`
-  - resolves only recent open `near_cap` incidents for the same `(project_id, provider)` inside the dedup window
+  - resolves only recent open `near_cap` incidents for the same `(project_id, provider)` that are still active
 - Dominance level 2: `near_cap` (only when no cap breach)
   - suppresses: `retry_storm`, `loop_suspect`, `token_explosion`
 - Dominance level 1: `retry_storm`, `loop_suspect`, `token_explosion`
@@ -37,7 +46,7 @@ This map reflects the deterministic anomaly model now used by ingest and protect
   - `near_cap(both)` -> both booleans true, `near_cap_type="both"`
 - When it applies:
   - Protect preflight: decision `warn`, visible `near_cap` incident upsert, and Protect reporting event `protection.warn`.
-- Ingest (observe/protect): emits `near_cap` incident only when no `cap_breach` dominates that same event. If a later `cap_breach` is reached for the same provider, only recent open `near_cap` incidents inside the dedup window are resolved.
+- Ingest (observe/protect): emits `near_cap` incident only when no `cap_breach` dominates that same event. If a later `cap_breach` is reached for the same provider, only still-active open `near_cap` incidents are resolved.
 
 ## Retry Storm Detector
 - `retry_storm_window_seconds`: lookback window for failure burst detection.

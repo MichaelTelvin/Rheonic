@@ -45,6 +45,7 @@ class NearCapDetector(Detector):
                 scope_provider=ctx.provider,
                 fingerprint=f"{ctx.project_id}:{ctx.provider}:near_cap:{near_cap_type}",
                 evidence=evidence,
+                episode_window_seconds=60,
                 tags=_tags(ctx),
             )
         ]
