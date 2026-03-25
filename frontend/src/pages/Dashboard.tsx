@@ -178,6 +178,12 @@ export function Dashboard(): JSX.Element {
     return counts;
   }, [incidents]);
 
+  const applyProviders = useCallback((items: string[]): void => {
+    const normalized = Array.from(new Set(items.map((provider) => normalizeProviderValue(provider)).filter(Boolean)));
+    setProviders(normalized);
+    setSelectedProvider((current) => (current !== "all" && !normalized.includes(normalizeProviderValue(current)) ? "all" : current));
+  }, []);
+
   useLayoutEffect(() => {
     const cached = projectId ? readDashboardCache(projectId) : null;
     setMetrics(cached?.metrics ?? null);
@@ -378,12 +384,6 @@ export function Dashboard(): JSX.Element {
     ? { label: setupBannerContent.secondaryLabel, to: setupBannerContent.secondaryTo }
     : null;
   const visibleWebhookIssue = renderWebhookIssueBanner && webhookIssue ? webhookIssue : null;
-
-  const applyProviders = useCallback((items: string[]): void => {
-    const normalized = Array.from(new Set(items.map((provider) => normalizeProviderValue(provider)).filter(Boolean)));
-    setProviders(normalized);
-    setSelectedProvider((current) => (current !== "all" && !normalized.includes(normalizeProviderValue(current)) ? "all" : current));
-  }, []);
 
   const refreshProviders = useCallback(async (): Promise<void> => {
     if (!projectId) {
