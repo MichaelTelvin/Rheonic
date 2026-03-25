@@ -24,5 +24,13 @@ if [[ -z "${DOPPLER_TOKEN:-}" ]]; then
   exit 1
 fi
 
+command="${1:-up}"
+shift || true
+
+compose_args=("$command" "$@")
+if [[ "$command" == "up" ]]; then
+  compose_args+=(--force-recreate)
+fi
+
 exec doppler run --token "$DOPPLER_TOKEN" --project "$project" --config "$config" -- \
-  docker compose -p rheonic_prod_logs -f deploy/docker-compose.promtail.yml "$@"
+  docker compose -p rheonic_prod_logs -f deploy/docker-compose.promtail.yml "${compose_args[@]}"
