@@ -166,6 +166,19 @@ def _assert_line(label: str, passed: bool) -> None:
     print(f"[ASSERT] {label}" if passed else f"[ASSERT] {label} (FAILED)")
 
 
+def _assert_delivery(client: Client, *, expected_min_sent: int = 0) -> None:
+    stats = client.stats()
+    print(f"[DEMO] sdk delivery stats: {stats}")
+    sent = int(stats.get("sent", 0))
+    failed = int(stats.get("failed", 0))
+    queued = int(stats.get("queued", 0))
+    if sent < expected_min_sent or failed > 0 or queued > 0:
+        raise RuntimeError(
+            "protect demo did not fully deliver SDK events "
+            f"(sent={sent}, failed={failed}, queued={queued})"
+        )
+
+
 def _print_config_hint() -> None:
     target_hint = (os.getenv("RHEONIC_DEMO_TARGET_HINT") or "").strip() or "protect-prod-python"
     print(f"Run: make {target_hint} RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach")
@@ -612,6 +625,9 @@ def main() -> None:
         elif scenario == "cooldown":
             _assert_line("cooldown active", blocked and provider_calls_delta == 0)
             _assert_line("cooldown active - repeated call blocked", blocked and provider_calls_delta == 0)
+
+        expected_sent = 1 if provider_calls_delta >= 1 else 0
+        _assert_delivery(client, expected_min_sent=expected_sent)
 
     finally:
         client.close()

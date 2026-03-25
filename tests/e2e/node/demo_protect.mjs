@@ -95,6 +95,17 @@ function assertLine(label, passed) {
   console.log(passed ? `[ASSERT] ${label}` : `[ASSERT] ${label} (FAILED)`);
 }
 
+function assertDelivery(client, expectedMinSent = 0) {
+  const stats = client.getStats();
+  console.log("[DEMO] sdk delivery stats:", stats);
+  const sent = Number(stats.sent ?? 0);
+  const failed = Number(stats.failed ?? 0);
+  const queued = Number(stats.queued ?? 0);
+  if (sent < expectedMinSent || failed > 0 || queued > 0) {
+    throw new Error(`protect demo did not fully deliver SDK events (sent=${sent}, failed=${failed}, queued=${queued})`);
+  }
+}
+
 async function sendIngestEvent(ingestKey, provider, model, totalTokens, feature, environment, options) {
   const status = options?.status ?? "ok";
   const httpStatus = options?.httpStatus ?? 200;
@@ -449,7 +460,7 @@ async function main() {
   }
 
   await client.flush();
-  console.log("[DEMO] sdk delivery stats:", client.getStats());
+  assertDelivery(client, providerCallsDelta >= 1 ? 1 : 0);
   client.close();
 }
 
