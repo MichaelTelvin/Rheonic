@@ -166,6 +166,17 @@ async function getProjectReqCap(projectId, dashboardSession) {
   return Math.floor(value);
 }
 
+async function assertProjectIsInProtectMode(projectId, dashboardSession) {
+  if (!projectId || !dashboardSession) return;
+  const payload = await dashboardSession.request(`/api/v1/projects/${projectId}/protect`);
+  if (!payload?.protect_enabled) {
+    throw new Error(
+      "Protect demo requires project mode Protect. Current project mode is Observe, " +
+        "so protect decision counters will stay at zero even though usage metrics still increment."
+    );
+  }
+}
+
 async function runProviderCall(provider, model, maxTokens, openai, anthropic, googleModel) {
   try {
     if (provider === "anthropic") {
@@ -235,6 +246,7 @@ async function main() {
       dashboardSession = null;
     }
   }
+  await assertProjectIsInProtectMode(projectId, dashboardSession);
 
   await resetProvider();
   const before = await providerCount();

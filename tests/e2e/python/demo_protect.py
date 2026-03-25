@@ -424,6 +424,38 @@ def _get_project_req_cap(
     return value if isinstance(value, int) and value > 0 else None
 
 
+def _assert_project_is_in_protect_mode(
+    dashboard_session: DashboardSession | None,
+    project_id: str,
+    auth_email: str,
+) -> None:
+    if dashboard_session is None or not project_id:
+        return
+    try:
+        payload = dashboard_session.request(f"/api/v1/projects/{project_id}/protect")
+    except httpx.HTTPError as exc:
+        status_code = (
+            exc.response.status_code
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response is not None
+            else None
+        )
+        if status_code in {401, 403}:
+            print(
+                "[PROTECT] mode check skipped "
+                f"({status_code} auth error; update dashboard cookie "
+                f"credentials for {auth_email})"
+            )
+            return
+        raise
+    protect_enabled = bool(payload.get("protect_enabled")) if isinstance(payload, dict) else False
+    if not protect_enabled:
+        raise RuntimeError(
+            "Protect demo requires project mode Protect. "
+            "Current project mode is Observe, so protect decision counters "
+            "will stay at zero even though usage metrics still increment."
+        )
+
+
 def _run_provider_call(
     provider: str,
     model: str,
@@ -496,6 +528,7 @@ def main() -> None:
         except Exception as error:
             print(f"[INCIDENTS] dashboard cookie session unavailable ({error})")
             dashboard_session = None
+    _assert_project_is_in_protect_mode(dashboard_session, project_id, auth_email)
 
     transport = LoggingHttpClient(timeout_s=5.0)
     client = Client(

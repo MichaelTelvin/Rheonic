@@ -710,6 +710,27 @@ def test_dominance_near_cap_suppresses_behavioral_signals() -> None:
     assert all(row.incident_type not in {"retry_storm", "loop_suspect", "token_explosion"} for row in incidents.rows)
 
 
+def test_dominance_near_cap_suppresses_token_explosion_for_same_event() -> None:
+    service, incidents, _, _ = _service(
+        protect_enabled=True,
+        req_cap=None,
+        tok_cap=4000,
+        token_explosion_abs=1500,
+    )
+    service.ingest(
+        _event(
+            "p1",
+            total_tokens=3200,
+            feature="dominance-near-token-explosion",
+            offset_seconds=0,
+        )
+    )
+
+    assert len(incidents.rows) == 1
+    assert incidents.rows[0].incident_type == "near_cap"
+    assert all(row.incident_type != "token_explosion" for row in incidents.rows)
+
+
 def test_dominance_behavioral_retry_suppresses_loop_suspect() -> None:
     service, incidents, _, _ = _service(
         protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, loop_count=1

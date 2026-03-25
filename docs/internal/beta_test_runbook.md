@@ -173,6 +173,9 @@ Expected:
 
 Switch project mode to `Protect`.
 
+If the project is still in `Observe`, protect demos can still return `allow` and the
+provider call can still happen, but the Protect decision counters will stay at zero by design.
+
 Run:
 
 ```bash
