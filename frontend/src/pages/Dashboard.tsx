@@ -253,25 +253,26 @@ export function Dashboard(): JSX.Element {
 
     let cancelled = false;
     const loadSetupSignals = async (): Promise<void> => {
+      const [keysResult, providersResult] = await Promise.allSettled([
+        listKeys(projectId),
+        fetchProjectProviders(projectId),
+      ]);
+      if (cancelled) {
+        return;
+      }
+
       let setupSignalsLoaded = false;
-      try {
-        const [keys, projectProviders] = await Promise.all([listKeys(projectId), fetchProjectProviders(projectId)]);
-        if (cancelled) {
-          return;
-        }
+      if (keysResult.status === "fulfilled") {
+        setHasIngestKey(keysResult.value.some((key) => key.status === "active"));
         setupSignalsLoaded = true;
-        setHasIngestKey(keys.some((key) => key.status === "active"));
-        setHasEvents(projectProviders.length > 0);
-        applyProviders(projectProviders);
-      } catch {
-        if (cancelled) {
-          return;
-        }
-        // Keep the last known setup state during transient backend outages.
-      } finally {
-        if (!cancelled && setupSignalsLoaded) {
-          setSetupStatusResolved(true);
-        }
+      }
+      if (providersResult.status === "fulfilled") {
+        setHasEvents(providersResult.value.length > 0);
+        applyProviders(providersResult.value);
+        setupSignalsLoaded = true;
+      }
+      if (setupSignalsLoaded) {
+        setSetupStatusResolved(true);
       }
     };
 
