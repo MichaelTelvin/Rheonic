@@ -8,16 +8,27 @@
   }
 }
 
-(block_bad_paths) {
-  @bad path /.env* /.git* /wp-admin* /phpmyadmin* /logs* /debug*
-  respond @bad 403
-}
 
 staging.rheonic.dev {
   encode gzip zstd
 
   import common_security
-  import block_bad_paths
+
+  handle_path /.env* {
+    respond 403
+  }
+
+  handle_path /.git* {
+    respond 403
+  }
+
+  handle_path /logs* {
+    respond 403
+  }
+
+  handle_path /debug* {
+    respond 403
+  }
 
   handle /api/* {
     reverse_proxy staging-backend:8000
@@ -31,12 +42,27 @@ staging.rheonic.dev {
 beta.rheonic.dev {
   encode gzip zstd
 
-  import common_security
-  import block_bad_paths
-
   log {
     output stdout
     format json
+  }
+
+  import common_security
+  
+  handle_path /.env* {
+    respond 403
+  }
+
+  handle_path /.git* {
+    respond 403
+  }
+
+  handle_path /logs* {
+    respond 403
+  }
+
+  handle_path /debug* {
+    respond 403
   }
 
   handle /api/* {
