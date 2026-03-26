@@ -1,5 +1,23 @@
+(common_security) {
+  header {
+    -Server
+    X-Frame-Options "DENY"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+  }
+}
+
+(block_bad_paths) {
+  @bad path /.env* /.git* /wp-admin* /phpmyadmin* /logs* /debug*
+  respond @bad 404
+}
+
 staging.rheonic.dev {
   encode gzip zstd
+
+  import common_security
+  import block_bad_paths
 
   handle /api/* {
     reverse_proxy staging-backend:8000
@@ -12,6 +30,9 @@ staging.rheonic.dev {
 
 beta.rheonic.dev {
   encode gzip zstd
+
+  import common_security
+  import block_bad_paths
 
   log {
     output stdout
