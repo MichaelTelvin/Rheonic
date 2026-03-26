@@ -47,7 +47,7 @@ export function Seo({
   description,
   path = "/",
   type = "website",
-  imagePath = "/landing/dashboard-preview.svg",
+  imagePath = import.meta.env.VITE_OG_IMAGE || "/landing/og-image.png",
   noindex = false,
   jsonLd,
 }: SeoProps): null {
