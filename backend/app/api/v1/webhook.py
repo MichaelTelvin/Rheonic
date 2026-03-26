@@ -1,9 +1,10 @@
 # Project webhook configuration endpoints.
 import json
+import time
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import AnyHttpUrl, BaseModel
 
 from app.application.interfaces.transport_outbox_repository import TransportOutboxRepository
@@ -12,11 +13,13 @@ from app.config import Settings, app_config
 from app.dependencies import (
     get_current_user,
     get_project_service,
+    get_redis_client,
     get_settings,
     get_transport_outbox_repository,
 )
 from app.domain.models.transport_outbox import TransportOutbox
 from app.domain.models.user import User
+from app.infrastructure.redis.redis_client import RedisClient
 from app.logger import generate_span_id, generate_trace_id, get_logger, get_trace_id
 from app.security.webhook_urls import ensure_webhook_url_is_safe, normalize_webhook_url
 
@@ -52,6 +55,53 @@ class ProjectWebhookTestOut(BaseModel):
     status: str
     status_code: int | None = None
     error: str | None = None
+
+
+def _client_ip(request: Request, settings: Settings) -> str:
+    if settings.trust_proxy_headers:
+        forwarded_for = (request.headers.get("X-Forwarded-For") or "").strip()
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+    return (request.client.host if request.client is not None else "") or "unknown"
+
+
+def _webhook_test_rate_limit_key(project_id: str, user_id: str, client_ip: str, window_epoch: int) -> str:
+    return f"webhook_test_rl:{project_id}:{user_id}:{client_ip}:{window_epoch}"
+
+
+def _enforce_webhook_test_rate_limit(
+    *,
+    redis_client: RedisClient,
+    settings: Settings,
+    request: Request,
+    project_id: str,
+    user_id: str,
+) -> None:
+    window_seconds = max(int(settings.webhook_test_rate_limit_window_seconds), 1)
+    window_epoch = int(time.time()) // window_seconds
+    client_ip = _client_ip(request, settings)
+    key = _webhook_test_rate_limit_key(project_id, user_id, client_ip, window_epoch)
+    try:
+        counter = redis_client.incr(key)
+        if counter == 1:
+            redis_client.expire(key, window_seconds)
+        if counter > settings.webhook_test_rate_limit_per_window:
+            logger.warning(
+                "Webhook test rate limit exceeded",
+                extra={
+                    "project_id": project_id,
+                    "user_id": user_id,
+                    "client_ip": client_ip,
+                },
+            )
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.warning(
+            "Webhook test rate-limit Redis unavailable; processing in fail-open mode",
+            extra={"project_id": project_id, "user_id": user_id, "client_ip": client_ip},
+        )
 
 
 @router.get("/projects/{project_id}/webhook", response_model=ProjectWebhookOut)
@@ -121,13 +171,22 @@ def update_project_webhook(
 @router.post("/projects/{project_id}/webhook/test", response_model=ProjectWebhookTestOut)
 def test_project_webhook(
     project_id: str,
+    request: Request,
     payload: ProjectWebhookTestIn | None = None,
     project_service: ProjectService = Depends(get_project_service),
+    redis_client: RedisClient = Depends(get_redis_client),
     settings: Settings = Depends(get_settings),
     current_user: User = Depends(get_current_user),
 ) -> ProjectWebhookTestOut:
     # Send a webhook test payload immediately and return the real delivery result.
     try:
+        _enforce_webhook_test_rate_limit(
+            redis_client=redis_client,
+            settings=settings,
+            request=request,
+            project_id=project_id,
+            user_id=current_user.id,
+        )
         project = project_service.get_project_webhook_settings(project_id=project_id, user_id=current_user.id)
         override_url = normalize_webhook_url(str(payload.url) if payload and payload.url is not None else None)
         target_url = override_url or project.webhook_url

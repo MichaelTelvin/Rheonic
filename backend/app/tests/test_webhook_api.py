@@ -5,7 +5,8 @@ from fastapi.testclient import TestClient
 
 from app.api.v1 import webhook as webhook_api
 from app.application.services.project_service import ProjectService
-from app.dependencies import get_current_user, get_project_service, get_transport_outbox_repository
+from app.config import Settings
+from app.dependencies import get_current_user, get_project_service, get_redis_client, get_settings, get_transport_outbox_repository
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base, TransportOutboxRecord
@@ -18,7 +19,28 @@ def _cleanup_overrides() -> None:
     app.dependency_overrides.clear()
 
 
-def _make_client(tmp_path, current_user: User | None = None) -> TestClient:
+class _FakeRedisClient:
+    def __init__(self) -> None:
+        self.values: dict[str, int] = {}
+        self.ttls: dict[str, int] = {}
+
+    def incr(self, key: str) -> int:
+        value = int(self.values.get(key, 0)) + 1
+        self.values[key] = value
+        return value
+
+    def expire(self, key: str, ttl_seconds: int) -> bool:
+        self.ttls[key] = ttl_seconds
+        return True
+
+
+def _make_client(
+    tmp_path,
+    current_user: User | None = None,
+    *,
+    redis_client: _FakeRedisClient | None = None,
+    settings: Settings | None = None,
+) -> TestClient:
     db_url = f"sqlite:///{tmp_path}/webhook_api_test.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)
@@ -28,6 +50,8 @@ def _make_client(tmp_path, current_user: User | None = None) -> TestClient:
     app.dependency_overrides[get_transport_outbox_repository] = lambda: TransportOutboxRepositoryImpl(
         session_factory=session_factory
     )
+    app.dependency_overrides[get_redis_client] = lambda: (redis_client or _FakeRedisClient())
+    app.dependency_overrides[get_settings] = lambda: (settings or Settings(app_env="test", database_url=db_url))
     app.dependency_overrides[get_current_user] = lambda: (
         current_user
         or User(
@@ -223,6 +247,59 @@ def test_project_webhook_test_is_available_in_observe_mode(tmp_path) -> None:
     assert test_response.status_code == 200
     assert test_response.json() == {"status": "success", "status_code": 204, "error": None}
 
+    _cleanup_overrides()
+
+
+def test_project_webhook_test_is_rate_limited(tmp_path) -> None:
+    redis_client = _FakeRedisClient()
+    settings = Settings(
+        app_env="test",
+        database_url=f"sqlite:///{tmp_path}/webhook_rate_limit.db",
+        webhook_test_rate_limit_per_window=2,
+        webhook_test_rate_limit_window_seconds=60,
+    )
+    client = _make_client(tmp_path, redis_client=redis_client, settings=settings)
+    project_id = client.post("/api/v1/projects", json={"name": "Webhook Test Rate Limit"}).json()["id"]
+
+    put_response = client.put(
+        f"/api/v1/projects/{project_id}/webhook",
+        json={"enabled": True, "url": "https://example.test/hook"},
+    )
+    assert put_response.status_code == 200
+
+    class _FakeOkResponse:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class _FakeOkClient:
+        def __init__(self, timeout) -> None:
+            _ = timeout
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            _ = exc_type, exc, tb
+
+        def post(self, url: str, content: bytes, headers: dict[str, str]):
+            _ = url, content, headers
+            return _FakeOkResponse()
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(webhook_api.httpx, "Client", _FakeOkClient)
+    try:
+        first = client.post(f"/api/v1/projects/{project_id}/webhook/test")
+        second = client.post(f"/api/v1/projects/{project_id}/webhook/test")
+        limited = client.post(f"/api/v1/projects/{project_id}/webhook/test")
+    finally:
+        monkeypatch.undo()
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert limited.status_code == 429
+    assert limited.json() == {"error": {"code": "too_many_requests", "message": "rate limit exceeded"}}
     _cleanup_overrides()
 
 

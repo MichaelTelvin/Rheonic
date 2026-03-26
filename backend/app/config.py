@@ -112,6 +112,8 @@ class Settings(BaseSettings):
     auth_register_rate_limit_per_window: int = 10
     auth_login_rate_limit_per_window: int = 10
     auth_refresh_rate_limit_per_window: int = 10
+    webhook_test_rate_limit_window_seconds: int = app_config.rate_limit_window_seconds
+    webhook_test_rate_limit_per_window: int = 5
     incident_dedup_window_seconds: int = 300
     retry_storm_window_seconds: int = app_config.retry_storm_window_seconds
     retry_storm_count: int = app_config.retry_storm_count
