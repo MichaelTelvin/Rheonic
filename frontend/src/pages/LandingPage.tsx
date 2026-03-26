@@ -39,7 +39,7 @@ export function LandingPage(): JSX.Element {
       showBetaBadge
     >
       <Seo
-        title="Rheonic | LLM Guardrails and Cost Control"
+        title="Rheonic | Observability & Control for AI Systems"
         description="Rheonic helps teams monitor model traffic, detect anomalies, and enforce preflight guardrails before expensive provider calls are sent."
         path="/"
         jsonLd={{
