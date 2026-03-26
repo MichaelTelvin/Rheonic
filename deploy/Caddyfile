@@ -10,7 +10,7 @@
 
 (block_bad_paths) {
   @bad path /.env* /.git* /wp-admin* /phpmyadmin* /logs* /debug*
-  respond @bad 404
+  respond @bad 403
 }
 
 staging.rheonic.dev {
