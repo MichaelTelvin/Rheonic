@@ -228,7 +228,7 @@ async function main() {
 
   const scenario = (process.env.RHEONIC_SCENARIO ?? "allow").toLowerCase();
   const pauseMs = envInt("RHEONIC_STEP_SLEEP_MS", 200);
-  const protectDecisionTimeoutMs = envInt("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", 150);
+  const protectDecisionTimeoutMs = envInt("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", 160);
   const env = (process.env.RHEONIC_ENVIRONMENT ?? "").trim() || `protect-${Date.now()}`;
   const projectId = process.env.RHEONIC_PROJECT_ID ?? "";
   const authEmail = (process.env.RHEONIC_AUTH_EMAIL ?? "").trim().toLowerCase();

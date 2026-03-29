@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 @dataclass(frozen=True)
 class AppConfig:
     default_log_format: str = "%(asctime)s %(levelname)s %(name)s %(message)s"
-    default_protect_decision_timeout_ms: int = 150
+    default_protect_decision_timeout_ms: int = 160
     protect_outcome_source_live: str = "live"
     protect_outcome_source_timeout_fallback: str = "timeout_fallback"
     protect_outcome_source_unavailable_fallback: str = "unavailable_fallback"
