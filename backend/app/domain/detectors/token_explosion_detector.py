@@ -1,5 +1,6 @@
 from app.domain.detectors.contracts import DetectionContext, Signal
 from app.domain.detectors.detector import Detector
+from app.domain.detectors.model_normalization import normalized_model_name
 from app.domain.models.event import Event
 
 
@@ -84,7 +85,7 @@ def resolve_previous_estimated_tokens(
     current_event: Event | None = None,
 ) -> int | None:
     current_event_id = current_event.id if current_event is not None else None
-    normalized_model = model or ""
+    normalized_model = normalized_model_name(model)
     # Normalize ordering here so growth compares against the latest matching event
     # regardless of whether the caller hands us newest-first repository rows or
     # append-ordered test doubles.
@@ -92,7 +93,7 @@ def resolve_previous_estimated_tokens(
     for event in ordered_events:
         if event.provider != provider:
             continue
-        if (event.model or "") != normalized_model:
+        if normalized_model_name(event.model) != normalized_model:
             continue
         if current_event_id is not None and event.id == current_event_id:
             continue

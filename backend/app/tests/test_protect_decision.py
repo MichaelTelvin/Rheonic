@@ -684,6 +684,39 @@ def test_retry_storm_warns_in_preflight(tmp_path) -> None:
     _cleanup_overrides()
 
 
+def test_retry_storm_warns_in_preflight_when_recent_events_use_resolved_model_name(tmp_path) -> None:
+    client, _, events = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Retry Storm Resolved Model")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    now = datetime.now(timezone.utc)
+    for offset, http_status in enumerate((500, 501, 502, 503, 504), start=1):
+        events.add_recent(
+            _event(
+                project_id,
+                "openai",
+                "gpt-4o-mini-2024-07-18",
+                status="error",
+                http_status=http_status,
+                total_tokens=50,
+                created_at=now - timedelta(seconds=6 - offset),
+            )
+        )
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+        },
+    )
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "retry_storm"
+    _cleanup_overrides()
+
+
 def test_retry_storm_preflight_ignores_retry_status_and_only_counts_failures(tmp_path) -> None:
     client, _, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Retry Storm Failure Counting")
@@ -735,6 +768,41 @@ def test_loop_suspect_warns_in_preflight_when_feature_matches(tmp_path) -> None:
                 project_id,
                 "openai",
                 "gpt-4o-mini",
+                status="ok",
+                http_status=200,
+                total_tokens=60,
+                created_at=now - timedelta(seconds=6 - offset),
+                request_feature="manual-protect-demo",
+            )
+        )
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "feature": "manual-protect-demo",
+        },
+    )
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "loop_suspect"
+    _cleanup_overrides()
+
+
+def test_loop_suspect_warns_in_preflight_when_recent_events_use_resolved_model_name(tmp_path) -> None:
+    client, _, events = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Resolved Model")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    now = datetime.now(timezone.utc)
+    for offset in range(7):
+        events.add_recent(
+            _event(
+                project_id,
+                "openai",
+                "gpt-4o-mini-2024-07-18",
                 status="ok",
                 http_status=200,
                 total_tokens=60,
@@ -897,7 +965,7 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
         _event(
             project_id,
             "openai",
-            "gpt-4o-mini",
+            "gpt-4o-mini-2024-07-18",
             status="ok",
             http_status=200,
             total_tokens=300,

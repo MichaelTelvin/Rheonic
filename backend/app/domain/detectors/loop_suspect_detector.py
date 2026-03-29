@@ -1,5 +1,6 @@
 from app.domain.detectors.contracts import DetectionContext, Signal
 from app.domain.detectors.detector import Detector
+from app.domain.detectors.model_normalization import normalized_model_name
 from app.domain.models.event import Event
 
 
@@ -83,16 +84,19 @@ def _signature(
     event: Event | None,
 ) -> str:
     if event is None:
-        return f"{project_id}:{provider}:{model or 'na'}:{environment or 'na'}:na:unknown"
+        return f"{project_id}:{provider}:{normalized_model_name(model) or 'na'}:{environment or 'na'}:na:unknown"
     endpoint = (event.request_endpoint or "na").strip()
     feature = (event.request_feature or "unknown").strip() or "unknown"
-    return f"{project_id}:{provider}:{model or 'na'}:{environment or 'na'}:{endpoint}:{feature}"
+    return f"{project_id}:{provider}:{normalized_model_name(model) or 'na'}:{environment or 'na'}:{endpoint}:{feature}"
 
 
 def _context_signature(ctx: DetectionContext) -> str:
     endpoint = (ctx.request_endpoint or "na").strip()
     feature = (ctx.request_feature or "unknown").strip() or "unknown"
-    return f"{ctx.project_id}:{ctx.provider}:{ctx.model or 'na'}:{ctx.environment or 'na'}:{endpoint}:{feature}"
+    return (
+        f"{ctx.project_id}:{ctx.provider}:{normalized_model_name(ctx.model) or 'na'}:"
+        f"{ctx.environment or 'na'}:{endpoint}:{feature}"
+    )
 
 
 def _tags(ctx: DetectionContext) -> dict[str, str]:

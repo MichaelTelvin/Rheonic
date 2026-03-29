@@ -1,5 +1,6 @@
 from app.domain.detectors.contracts import DetectionContext, Signal
 from app.domain.detectors.detector import Detector
+from app.domain.detectors.model_normalization import normalized_model_name
 from app.domain.models.event import Event
 
 
@@ -15,7 +16,7 @@ class RetryStormDetector(Detector):
             event
             for event in ctx.recent_events
             if event.provider == ctx.provider
-            and (event.model or "") == (ctx.model or "")
+            and normalized_model_name(event.model) == normalized_model_name(ctx.model)
             and event.created_at.timestamp() >= cutoff
             and _is_failure(event)
         ]
