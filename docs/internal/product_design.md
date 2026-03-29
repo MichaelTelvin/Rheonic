@@ -79,7 +79,7 @@ Protect Mode is explicit opt-in. It provides safe, deterministic actions:
 
 ### “Runaway” patterns (v1)
 - **RETRY_STORM**: elevated retry rate AND elevated attempts/min
-- **LOOP_SUSPECT**: repeated job_id/trace_id or repeated prompt_hash pattern
+- **LOOP_SUSPECT**: a rapid consecutive sequence repeats the same endpoint/feature signature, including failed steps
 - **BURN_RATE_SPIKE**: spend velocity jumps above normal operating range
 - **TOKEN_EXPLOSION**: input/output tokens spike sharply because the request is large, cap-relative, or suddenly grows versus the previous matching step
 

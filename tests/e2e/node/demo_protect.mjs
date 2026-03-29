@@ -369,7 +369,7 @@ async function main() {
     }
   } else if (scenario === "loop_suspect") {
     const count = envInt("RHEONIC_LOOP_COUNT", 7);
-    console.log("[STEP] Seed loop suspect then expect warn");
+    console.log("[STEP] Seed a rapid repeated sequence for loop suspect then expect warn");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 60, "loop-fixed-signature", env);
       await sleep(pauseMs);
@@ -466,7 +466,10 @@ async function main() {
       !blocked && decision === "warn" && reason === "retry_storm",
     );
   } else if (scenario === "loop_suspect") {
-    assertLine("loop_suspect warn triggered", !blocked && decision === "warn" && reason === "loop_suspect");
+    assertLine(
+      "loop_suspect warn triggered from a rapid repeated sequence",
+      !blocked && decision === "warn" && reason === "loop_suspect",
+    );
   } else if (scenario === "token_explosion") {
     assertLine("token_explosion warn triggered", !blocked && decision === "warn" && (reason === "token_explosion" || reason === "near_cap"));
   } else if (scenario === "cooldown") {

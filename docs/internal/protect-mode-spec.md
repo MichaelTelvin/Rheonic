@@ -60,6 +60,11 @@ Protect preflight warns when either condition is met:
 - Also warns on abrupt sequential growth against the previous matching estimate.
 - Growth-only detection is suppressed when request volume is high enough to suggest concurrency instead of one step feeding the next.
 
+## Loop-Suspect Rule
+- Counts rapid consecutive repeats of the same signature, not scattered frequency across the full window.
+- Error events stay eligible because stuck loops often fail while repeating.
+- Detection is suppressed when request volume is high enough to suggest concurrency instead of one sequence feeding the next.
+
 ## Incidents
 Incident types:
 - `near_cap`

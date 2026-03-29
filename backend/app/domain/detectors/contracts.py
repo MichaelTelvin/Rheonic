@@ -40,6 +40,8 @@ class DetectionContext:
     retry_storm_count: int = 5
     loop_window_seconds: int = 30
     loop_count: int = 6
+    loop_max_gap_seconds: float = 2.0
+    loop_concurrency_threshold: int = 5
     token_explosion_ratio: float = 0.8
     token_explosion_abs: int = 6000
     token_explosion_growth_ratio: float = 2.0

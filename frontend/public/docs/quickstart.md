@@ -106,6 +106,8 @@ Keep one long-lived SDK client per app process. Initialize it during app startup
 
 Make one provider call. Open the dashboard and confirm traffic appears.
 
+Incidents surface detector states such as failed retry storms, rapid repeated loop sequences, and sudden token growth when those patterns appear.
+
 Dashboard path: `Dashboard → Metrics` or `Incidents`
 
 ## 6. Set request and token limits

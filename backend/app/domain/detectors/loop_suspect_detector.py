@@ -4,20 +4,24 @@ from app.domain.models.event import Event
 
 
 class LoopSuspectDetector(Detector):
-    # Detect rapid repeated traffic with the same signature.
+    # Detect rapid consecutive traffic with the same signature so scattered
+    # repetition or high-concurrency bursts do not look like a stuck loop.
     def detect(self, ctx: DetectionContext) -> list[Signal]:
-        if not ctx.recent_events or _is_error_event(ctx.current_event):
+        if not ctx.recent_events:
             return []
         cutoff = ctx.now.timestamp() - float(ctx.loop_window_seconds)
         signature = _context_signature(ctx)
-        hit_count = 0
-        for event in ctx.recent_events:
+        sequence_count = 0
+        prev_ts = None
+
+        # Walk newest to oldest and stop as soon as the rapid repeated sequence
+        # breaks by signature, timing gap, or window boundary.
+        for event in reversed(ctx.recent_events):
             if event.provider != ctx.provider:
                 continue
-            if event.created_at.timestamp() < cutoff:
-                continue
-            if _is_error_event(event):
-                continue
+            event_ts = event.created_at.timestamp()
+            if event_ts < cutoff:
+                break
             event_signature = _signature(
                 project_id=ctx.project_id,
                 provider=event.provider,
@@ -25,9 +29,21 @@ class LoopSuspectDetector(Detector):
                 environment=event.environment,
                 event=event,
             )
-            if event_signature == signature:
-                hit_count += 1
-        if hit_count < ctx.loop_count:
+            if event_signature != signature:
+                break
+            if prev_ts is not None and (prev_ts - event_ts) > float(ctx.loop_max_gap_seconds):
+                break
+            sequence_count += 1
+            prev_ts = event_ts
+
+        # High request volume usually means parallel work rather than one step
+        # feeding the next, so suppress loop detection in that case.
+        if (
+            ctx.current_requests_60s is not None
+            and ctx.current_requests_60s >= int(ctx.loop_concurrency_threshold)
+        ):
+            return []
+        if sequence_count < ctx.loop_count:
             return []
         evidence: dict[str, object] = {
             "provider": ctx.provider,
@@ -40,7 +56,8 @@ class LoopSuspectDetector(Detector):
             "estimated_next_tokens": ctx.estimated_next_tokens,
             "signature": signature,
             "window_seconds": ctx.loop_window_seconds,
-            "hit_count": hit_count,
+            "sequence_count": sequence_count,
+            "max_gap_seconds": ctx.loop_max_gap_seconds,
             "threshold_count": ctx.loop_count,
             "reason": "loop_suspect",
         }
@@ -75,18 +92,6 @@ def _context_signature(ctx: DetectionContext) -> str:
     endpoint = (ctx.request_endpoint or "na").strip()
     feature = (ctx.request_feature or "unknown").strip() or "unknown"
     return f"{ctx.project_id}:{ctx.provider}:{ctx.model or 'na'}:{ctx.environment or 'na'}:{endpoint}:{feature}"
-
-
-def _is_error_event(event: Event | None) -> bool:
-    if event is None:
-        return False
-    status = (event.status or "").strip().lower()
-    if status and status != "ok":
-        return True
-    http_status = int(event.http_status or 0)
-    if http_status >= 400:
-        return True
-    return bool(event.error_type)
 
 
 def _tags(ctx: DetectionContext) -> dict[str, str]:

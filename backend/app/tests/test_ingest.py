@@ -301,6 +301,8 @@ def _service(
     tok_cap: int | None = None,
     retry_storm_count: int = 3,
     loop_count: int = 6,
+    loop_max_gap_seconds: float = 2.0,
+    loop_concurrency_threshold: int = 5,
     token_explosion_abs: int = 6000,
     token_explosion_ratio: float = 0.8,
     token_explosion_growth_ratio: float = 2.0,
@@ -332,6 +334,8 @@ def _service(
         retry_storm_window_seconds=60,
         loop_count=loop_count,
         loop_window_seconds=30,
+        loop_max_gap_seconds=loop_max_gap_seconds,
+        loop_concurrency_threshold=loop_concurrency_threshold,
         token_explosion_abs=token_explosion_abs,
         token_explosion_ratio=token_explosion_ratio,
         token_explosion_growth_ratio=token_explosion_growth_ratio,
@@ -419,7 +423,8 @@ def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_but_no_email()
     assert isinstance(evidence, dict)
     assert evidence["signature"] == "p1:openai:gpt-4o-mini:dev:/chat/completions:loop-fixed-signature"
     assert evidence["window_seconds"] == 30
-    assert evidence["hit_count"] == 3
+    assert evidence["sequence_count"] == 3
+    assert evidence["max_gap_seconds"] == 2.0
     assert evidence["threshold_count"] == 3
     assert evidence["count"] == 1
     assert "provider" not in evidence
@@ -430,7 +435,29 @@ def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_but_no_email()
     assert transport.calls == []
 
 
-def test_loop_suspect_ignores_error_events_and_retry_storm_still_triggers() -> None:
+def test_loop_suspect_error_sequence_still_triggers_when_retry_storm_threshold_is_higher() -> None:
+    service, incidents, webhook, transport = _service(protect_enabled=False, retry_storm_count=10, loop_count=3)
+    for i in range(3):
+        service.ingest(
+            _event(
+                "p1",
+                status="error",
+                http_status=500,
+                error_type="provider_5xx",
+                feature="loop-error-sequence",
+                offset_seconds=i,
+            )
+        )
+
+    assert len(incidents.rows) == 1
+    assert incidents.rows[0].incident_type == "loop_suspect"
+    assert incidents.rows[0].evidence.get("sequence_count") == 3
+    warn_calls = [payload for _, event_type, payload in webhook.calls if event_type == "incident.warn"]
+    assert len(warn_calls) == 1
+    assert transport.calls == []
+
+
+def test_loop_suspect_retry_storm_dominance_still_wins_for_error_sequence() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=True, retry_storm_count=3, loop_count=3)
     for i in range(3):
         service.ingest(
@@ -448,6 +475,49 @@ def test_loop_suspect_ignores_error_events_and_retry_storm_still_triggers() -> N
     assert incidents.rows[0].incident_type == "retry_storm"
     assert all(row.incident_type != "loop_suspect" for row in incidents.rows)
     assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
+
+
+def test_loop_suspect_requires_consecutive_sequence_not_scattered_repetition() -> None:
+    service, incidents, _, _ = _service(protect_enabled=False, loop_count=3)
+
+    service.ingest(_event("p1", feature="feature-a", offset_seconds=0))
+    service.ingest(_event("p1", feature="feature-a", offset_seconds=1))
+    service.ingest(_event("p1", feature="feature-b", offset_seconds=2))
+    service.ingest(_event("p1", feature="feature-a", offset_seconds=3))
+
+    assert all(row.incident_type != "loop_suspect" for row in incidents.rows)
+
+
+def test_loop_suspect_requires_small_gap_between_steps() -> None:
+    service, incidents, webhook, transport = _service(
+        protect_enabled=False,
+        loop_count=3,
+        loop_max_gap_seconds=1.0,
+    )
+
+    service.ingest(_event("p1", feature="gap-sequence", offset_seconds=0))
+    service.ingest(_event("p1", feature="gap-sequence", offset_seconds=1))
+    service.ingest(_event("p1", feature="gap-sequence", offset_seconds=4))
+
+    assert incidents.rows == []
+    assert webhook.calls == []
+    assert transport.calls == []
+
+
+def test_loop_suspect_is_suppressed_under_high_concurrency() -> None:
+    service, incidents, webhook, transport = _service(
+        protect_enabled=False,
+        loop_count=3,
+        loop_concurrency_threshold=3,
+    )
+
+    service.ingest(_event("p1", feature="loop-concurrency", offset_seconds=0))
+    service.ingest(_event("p1", feature="loop-concurrency", offset_seconds=1))
+    service.ingest(_event("p1", feature="loop-concurrency", offset_seconds=2))
+
+    assert incidents.rows == []
+    assert webhook.calls == []
+    assert transport.calls == []
 
 
 def test_loop_signature_is_scoped_by_feature() -> None:

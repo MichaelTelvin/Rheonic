@@ -594,7 +594,7 @@ def main() -> None:
                 )
                 time.sleep(pause_ms / 1000)
         elif scenario == "loop_suspect":
-            print("\n[STEP] Seed loop suspect then expect warn")
+            print("\n[STEP] Seed a rapid repeated sequence for loop suspect then expect warn")
             count = int(os.getenv("RHEONIC_LOOP_COUNT", "7"))
             for _ in range(count):
                 _send_ingest_event(
@@ -706,7 +706,7 @@ def main() -> None:
             )
         elif scenario == "loop_suspect":
             _assert_line(
-                "loop_suspect warn triggered",
+                "loop_suspect warn triggered from a rapid repeated sequence",
                 decision_value == "warn" and decision_reason == "loop_suspect" and not blocked,
             )
         elif scenario == "token_explosion":

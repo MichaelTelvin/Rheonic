@@ -220,7 +220,7 @@ async function runDemo() {
   };
 
   const runLoopSuspect = async () => {
-    logVerbose("\n[STEP] Loop suspect");
+    logVerbose("\n[STEP] Loop suspect from a rapid repeated sequence");
     for (let i = 0; i < loopCount; i += 1) {
       await sendEvent(client, provider, model, endpoint, 60, "loop-fixed-signature");
       await sleep(stepSleepMs);

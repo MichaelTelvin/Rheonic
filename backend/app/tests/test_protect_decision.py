@@ -758,6 +758,94 @@ def test_loop_suspect_warns_in_preflight_when_feature_matches(tmp_path) -> None:
     _cleanup_overrides()
 
 
+def test_loop_suspect_warns_in_preflight_for_error_sequence(tmp_path) -> None:
+    client, _, events = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Error Sequence")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    now = datetime.now(timezone.utc)
+    for offset in range(3):
+        events.add_recent(
+            _event(
+                project_id,
+                "openai",
+                "gpt-4o-mini",
+                status="error",
+                http_status=500,
+                total_tokens=60,
+                created_at=now - timedelta(seconds=2 - offset),
+                request_feature="manual-protect-demo",
+            )
+        )
+
+    original_retry_storm_count = _set_app_config_value("retry_storm_count", 10)
+    original_loop_count = _set_app_config_value("loop_count", 3)
+    try:
+        decision = _decision(
+            client,
+            ingest_key,
+            body={
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+                "environment": "dev",
+                "feature": "manual-protect-demo",
+            },
+        )
+    finally:
+        object.__setattr__(app_config, "retry_storm_count", original_retry_storm_count)
+        object.__setattr__(app_config, "loop_count", original_loop_count)
+
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "loop_suspect"
+    _cleanup_overrides()
+
+
+def test_loop_suspect_preflight_is_suppressed_under_high_concurrency(tmp_path) -> None:
+    client, rolling_window, events = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Concurrency")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    now = datetime.now(timezone.utc)
+    for offset in range(3):
+        events.add_recent(
+            _event(
+                project_id,
+                "openai",
+                "gpt-4o-mini",
+                status="ok",
+                http_status=200,
+                total_tokens=60,
+                created_at=now - timedelta(seconds=2 - offset),
+                request_feature="manual-protect-demo",
+            )
+        )
+    scoped_id = scoped_project_provider_id(project_id, "openai")
+    rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
+    rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
+    rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
+
+    original_loop_count = _set_app_config_value("loop_count", 3)
+    original_concurrency = _set_app_config_value("loop_concurrency_threshold", 3)
+    try:
+        decision = _decision(
+            client,
+            ingest_key,
+            body={
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+                "environment": "dev",
+                "feature": "manual-protect-demo",
+            },
+        )
+    finally:
+        object.__setattr__(app_config, "loop_count", original_loop_count)
+        object.__setattr__(app_config, "loop_concurrency_threshold", original_concurrency)
+
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
+    _cleanup_overrides()
+
+
 def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit(tmp_path) -> None:
     client, _, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Growth")

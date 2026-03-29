@@ -56,7 +56,9 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 
 ## Loop Suspect Detector
 - `loop_window_seconds`: lookback window for repeated signature detection.
-- `loop_count`: minimum matching signature hits to trigger.
+- `loop_count`: minimum consecutive matching signature steps to trigger.
+- `loop_max_gap_seconds`: maximum gap allowed between adjacent repeated steps.
+- `loop_concurrency_threshold`: suppress loop detection when request volume suggests concurrency.
 - Signature uses provider/model/environment plus stable event characteristics.
 
 ## Token Explosion Detector

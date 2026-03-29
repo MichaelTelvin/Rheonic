@@ -339,7 +339,7 @@ def main() -> None:
             )
 
         def run_loop_suspect() -> None:
-            _log_verbose("\n[STEP] Loop suspect")
+            _log_verbose("\n[STEP] Loop suspect from a rapid repeated sequence")
             phase_started_at = datetime.now().astimezone()
             for i in range(loop_count):
                 _send_event(

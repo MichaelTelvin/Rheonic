@@ -29,6 +29,8 @@ class AppConfig:
     retry_storm_count: int = 5
     loop_window_seconds: int = 30
     loop_count: int = 6
+    loop_max_gap_seconds: float = 2.0
+    loop_concurrency_threshold: int = 5
     token_explosion_ratio: float = 0.8
     token_explosion_abs: int = 6000
     token_explosion_growth_ratio: float = 2.0
@@ -121,6 +123,8 @@ class Settings(BaseSettings):
     retry_storm_count: int = app_config.retry_storm_count
     loop_window_seconds: int = app_config.loop_window_seconds
     loop_count: int = app_config.loop_count
+    loop_max_gap_seconds: float = app_config.loop_max_gap_seconds
+    loop_concurrency_threshold: int = app_config.loop_concurrency_threshold
     token_explosion_ratio: float = app_config.token_explosion_ratio
     token_explosion_abs: int = app_config.token_explosion_abs
     token_explosion_growth_ratio: float = app_config.token_explosion_growth_ratio

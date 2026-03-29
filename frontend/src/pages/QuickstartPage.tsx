@@ -398,6 +398,10 @@ RHEONIC_BASE_URL=<value_shown_in_dashboard>`}
                 <h2>Verify in Observe mode</h2>
               </div>
               <p>Make one provider call. Open the dashboard and confirm traffic appears.</p>
+              <p>
+                Incidents surface detector states such as failed retry storms, rapid repeated loop sequences, and sudden
+                token growth when those patterns appear.
+              </p>
               <p className="quickstart-step-muted">Dashboard path: Dashboard → Metrics or Incidents</p>
             </section>
 

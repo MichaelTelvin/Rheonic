@@ -45,6 +45,8 @@ Available settings:
 
 `token_explosion` can come from a large estimate, a cap-relative spike, or a sudden jump versus the previous matching step. Growth-only detection is suppressed when request volume suggests concurrency.
 
+`loop_suspect` is based on a rapid consecutive repeated sequence for the same signature, including failed steps. It is suppressed when request volume suggests concurrency instead of one looping sequence.
+
 Warn outcomes also appear in the dashboard so the reason for a protected request stays visible.
 
 ## Auto Token Clamp
