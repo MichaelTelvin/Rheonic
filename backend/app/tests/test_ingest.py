@@ -359,6 +359,12 @@ def _ingest_at(service: IngestEventService, clock: dict[str, datetime], event: E
     service.ingest(event)
 
 
+def _non_policy_gap_webhook_calls(
+    webhook: FakeWebhookDispatcher,
+) -> list[tuple[str, str, dict[str, object]]]:
+    return [call for call in webhook.calls if call[1] != "policy_gap.detected"]
+
+
 def test_retry_storm_opens_incident_and_updates_dedup_count() -> None:
     service, incidents, webhook, transport = _service(protect_enabled=True, retry_storm_count=2)
     service.ingest(_event("p1", status="error", http_status=502, error_type="provider_error", offset_seconds=0))
@@ -381,7 +387,7 @@ def test_retry_storm_ignores_retry_status_without_failure_signal() -> None:
     service.ingest(_event("p1", status="retry", http_status=200, offset_seconds=2))
 
     assert incidents.rows == []
-    assert webhook.calls == []
+    assert _non_policy_gap_webhook_calls(webhook) == []
     assert transport.calls == []
 
 
@@ -500,7 +506,7 @@ def test_loop_suspect_requires_small_gap_between_steps() -> None:
     service.ingest(_event("p1", feature="gap-sequence", offset_seconds=4))
 
     assert incidents.rows == []
-    assert webhook.calls == []
+    assert _non_policy_gap_webhook_calls(webhook) == []
     assert transport.calls == []
 
 
@@ -516,20 +522,25 @@ def test_loop_suspect_is_suppressed_under_high_concurrency() -> None:
     service.ingest(_event("p1", feature="loop-concurrency", offset_seconds=2))
 
     assert incidents.rows == []
-    assert webhook.calls == []
+    assert _non_policy_gap_webhook_calls(webhook) == []
     assert transport.calls == []
 
 
 def test_loop_signature_is_scoped_by_feature() -> None:
-    service, incidents, _, _ = _service(protect_enabled=False, loop_count=3)
+    service, incidents, _, _ = _service(
+        protect_enabled=False,
+        loop_count=3,
+        loop_concurrency_threshold=10,
+    )
 
     service.ingest(_event("p1", feature="feature-a", offset_seconds=0))
     service.ingest(_event("p1", feature="feature-b", offset_seconds=1))
     service.ingest(_event("p1", feature="feature-a", offset_seconds=2))
+    service.ingest(_event("p1", feature="feature-a", offset_seconds=3))
 
     assert all(row.incident_type != "loop_suspect" for row in incidents.rows)
 
-    service.ingest(_event("p1", feature="feature-a", offset_seconds=3))
+    service.ingest(_event("p1", feature="feature-a", offset_seconds=4))
 
     loop_rows = [row for row in incidents.rows if row.incident_type == "loop_suspect"]
     assert len(loop_rows) == 1
@@ -577,7 +588,12 @@ def test_cap_breach_repeated_events_update_same_incident_within_dedup_window() -
 
 def test_loop_suspect_opens_new_incident_after_episode_window_expires() -> None:
     clock, now_provider = _clock()
-    service, incidents, webhook, _ = _service(protect_enabled=False, loop_count=3, now_provider=now_provider)
+    service, incidents, webhook, _ = _service(
+        protect_enabled=False,
+        loop_count=3,
+        loop_concurrency_threshold=10,
+        now_provider=now_provider,
+    )
 
     _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=0))
     _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=1))
@@ -650,7 +666,7 @@ def test_token_explosion_growth_is_suppressed_under_high_concurrency() -> None:
     service.ingest(_event("p1", total_tokens=300, feature="growth-concurrency", offset_seconds=1))
 
     assert incidents.rows == []
-    assert webhook.calls == []
+    assert _non_policy_gap_webhook_calls(webhook) == []
     assert transport.calls == []
 
 

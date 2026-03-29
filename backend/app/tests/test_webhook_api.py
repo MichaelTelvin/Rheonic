@@ -6,7 +6,13 @@ from fastapi.testclient import TestClient
 from app.api.v1 import webhook as webhook_api
 from app.application.services.project_service import ProjectService
 from app.config import Settings
-from app.dependencies import get_current_user, get_project_service, get_redis_client, get_settings, get_transport_outbox_repository
+from app.dependencies import (
+    get_current_user,
+    get_project_service,
+    get_redis_client,
+    get_settings,
+    get_transport_outbox_repository,
+)
 from app.domain.models.user import User
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base, TransportOutboxRecord
