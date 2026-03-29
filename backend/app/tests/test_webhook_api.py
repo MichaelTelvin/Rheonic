@@ -56,8 +56,8 @@ def _make_client(
     app.dependency_overrides[get_transport_outbox_repository] = lambda: TransportOutboxRepositoryImpl(
         session_factory=session_factory
     )
-    app.dependency_overrides[get_redis_client] = lambda: (redis_client or _FakeRedisClient())
-    app.dependency_overrides[get_settings] = lambda: (settings or Settings(app_env="test", database_url=db_url))
+    app.dependency_overrides[get_redis_client] = lambda: redis_client or _FakeRedisClient()
+    app.dependency_overrides[get_settings] = lambda: settings or Settings(app_env="test", database_url=db_url)
     app.dependency_overrides[get_current_user] = lambda: (
         current_user
         or User(

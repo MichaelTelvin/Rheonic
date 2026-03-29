@@ -42,10 +42,7 @@ class LoopSuspectDetector(Detector):
 
         # High request volume usually means parallel work rather than one step
         # feeding the next, so suppress loop detection in that case.
-        if (
-            ctx.current_requests_60s is not None
-            and ctx.current_requests_60s >= int(ctx.loop_concurrency_threshold)
-        ):
+        if ctx.current_requests_60s is not None and ctx.current_requests_60s >= int(ctx.loop_concurrency_threshold):
             return []
         if sequence_count < ctx.loop_count:
             return []

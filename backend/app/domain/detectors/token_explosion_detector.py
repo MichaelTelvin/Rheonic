@@ -31,9 +31,8 @@ class TokenExplosionDetector(Detector):
 
         # High request volume usually means concurrent requests rather than one step
         # feeding the next, so suppress growth-only interpretation in that case.
-        if (
-            ctx.current_requests_60s is not None
-            and ctx.current_requests_60s >= int(ctx.token_explosion_concurrency_threshold)
+        if ctx.current_requests_60s is not None and ctx.current_requests_60s >= int(
+            ctx.token_explosion_concurrency_threshold
         ):
             growth_hit = False
 
