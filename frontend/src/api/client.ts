@@ -182,7 +182,6 @@ async function executeRequest(path: string, init?: RequestInit): Promise<Respons
 async function executeRequestWithRefreshBarrier(
   path: string,
   init: RequestInit | undefined,
-  *,
   isAuthRoute: boolean,
 ): Promise<Response> {
   // If another request is already refreshing the cookie session, wait for it
@@ -216,12 +215,12 @@ async function parseApiError(response: Response): Promise<ApiError> {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isAuthRoute = path.startsWith("/api/v1/auth/");
   const allowsRefreshRetry = !isAuthRoute || path === "/api/v1/auth/me";
-  const response = await executeRequestWithRefreshBarrier(path, init, { isAuthRoute });
+  const response = await executeRequestWithRefreshBarrier(path, init, isAuthRoute);
 
   if (response.status === 401) {
     if (allowsRefreshRetry) {
       if (Date.now() - lastRefreshSucceededAtMs <= recentRefreshRetryWindowMs) {
-        const recentRetryResponse = await executeRequestWithRefreshBarrier(path, init, { isAuthRoute });
+        const recentRetryResponse = await executeRequestWithRefreshBarrier(path, init, isAuthRoute);
         if (recentRetryResponse.ok) {
           return (await recentRetryResponse.json()) as T;
         }
@@ -231,7 +230,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       }
       const refreshed = await refreshSession();
       if (refreshed) {
-        const retryResponse = await executeRequestWithRefreshBarrier(path, init, { isAuthRoute });
+        const retryResponse = await executeRequestWithRefreshBarrier(path, init, isAuthRoute);
         if (retryResponse.ok) {
           return (await retryResponse.json()) as T;
         }
