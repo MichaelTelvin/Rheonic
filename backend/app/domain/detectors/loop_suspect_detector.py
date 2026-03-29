@@ -14,9 +14,13 @@ class LoopSuspectDetector(Detector):
         sequence_count = 0
         prev_ts = None
 
+        # Normalize ordering first because some repositories return descending
+        # recent events while in-memory tests often preserve insertion order.
+        ordered_events = sorted(ctx.recent_events, key=lambda event: event.created_at.timestamp(), reverse=True)
+
         # Walk newest to oldest and stop as soon as the rapid repeated sequence
         # breaks by signature, timing gap, or window boundary.
-        for event in reversed(ctx.recent_events):
+        for event in ordered_events:
             if event.provider != ctx.provider:
                 continue
             event_ts = event.created_at.timestamp()
