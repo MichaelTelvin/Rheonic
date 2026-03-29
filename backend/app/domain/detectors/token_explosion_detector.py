@@ -30,6 +30,12 @@ class TokenExplosionDetector(Detector):
             growth_ratio = float(estimate) / float(prev)
             growth_hit = growth_ratio >= float(ctx.token_explosion_growth_ratio)
 
+        # Growth needs live current-window activity to mean "step-up inside an
+        # active burst". With zero current traffic, the last persisted event may
+        # be stale history from an earlier run, so suppress growth-only warns.
+        if (ctx.current_requests_60s or 0) <= 0 or (ctx.current_tokens_60s or 0) <= 0:
+            growth_hit = False
+
         # High request volume usually means concurrent requests rather than one step
         # feeding the next, so suppress growth-only interpretation in that case.
         if ctx.current_requests_60s is not None and ctx.current_requests_60s >= int(
