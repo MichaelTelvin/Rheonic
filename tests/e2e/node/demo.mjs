@@ -37,9 +37,9 @@ function printUsageExamples() {
   console.log("  RHEONIC_MODEL=gpt-4o-mini");
   console.log("  RHEONIC_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all");
   console.log("  RHEONIC_STEP_SLEEP_MS=200");
-  console.log("  RHEONIC_RETRY_STORM_COUNT=6");
-  console.log("  RHEONIC_LOOP_COUNT=7");
-  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=9000");
+  console.log("  RHEONIC_RETRY_STORM_COUNT=5");
+  console.log("  RHEONIC_LOOP_COUNT=6");
+  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=6000");
   console.log("  RHEONIC_CAP_BREACH_TOKENS=4000");
   console.log("  RHEONIC_REQ_CAP_BREACH_COUNT=6");
   console.log("  RHEONIC_CAP_BREACH_REQ_TOKENS=1");
@@ -154,9 +154,9 @@ async function runDemo() {
   const endpoint = endpointByProvider[provider] ?? "/chat/completions";
   const demoCase = (process.env.RHEONIC_DEMO_CASE ?? "steady").toLowerCase();
   const stepSleepMs = Number(process.env.RHEONIC_STEP_SLEEP_MS ?? 200);
-  const retryStormCount = Number(process.env.RHEONIC_RETRY_STORM_COUNT ?? 6);
-  const loopCount = Number(process.env.RHEONIC_LOOP_COUNT ?? 7);
-  const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 9000);
+  const retryStormCount = Number(process.env.RHEONIC_RETRY_STORM_COUNT ?? 5);
+  const loopCount = Number(process.env.RHEONIC_LOOP_COUNT ?? 6);
+  const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 6000);
   const capBreachTokens = Number(process.env.RHEONIC_CAP_BREACH_TOKENS ?? 4000);
   const capBreachReqCount = Number(process.env.RHEONIC_REQ_CAP_BREACH_COUNT ?? 6);
   const capBreachReqTokens = Number(process.env.RHEONIC_CAP_BREACH_REQ_TOKENS ?? 1);

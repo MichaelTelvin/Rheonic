@@ -228,7 +228,7 @@ async function main() {
 
   const scenario = (process.env.RHEONIC_SCENARIO ?? "allow").toLowerCase();
   const pauseMs = envInt("RHEONIC_STEP_SLEEP_MS", 200);
-  const protectDecisionTimeoutMs = envInt("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", 250);
+  const protectDecisionTimeoutMs = envInt("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", 150);
   const env = (process.env.RHEONIC_ENVIRONMENT ?? "").trim() || `protect-${Date.now()}`;
   const projectId = process.env.RHEONIC_PROJECT_ID ?? "";
   const authEmail = (process.env.RHEONIC_AUTH_EMAIL ?? "").trim().toLowerCase();
@@ -357,7 +357,7 @@ async function main() {
     }
     console.log(`[STEP] req_cap_breach ingest events sent=${count} (provider_calls_delta tracks provider calls only)`);
   } else if (scenario === "retry_storm") {
-    const count = envInt("RHEONIC_RETRY_STORM_COUNT", 6);
+    const count = envInt("RHEONIC_RETRY_STORM_COUNT", 5);
     console.log("[STEP] Seed failed attempts for retry storm then expect warn");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 50, `retry-${i + 1}`, env, {
@@ -368,14 +368,14 @@ async function main() {
       await sleep(pauseMs);
     }
   } else if (scenario === "loop_suspect") {
-    const count = envInt("RHEONIC_LOOP_COUNT", 7);
+    const count = envInt("RHEONIC_LOOP_COUNT", 6);
     console.log("[STEP] Seed a rapid repeated sequence for loop suspect then expect warn");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 60, "loop-fixed-signature", env);
       await sleep(pauseMs);
     }
   } else if (scenario === "token_explosion") {
-    const seed = envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 9000);
+    const seed = envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 6000);
     console.log("[STEP] Seed token explosion then expect warn");
     await sendIngestEvent(ingestKey, provider, model, seed, "token-explosion-seed", env);
     callMaxTokens = Math.max(maxTokens, seed);

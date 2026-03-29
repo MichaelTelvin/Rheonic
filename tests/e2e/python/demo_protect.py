@@ -472,7 +472,7 @@ def main() -> None:
     scenario = (os.getenv("RHEONIC_SCENARIO") or "allow").strip().lower()
     env = (os.getenv("RHEONIC_ENVIRONMENT") or "").strip() or f"protect-{int(time.time())}"
     pause_ms = int(os.getenv("RHEONIC_STEP_SLEEP_MS", "200"))
-    decision_timeout_ms = int(os.getenv("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", "250"))
+    decision_timeout_ms = int(os.getenv("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", "150"))
     project_id = os.getenv("RHEONIC_PROJECT_ID", "")
     auth_email = (os.getenv("RHEONIC_AUTH_EMAIL", "") or "").strip().lower()
     auth_password = os.getenv("RHEONIC_AUTH_PASSWORD", "")
@@ -578,7 +578,7 @@ def main() -> None:
             print(f"[STEP] req_cap_breach ingest events sent={count} (provider_calls_delta tracks provider calls only)")
         elif scenario == "retry_storm":
             print("\n[STEP] Seed failed attempts for retry storm then expect warn")
-            count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "6"))
+            count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "5"))
             for i in range(count):
                 _send_ingest_event(
                     transport,
@@ -595,7 +595,7 @@ def main() -> None:
                 time.sleep(pause_ms / 1000)
         elif scenario == "loop_suspect":
             print("\n[STEP] Seed a rapid repeated sequence for loop suspect then expect warn")
-            count = int(os.getenv("RHEONIC_LOOP_COUNT", "7"))
+            count = int(os.getenv("RHEONIC_LOOP_COUNT", "6"))
             for _ in range(count):
                 _send_ingest_event(
                     transport,
@@ -609,7 +609,7 @@ def main() -> None:
                 time.sleep(pause_ms / 1000)
         elif scenario == "token_explosion":
             print("\n[STEP] Seed token explosion then expect warn")
-            huge = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "9000"))
+            huge = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "6000"))
             _send_ingest_event(
                 transport,
                 ingest_key,
