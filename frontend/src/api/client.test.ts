@@ -185,6 +185,81 @@ describe("api client", () => {
     vi.useRealTimers();
   });
 
+  it("waits for an in-flight refresh before issuing another protected request", async () => {
+    let resolveRefresh: ((value: Response) => void) | null = null;
+    let projectsCallCount = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/projects")) {
+        projectsCallCount += 1;
+        if (projectsCallCount === 1) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ error: { code: "unauthorized", message: "expired" } }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      if (url.endsWith("/api/v1/auth/refresh")) {
+        return new Promise<Response>((resolve) => {
+          resolveRefresh = resolve;
+        });
+      }
+      if (url.endsWith("/api/v1/incidents?project_id=p1")) {
+        return Promise.resolve(
+          new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const firstRequest = fetchProjects();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const secondRequestPromise = fetchIncidents("p1");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const incidentCallsBeforeRefresh = fetchMock.mock.calls.filter((call) =>
+      String(call[0]).endsWith("/api/v1/incidents?project_id=p1"),
+    );
+    expect(incidentCallsBeforeRefresh).toHaveLength(0);
+
+    resolveRefresh?.(
+      new Response(JSON.stringify({ user: { id: "u1", email: "u@example.com" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await firstRequest;
+    await secondRequestPromise;
+
+    const refreshCalls = fetchMock.mock.calls.filter((call) => String(call[0]).endsWith("/api/v1/auth/refresh"));
+    expect(refreshCalls).toHaveLength(1);
+    const incidentCallsAfterRefresh = fetchMock.mock.calls.filter((call) =>
+      String(call[0]).endsWith("/api/v1/incidents?project_id=p1"),
+    );
+    expect(incidentCallsAfterRefresh).toHaveLength(1);
+  });
+
   it("uses structured error payload message and code", async () => {
     vi.stubGlobal(
       "fetch",

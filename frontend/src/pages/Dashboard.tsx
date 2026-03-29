@@ -16,6 +16,7 @@ import {
   type RealtimeMetrics,
 } from "../api/client";
 import { Card } from "../components/Card";
+import { InfoTooltip } from "../components/InfoTooltip";
 import { PulseMeter } from "../components/pulseMeter";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
@@ -824,7 +825,20 @@ export function Dashboard(): JSX.Element {
               </Card>
 
               <Card>
-                <h2 className="card-title">Incidents</h2>
+                <h2 className="card-title">
+                  <span className="label-with-tooltip tooltip-label-inline">
+                    <span>Incident episodes</span>
+                    <InfoTooltip
+                      text={
+                        <>
+                          Open episodes grouped by
+                          <br />
+                          active detection window
+                        </>
+                      }
+                    />
+                  </span>
+                </h2>
                 <div className="protect-decisions-list">
                   <div className="protect-decisions-row">
                     <span className="protect-decisions-label">Near cap</span>
@@ -850,7 +864,20 @@ export function Dashboard(): JSX.Element {
               </Card>
 
               <Card>
-                <h2 className="card-title">Protect decisions (60m)</h2>
+                <h2 className="card-title">
+                  <span className="label-with-tooltip tooltip-label-inline">
+                    <span>Protect decisions (60m)</span>
+                    <InfoTooltip
+                      text={
+                        <>
+                          Raw request-level decisions
+                          <br />
+                          in the last 60 minutes
+                        </>
+                      }
+                    />
+                  </span>
+                </h2>
                 <div className="protect-decisions-list">
                   <div className="protect-decisions-row">
                     <span className="protect-decisions-label">Allowed</span>

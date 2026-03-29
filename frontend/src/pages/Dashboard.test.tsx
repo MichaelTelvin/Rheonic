@@ -208,7 +208,7 @@ describe("Dashboard", () => {
         <Dashboard />
       </TestRouter>,
     );
-    await screen.findByText("Incidents");
+    await screen.findByText("Incident episodes");
     expect(screen.getByText("Near cap")).toBeDefined();
     expect(screen.getByText("Retry storm")).toBeDefined();
     expect(screen.getByText("Cap breach")).toBeDefined();

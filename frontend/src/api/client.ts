@@ -179,6 +179,20 @@ async function executeRequest(path: string, init?: RequestInit): Promise<Respons
   });
 }
 
+async function executeRequestWithRefreshBarrier(
+  path: string,
+  init: RequestInit | undefined,
+  *,
+  isAuthRoute: boolean,
+): Promise<Response> {
+  // If another request is already refreshing the cookie session, wait for it
+  // so protected dashboard/API calls do not race into avoidable 401 responses.
+  if (!isAuthRoute && refreshInFlight) {
+    await refreshInFlight;
+  }
+  return await executeRequest(path, init);
+}
+
 async function parseApiError(response: Response): Promise<ApiError> {
   let responseMessage = `Request failed: ${response.status}`;
   let responseCode: string | undefined;
@@ -202,12 +216,12 @@ async function parseApiError(response: Response): Promise<ApiError> {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isAuthRoute = path.startsWith("/api/v1/auth/");
   const allowsRefreshRetry = !isAuthRoute || path === "/api/v1/auth/me";
-  const response = await executeRequest(path, init);
+  const response = await executeRequestWithRefreshBarrier(path, init, { isAuthRoute });
 
   if (response.status === 401) {
     if (allowsRefreshRetry) {
       if (Date.now() - lastRefreshSucceededAtMs <= recentRefreshRetryWindowMs) {
-        const recentRetryResponse = await executeRequest(path, init);
+        const recentRetryResponse = await executeRequestWithRefreshBarrier(path, init, { isAuthRoute });
         if (recentRetryResponse.ok) {
           return (await recentRetryResponse.json()) as T;
         }
@@ -217,7 +231,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       }
       const refreshed = await refreshSession();
       if (refreshed) {
-        const retryResponse = await executeRequest(path, init);
+        const retryResponse = await executeRequestWithRefreshBarrier(path, init, { isAuthRoute });
         if (retryResponse.ok) {
           return (await retryResponse.json()) as T;
         }
