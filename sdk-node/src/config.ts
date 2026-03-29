@@ -1,6 +1,6 @@
 export const sdkNodeConfig = {
   defaultBaseUrl: "http://localhost:8000",
-  defaultEnvironment: "dev",
+  defaultEnvironment: "unknown",
   defaultFlushIntervalMs: 1000,
   defaultMaxQueueSize: 1000,
   defaultFlushTimeoutMs: 500,

@@ -59,9 +59,10 @@ export class Client {
     this.ingestKey = config.ingestKey;
     this.environment =
       config.environment ??
-      process.env.RHEONIC_ENVIRONMENT ??
-      process.env.RHEONIC_ENV ??
       process.env.NODE_ENV ??
+      process.env.APP_ENV ??
+      process.env.ENVIRONMENT ??
+      process.env.ENV ??
       sdkNodeConfig.defaultEnvironment;
     this.flushIntervalMs = config.flushIntervalMs ?? sdkNodeConfig.defaultFlushIntervalMs;
     this.maxQueueSize = config.maxQueueSize ?? sdkNodeConfig.defaultMaxQueueSize;

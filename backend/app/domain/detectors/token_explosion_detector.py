@@ -85,7 +85,11 @@ def resolve_previous_estimated_tokens(
 ) -> int | None:
     current_event_id = current_event.id if current_event is not None else None
     normalized_model = model or ""
-    for event in reversed(recent_events):
+    # Normalize ordering here so growth compares against the latest matching event
+    # regardless of whether the caller hands us newest-first repository rows or
+    # append-ordered test doubles.
+    ordered_events = sorted(recent_events, key=lambda event: event.ts.timestamp(), reverse=True)
+    for event in ordered_events:
         if event.provider != provider:
             continue
         if (event.model or "") != normalized_model:

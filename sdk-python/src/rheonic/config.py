@@ -5,7 +5,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class SDKConfig:
     default_base_url: str = "http://localhost:8000"
-    default_environment: str = "dev"
+    default_environment: str = "unknown"
     default_flush_interval_s: float = 1.0
     default_max_queue_size: int = 1000
     default_flush_timeout_s: float = 0.5

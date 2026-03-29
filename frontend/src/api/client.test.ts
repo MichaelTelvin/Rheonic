@@ -187,6 +187,10 @@ describe("api client", () => {
 
   it("waits for an in-flight refresh before issuing another protected request", async () => {
     let resolveRefresh: ((value: Response) => void) | null = null;
+    let markRefreshStarted: (() => void) | null = null;
+    const refreshStarted = new Promise<void>((resolve) => {
+      markRefreshStarted = resolve;
+    });
     let projectsCallCount = 0;
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
@@ -210,6 +214,7 @@ describe("api client", () => {
       if (url.endsWith("/api/v1/auth/refresh")) {
         return new Promise<Response>((resolve) => {
           resolveRefresh = resolve;
+          markRefreshStarted?.();
         });
       }
       if (url.endsWith("/api/v1/incidents?project_id=p1")) {
@@ -230,8 +235,7 @@ describe("api client", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const firstRequest = fetchProjects();
-    await Promise.resolve();
-    await Promise.resolve();
+    await refreshStarted;
 
     const secondRequestPromise = fetchIncidents("p1");
     await Promise.resolve();

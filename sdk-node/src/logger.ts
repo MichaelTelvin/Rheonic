@@ -53,7 +53,14 @@ export function emitLog(params: {
     timestamp: new Date().toISOString(),
     level: params.level,
     service: SERVICE_NAME,
-    env: (params.environment ?? process.env.RHEONIC_ENV ?? process.env.NODE_ENV ?? "dev").toLowerCase(),
+    env: (
+      params.environment ??
+      process.env.NODE_ENV ??
+      process.env.APP_ENV ??
+      process.env.ENVIRONMENT ??
+      process.env.ENV ??
+      "unknown"
+    ).toLowerCase(),
     trace_id: params.traceId ?? getTraceId(),
     span_id: params.spanId ?? getSpanId(),
     event: sanitizeEvent(params.event),

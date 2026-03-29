@@ -887,6 +887,58 @@ def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit
     _cleanup_overrides()
 
 
+def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path) -> None:
+    client, _, events = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Latest Match")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    # Add the newest event first to mirror production repository ordering.
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="ok",
+            http_status=200,
+            total_tokens=300,
+            created_at=datetime(2026, 3, 29, 16, 33, 38, tzinfo=timezone.utc),
+        )
+    )
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="ok",
+            http_status=200,
+            total_tokens=100,
+            created_at=datetime(2026, 3, 29, 16, 30, 0, tzinfo=timezone.utc),
+        )
+    )
+
+    original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 2.0)
+    original_abs = _set_app_config_value("token_explosion_abs", 10_000)
+    try:
+        decision = _decision(
+            client,
+            ingest_key,
+            body={
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+                "environment": "dev",
+                "input_tokens_estimate": 200,
+                "max_output_tokens": 0,
+            },
+        )
+    finally:
+        object.__setattr__(app_config, "token_explosion_growth_ratio", original_growth_ratio)
+        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
+    _cleanup_overrides()
+
+
 def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrency(tmp_path) -> None:
     client, rolling_window, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Concurrency")

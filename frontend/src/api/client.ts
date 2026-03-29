@@ -154,6 +154,7 @@ export class ApiError extends Error {
 
 let unauthorizedHandler: (() => void) | null = null;
 let refreshInFlight: Promise<boolean> | null = null;
+let protectedRequestChain: Promise<void> = Promise.resolve();
 let lastRefreshSucceededAtMs = 0;
 const recentRefreshRetryWindowMs = 1500;
 
@@ -164,6 +165,7 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
 export function resetClientAuthStateForTests(): void {
   unauthorizedHandler = null;
   refreshInFlight = null;
+  protectedRequestChain = Promise.resolve();
   lastRefreshSucceededAtMs = 0;
 }
 
@@ -192,6 +194,21 @@ async function executeRequestWithRefreshBarrier(
   return await executeRequest(path, init);
 }
 
+async function runSerializedProtectedRequest<T>(task: () => Promise<T>): Promise<T> {
+  let releaseCurrentRequest!: () => void;
+  const priorRequest = protectedRequestChain;
+  protectedRequestChain = new Promise<void>((resolve) => {
+    releaseCurrentRequest = resolve;
+  });
+
+  await priorRequest.catch(() => undefined);
+  try {
+    return await task();
+  } finally {
+    releaseCurrentRequest();
+  }
+}
+
 async function parseApiError(response: Response): Promise<ApiError> {
   let responseMessage = `Request failed: ${response.status}`;
   let responseCode: string | undefined;
@@ -212,8 +229,7 @@ async function parseApiError(response: Response): Promise<ApiError> {
   return new ApiError(response.status, responseMessage, responseCode);
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const isAuthRoute = path.startsWith("/api/v1/auth/");
+async function requestInternal<T>(path: string, init: RequestInit | undefined, isAuthRoute: boolean): Promise<T> {
   const allowsRefreshRetry = !isAuthRoute || path === "/api/v1/auth/me";
   const response = await executeRequestWithRefreshBarrier(path, init, isAuthRoute);
 
@@ -248,6 +264,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return (await response.json()) as T;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isAuthRoute = path.startsWith("/api/v1/auth/");
+  if (!isAuthRoute) {
+    return await runSerializedProtectedRequest(async () => await requestInternal<T>(path, init, isAuthRoute));
+  }
+  return await requestInternal<T>(path, init, isAuthRoute);
 }
 
 async function refreshSession(): Promise<boolean> {

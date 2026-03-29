@@ -38,9 +38,10 @@ _default_client: "Client | None" = None
 def _resolve_environment(explicit_environment: str | None) -> str:
     resolved = (
         explicit_environment
-        or os.getenv("RHEONIC_ENVIRONMENT")
-        or os.getenv("RHEONIC_ENV")
         or os.getenv("NODE_ENV")
+        or os.getenv("APP_ENV")
+        or os.getenv("ENVIRONMENT")
+        or os.getenv("ENV")
         or sdk_config.default_environment
     )
     return str(resolved).strip() or sdk_config.default_environment

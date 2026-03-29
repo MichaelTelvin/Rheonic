@@ -50,7 +50,18 @@ def configure_logging(
     configured_level = level if level is not None else os.getenv("RHEONIC_LOG_LEVEL")
     resolved_level = (configured_level or "INFO").upper()
     _SERVICE_NAME = service_name
-    _ENV_NAME = (environment or os.getenv("RHEONIC_ENV") or sdk_config.default_environment).strip().lower()
+    _ENV_NAME = (
+        (
+            environment
+            or os.getenv("NODE_ENV")
+            or os.getenv("APP_ENV")
+            or os.getenv("ENVIRONMENT")
+            or os.getenv("ENV")
+            or sdk_config.default_environment
+        )
+        .strip()
+        .lower()
+    )
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(_JsonFormatter())
     root_logger = logging.getLogger()

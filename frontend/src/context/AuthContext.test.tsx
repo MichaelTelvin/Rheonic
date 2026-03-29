@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { AuthContext, useAuthContext } from "./AuthContext";
 
@@ -35,6 +35,11 @@ describe("AuthContext", () => {
   });
 
   it("throws when used without a provider", () => {
-    expect(() => render(<AuthProbe />)).toThrowError("useAuthContext must be used within AuthContext.Provider");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      expect(() => render(<AuthProbe />)).toThrowError("useAuthContext must be used within AuthContext.Provider");
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });
