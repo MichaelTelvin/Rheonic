@@ -81,7 +81,7 @@ Protect Mode is explicit opt-in. It provides safe, deterministic actions:
 - **RETRY_STORM**: elevated retry rate AND elevated attempts/min
 - **LOOP_SUSPECT**: repeated job_id/trace_id or repeated prompt_hash pattern
 - **BURN_RATE_SPIKE**: spend velocity jumps above normal operating range
-- **TOKEN_EXPLOSION**: input/output tokens spike sharply for endpoint/feature
+- **TOKEN_EXPLOSION**: input/output tokens spike sharply because the request is large, cap-relative, or suddenly grows versus the previous matching step
 
 ## 7) UX summary
 ### Observe Mode dashboard (default landing after login)

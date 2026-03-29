@@ -55,6 +55,11 @@ Protect preflight warns when either condition is met:
 - Failure signals are HTTP `>=500`, explicit error status, or error type present.
 - Retry intent/state by itself does not count as a failure.
 
+## Token-Explosion Rule
+- Counts the current estimate/event against the existing ratio and absolute thresholds.
+- Also warns on abrupt sequential growth against the previous matching estimate.
+- Growth-only detection is suppressed when request volume is high enough to suggest concurrency instead of one step feeding the next.
+
 ## Incidents
 Incident types:
 - `near_cap`

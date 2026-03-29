@@ -31,6 +31,8 @@ class AppConfig:
     loop_count: int = 6
     token_explosion_ratio: float = 0.8
     token_explosion_abs: int = 6000
+    token_explosion_growth_ratio: float = 2.0
+    token_explosion_concurrency_threshold: int = 5
     protect_near_cap_factor: float = 0.85
     protect_action_counter_ttl_seconds: int = 3600
     webhook_retry_max_attempts: int = 3
@@ -121,6 +123,8 @@ class Settings(BaseSettings):
     loop_count: int = app_config.loop_count
     token_explosion_ratio: float = app_config.token_explosion_ratio
     token_explosion_abs: int = app_config.token_explosion_abs
+    token_explosion_growth_ratio: float = app_config.token_explosion_growth_ratio
+    token_explosion_concurrency_threshold: int = app_config.token_explosion_concurrency_threshold
     incident_auto_close_seconds: int = 3600
     auto_close_run_interval_seconds: int = 60
     event_retention_days: int = 30

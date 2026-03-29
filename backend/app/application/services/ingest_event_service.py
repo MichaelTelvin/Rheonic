@@ -16,7 +16,7 @@ from app.domain.detectors.loop_suspect_detector import LoopSuspectDetector
 from app.domain.detectors.near_cap_detector import NearCapDetector
 from app.domain.detectors.registry import DetectorRegistry
 from app.domain.detectors.retry_storm_detector import RetryStormDetector
-from app.domain.detectors.token_explosion_detector import TokenExplosionDetector
+from app.domain.detectors.token_explosion_detector import TokenExplosionDetector, resolve_previous_estimated_tokens
 from app.domain.models.event import Event
 from app.logger import get_logger
 
@@ -42,6 +42,8 @@ class IngestEventService:
         loop_count: int = app_config.loop_count,
         token_explosion_ratio: float = app_config.token_explosion_ratio,
         token_explosion_abs: int = app_config.token_explosion_abs,
+        token_explosion_growth_ratio: float = app_config.token_explosion_growth_ratio,
+        token_explosion_concurrency_threshold: int = app_config.token_explosion_concurrency_threshold,
     ) -> None:
         self._event_repository = event_repository
         self._realtime_counters = realtime_counters
@@ -53,6 +55,8 @@ class IngestEventService:
         self._loop_count = loop_count
         self._token_explosion_ratio = token_explosion_ratio
         self._token_explosion_abs = token_explosion_abs
+        self._token_explosion_growth_ratio = token_explosion_growth_ratio
+        self._token_explosion_concurrency_threshold = token_explosion_concurrency_threshold
         self._incident_dedup_window_seconds = incident_dedup_window_seconds
         self._detector_registry = DetectorRegistry(
             detectors=[
@@ -95,6 +99,12 @@ class IngestEventService:
                 limit=recent_limit,
                 provider=provider,
             )
+            previous_estimated_tokens = resolve_previous_estimated_tokens(
+                recent_events=recent_events,
+                provider=provider,
+                model=event.model,
+                current_event=event,
+            )
             ctx = DetectionContext(
                 project_id=event.project_id,
                 provider=provider,
@@ -109,6 +119,7 @@ class IngestEventService:
                 request_endpoint=event.request_endpoint,
                 request_feature=event.request_feature,
                 estimated_next_tokens=event.total_tokens,
+                previous_estimated_tokens=previous_estimated_tokens,
                 current_event=event,
                 recent_events=recent_events,
                 warn_ratio=app_config.protect_near_cap_factor,
@@ -119,6 +130,8 @@ class IngestEventService:
                 loop_count=self._loop_count,
                 token_explosion_ratio=self._token_explosion_ratio,
                 token_explosion_abs=self._token_explosion_abs,
+                token_explosion_growth_ratio=self._token_explosion_growth_ratio,
+                token_explosion_concurrency_threshold=self._token_explosion_concurrency_threshold,
             )
             signals = self._detector_registry.detect(ctx)
             cap_breach_signals = self._cap_breach_signal_if_any(ctx)

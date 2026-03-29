@@ -11,6 +11,7 @@ from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.metrics_service import MetricsService
 from app.application.services.project_service import ProjectService
 from app.application.services.protect_service import ProtectService
+from app.config import app_config
 from app.dependencies import (
     get_current_user,
     get_ingest_key_service,
@@ -162,6 +163,12 @@ class FakeTransportService:
 
 def _cleanup_overrides() -> None:
     app.dependency_overrides.clear()
+
+
+def _set_app_config_value(name: str, value: object) -> object:
+    original = getattr(app_config, name)
+    object.__setattr__(app_config, name, value)
+    return original
 
 
 @pytest.fixture(autouse=True)
@@ -748,6 +755,93 @@ def test_loop_suspect_warns_in_preflight_when_feature_matches(tmp_path) -> None:
     )
     assert decision["decision"] == "warn"
     assert decision["reason"] == "loop_suspect"
+    _cleanup_overrides()
+
+
+def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit(tmp_path) -> None:
+    client, _, events = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Growth")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    now = datetime.now(timezone.utc)
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="ok",
+            http_status=200,
+            total_tokens=100,
+            created_at=now - timedelta(seconds=1),
+        )
+    )
+
+    original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 2.0)
+    original_abs = _set_app_config_value("token_explosion_abs", 10_000)
+    try:
+        decision = _decision(
+            client,
+            ingest_key,
+            body={
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+                "environment": "dev",
+                "input_tokens_estimate": 260,
+                "max_output_tokens": 0,
+            },
+        )
+    finally:
+        object.__setattr__(app_config, "token_explosion_growth_ratio", original_growth_ratio)
+        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "token_explosion"
+    _cleanup_overrides()
+
+
+def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrency(tmp_path) -> None:
+    client, rolling_window, events = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Concurrency")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    now = datetime.now(timezone.utc)
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="ok",
+            http_status=200,
+            total_tokens=100,
+            created_at=now - timedelta(seconds=1),
+        )
+    )
+    scoped_id = scoped_project_provider_id(project_id, "openai")
+    rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
+    rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
+
+    original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 2.0)
+    original_abs = _set_app_config_value("token_explosion_abs", 10_000)
+    original_concurrency = _set_app_config_value("token_explosion_concurrency_threshold", 2)
+    try:
+        decision = _decision(
+            client,
+            ingest_key,
+            body={
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+                "environment": "dev",
+                "input_tokens_estimate": 260,
+                "max_output_tokens": 0,
+            },
+        )
+    finally:
+        object.__setattr__(app_config, "token_explosion_growth_ratio", original_growth_ratio)
+        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+        object.__setattr__(app_config, "token_explosion_concurrency_threshold", original_concurrency)
+
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     _cleanup_overrides()
 
 

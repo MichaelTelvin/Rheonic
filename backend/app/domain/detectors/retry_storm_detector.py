@@ -9,6 +9,8 @@ class RetryStormDetector(Detector):
         if not ctx.recent_events:
             return []
         cutoff = ctx.now.timestamp() - float(ctx.retry_storm_window_seconds)
+        # Count actual failure outcomes only so retry intent/state changes do not
+        # double-count a single failure episode.
         failed_events = [
             event
             for event in ctx.recent_events

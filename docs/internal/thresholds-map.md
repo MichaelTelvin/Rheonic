@@ -62,7 +62,9 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 ## Token Explosion Detector
 - `token_explosion_ratio`: ratio threshold against token cap when cap exists.
 - `token_explosion_abs`: absolute token threshold when cap-independent trigger is needed.
-- Trigger condition: estimate/event tokens exceed ratio threshold or absolute threshold.
+- `token_explosion_growth_ratio`: sequential growth threshold against the previous matching estimate.
+- `token_explosion_concurrency_threshold`: growth-only suppression threshold when request volume suggests concurrency.
+- Trigger condition: estimate/event tokens exceed ratio threshold, absolute threshold, or growth threshold.
 
 ## Protect Enforcement
 - Hard block conditions (protect mode only):

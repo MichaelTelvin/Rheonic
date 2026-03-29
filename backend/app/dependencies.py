@@ -125,6 +125,8 @@ def get_ingest_event_service() -> IngestEventService:
             loop_count=get_settings().loop_count,
             token_explosion_ratio=get_settings().token_explosion_ratio,
             token_explosion_abs=get_settings().token_explosion_abs,
+            token_explosion_growth_ratio=get_settings().token_explosion_growth_ratio,
+            token_explosion_concurrency_threshold=get_settings().token_explosion_concurrency_threshold,
             webhook_dispatcher=get_webhook_dispatcher(),
             transport_service=get_transport_service(),
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),

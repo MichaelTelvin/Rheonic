@@ -18,7 +18,7 @@ from app.domain.detectors.loop_suspect_detector import LoopSuspectDetector
 from app.domain.detectors.near_cap_detector import NearCapDetector
 from app.domain.detectors.registry import DetectorRegistry
 from app.domain.detectors.retry_storm_detector import RetryStormDetector
-from app.domain.detectors.token_explosion_detector import TokenExplosionDetector
+from app.domain.detectors.token_explosion_detector import TokenExplosionDetector, resolve_previous_estimated_tokens
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.logger import get_logger
 
@@ -258,6 +258,7 @@ class ProtectService:
             tok_cap=max_tok,
             protect_enabled=True,
             estimated_next_tokens=estimated_next_tokens,
+            previous_estimated_tokens=None,
             current_event=None,
             recent_events=[],
             warn_ratio=app_config.protect_near_cap_factor,
@@ -267,6 +268,8 @@ class ProtectService:
             loop_count=app_config.loop_count,
             token_explosion_ratio=app_config.token_explosion_ratio,
             token_explosion_abs=app_config.token_explosion_abs,
+            token_explosion_growth_ratio=app_config.token_explosion_growth_ratio,
+            token_explosion_concurrency_threshold=app_config.token_explosion_concurrency_threshold,
         )
         warn_signals = self._fast_warn_detector_registry.detect(detector_ctx)
         if warn_signals:
@@ -345,6 +348,11 @@ class ProtectService:
                     "recent_events_fetch_ms": int((perf_counter() - recent_fetch_started_at) * 1000),
                 },
             )
+        previous_estimated_tokens = resolve_previous_estimated_tokens(
+            recent_events=recent_events,
+            provider=provider,
+            model=ctx.model,
+        )
         detector_ctx = DetectionContext(
             project_id=project_id,
             provider=provider,
@@ -359,6 +367,7 @@ class ProtectService:
             tok_cap=max_tok,
             protect_enabled=True,
             estimated_next_tokens=estimated_next_tokens,
+            previous_estimated_tokens=previous_estimated_tokens,
             current_event=None,
             recent_events=recent_events,
             warn_ratio=app_config.protect_near_cap_factor,
@@ -368,6 +377,8 @@ class ProtectService:
             loop_count=app_config.loop_count,
             token_explosion_ratio=app_config.token_explosion_ratio,
             token_explosion_abs=app_config.token_explosion_abs,
+            token_explosion_growth_ratio=app_config.token_explosion_growth_ratio,
+            token_explosion_concurrency_threshold=app_config.token_explosion_concurrency_threshold,
         )
         warn_signals = self._behavioral_warn_detector_registry.detect(detector_ctx)
         if warn_signals:

@@ -7,7 +7,7 @@ Incidents are the main way Rheonic surfaces risky runtime behavior. They are cre
 - `cap_breach`: traffic has crossed a hard request or token cap.
 - `retry_storm`: failed attempts are repeating fast enough to suggest an unhealthy retry loop; retry state by itself does not count as a failure.
 - `loop_suspect`: repeated request patterns suggest the app is stuck in a loop.
-- `token_explosion`: token usage has jumped sharply.
+- `token_explosion`: token usage has jumped sharply because the request is large, near a cap-driven threshold, or suddenly much bigger than the previous matching step. Growth-only detection is suppressed when traffic looks highly concurrent.
 
 ## Where to Review Incidents
 Open `Incidents` in the dashboard. You can filter by:
