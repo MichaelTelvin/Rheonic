@@ -660,6 +660,53 @@ def test_retry_storm_warns_in_preflight(tmp_path) -> None:
         )
     )
     events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="error",
+            http_status=504,
+            total_tokens=50,
+            created_at=now + timedelta(seconds=1),
+        )
+    )
+
+    decision = _decision(client, ingest_key)
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "retry_storm"
+    _cleanup_overrides()
+
+
+def test_retry_storm_preflight_ignores_retry_status_and_only_counts_failures(tmp_path) -> None:
+    client, _, events = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Retry Storm Failure Counting")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    now = datetime.now(timezone.utc)
+    for seconds_ago, status, http_status in [
+        (4, "error", 500),
+        (3, "error", 501),
+        (2, "error", 502),
+        (1, "error", 503),
+        (0, "retry", 200),
+    ]:
+        events.add_recent(
+            _event(
+                project_id,
+                "openai",
+                "gpt-4o-mini",
+                status=status,
+                http_status=http_status,
+                total_tokens=50,
+                created_at=now - timedelta(seconds=seconds_ago),
+            )
+        )
+
+    decision = _decision(client, ingest_key)
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
+
+    events.add_recent(
         _event(project_id, "openai", "gpt-4o-mini", status="error", http_status=504, total_tokens=50, created_at=now)
     )
 

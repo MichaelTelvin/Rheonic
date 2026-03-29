@@ -52,6 +52,7 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - `retry_storm_window_seconds`: lookback window for failure burst detection.
 - `retry_storm_count`: minimum failures in window to trigger.
 - Failure criteria: HTTP `>=500`, explicit error status, or error type present.
+- Retry intent/state alone does not count as a failure for this detector.
 
 ## Loop Suspect Detector
 - `loop_window_seconds`: lookback window for repeated signature detection.

@@ -198,7 +198,7 @@ async function runDemo() {
   };
 
   const runRetryStorm = async () => {
-    logVerbose("\n[STEP] Retry storm");
+    logVerbose("\n[STEP] Retry storm from failed attempts");
     for (let i = 0; i < retryStormCount; i += 1) {
       await sendEvent(client, provider, model, endpoint, 50, `retry-${i + 1}`, {
         status: "error",

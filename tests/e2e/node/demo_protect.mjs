@@ -358,7 +358,7 @@ async function main() {
     console.log(`[STEP] req_cap_breach ingest events sent=${count} (provider_calls_delta tracks provider calls only)`);
   } else if (scenario === "retry_storm") {
     const count = envInt("RHEONIC_RETRY_STORM_COUNT", 6);
-    console.log("[STEP] Seed retry storm then expect warn");
+    console.log("[STEP] Seed failed attempts for retry storm then expect warn");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 50, `retry-${i + 1}`, env, {
         status: "error",
@@ -461,7 +461,10 @@ async function main() {
     assertLine("req_cap breach blocked", blocked && providerCallsDelta === 0 && incidentTypes.has("cap_breach"));
     assertLine("req_cap breach triggered block", blocked && providerCallsDelta === 0);
   } else if (scenario === "retry_storm") {
-    assertLine("retry_storm warn triggered", !blocked && decision === "warn" && reason === "retry_storm");
+    assertLine(
+      "retry_storm warn triggered from failed attempts",
+      !blocked && decision === "warn" && reason === "retry_storm",
+    );
   } else if (scenario === "loop_suspect") {
     assertLine("loop_suspect warn triggered", !blocked && decision === "warn" && reason === "loop_suspect");
   } else if (scenario === "token_explosion") {

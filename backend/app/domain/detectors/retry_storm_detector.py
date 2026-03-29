@@ -51,7 +51,7 @@ def _is_failure(event: Event) -> bool:
     if isinstance(http_status, int) and http_status >= 500:
         return True
     status = (event.status or "").strip().lower()
-    if status in {"error", "failed", "fail", "retry"}:
+    if status in {"error", "failed", "fail"}:
         return True
     return bool(event.error_type)
 

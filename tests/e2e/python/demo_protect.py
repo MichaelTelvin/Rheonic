@@ -577,7 +577,7 @@ def main() -> None:
                 time.sleep(pause_ms / 1000)
             print(f"[STEP] req_cap_breach ingest events sent={count} (provider_calls_delta tracks provider calls only)")
         elif scenario == "retry_storm":
-            print("\n[STEP] Seed retry storm then expect warn")
+            print("\n[STEP] Seed failed attempts for retry storm then expect warn")
             count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "6"))
             for i in range(count):
                 _send_ingest_event(
@@ -701,7 +701,7 @@ def main() -> None:
             )
         elif scenario == "retry_storm":
             _assert_line(
-                "retry_storm warn triggered",
+                "retry_storm warn triggered from failed attempts",
                 decision_value == "warn" and decision_reason == "retry_storm" and not blocked,
             )
         elif scenario == "loop_suspect":

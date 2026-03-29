@@ -314,7 +314,7 @@ def main() -> None:
             )
 
         def run_retry_storm() -> None:
-            _log_verbose("\n[STEP] Retry storm")
+            _log_verbose("\n[STEP] Retry storm from failed attempts")
             phase_started_at = datetime.now().astimezone()
             for i in range(retry_storm_count):
                 _send_event(

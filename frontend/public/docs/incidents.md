@@ -5,7 +5,7 @@ Incidents are the main way Rheonic surfaces risky runtime behavior. They are cre
 ## Incident Types
 - `near_cap`: traffic is approaching a configured request or token cap.
 - `cap_breach`: traffic has crossed a hard request or token cap.
-- `retry_storm`: failures are repeating fast enough to suggest an unhealthy retry loop.
+- `retry_storm`: failed attempts are repeating fast enough to suggest an unhealthy retry loop; retry state by itself does not count as a failure.
 - `loop_suspect`: repeated request patterns suggest the app is stuck in a loop.
 - `token_explosion`: token usage has jumped sharply.
 

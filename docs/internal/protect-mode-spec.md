@@ -50,6 +50,11 @@ Protect preflight warns when either condition is met:
 - `tokens_60s + estimated_next_tokens >= tok_cap * protect_near_cap_factor`
 - `requests_60s + 1 >= req_cap * protect_near_cap_factor`
 
+## Retry-Storm Rule
+- Counts failed attempts in the retry-storm window.
+- Failure signals are HTTP `>=500`, explicit error status, or error type present.
+- Retry intent/state by itself does not count as a failure.
+
 ## Incidents
 Incident types:
 - `near_cap`

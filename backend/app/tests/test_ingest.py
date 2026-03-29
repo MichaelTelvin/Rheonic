@@ -365,6 +365,34 @@ def test_retry_storm_opens_incident_and_updates_dedup_count() -> None:
     assert transport.calls == []
 
 
+def test_retry_storm_ignores_retry_status_without_failure_signal() -> None:
+    service, incidents, webhook, transport = _service(protect_enabled=False, retry_storm_count=2)
+    service.ingest(_event("p1", status="retry", http_status=200, offset_seconds=0))
+    service.ingest(_event("p1", status="retry", http_status=200, offset_seconds=1))
+    service.ingest(_event("p1", status="retry", http_status=200, offset_seconds=2))
+
+    assert incidents.rows == []
+    assert webhook.calls == []
+    assert transport.calls == []
+
+
+def test_retry_storm_does_not_double_count_retry_state_updates() -> None:
+    service, incidents, webhook, transport = _service(protect_enabled=True, retry_storm_count=2)
+    service.ingest(_event("p1", status="error", http_status=502, error_type="provider_error", offset_seconds=0))
+    service.ingest(_event("p1", status="retry", http_status=200, offset_seconds=1))
+
+    assert incidents.rows == []
+
+    service.ingest(_event("p1", status="error", http_status=503, error_type="provider_error", offset_seconds=2))
+
+    assert len(incidents.rows) == 1
+    row = incidents.rows[0]
+    assert row.incident_type == "retry_storm"
+    assert row.evidence.get("failure_count") == 2
+    assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
+    assert transport.calls == []
+
+
 def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_but_no_email() -> None:
     service, incidents, webhook, transport = _service(protect_enabled=False, loop_count=3)
     service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=0))
