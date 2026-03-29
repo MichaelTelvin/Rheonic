@@ -6,7 +6,7 @@ export const sdkNodeConfig = {
   defaultFlushTimeoutMs: 500,
   defaultRequestTimeoutMs: 1000,
   defaultProtectFailMode: "open",
-  internalProtectDecisionTimeoutMs: 150,
+  internalProtectDecisionTimeoutMs: 160,
   retryDelayMinMs: 200,
   retryDelayMaxMs: 400,
   defaultTokenizerEncoding: "cl100k_base",

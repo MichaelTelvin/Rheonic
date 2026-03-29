@@ -35,6 +35,17 @@ OverflowPolicy = Literal["drop_oldest", "drop_newest"]
 _default_client: "Client | None" = None
 
 
+def _resolve_environment(explicit_environment: str | None) -> str:
+    resolved = (
+        explicit_environment
+        or os.getenv("RHEONIC_ENVIRONMENT")
+        or os.getenv("RHEONIC_ENV")
+        or os.getenv("NODE_ENV")
+        or sdk_config.default_environment
+    )
+    return str(resolved).strip() or sdk_config.default_environment
+
+
 class HttpResponse(Protocol):
     # HTTP response contract used for retry logic.
 
@@ -171,17 +182,18 @@ class Client:
     ) -> None:
         # Initialize client queue, worker thread, and HTTP transport.
         try:
+            resolved_environment = _resolve_environment(environment)
             env_debug = os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"}
             self._debug_enabled = debug or env_debug
             configure_logging(
                 level="DEBUG" if self._debug_enabled else None,
-                environment=environment,
+                environment=resolved_environment,
             )
 
             self.ingest_key = ingest_key
             resolved_base_url = base_url or os.getenv("RHEONIC_BASE_URL") or sdk_config.default_base_url
             self.base_url = resolved_base_url.rstrip("/")
-            self.environment = environment
+            self.environment = resolved_environment
             self.flush_interval_s = flush_interval_s
             self.max_queue_size = max_queue_size
             self.overflow_policy = overflow_policy

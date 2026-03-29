@@ -57,7 +57,12 @@ export class Client {
   public constructor(config: ClientConfig) {
     this.baseUrl = config.baseUrl ?? process.env.RHEONIC_BASE_URL ?? sdkNodeConfig.defaultBaseUrl;
     this.ingestKey = config.ingestKey;
-    this.environment = config.environment ?? sdkNodeConfig.defaultEnvironment;
+    this.environment =
+      config.environment ??
+      process.env.RHEONIC_ENVIRONMENT ??
+      process.env.RHEONIC_ENV ??
+      process.env.NODE_ENV ??
+      sdkNodeConfig.defaultEnvironment;
     this.flushIntervalMs = config.flushIntervalMs ?? sdkNodeConfig.defaultFlushIntervalMs;
     this.maxQueueSize = config.maxQueueSize ?? sdkNodeConfig.defaultMaxQueueSize;
     this.overflowPolicy = config.overflowPolicy ?? "drop_oldest";

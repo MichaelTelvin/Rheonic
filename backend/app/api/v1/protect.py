@@ -157,6 +157,7 @@ def protect_decision(
                     "provider": payload.provider,
                     "model": payload.model,
                     "environment": payload.environment,
+                    "request_id": request_id,
                     "decision": decision.decision,
                     "reason": decision.reason,
                     "latency_ms": latency_ms,
@@ -199,12 +200,30 @@ def protect_decision_timeout(
         if project is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
         provider = payload.provider or "unknown"
+        resolved_request_id = request_id_header or payload.request_id
+        fallback_decision = "block" if project.protect_fail_mode == "closed" else "allow"
         protect_action_store.finalize_outcome(
             project_id=scoped_project_provider_id(project.id, provider),
-            decision="block" if project.protect_fail_mode == "closed" else "allow",
+            decision=fallback_decision,
             reason="decision_timeout",
             source=app_config.protect_outcome_source_timeout_fallback,
-            request_id=request_id_header or payload.request_id,
+            request_id=resolved_request_id,
+        )
+        logger.info(
+            "Protect timeout fallback recorded",
+            extra=build_log_extra(
+                event="protect_timeout_fallback",
+                metadata={
+                    "project_id": project.id,
+                    "provider": provider,
+                    "model": payload.model,
+                    "environment": payload.environment,
+                    "request_id": resolved_request_id,
+                    "decision": fallback_decision,
+                    "fail_mode": project.protect_fail_mode,
+                    "source": app_config.protect_outcome_source_timeout_fallback,
+                },
+            ),
         )
         if project.protect_fail_mode == "closed":
             protect_service.report_fail_closed_block(
@@ -214,7 +233,7 @@ def protect_decision_timeout(
                 environment=payload.environment,
                 detail_reason="decision_timeout",
                 source=app_config.protect_outcome_source_timeout_fallback,
-                request_id=request_id_header or payload.request_id,
+                request_id=resolved_request_id,
             )
         return {"status": "accepted"}
     except HTTPException:
@@ -242,12 +261,30 @@ def protect_decision_unavailable(
         if project is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
         provider = payload.provider or "unknown"
+        resolved_request_id = request_id_header or payload.request_id
+        fallback_decision = "block" if project.protect_fail_mode == "closed" else "allow"
         protect_action_store.finalize_outcome(
             project_id=scoped_project_provider_id(project.id, provider),
-            decision="block" if project.protect_fail_mode == "closed" else "allow",
+            decision=fallback_decision,
             reason="decision_unavailable",
             source=app_config.protect_outcome_source_unavailable_fallback,
-            request_id=request_id_header or payload.request_id,
+            request_id=resolved_request_id,
+        )
+        logger.info(
+            "Protect unavailable fallback recorded",
+            extra=build_log_extra(
+                event="protect_unavailable_fallback",
+                metadata={
+                    "project_id": project.id,
+                    "provider": provider,
+                    "model": payload.model,
+                    "environment": payload.environment,
+                    "request_id": resolved_request_id,
+                    "decision": fallback_decision,
+                    "fail_mode": project.protect_fail_mode,
+                    "source": app_config.protect_outcome_source_unavailable_fallback,
+                },
+            ),
         )
         if project.protect_fail_mode == "closed":
             protect_service.report_fail_closed_block(
@@ -257,7 +294,7 @@ def protect_decision_unavailable(
                 environment=payload.environment,
                 detail_reason="decision_unavailable",
                 source=app_config.protect_outcome_source_unavailable_fallback,
-                request_id=request_id_header or payload.request_id,
+                request_id=resolved_request_id,
             )
         return {"status": "accepted"}
     except HTTPException:
