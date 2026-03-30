@@ -368,7 +368,12 @@ async function main() {
     },
   };
 
-  const decisionFeature = scenario === "loop_suspect" ? "loop-fixed-signature" : "manual-protect-demo";
+  const decisionFeature =
+    scenario === "loop_suspect"
+      ? "loop-fixed-signature"
+      : scenario === "token_explosion"
+        ? "token-explosion-growth"
+        : "manual-protect-demo";
   instrumentOpenAI(openai, { client, feature: decisionFeature, environment: env });
   instrumentAnthropic(anthropic, { client, feature: decisionFeature, environment: env });
   instrumentGoogle(googleModel, { client, feature: decisionFeature, environment: env });

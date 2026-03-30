@@ -548,7 +548,12 @@ def main() -> None:
     google = _make_google_stub()
     google.model_name = model
 
-    decision_feature = "loop-fixed-signature" if scenario == "loop_suspect" else "manual-protect-demo"
+    if scenario == "loop_suspect":
+        decision_feature = "loop-fixed-signature"
+    elif scenario == "token_explosion":
+        decision_feature = "token-explosion-growth"
+    else:
+        decision_feature = "manual-protect-demo"
     instrument_openai(openai, client=client, feature=decision_feature, environment=env)
     instrument_anthropic(
         anthropic,
