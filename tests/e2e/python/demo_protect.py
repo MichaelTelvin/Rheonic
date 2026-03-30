@@ -725,9 +725,7 @@ def main() -> None:
             time.sleep(pause_ms / 1000)
 
         if scenario == "cooldown":
-            first_blocked = _run_provider_call(
-                provider, model, call_max_tokens, prompt_text, openai, anthropic, google
-            )
+            first_blocked = _run_provider_call(provider, model, call_max_tokens, prompt_text, openai, anthropic, google)
             second_blocked = _run_provider_call(
                 provider, model, call_max_tokens, prompt_text, openai, anthropic, google
             )
