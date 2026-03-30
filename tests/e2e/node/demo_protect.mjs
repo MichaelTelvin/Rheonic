@@ -147,6 +147,12 @@ function assertDelivery(client, expectedMinSent = 0) {
 }
 
 async function sendIngestEvent(ingestKey, provider, model, totalTokens, feature, environment, options) {
+  const endpointByProvider = {
+    openai: "/chat/completions",
+    anthropic: "/v1/messages",
+    google: "/v1beta/models/generateContent",
+  };
+  const endpoint = endpointByProvider[provider] ?? "/chat/completions";
   const status = options?.status ?? "ok";
   const httpStatus = options?.httpStatus ?? 200;
   const payload = {
@@ -158,7 +164,7 @@ async function sendIngestEvent(ingestKey, provider, model, totalTokens, feature,
     http_status: httpStatus,
     ...(options?.errorType ? { error_type: options.errorType } : {}),
     request: {
-      endpoint: "/chat/completions",
+      endpoint,
       feature,
       input_tokens: 1,
       ...(typeof options?.tokenExplosionTokens === "number"
@@ -374,9 +380,15 @@ async function main() {
       : scenario === "token_explosion"
         ? "token-explosion-growth"
         : "manual-protect-demo";
-  instrumentOpenAI(openai, { client, feature: decisionFeature, environment: env });
-  instrumentAnthropic(anthropic, { client, feature: decisionFeature, environment: env });
-  instrumentGoogle(googleModel, { client, feature: decisionFeature, environment: env });
+  const endpointByProvider = {
+    openai: "/chat/completions",
+    anthropic: "/v1/messages",
+    google: "/v1beta/models/generateContent",
+  };
+  const decisionEndpoint = endpointByProvider[provider] ?? "/chat/completions";
+  instrumentOpenAI(openai, { client, feature: decisionFeature, environment: env, endpoint: decisionEndpoint });
+  instrumentAnthropic(anthropic, { client, feature: decisionFeature, environment: env, endpoint: decisionEndpoint });
+  instrumentGoogle(googleModel, { client, feature: decisionFeature, environment: env, endpoint: decisionEndpoint });
 
   console.log(`[DEMO] provider=${provider} model=${model} scenario=${scenario}`);
   console.log(`[DEMO] environment=${env}`);

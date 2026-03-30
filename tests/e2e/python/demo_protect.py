@@ -323,6 +323,12 @@ def _send_ingest_event(
     http_status: int = 200,
     error_type: str | None = None,
 ) -> None:
+    endpoint_by_provider = {
+        "openai": "/chat/completions",
+        "anthropic": "/v1/messages",
+        "google": "/v1beta/models/generateContent",
+    }
+    endpoint = endpoint_by_provider.get(provider, "/chat/completions")
     payload = {
         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "provider": provider,
@@ -332,7 +338,7 @@ def _send_ingest_event(
         "http_status": http_status,
         **({"error_type": error_type} if error_type else {}),
         "request": {
-            "endpoint": "/chat/completions",
+            "endpoint": endpoint,
             "feature": feature,
             "input_tokens": 1,
             **({"token_explosion_tokens": token_explosion_tokens} if isinstance(token_explosion_tokens, int) else {}),
@@ -547,6 +553,12 @@ def main() -> None:
     anthropic = _make_anthropic_stub()
     google = _make_google_stub()
     google.model_name = model
+    endpoint_by_provider = {
+        "openai": "/chat/completions",
+        "anthropic": "/v1/messages",
+        "google": "/v1beta/models/generateContent",
+    }
+    decision_endpoint = endpoint_by_provider.get(provider, "/chat/completions")
 
     if scenario == "loop_suspect":
         decision_feature = "loop-fixed-signature"
@@ -554,14 +566,27 @@ def main() -> None:
         decision_feature = "token-explosion-growth"
     else:
         decision_feature = "manual-protect-demo"
-    instrument_openai(openai, client=client, feature=decision_feature, environment=env)
+    instrument_openai(
+        openai,
+        client=client,
+        feature=decision_feature,
+        environment=env,
+        endpoint=decision_endpoint,
+    )
     instrument_anthropic(
         anthropic,
         client=client,
         feature=decision_feature,
         environment=env,
+        endpoint=decision_endpoint,
     )
-    instrument_google(google, client=client, feature=decision_feature, environment=env)
+    instrument_google(
+        google,
+        client=client,
+        feature=decision_feature,
+        environment=env,
+        endpoint=decision_endpoint,
+    )
 
     try:
         _provider_reset()
