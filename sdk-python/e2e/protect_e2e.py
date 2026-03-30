@@ -206,7 +206,7 @@ def run() -> None:
         openai.chat.completions.create(
             model="gpt-4o-mini",
             max_tokens=2000,
-            messages=[{"role": "user", "content": "Predictive warning near cap check for python e2e clamp off."}],
+            messages=[{"role": "user", "content": "Clamp-off allow check for python e2e."}],
         )
     except RHEONICBlockedError:
         blocked = True
@@ -232,7 +232,7 @@ def run() -> None:
         openai.chat.completions.create(
             model="gpt-4o-mini",
             max_tokens=2000,
-            messages=[{"role": "user", "content": "Predictive warning near cap check for python e2e clamp on."}],
+            messages=[{"role": "user", "content": "Clamp-on check for python e2e."}],
         )
     except RHEONICBlockedError:
         blocked = True
@@ -242,13 +242,13 @@ def run() -> None:
     assert 0 < clamped_max_tokens < 2000
 
     protect_metrics = _api(auth.session, f"/api/v1/metrics/protect?project_id={auth.project_id}")
-    assert int(protect_metrics.get("warned_60m") or 0) >= 2
+    assert int(protect_metrics.get("clamped_60m") or 0) >= 1
     open_incidents = _api(
         auth.session,
         f"/api/v1/incidents?project_id={auth.project_id}&status=open&provider=openai",
     )
     assert isinstance(open_incidents, list)
-    assert any(str(row.get("type")) == "near_cap" for row in open_incidents)
+    assert all(str(row.get("type")) != "block" for row in open_incidents)
 
     metrics_before_cooldown = _api(auth.session, f"/api/v1/metrics/protect?project_id={auth.project_id}")
     blocked_before_cooldown = int(metrics_before_cooldown.get("blocked_60m") or 0)

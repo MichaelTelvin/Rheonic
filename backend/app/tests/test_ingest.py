@@ -383,8 +383,9 @@ def test_retry_storm_opens_incident_and_updates_dedup_count() -> None:
     assert row.incident_type == "retry_storm"
     assert int(row.evidence.get("count", 0)) == 2
     assert row.status == "open"
-    assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
-    assert transport.calls == []
+    assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
+    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
+    assert [call["template"] for call in transport.calls] == ["incident_warn"]
 
 
 def test_retry_storm_ignores_retry_status_without_failure_signal() -> None:
@@ -411,11 +412,11 @@ def test_retry_storm_does_not_double_count_retry_state_updates() -> None:
     row = incidents.rows[0]
     assert row.incident_type == "retry_storm"
     assert row.evidence.get("failure_count") == 2
-    assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
-    assert transport.calls == []
+    assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
+    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
+    assert [call["template"] for call in transport.calls] == ["incident_warn"]
 
-
-def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_but_no_email() -> None:
+def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_and_email() -> None:
     service, incidents, webhook, transport = _service(protect_enabled=False, loop_count=3)
     service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=0))
     service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=1))
@@ -445,7 +446,8 @@ def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_but_no_email()
     assert "environment" not in evidence
     assert "last_seen_at" not in evidence
     assert "reason" not in evidence
-    assert transport.calls == []
+    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
+    assert [call["template"] for call in transport.calls] == ["incident_warn"]
 
 
 def test_loop_suspect_error_sequence_still_triggers_when_retry_storm_threshold_is_higher() -> None:
@@ -467,10 +469,10 @@ def test_loop_suspect_error_sequence_still_triggers_when_retry_storm_threshold_i
     assert incidents.rows[0].evidence.get("sequence_count") == 3
     warn_calls = [payload for _, event_type, payload in webhook.calls if event_type == "incident.warn"]
     assert len(warn_calls) == 1
-    assert transport.calls == []
+    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
+    assert [call["template"] for call in transport.calls] == ["incident_warn"]
 
-
-def test_loop_suspect_retry_storm_dominance_still_wins_for_error_sequence() -> None:
+def test_loop_suspect_and_retry_storm_can_both_open_for_error_sequence() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=True, retry_storm_count=3, loop_count=3)
     for i in range(3):
         service.ingest(
@@ -484,10 +486,9 @@ def test_loop_suspect_retry_storm_dominance_still_wins_for_error_sequence() -> N
             )
         )
 
-    assert len(incidents.rows) == 1
-    assert incidents.rows[0].incident_type == "retry_storm"
-    assert all(row.incident_type != "loop_suspect" for row in incidents.rows)
-    assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
+    incident_types = sorted(row.incident_type for row in incidents.rows)
+    assert incident_types == ["loop_suspect", "retry_storm"]
+    assert sum(1 for _, event_type, _ in webhook.calls if event_type == "incident.warn") == 2
 
 
 def test_loop_suspect_requires_consecutive_sequence_not_scattered_repetition() -> None:
@@ -552,45 +553,6 @@ def test_loop_signature_is_scoped_by_feature() -> None:
     loop_rows = [row for row in incidents.rows if row.incident_type == "loop_suspect"]
     assert len(loop_rows) == 1
     assert "feature-a" in str(loop_rows[0].evidence.get("signature"))
-
-
-def test_cap_breach_logged_in_observe_mode() -> None:
-    service, incidents, webhook, _ = _service(protect_enabled=False, req_cap=1, tok_cap=500)
-    service.ingest(_event("p1", total_tokens=100, offset_seconds=0))
-
-    assert len(incidents.rows) == 1
-    assert incidents.rows[0].incident_type == "cap_breach"
-    assert incidents.rows[0].evidence.get("req_cap_breach") is True
-    warn_calls = [
-        (project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"
-    ]
-    assert warn_calls
-    project_id, payload = warn_calls[0]
-    assert project_id == "p1"
-    assert payload["incident_type"] == "cap_breach"
-    assert payload["provider"] == "openai"
-    assert payload["model"] == "gpt-4o-mini"
-    assert payload["environment"] == "dev"
-    evidence = payload["evidence"]
-    assert isinstance(evidence, dict)
-    assert evidence["req_cap_breach"] is True
-    assert evidence["tok_cap_breach"] is False
-    assert "provider" not in evidence
-    assert "model" not in evidence
-    assert "environment" not in evidence
-    assert "last_seen_at" not in evidence
-    assert "reason" not in evidence
-
-
-def test_cap_breach_repeated_events_update_same_incident_within_dedup_window() -> None:
-    service, incidents, _, _ = _service(protect_enabled=False, req_cap=2, tok_cap=1000)
-    service.ingest(_event("p1", provider="openai", total_tokens=10, offset_seconds=0))
-    service.ingest(_event("p1", provider="openai", total_tokens=10, offset_seconds=1))
-    service.ingest(_event("p1", provider="openai", total_tokens=10, offset_seconds=2))
-
-    cap_rows = [row for row in incidents.rows if row.incident_type == "cap_breach" and row.provider == "openai"]
-    assert len(cap_rows) == 1
-    assert int(cap_rows[0].evidence.get("count", 0)) == 2
 
 
 def test_loop_suspect_opens_new_incident_after_episode_window_expires() -> None:
@@ -663,7 +625,8 @@ def test_token_explosion_triggers_on_growth_without_absolute_or_ratio_hit() -> N
     assert row.evidence.get("absolute_hit") is False
     assert row.evidence.get("ratio_hit") is False
     assert webhook.calls
-    assert transport.calls == []
+    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
+    assert [call["template"] for call in transport.calls] == ["incident_warn"]
 
 
 def test_token_explosion_growth_ignores_tiny_request_context_jumps() -> None:
@@ -700,7 +663,8 @@ def test_token_explosion_uses_dedicated_request_context_signal_on_ingest() -> No
     assert row.evidence.get("token_explosion_tokens") == 240
     assert row.evidence.get("absolute_hit") is True
     assert webhook.calls
-    assert transport.calls == []
+    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
+    assert [call["template"] for call in transport.calls] == ["incident_warn"]
 
 
 def test_token_explosion_growth_is_suppressed_under_high_concurrency() -> None:
@@ -743,96 +707,8 @@ def test_token_explosion_growth_ignores_unrelated_feature_history() -> None:
     assert row.incident_type == "token_explosion"
     assert row.evidence.get("previous_token_explosion_tokens") == 3_230
     assert webhook.calls
-    assert transport.calls == []
-
-
-def test_near_cap_opens_incident_in_observe_with_warn_webhook() -> None:
-    service, incidents, webhook, _ = _service(protect_enabled=False, req_cap=None, tok_cap=1000)
-    service.ingest(_event("p1", total_tokens=900, offset_seconds=0))
-
-    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
-    assert len(near_cap_rows) == 1
-    assert near_cap_rows[0].evidence.get("near_cap_type") == "tok"
-    assert near_cap_rows[0].evidence.get("req_near_cap") is False
-    assert near_cap_rows[0].evidence.get("tok_near_cap") is True
-    assert near_cap_rows[0].fingerprint and near_cap_rows[0].fingerprint.endswith(":tok")
-    warn_calls = [
-        (project_id, payload) for project_id, event_type, payload in webhook.calls if event_type == "incident.warn"
-    ]
-    assert warn_calls
-    project_id, payload = warn_calls[0]
-    assert project_id == "p1"
-    assert payload["incident_type"] == "near_cap"
-    assert payload["provider"] == "openai"
-    assert payload["model"] == "gpt-4o-mini"
-    assert payload["environment"] == "dev"
-    evidence = payload["evidence"]
-    assert isinstance(evidence, dict)
-    assert evidence["near_cap_type"] == "tok"
-    assert evidence["req_near_cap"] is False
-    assert evidence["tok_near_cap"] is True
-    assert "provider" not in evidence
-    assert "model" not in evidence
-    assert "environment" not in evidence
-    assert "last_seen_at" not in evidence
-    assert "reason" not in evidence
-
-
-def test_near_cap_in_protect_mode_does_not_emit_observe_incident_warn_webhook() -> None:
-    service, incidents, webhook, _ = _service(protect_enabled=True, req_cap=None, tok_cap=1000)
-    service.ingest(_event("p1", total_tokens=900, offset_seconds=0))
-
-    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
-    assert len(near_cap_rows) == 1
-    assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
-
-
-def test_near_cap_req_only_evidence_and_fingerprint() -> None:
-    service, incidents, _, _ = _service(protect_enabled=False, req_cap=10, tok_cap=10_000)
-    for i in range(9):
-        service.ingest(_event("p1", total_tokens=1, offset_seconds=i))
-
-    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
-    assert len(near_cap_rows) == 1
-    row = near_cap_rows[0]
-    assert row.evidence.get("near_cap_type") == "req"
-    assert row.evidence.get("req_near_cap") is True
-    assert row.evidence.get("tok_near_cap") is False
-    assert row.fingerprint and row.fingerprint.endswith(":req")
-
-
-def test_near_cap_both_evidence_and_fingerprint() -> None:
-    service, incidents, _, _ = _service(protect_enabled=False, req_cap=10, tok_cap=1000)
-    for i in range(8):
-        service.ingest(_event("p1", total_tokens=1, offset_seconds=i))
-    service.ingest(_event("p1", total_tokens=900, offset_seconds=8))
-
-    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
-    assert len(near_cap_rows) == 1
-    row = near_cap_rows[0]
-    assert row.evidence.get("near_cap_type") == "both"
-    assert row.evidence.get("req_near_cap") is True
-    assert row.evidence.get("tok_near_cap") is True
-    assert row.fingerprint and row.fingerprint.endswith(":both")
-
-
-def test_near_cap_dedupes_per_subtype_req_and_tok_are_separate() -> None:
-    service, incidents, _, _ = _service(protect_enabled=False, req_cap=20, tok_cap=1000)
-
-    # req-only subtype first
-    for i in range(17):
-        service.ingest(_event("p1", total_tokens=1, offset_seconds=i))
-
-    # Move counters into both-near territory without breaching either cap.
-    service.ingest(_event("p1", total_tokens=900, offset_seconds=17))
-
-    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap" and row.status == "open"]
-    assert len(near_cap_rows) == 2
-    types = sorted(str(row.evidence.get("near_cap_type")) for row in near_cap_rows)
-    assert types == ["both", "req"]
-    fingerprints = sorted(str(row.fingerprint) for row in near_cap_rows)
-    assert any(fp.endswith(":req") for fp in fingerprints)
-    assert any(fp.endswith(":both") for fp in fingerprints)
+    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
+    assert [call["template"] for call in transport.calls] == ["incident_warn"]
 
 
 def test_token_explosion_incident_emits_warn_in_protect_mode() -> None:
@@ -841,134 +717,10 @@ def test_token_explosion_incident_emits_warn_in_protect_mode() -> None:
 
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "token_explosion"
-    assert all(event_type != "incident.warn" for _, event_type, _ in webhook.calls)
+    assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
 
 
-def test_cap_breach_suppresses_token_explosion_for_same_event() -> None:
-    service, incidents, webhook, _ = _service(protect_enabled=True, req_cap=None, tok_cap=1000, token_explosion_abs=500)
-    service.ingest(_event("p1", provider="openai", total_tokens=1200, offset_seconds=0))
-
-    assert len(incidents.rows) == 1
-    incident = incidents.rows[0]
-    assert incident.provider == "openai"
-    assert incident.incident_type == "cap_breach"
-    assert incident.evidence.get("tok_cap_breach") is True
-    assert all(row.incident_type != "token_explosion" for row in incidents.rows)
-    assert all(event_type != "protection.block" for _, event_type, _ in webhook.calls)
-
-
-def test_dominance_cap_breach_suppresses_retry_storm() -> None:
-    service, incidents, _, _ = _service(protect_enabled=True, req_cap=1, tok_cap=10_000, retry_storm_count=1)
-    service.ingest(
-        _event(
-            "p1",
-            total_tokens=50,
-            status="error",
-            http_status=500,
-            error_type="provider_5xx",
-            feature="dominance-cap-retry",
-            offset_seconds=0,
-        )
-    )
-
-    assert len(incidents.rows) == 1
-    assert incidents.rows[0].incident_type == "cap_breach"
-    assert all(row.incident_type != "retry_storm" for row in incidents.rows)
-
-
-def test_dominance_cap_breach_suppresses_near_cap() -> None:
-    service, incidents, _, _ = _service(protect_enabled=True, req_cap=1, tok_cap=1000, retry_storm_count=10)
-    service.ingest(_event("p1", total_tokens=600, feature="dominance-cap-near", offset_seconds=0))
-
-    assert len(incidents.rows) == 1
-    assert incidents.rows[0].incident_type == "cap_breach"
-    assert all(row.incident_type != "near_cap" for row in incidents.rows)
-
-
-def test_cap_breach_resolves_existing_near_cap_incident_for_same_provider() -> None:
-    service, incidents, _, _ = _service(protect_enabled=False, req_cap=100, tok_cap=1000, retry_storm_count=10)
-
-    service.ingest(_event("p1", total_tokens=900, feature="tok-cap-breach-sequence", offset_seconds=0))
-
-    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
-    assert len(near_cap_rows) == 1
-    assert near_cap_rows[0].status == "open"
-
-    service.ingest(_event("p1", total_tokens=200, feature="tok-cap-breach-sequence", offset_seconds=1))
-
-    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
-    cap_breach_rows = [row for row in incidents.rows if row.incident_type == "cap_breach"]
-    assert len(near_cap_rows) == 1
-    assert near_cap_rows[0].status == "resolved"
-    assert near_cap_rows[0].resolved_at is not None
-    assert len(cap_breach_rows) == 1
-    assert cap_breach_rows[0].status == "open"
-
-
-def test_cap_breach_does_not_resolve_old_near_cap_outside_recent_window() -> None:
-    service, incidents, _, _ = _service(protect_enabled=False, req_cap=100, tok_cap=1000, retry_storm_count=10)
-
-    service.ingest(_event("p1", total_tokens=900, feature="tok-cap-breach-window", offset_seconds=0))
-    near_cap_row = next(row for row in incidents.rows if row.incident_type == "near_cap")
-    near_cap_row.created_at = near_cap_row.created_at - timedelta(seconds=301)
-    near_cap_row.last_seen_at = (
-        near_cap_row.last_seen_at - timedelta(seconds=301) if near_cap_row.last_seen_at is not None else None
-    )
-
-    service.ingest(_event("p1", total_tokens=200, feature="tok-cap-breach-window", offset_seconds=1))
-
-    near_cap_rows = [row for row in incidents.rows if row.incident_type == "near_cap"]
-    cap_breach_rows = [row for row in incidents.rows if row.incident_type == "cap_breach"]
-    assert len(near_cap_rows) == 1
-    assert near_cap_rows[0].status == "open"
-    assert near_cap_rows[0].resolved_at is None
-    assert len(cap_breach_rows) == 1
-    assert cap_breach_rows[0].status == "open"
-
-
-def test_dominance_near_cap_suppresses_behavioral_signals() -> None:
-    service, incidents, _, _ = _service(
-        protect_enabled=True, req_cap=100, tok_cap=1000, retry_storm_count=1, loop_count=1
-    )
-    service.ingest(
-        _event(
-            "p1",
-            total_tokens=900,
-            status="error",
-            http_status=500,
-            error_type="provider_5xx",
-            feature="dominance-near-retry",
-            offset_seconds=0,
-        )
-    )
-
-    assert len(incidents.rows) == 1
-    assert incidents.rows[0].incident_type == "near_cap"
-    assert all(row.incident_type not in {"retry_storm", "loop_suspect", "token_explosion"} for row in incidents.rows)
-
-
-def test_dominance_near_cap_suppresses_token_explosion_for_same_event() -> None:
-    service, incidents, _, _ = _service(
-        protect_enabled=True,
-        req_cap=None,
-        tok_cap=4000,
-        token_explosion_abs=1500,
-    )
-    service.ingest(
-        _event(
-            "p1",
-            total_tokens=3400,
-            feature="dominance-near-token-explosion",
-            offset_seconds=0,
-        )
-    )
-
-    assert len(incidents.rows) == 1
-    assert incidents.rows[0].incident_type == "near_cap"
-    assert all(row.incident_type != "token_explosion" for row in incidents.rows)
-
-
-def test_dominance_behavioral_retry_suppresses_loop_suspect() -> None:
+def test_behavioral_retry_and_loop_suspect_can_coexist() -> None:
     service, incidents, _, _ = _service(
         protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, loop_count=1
     )
@@ -986,12 +738,10 @@ def test_dominance_behavioral_retry_suppresses_loop_suspect() -> None:
     service.ingest(_event("p1", total_tokens=60, feature="dominance-retry-loop", offset_seconds=1))
 
     incident_types = sorted({row.incident_type for row in incidents.rows})
-    assert incident_types == ["retry_storm"]
-    assert all(row.incident_type != "near_cap" for row in incidents.rows)
-    assert all(row.incident_type != "cap_breach" for row in incidents.rows)
+    assert incident_types == ["loop_suspect", "retry_storm"]
 
 
-def test_dominance_behavioral_retry_suppresses_token_explosion_without_caps() -> None:
+def test_behavioral_retry_and_token_explosion_can_coexist_without_caps() -> None:
     service, incidents, _, _ = _service(
         protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, token_explosion_abs=1500
     )
@@ -1008,9 +758,7 @@ def test_dominance_behavioral_retry_suppresses_token_explosion_without_caps() ->
     )
 
     incident_types = sorted(row.incident_type for row in incidents.rows)
-    assert incident_types == ["retry_storm"]
-    assert all(row.incident_type != "near_cap" for row in incidents.rows)
-    assert all(row.incident_type != "cap_breach" for row in incidents.rows)
+    assert incident_types == ["retry_storm", "token_explosion"]
 
 
 def test_policy_gap_first_seen_baseline_sends_no_webhook_and_no_incident() -> None:

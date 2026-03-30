@@ -170,12 +170,13 @@ def get_detect_incidents_service() -> DetectIncidentsService:
 
 
 def get_incident_manager() -> IncidentManager:
-    # Provide an incident upsert manager shared by ingest and preflight warning paths.
+    # Provide the shared incident upsert manager used by ingest and protect block recording.
     try:
         return IncidentManager(
             incident_repository=IncidentRepositoryImpl(session_factory=get_db_session_factory()),
             incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
             webhook_dispatcher=get_webhook_dispatcher(),
+            transport_service=get_transport_service(),
         )
     except Exception:
         logger.exception("Failed to construct incident manager")
@@ -210,25 +211,13 @@ def get_protect_service() -> ProtectService:
     try:
         return ProtectService(
             ingest_key_service=get_ingest_key_service(),
-            event_repository=EventRepositoryImpl(session_factory=get_db_session_factory()),
             realtime_counters=get_rolling_window(),
             protect_action_store=get_protect_action_store(),
             protect_block_cooldown_seconds=get_settings().protect_block_cooldown_seconds,
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
             incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
             protect_decision_timeout_ms=get_settings().protect_decision_timeout_ms,
-            retry_storm_window_seconds=get_settings().retry_storm_window_seconds,
-            retry_storm_count=get_settings().retry_storm_count,
-            loop_window_seconds=get_settings().loop_window_seconds,
-            loop_count=get_settings().loop_count,
-            loop_max_gap_seconds=get_settings().loop_max_gap_seconds,
-            loop_concurrency_threshold=get_settings().loop_concurrency_threshold,
-            token_explosion_ratio=get_settings().token_explosion_ratio,
-            token_explosion_abs=get_settings().token_explosion_abs,
-            token_explosion_growth_ratio=get_settings().token_explosion_growth_ratio,
-            token_explosion_growth_count=get_settings().token_explosion_growth_count,
-            token_explosion_growth_min_tokens=get_settings().token_explosion_growth_min_tokens,
-            token_explosion_concurrency_threshold=get_settings().token_explosion_concurrency_threshold,
+            protect_clamp_factor=get_settings().protect_clamp_factor,
             webhook_dispatcher=get_webhook_dispatcher(),
             transport_service=get_transport_service(),
         )

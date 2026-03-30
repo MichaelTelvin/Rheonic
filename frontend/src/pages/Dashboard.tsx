@@ -59,7 +59,7 @@ type DashboardCachedState = {
   lastProtectHealthSuccessAt: string | null;
   protectDecisionStats: {
     allowed_60m: number | null;
-    warned_60m: number | null;
+    clamped_60m: number | null;
     blocked_60m: number | null;
   } | null;
 };
@@ -122,7 +122,7 @@ export function Dashboard(): JSX.Element {
   const [protectHealth, setProtectHealth] = useState<ProtectHealthMetrics | null>(initialDashboardState?.protectHealth ?? null);
   const [protectDecisionStats, setProtectDecisionStats] = useState<{
     allowed_60m: number | null;
-    warned_60m: number | null;
+    clamped_60m: number | null;
     blocked_60m: number | null;
   } | null>(initialDashboardState?.protectDecisionStats ?? null);
   const [globalBanner, setGlobalBanner] = useState<string | null>(null);
@@ -427,7 +427,7 @@ export function Dashboard(): JSX.Element {
         }
         setProtectDecisionStats({
           allowed_60m: data.allowed_60m,
-          warned_60m: data.warned_60m,
+          clamped_60m: data.clamped_60m,
           blocked_60m: data.blocked_60m,
         });
       } catch {
@@ -841,10 +841,6 @@ export function Dashboard(): JSX.Element {
                 </h2>
                 <div className="protect-decisions-list">
                   <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Near cap</span>
-                    <span className="protect-decisions-value warned">{incidentSummary.near_cap ?? 0}</span>
-                  </div>
-                  <div className="protect-decisions-row">
                     <span className="protect-decisions-label">Retry storm</span>
                     <span className="protect-decisions-value warned">{incidentSummary.retry_storm ?? 0}</span>
                   </div>
@@ -857,8 +853,8 @@ export function Dashboard(): JSX.Element {
                     <span className="protect-decisions-value warned">{incidentSummary.token_explosion ?? 0}</span>
                   </div>
                   <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Cap breach</span>
-                    <span className="protect-decisions-value blocked">{incidentSummary.cap_breach ?? 0}</span>
+                    <span className="protect-decisions-label">Block</span>
+                    <span className="protect-decisions-value blocked">{incidentSummary.block ?? 0}</span>
                   </div>
                 </div>
               </Card>
@@ -884,8 +880,8 @@ export function Dashboard(): JSX.Element {
                     <span className="protect-decisions-value">{renderMetric(protectDecisionStats?.allowed_60m)}</span>
                   </div>
                   <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Warned</span>
-                    <span className="protect-decisions-value warned">{renderMetric(protectDecisionStats?.warned_60m)}</span>
+                    <span className="protect-decisions-label">Clamped</span>
+                    <span className="protect-decisions-value warned">{renderMetric(protectDecisionStats?.clamped_60m)}</span>
                   </div>
                   <div className="protect-decisions-row">
                     <span className="protect-decisions-label">Blocked</span>

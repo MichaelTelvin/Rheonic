@@ -213,7 +213,7 @@ Status: complete
 
 Add table-driven tests covering:
 
-- success allow/warn/block
+- success allow/clamp/block
 - timeout fail-open
 - timeout fail-closed
 - unavailable fail-open
@@ -221,7 +221,7 @@ Add table-driven tests covering:
 - late decision after timeout
 - duplicate timeout report
 - duplicate decision report
-- clamp on/off near-cap
+- clamp on/off projected budget pressure
 - cooldown active
 
 These tests should assert all of:

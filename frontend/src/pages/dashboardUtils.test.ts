@@ -10,7 +10,7 @@ describe("dashboardUtils", () => {
 
   it("formats incident type labels", () => {
     expect(humanizeIncidentType("retry_storm")).toBe("Retry storm");
-    expect(humanizeIncidentType("cap_breach")).toBe("Cap breach");
+    expect(humanizeIncidentType("block")).toBe("Block");
   });
 
   it("formats relative time in seconds, minutes, and hours", () => {

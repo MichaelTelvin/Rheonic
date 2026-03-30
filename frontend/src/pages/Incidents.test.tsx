@@ -57,7 +57,7 @@ describe("Incidents page", () => {
 
     await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai", "open"));
 
-    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "cap_breach" } });
+    fireEvent.change(screen.getByLabelText("Type"), { target: { value: "block" } });
     await waitFor(() => expect(mocks.fetchIncidents).toHaveBeenCalledWith("p1", "openai", "open"));
 
     fireEvent.change(screen.getByLabelText("Status"), { target: { value: "resolved" } });

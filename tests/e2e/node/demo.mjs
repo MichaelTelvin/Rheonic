@@ -28,22 +28,18 @@ function assertDelivery(client, expectedMinSent = 1) {
 
 function printConfigHint() {
   const targetHint = (process.env.RHEONIC_DEMO_TARGET_HINT ?? "").trim() || "demo-prod-node";
-  console.log(`  Run: make ${targetHint} RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach`);
+  console.log(`  Run: make ${targetHint} RHEONIC_PROVIDER=google RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=token_explosion`);
 }
 
 function printUsageExamples() {
   console.log("Example:");
   console.log("  RHEONIC_PROVIDER=openai");
   console.log("  RHEONIC_MODEL=gpt-4o-mini");
-  console.log("  RHEONIC_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all");
+  console.log("  RHEONIC_DEMO_CASE=steady|retry_storm|loop_suspect|token_explosion|all");
   console.log("  RHEONIC_STEP_SLEEP_MS=200");
   console.log("  RHEONIC_RETRY_STORM_COUNT=5");
   console.log("  RHEONIC_LOOP_COUNT=6");
   console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=5500");
-  console.log("  RHEONIC_CAP_BREACH_TOKENS=4000");
-  console.log("  RHEONIC_REQ_CAP_BREACH_COUNT=6");
-  console.log("  RHEONIC_CAP_BREACH_REQ_TOKENS=1");
-  console.log("  RHEONIC_NEAR_CAP_TOKENS=3200");
   console.log("  Optional snapshot/incident summary:");
   console.log("  RHEONIC_AUTH_EMAIL=<email> RHEONIC_AUTH_PASSWORD=<password> RHEONIC_PROJECT_ID=<project_id>");
   printConfigHint();
@@ -176,10 +172,6 @@ async function runDemo() {
   const retryStormCount = Number(process.env.RHEONIC_RETRY_STORM_COUNT ?? 5);
   const loopCount = Number(process.env.RHEONIC_LOOP_COUNT ?? 6);
   const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 5500);
-  const capBreachTokens = Number(process.env.RHEONIC_CAP_BREACH_TOKENS ?? 4000);
-  const capBreachReqCount = Number(process.env.RHEONIC_REQ_CAP_BREACH_COUNT ?? 6);
-  const capBreachReqTokens = Number(process.env.RHEONIC_CAP_BREACH_REQ_TOKENS ?? 1);
-  const nearCapTokens = Number(process.env.RHEONIC_NEAR_CAP_TOKENS ?? 3200);
   const projectId = process.env.RHEONIC_PROJECT_ID ?? "";
   const authEmail = (process.env.RHEONIC_AUTH_EMAIL ?? "").trim().toLowerCase();
   const authPassword = process.env.RHEONIC_AUTH_PASSWORD ?? "";
@@ -206,7 +198,7 @@ async function runDemo() {
 
   log(`[DEMO] observe ${demoCase} provider=${provider} model=${model} environment=${environment}`);
   logVerbose(
-    `[DEMO] params retry_storm_count=${retryStormCount} loop_count=${loopCount} token_explosion_tokens=${tokenExplosionTokens} cap_breach_tokens=${capBreachTokens} cap_breach_req_count=${capBreachReqCount} cap_breach_req_tokens=${capBreachReqTokens} near_cap_tokens=${nearCapTokens} step_sleep_ms=${stepSleepMs}`,
+    `[DEMO] params retry_storm_count=${retryStormCount} loop_count=${loopCount} token_explosion_tokens=${tokenExplosionTokens} step_sleep_ms=${stepSleepMs}`,
   );
 
   const runSteady = async () => {
@@ -228,14 +220,6 @@ async function runDemo() {
     }
     await client.flush();
     await printPhase(dashboardSession, "retry_storm", projectId, provider);
-  };
-
-  const runNearCap = async () => {
-    logVerbose("\n[STEP] Near-cap logging (observe)");
-    logVerbose("[STEP] Requires project token/request cap configured in Settings page.");
-    await sendEvent(client, provider, model, endpoint, nearCapTokens, "near-cap");
-    await client.flush();
-    await printPhase(dashboardSession, "near_cap", projectId, provider);
   };
 
   const runLoopSuspect = async () => {
@@ -264,50 +248,19 @@ async function runDemo() {
     await printPhase(dashboardSession, "token_explosion", projectId, provider);
   };
 
-  const runCapBreach = async () => {
-    logVerbose("\n[STEP] Cap breach logging (observe)");
-    logVerbose("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).");
-    await sendEvent(client, provider, model, endpoint, capBreachTokens, "cap-breach");
-    await client.flush();
-    await printPhase(dashboardSession, "cap_breach", projectId, provider);
-  };
-
-  const runReqCapBreach = async () => {
-    logVerbose("\n[STEP] Request cap breach logging (observe)");
-    logVerbose("[STEP] Requires project request cap configured in Mode page (max requests per minute).");
-    for (let i = 0; i < capBreachReqCount; i += 1) {
-      await sendEvent(client, provider, model, endpoint, capBreachReqTokens, `req-cap-breach-${i + 1}`, {
-        status: "ok",
-        httpStatus: 200,
-      });
-      await sleep(stepSleepMs);
-    }
-    await client.flush();
-    await printPhase(dashboardSession, "req_cap_breach", projectId, provider);
-  };
-
   if (demoCase === "all") {
     await runSteady();
-    await runNearCap();
     await runRetryStorm();
     await runLoopSuspect();
     await runTokenExplosion();
-    await runCapBreach();
-    await runReqCapBreach();
   } else if (demoCase === "steady") {
     await runSteady();
-  } else if (demoCase === "near_cap") {
-    await runNearCap();
   } else if (demoCase === "retry_storm") {
     await runRetryStorm();
   } else if (demoCase === "loop_suspect") {
     await runLoopSuspect();
   } else if (demoCase === "token_explosion") {
     await runTokenExplosion();
-  } else if (demoCase === "cap_breach") {
-    await runCapBreach();
-  } else if (demoCase === "req_cap_breach") {
-    await runReqCapBreach();
   } else {
     console.error(`Unsupported RHEONIC_DEMO_CASE: ${demoCase}`);
     printUsageExamples();
@@ -318,16 +271,14 @@ async function runDemo() {
 
   const expectedSent =
     demoCase === "all"
-      ? 1 + 1 + retryStormCount + (loopCount + 1) + 3 + 1 + capBreachReqCount
+      ? 1 + retryStormCount + (loopCount + 1) + 3
       : demoCase === "retry_storm"
         ? retryStormCount
         : demoCase === "loop_suspect"
           ? loopCount + 1
           : demoCase === "token_explosion"
             ? 3
-            : demoCase === "req_cap_breach"
-              ? capBreachReqCount
-              : 1;
+            : 1;
   assertDelivery(client, expectedSent);
   log("[DONE] observe demo complete");
   client.close();

@@ -52,7 +52,7 @@ class MetricsService:
         try:
             totals: dict[str, int] = {
                 "allowed_60m": 0,
-                "warned_60m": 0,
+                "clamped_60m": 0,
                 "blocked_60m": 0,
                 "decision_timeouts_60m": 0,
             }
@@ -65,7 +65,7 @@ class MetricsService:
                     project_id=scoped_project_provider_id(project_id, scoped_provider)
                 )
                 totals["allowed_60m"] += int(raw.get("allowed_60m", 0) or 0)
-                totals["warned_60m"] += int(raw.get("warned_60m", 0) or 0)
+                totals["clamped_60m"] += int(raw.get("clamped_60m", 0) or 0)
                 totals["blocked_60m"] += int(raw.get("blocked_60m", 0) or 0)
                 totals["decision_timeouts_60m"] += int(raw.get("decision_timeouts_60m", 0) or 0)
                 if isinstance(raw.get("decision_latency_p50_60m_ms"), int):
@@ -80,7 +80,7 @@ class MetricsService:
                         latest_last = raw_last
             metrics: dict[str, object] = {
                 "allowed_60m": totals["allowed_60m"],
-                "warned_60m": totals["warned_60m"],
+                "clamped_60m": totals["clamped_60m"],
                 "blocked_60m": totals["blocked_60m"],
                 "decision_timeouts_60m": totals["decision_timeouts_60m"],
                 "decision_latency_p50_60m_ms": (

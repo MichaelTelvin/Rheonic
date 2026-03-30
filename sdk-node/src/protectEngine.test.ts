@@ -232,7 +232,7 @@ test("parallel calls during active cooldown block locally without backend decisi
   }
 });
 
-test("near_cap warn allows provider call", async () => {
+test("clamp decision allows provider call", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () =>
     ({
@@ -240,7 +240,7 @@ test("near_cap warn allows provider call", async () => {
       status: 200,
       json: async () => ({
         decision: "warn",
-        reason: "near_cap",
+        reason: "token_clamp",
         fail_mode: "open",
         protect_decision_timeout_ms: 100,
       }),
@@ -258,7 +258,7 @@ test("near_cap warn allows provider call", async () => {
   }
 });
 
-test("decision warn allows provider call and tags telemetry", async () => {
+test("decision clamp allows provider call and tags telemetry", async () => {
   const originalFetch = globalThis.fetch;
   const ingestedEvents: Array<Record<string, unknown>> = [];
   globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -267,8 +267,8 @@ test("decision warn allows provider call and tags telemetry", async () => {
         ok: true,
         status: 200,
         json: async () => ({
-          decision: "warn",
-          reason: "retry_storm",
+          decision: "clamp",
+          reason: "token_clamp",
           fail_mode: "open",
           protect_decision_timeout_ms: 100,
         }),
@@ -292,8 +292,8 @@ test("decision warn allows provider call and tags telemetry", async () => {
     assert.equal(calls.length, 1);
     assert.equal(ingestedEvents.length, 1);
     const request = (ingestedEvents[0].request ?? {}) as Record<string, unknown>;
-    assert.equal(request.protect_decision, "warn");
-    assert.equal(request.protect_reason, "retry_storm");
+    assert.equal(request.protect_decision, "clamp");
+    assert.equal(request.protect_reason, "token_clamp");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;

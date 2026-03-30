@@ -1,6 +1,6 @@
 # Application service for event ingestion.
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.event_repository import EventRepository
@@ -11,9 +11,8 @@ from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.incident_manager import IncidentManager
 from app.application.services.transport_service import TransportService
 from app.config import app_config
-from app.domain.detectors.contracts import DetectionContext, Signal
+from app.domain.detectors.contracts import DetectionContext
 from app.domain.detectors.loop_suspect_detector import LoopSuspectDetector
-from app.domain.detectors.near_cap_detector import NearCapDetector
 from app.domain.detectors.registry import DetectorRegistry
 from app.domain.detectors.retry_storm_detector import RetryStormDetector
 from app.domain.detectors.token_explosion_detector import TokenExplosionDetector, resolve_previous_estimated_tokens
@@ -68,7 +67,6 @@ class IngestEventService:
         self._incident_dedup_window_seconds = incident_dedup_window_seconds
         self._detector_registry = DetectorRegistry(
             detectors=[
-                NearCapDetector(),
                 RetryStormDetector(),
                 LoopSuspectDetector(),
                 TokenExplosionDetector(),
@@ -79,6 +77,7 @@ class IngestEventService:
             incident_repository=incident_repository,
             incident_dedup_window_seconds=incident_dedup_window_seconds,
             webhook_dispatcher=webhook_dispatcher,
+            transport_service=transport_service,
         )
         self._webhook_dispatcher = webhook_dispatcher
 
@@ -133,8 +132,6 @@ class IngestEventService:
                 previous_estimated_tokens=previous_estimated_tokens,
                 current_event=event,
                 recent_events=recent_events,
-                warn_ratio=app_config.protect_near_cap_factor,
-                predictive_near_cap=False,
                 retry_storm_window_seconds=self._retry_storm_window_seconds,
                 retry_storm_count=self._retry_storm_count,
                 loop_window_seconds=self._loop_window_seconds,
@@ -149,32 +146,6 @@ class IngestEventService:
                 token_explosion_concurrency_threshold=self._token_explosion_concurrency_threshold,
             )
             signals = self._detector_registry.detect(ctx)
-            cap_breach_signals = self._cap_breach_signal_if_any(ctx)
-            if cap_breach_signals:
-                # Dominance L3: cap_breach suppresses all other signals for this ingest event.
-                # A live cap breach supersedes only recent open near-cap incidents from the same provider.
-                self._incident_repository.resolve_open_incidents_by_type(
-                    project_id=event.project_id,
-                    provider=provider,
-                    incident_type=app_config.incident_type_near_cap,
-                    resolved_at=self._now_provider(),
-                    created_after=self._now_provider() - timedelta(seconds=self._incident_dedup_window_seconds),
-                )
-                signals = cap_breach_signals
-            else:
-                near_cap_signals = [signal for signal in signals if signal.detector == "near_cap"]
-                if near_cap_signals:
-                    # Dominance L2: near_cap suppresses behavioral signals for this ingest event.
-                    signals = near_cap_signals
-                else:
-                    behavioral_signals = [
-                        signal for signal in signals if signal.detector in {"retry_storm", "loop_suspect"}
-                    ]
-                    if behavioral_signals:
-                        # Dominance L1: pick one primary behavioral reason so ingest incidents match
-                        # protect preflight's single returned reason and notification semantics.
-                        signals = [behavioral_signals[0]]
-                # Dominance L1: behavioral signals may coexist.
             self._incident_manager.process_signals(
                 project_id=event.project_id,
                 provider=provider,
@@ -187,35 +158,6 @@ class IngestEventService:
         except Exception:
             logger.exception("Ingest service failed", extra={"project_id": event.project_id})
             raise
-
-    def _cap_breach_signal_if_any(self, ctx: DetectionContext) -> list[Signal]:
-        req_breach = bool(ctx.req_cap is not None and ctx.current_requests_60s >= ctx.req_cap)
-        tok_breach = bool(ctx.tok_cap is not None and ctx.current_tokens_60s >= ctx.tok_cap)
-        if not (req_breach or tok_breach):
-            return []
-        reason = "tok_cap_breach" if tok_breach else "req_cap_breach"
-        evidence: dict[str, object] = {
-            "provider": ctx.provider,
-            "model": ctx.model,
-            "environment": ctx.environment,
-            "requests_60s": ctx.current_requests_60s,
-            "tokens_60s": ctx.current_tokens_60s,
-            "req_cap": ctx.req_cap,
-            "tok_cap": ctx.tok_cap,
-            "estimated_next_tokens": ctx.estimated_next_tokens,
-            "req_cap_breach": req_breach,
-            "tok_cap_breach": tok_breach,
-            "reason": reason,
-        }
-        return [
-            Signal(
-                detector="cap_breach",
-                scope_provider=ctx.provider,
-                fingerprint=f"{ctx.project_id}:{ctx.provider}:cap_breach",
-                evidence=evidence,
-                episode_window_seconds=60,
-            )
-        ]
 
     def _detect_policy_gap_if_needed(self, *, event: Event) -> None:
         # Record first-seen project/provider/model tuples and emit one-time policy-gap webhook notification.

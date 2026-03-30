@@ -80,6 +80,7 @@ Protect settings include:
 
 Protect decisions return:
 - `decision`
+  - values: `allow`, `clamp`, `block`
 - `reason`
 - `fail_mode`
 - `retry_after_seconds`

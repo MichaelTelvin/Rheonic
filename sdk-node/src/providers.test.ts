@@ -20,8 +20,8 @@ function makeClient(decision: Record<string, unknown>) {
 
 test("openai adapter clamps max_tokens and captures provider failures", async () => {
   const client = makeClient({
-    decision: "warn",
-    reason: "near_cap",
+    decision: "clamp",
+    reason: "token_clamp",
     applyClampEnabled: true,
     clamp: { recommended_max_output_tokens: 32, applied: false },
   });
@@ -52,8 +52,8 @@ test("anthropic adapter returns original client when messages.create is missing"
 test("google adapter injects generation_config clamp into dict payloads", async () => {
   setGoogleEstimatorForTests(() => 77);
   const client = makeClient({
-    decision: "warn",
-    reason: "near_cap",
+    decision: "clamp",
+    reason: "token_clamp",
     applyClampEnabled: true,
     clamp: { recommended_max_output_tokens: 20, applied: false },
   });
@@ -98,8 +98,8 @@ test("anthropic adapter captures failure status from response object", async () 
 
 test("google adapter clamps second-argument generationConfig and preserves lower limits", async () => {
   const client = makeClient({
-    decision: "warn",
-    reason: "near_cap",
+    decision: "clamp",
+    reason: "token_clamp",
     applyClampEnabled: true,
     clamp: { recommended_max_output_tokens: 20, applied: false },
   });
@@ -140,8 +140,8 @@ test("google adapter reports failure status from statusCode", async () => {
 
 test("openai adapter clamps max_output_tokens payloads and reads response.status", async () => {
   const client = makeClient({
-    decision: "warn",
-    reason: "near_cap",
+    decision: "clamp",
+    reason: "token_clamp",
     applyClampEnabled: true,
     clamp: { recommended_max_output_tokens: 24, applied: false },
   });
@@ -166,8 +166,8 @@ test("openai adapter clamps max_output_tokens payloads and reads response.status
 test("anthropic adapter applies clamp when max_tokens is missing and sums token usage", async () => {
   setAnthropicEstimatorForTests(() => 88);
   const client = makeClient({
-    decision: "warn",
-    reason: "near_cap",
+    decision: "clamp",
+    reason: "token_clamp",
     applyClampEnabled: true,
     clamp: { recommended_max_output_tokens: 11, applied: false },
   });
@@ -202,8 +202,8 @@ test("openai adapter returns original object when completions.create is missing"
 test("openai adapter injects recommended max_tokens when no output limit exists", async () => {
   setOpenAIEstimatorForTests(() => 99);
   const client = makeClient({
-    decision: "warn",
-    reason: "near_cap",
+    decision: "clamp",
+    reason: "token_clamp",
     applyClampEnabled: true,
     clamp: { recommended_max_output_tokens: 13, applied: false },
   });
@@ -274,8 +274,8 @@ test("anthropic adapter returns undefined totals and http status from statusCode
 
 test("google adapter skips clamp when disabled and reads response.status on failures", async () => {
   const successClient = makeClient({
-    decision: "warn",
-    reason: "near_cap",
+    decision: "clamp",
+    reason: "token_clamp",
     applyClampEnabled: false,
     clamp: { recommended_max_output_tokens: 9, applied: false },
   });

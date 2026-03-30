@@ -153,7 +153,7 @@ async function main() {
     await openai.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 2000,
-      messages: [{ role: "user", content: "Predictive warning near cap check for node e2e clamp off." }],
+      messages: [{ role: "user", content: "Clamp-off allow check for node e2e." }],
     });
   } catch (error) {
     blocked = error instanceof RHEONICBlockedError;
@@ -178,7 +178,7 @@ async function main() {
     await openai.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 2000,
-      messages: [{ role: "user", content: "Predictive warning near cap check for node e2e clamp on." }],
+      messages: [{ role: "user", content: "Clamp-on check for node e2e." }],
     });
   } catch (error) {
     blocked = error instanceof RHEONICBlockedError;
@@ -189,10 +189,10 @@ async function main() {
   assert.ok(clampedMaxTokens > 0 && clampedMaxTokens < 2000);
 
   const protectMetrics = await session.request(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`);
-  assert.ok(Number(protectMetrics.warned_60m ?? 0) >= 2);
+  assert.ok(Number(protectMetrics.clamped_60m ?? 0) >= 1);
   const openIncidents = await session.request(`/api/v1/incidents?project_id=${encodeURIComponent(project.id)}&status=open&provider=openai`);
   assert.ok(Array.isArray(openIncidents));
-  assert.ok(openIncidents.some((row) => row.type === "near_cap"));
+  assert.ok(openIncidents.every((row) => row.type !== "block"));
 
   const metricsBeforeCooldown = await session.request(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`);
   const blockedBeforeCooldown = Number(metricsBeforeCooldown.blocked_60m ?? 0);

@@ -35,9 +35,10 @@ logger = get_logger(__name__)
 
 _SYSTEM_EMAIL_EVENTS = {"feedback.submitted"}
 _ALERT_EMAIL_EVENTS = {
-    "protection.warn",
     "protection.clamp_started",
     "protection.block",
+    "incident.warn",
+    "incident.block",
     "incident.resolved",
     "webhook.delivery_failed",
 }

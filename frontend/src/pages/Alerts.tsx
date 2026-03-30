@@ -27,11 +27,11 @@ function formatDateTime(iso: string | null): string {
   return value.toLocaleString();
 }
 
-const SAMPLE_WARN_PAYLOAD = JSON.stringify(
+const SAMPLE_CLAMP_PAYLOAD = JSON.stringify(
   {
-    event: "protection.warn",
+    event: "protection.clamp_started",
     project_id: "proj_123",
-    reason: "retry_storm",
+    reason: "token_clamp",
     provider: "openai",
     model: "gpt-4o-mini",
     environment: "staging",
@@ -349,7 +349,7 @@ export function Alerts(): JSX.Element {
 
   const onCopyPayload = async (): Promise<void> => {
     try {
-      await navigator.clipboard.writeText(SAMPLE_WARN_PAYLOAD);
+      await navigator.clipboard.writeText(SAMPLE_CLAMP_PAYLOAD);
       setPayloadCopied(true);
       window.setTimeout(() => setPayloadCopied(false), 1200);
     } catch {
@@ -509,7 +509,7 @@ export function Alerts(): JSX.Element {
             <div className="modal alerts-payload-modal">
               <div className="alerts-payload-modal-header">
                 <h2 id="alerts-payload-title" className="section-title">
-                  Sample payload for protection warn event
+                  Sample payload for protection clamp event
                 </h2>
                 <button
                   type="button"
@@ -520,7 +520,7 @@ export function Alerts(): JSX.Element {
                 </button>
               </div>
               <pre className="alerts-payload-code">
-                <code>{SAMPLE_WARN_PAYLOAD}</code>
+                <code>{SAMPLE_CLAMP_PAYLOAD}</code>
               </pre>
               <div className="modal-actions alerts-payload-modal-actions">
                 <button type="button" className="modal-button action-btn" onClick={() => void onCopyPayload()}>

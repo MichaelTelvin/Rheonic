@@ -26,8 +26,7 @@ def humanize_incident_type(value: object) -> str:
     if not normalized:
         return "-"
     mapping = {
-        "cap_breach": "Cap breach",
-        "near_cap": "Near cap",
+        "block": "Block",
         "retry_storm": "Retry storm",
         "loop_suspect": "Loop suspect",
         "token_explosion": "Token explosion",

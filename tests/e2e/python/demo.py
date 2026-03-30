@@ -215,19 +215,15 @@ def _usage() -> None:
     print("Example:")
     print("  RHEONIC_PROVIDER=openai")
     print("  RHEONIC_MODEL=gpt-4o-mini")
-    print("  RHEONIC_DEMO_CASE=steady|near_cap|retry_storm|loop_suspect|token_explosion|cap_breach|req_cap_breach|all")
+    print("  RHEONIC_DEMO_CASE=steady|retry_storm|loop_suspect|token_explosion|all")
     print("  RHEONIC_STEP_SLEEP_MS=200")
     print("  RHEONIC_RETRY_STORM_COUNT=5")
     print("  RHEONIC_LOOP_COUNT=6")
     print("  RHEONIC_TOKEN_EXPLOSION_TOKENS=5500")
-    print("  RHEONIC_CAP_BREACH_TOKENS=4000")
-    print("  RHEONIC_REQ_CAP_BREACH_COUNT=6")
-    print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
-    print("  RHEONIC_NEAR_CAP_TOKENS=3200")
     print("  Optional snapshot/incident summary: RHEONIC_AUTH_EMAIL, RHEONIC_AUTH_PASSWORD, RHEONIC_PROJECT_ID")
     print(
         f"  Run: make {target_hint} RHEONIC_PROVIDER=google "
-        "RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=req_cap_breach"
+        "RHEONIC_MODEL=gemini-1.5-pro RHEONIC_DEMO_CASE=token_explosion"
     )
 
 
@@ -266,10 +262,6 @@ def main() -> None:
     retry_storm_count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "5"))
     loop_count = int(os.getenv("RHEONIC_LOOP_COUNT", "6"))
     token_explosion_tokens = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "5500"))
-    cap_breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "4000"))
-    cap_breach_req_count = int(os.getenv("RHEONIC_REQ_CAP_BREACH_COUNT", "6"))
-    cap_breach_req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
-    near_cap_tokens = int(os.getenv("RHEONIC_NEAR_CAP_TOKENS", "3200"))
 
     project_id = os.getenv("RHEONIC_PROJECT_ID", "")
     auth_email = (os.getenv("RHEONIC_AUTH_EMAIL", "") or "").strip().lower()
@@ -299,10 +291,6 @@ def main() -> None:
             "[DEMO] params "
             f"retry_storm_count={retry_storm_count} loop_count={loop_count} "
             f"token_explosion_tokens={token_explosion_tokens} "
-            f"cap_breach_tokens={cap_breach_tokens} "
-            f"cap_breach_req_count={cap_breach_req_count} "
-            f"cap_breach_req_tokens={cap_breach_req_tokens} "
-            f"near_cap_tokens={near_cap_tokens} "
             f"step_sleep_ms={step_sleep_ms}"
         )
 
@@ -314,20 +302,6 @@ def main() -> None:
             _print_phase(
                 dashboard_session,
                 "steady",
-                project_id,
-                provider,
-                phase_started_at=phase_started_at,
-            )
-
-        def run_near_cap() -> None:
-            _log_verbose("\n[STEP] Near-cap logging (observe)")
-            _log_verbose("[STEP] Requires project token/request cap configured in Settings page.")
-            phase_started_at = datetime.now().astimezone()
-            _send_event(provider, model, endpoint, near_cap_tokens, "near-cap", environment)
-            client.flush()
-            _print_phase(
-                dashboard_session,
-                "near_cap",
                 project_id,
                 provider,
                 phase_started_at=phase_started_at,
@@ -409,81 +383,26 @@ def main() -> None:
                 phase_started_at=phase_started_at,
             )
 
-        def run_cap_breach() -> None:
-            _log_verbose("\n[STEP] Cap breach logging (observe)")
-            _log_verbose("[STEP] Requires project caps configured in Mode page (max requests/tokens per minute).")
-            phase_started_at = datetime.now().astimezone()
-            _send_event(
-                provider,
-                model,
-                endpoint,
-                cap_breach_tokens,
-                "cap-breach",
-                environment,
-            )
-            client.flush()
-            _print_phase(
-                dashboard_session,
-                "cap_breach",
-                project_id,
-                provider,
-                phase_started_at=phase_started_at,
-            )
-
-        def run_req_cap_breach() -> None:
-            _log_verbose("\n[STEP] Request cap breach logging (observe)")
-            _log_verbose("[STEP] Requires project request cap configured in Mode page (max requests per minute).")
-            phase_started_at = datetime.now().astimezone()
-            for i in range(cap_breach_req_count):
-                _send_event(
-                    provider,
-                    model,
-                    endpoint,
-                    cap_breach_req_tokens,
-                    f"req-cap-breach-{i + 1}",
-                    environment,
-                    status="ok",
-                    http_status=200,
-                )
-                time.sleep(step_sleep_ms / 1000)
-            client.flush()
-            _print_phase(
-                dashboard_session,
-                "req_cap_breach",
-                project_id,
-                provider,
-                phase_started_at=phase_started_at,
-            )
-
         if demo_case == "all":
             run_steady()
-            run_near_cap()
             run_retry_storm()
             run_loop_suspect()
             run_token_explosion()
-            run_cap_breach()
-            run_req_cap_breach()
         elif demo_case == "steady":
             run_steady()
-        elif demo_case == "near_cap":
-            run_near_cap()
         elif demo_case == "retry_storm":
             run_retry_storm()
         elif demo_case == "loop_suspect":
             run_loop_suspect()
         elif demo_case == "token_explosion":
             run_token_explosion()
-        elif demo_case == "cap_breach":
-            run_cap_breach()
-        elif demo_case == "req_cap_breach":
-            run_req_cap_breach()
         else:
             print(f"Unsupported RHEONIC_DEMO_CASE: {demo_case}")
             _usage()
             return
 
         expected_sent = (
-            1 + 1 + retry_storm_count + (loop_count + 1) + 3 + 1 + cap_breach_req_count
+            1 + retry_storm_count + (loop_count + 1) + 3
             if demo_case == "all"
             else retry_storm_count
             if demo_case == "retry_storm"
@@ -491,8 +410,6 @@ def main() -> None:
             if demo_case == "loop_suspect"
             else 3
             if demo_case == "token_explosion"
-            else cap_breach_req_count
-            if demo_case == "req_cap_breach"
             else 1
         )
         _assert_delivery(client, expected_min_sent=expected_sent)

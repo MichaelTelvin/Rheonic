@@ -69,7 +69,7 @@ describe("Dashboard", () => {
     mocks.fetchProjectProviders.mockResolvedValue(["anthropic", "openai"]);
     mocks.fetchProtectMetrics.mockResolvedValue({
       allowed_60m: 0,
-      warned_60m: 0,
+      clamped_60m: 0,
       blocked_60m: 0,
       decision_timeouts_60m: 0,
       decision_latency_p50_60m_ms: null,
@@ -188,7 +188,7 @@ describe("Dashboard", () => {
     mocks.fetchIncidents.mockResolvedValueOnce([
       {
         id: "inc-1",
-        type: "cap_breach",
+        type: "block",
         status: "open",
         created_at: new Date().toISOString(),
         resolved_at: null,
@@ -209,9 +209,8 @@ describe("Dashboard", () => {
       </TestRouter>,
     );
     await screen.findByText("Incident episodes");
-    expect(screen.getByText("Near cap")).toBeDefined();
+    expect(screen.getByText("Block")).toBeDefined();
     expect(screen.getByText("Retry storm")).toBeDefined();
-    expect(screen.getByText("Cap breach")).toBeDefined();
   });
 
   it("does not render dashboard config modal buttons", async () => {

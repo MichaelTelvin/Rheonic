@@ -42,8 +42,8 @@ def _client_with_decision(decision: dict[str, object]) -> Client:
 def test_openai_clamp_applies_recommended_max_tokens_and_marks_applied() -> None:
     client = _client_with_decision(
         {
-            "decision": "warn",
-            "reason": "near_cap",
+            "decision": "clamp",
+            "reason": "token_clamp",
             "apply_clamp_enabled": True,
             "clamp": {"recommended_max_output_tokens": 32, "applied": False},
         }
@@ -93,8 +93,8 @@ def test_openai_failure_capture_reads_http_status_from_exception_response() -> N
 def test_openai_async_wrapper_supports_success_and_clamp() -> None:
     client = _client_with_decision(
         {
-            "decision": "warn",
-            "reason": "near_cap",
+            "decision": "clamp",
+            "reason": "token_clamp",
             "apply_clamp_enabled": True,
             "clamp": {"recommended_max_output_tokens": 12, "applied": False},
         }
@@ -143,8 +143,8 @@ def test_openai_async_wrapper_captures_failure() -> None:
 def test_anthropic_async_wrapper_blocks_and_supports_clamp() -> None:
     client = _client_with_decision(
         {
-            "decision": "warn",
-            "reason": "near_cap",
+            "decision": "clamp",
+            "reason": "token_clamp",
             "apply_clamp_enabled": True,
             "clamp": {"recommended_max_output_tokens": 10, "applied": False},
         }
@@ -184,8 +184,8 @@ def test_anthropic_block_raises_blocked_error() -> None:
 def test_google_clamp_inserts_generation_config_and_extracts_nested_usage() -> None:
     client = _client_with_decision(
         {
-            "decision": "warn",
-            "reason": "near_cap",
+            "decision": "clamp",
+            "reason": "token_clamp",
             "apply_clamp_enabled": True,
             "clamp": {"recommended_max_output_tokens": 15, "applied": False},
         }
@@ -218,8 +218,8 @@ def test_google_clamp_inserts_generation_config_and_extracts_nested_usage() -> N
 def test_google_async_wrapper_supports_success_and_clamp() -> None:
     client = _client_with_decision(
         {
-            "decision": "warn",
-            "reason": "near_cap",
+            "decision": "clamp",
+            "reason": "token_clamp",
             "apply_clamp_enabled": True,
             "clamp": {"recommended_max_output_tokens": 9, "applied": False},
         }

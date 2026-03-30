@@ -127,7 +127,7 @@ function estimatePromptTokens(payload) {
 
 function printConfigHint() {
   const targetHint = (process.env.RHEONIC_DEMO_TARGET_HINT ?? "").trim() || "protect-prod-node";
-  console.log(`Run: make ${targetHint} RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach`);
+  console.log(`Run: make ${targetHint} RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=tok_cap_breach`);
   console.log("Optional exact provider-call visibility: python3 tests/e2e/provider_stub.py");
 }
 
@@ -398,21 +398,21 @@ async function main() {
   let callMaxTokens = maxTokens;
   console.log(`[DEMO] max_tokens(before call)=${maxTokens}`);
 
-  if (scenario === "near_cap") {
-    const seed = Number(process.env.RHEONIC_NEAR_CAP_SEED_TOKENS ?? 1600);
-    console.log("[STEP] Seed near-cap traffic then expect warn");
-    await sendIngestEvent(ingestKey, provider, model, seed, "near-cap-seed", env);
+  if (scenario === "clamp") {
+    const seed = Number(process.env.RHEONIC_CLAMP_SEED_TOKENS ?? 1600);
+    console.log("[STEP] Seed clamp traffic then expect clamp");
+    await sendIngestEvent(ingestKey, provider, model, seed, "clamp-seed", env);
     await sleep(pauseMs);
-  } else if (scenario === "cap_breach") {
-    const seed = Number(process.env.RHEONIC_CAP_BREACH_TOKENS ?? 5000);
-    console.log("[STEP] Seed cap breach then expect block");
-    await sendIngestEvent(ingestKey, provider, model, seed, "cap-breach-seed", env);
+  } else if (scenario === "tok_cap_breach") {
+    const seed = Number(process.env.RHEONIC_TOK_CAP_BREACH_TOKENS ?? 5000);
+    console.log("[STEP] Seed token-cap breach then expect block");
+    await sendIngestEvent(ingestKey, provider, model, seed, "tok-cap-breach-seed", env);
     callMaxTokens = Math.max(maxTokens, seed);
-    console.log(`[STEP] cap_breach call max_tokens=${callMaxTokens}`);
+    console.log(`[STEP] tok_cap_breach call max_tokens=${callMaxTokens}`);
     await sleep(pauseMs);
   } else if (scenario === "req_cap_breach") {
     let count = envInt("RHEONIC_REQ_CAP_BREACH_COUNT", 6);
-    const reqTokens = envInt("RHEONIC_CAP_BREACH_REQ_TOKENS", 1);
+    const reqTokens = envInt("RHEONIC_REQ_CAP_BREACH_TOKENS", 1);
     const reqCap = await getProjectReqCap(projectId, dashboardSession);
     if (typeof reqCap === "number") {
       count = Math.max(count, reqCap + 1);
@@ -427,7 +427,7 @@ async function main() {
     console.log(`[STEP] req_cap_breach ingest events sent=${count} (provider_calls_delta tracks provider calls only)`);
   } else if (scenario === "retry_storm") {
     const count = envInt("RHEONIC_RETRY_STORM_COUNT", 5);
-    console.log("[STEP] Seed failed attempts for retry storm then expect warn");
+    console.log("[STEP] Seed failed attempts for retry storm then expect incident");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 50, `retry-${i + 1}`, env, {
         status: "error",
@@ -438,7 +438,7 @@ async function main() {
     }
   } else if (scenario === "loop_suspect") {
     const count = envInt("RHEONIC_LOOP_COUNT", 6);
-    console.log("[STEP] Seed a rapid repeated sequence for loop suspect then expect warn");
+    console.log("[STEP] Seed a rapid repeated sequence for loop suspect then expect incident");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 60, "loop-fixed-signature", env);
       await sleep(pauseMs);
@@ -450,7 +450,7 @@ async function main() {
     const stepTwoMax = Math.floor(peak / 1.7);
     const stepTwo = Math.max(stepTwoMin, stepTwoMax);
     const growthSteps = [stepOne, stepTwo];
-    console.log(`[STEP] Seed token explosion growth history then expect warn (history=${growthSteps.join(" -> ")}, live=${peak})`);
+    console.log(`[STEP] Seed token explosion growth history then expect incident (history=${growthSteps.join(" -> ")}, live=${peak})`);
     for (const growthValue of growthSteps) {
       await sendIngestEvent(ingestKey, provider, model, growthValue, "token-explosion-growth", env, {
         tokenExplosionTokens: growthValue,
@@ -462,9 +462,9 @@ async function main() {
     console.log(`[STEP] token_explosion live prompt targets request-context growth to ~${peak} tokens`);
     await sleep(pauseMs);
   } else if (scenario === "cooldown") {
-    const seed = envInt("RHEONIC_CAP_BREACH_TOKENS", 5000);
-    console.log("[STEP] Seed cap breach then verify cooldown blocks repeated call");
-    await sendIngestEvent(ingestKey, provider, model, seed, "cooldown-breach-seed", env);
+    const seed = envInt("RHEONIC_TOK_CAP_BREACH_TOKENS", 5000);
+    console.log("[STEP] Seed token-cap breach then verify cooldown blocks repeated call");
+    await sendIngestEvent(ingestKey, provider, model, seed, "cooldown-block-seed", env);
     callMaxTokens = Math.max(maxTokens, seed);
     console.log(`[STEP] cooldown call max_tokens=${callMaxTokens}`);
     await sleep(pauseMs);
@@ -507,7 +507,7 @@ async function main() {
   );
 
   console.log(`[RESULT] blocked=${blocked} provider_calls_delta=${providerCallsDelta}`);
-  if (scenario === "near_cap") {
+  if (scenario === "clamp") {
     console.log(`[CLAMP] recommended=${lastClampRecommended} applied=${lastClampApplied} used_max_tokens=${usedMaxTokens}`);
   }
 
@@ -515,23 +515,13 @@ async function main() {
   if (projectId && dashboardSession) {
     const incidents = await listOpenIncidents(projectId, provider, dashboardSession);
     const counts = new Map();
-    const nearTypes = new Set();
     for (const incident of incidents) counts.set(incident.type, (counts.get(incident.type) ?? 0) + 1);
-    for (const incident of incidents) {
-      if (incident.type === "near_cap" && typeof incident.evidence?.near_cap_type === "string" && incident.evidence.near_cap_type) {
-        nearTypes.add(incident.evidence.near_cap_type);
-      }
-    }
     incidentTypes = new Set(incidents.map((incident) => incident.type));
     const compact = Array.from(counts.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join(", ");
-    if (nearTypes.size > 0) {
-      console.log(`[INCIDENTS] open=${incidents.length} types=${compact || "none"} near_cap_types=${Array.from(nearTypes).sort().join(",")}`);
-    } else {
-      console.log(`[INCIDENTS] open=${incidents.length} types=${compact || "none"}`);
-    }
+    console.log(`[INCIDENTS] open=${incidents.length} types=${compact || "none"}`);
   } else {
     console.log("[INCIDENTS] skipped (set RHEONIC_PROJECT_ID, RHEONIC_AUTH_EMAIL, and RHEONIC_AUTH_PASSWORD)");
   }
@@ -540,8 +530,8 @@ async function main() {
   const reason = lastDecisionReason;
   if (scenario === "allow") {
     assertLine("allow passed", !blocked && providerCallsDelta >= 1 && decision === "allow");
-  } else if (scenario === "near_cap") {
-    assertLine("near_cap warn triggered", !blocked && decision === "warn" && reason === "near_cap");
+  } else if (scenario === "clamp") {
+    assertLine("clamp triggered", !blocked && decision === "clamp" && reason === "token_clamp");
     const clampSuggested = typeof lastClampRecommended === "number" && lastClampRecommended > 0;
     const clampShouldApply = clampSuggested && typeof maxTokens === "number" && lastClampRecommended < maxTokens;
     const clampEnforced = clampSuggested && usedMaxTokens === lastClampRecommended && providerCallsDelta >= 1;
@@ -551,23 +541,28 @@ async function main() {
     } else {
       assertLine("clamp not applied", !lastClampApplied && !clampEnforced);
     }
-  } else if (scenario === "cap_breach") {
-    assertLine("cap breach blocked", blocked && providerCallsDelta === 0 && incidentTypes.has("cap_breach"));
+  } else if (scenario === "tok_cap_breach") {
+    assertLine("token cap breach blocked", blocked && providerCallsDelta === 0 && reason === "tok_cap_breach");
+    assertLine("block incident opened", incidentTypes.has("block"));
   } else if (scenario === "req_cap_breach") {
-    assertLine("req_cap breach blocked", blocked && providerCallsDelta === 0 && incidentTypes.has("cap_breach"));
+    assertLine("req_cap breach blocked", blocked && providerCallsDelta === 0 && reason === "req_cap_breach");
+    assertLine("block incident opened", incidentTypes.has("block"));
     assertLine("req_cap breach triggered block", blocked && providerCallsDelta === 0);
   } else if (scenario === "retry_storm") {
     assertLine(
-      "retry_storm warn triggered from failed attempts",
-      !blocked && decision === "warn" && reason === "retry_storm",
+      "retry_storm stayed allowed at preflight",
+      !blocked && decision === "allow",
     );
+    assertLine("retry_storm incident opened", incidentTypes.has("retry_storm"));
   } else if (scenario === "loop_suspect") {
     assertLine(
-      "loop_suspect warn triggered from a rapid repeated sequence",
-      !blocked && decision === "warn" && reason === "loop_suspect",
+      "loop_suspect stayed allowed at preflight",
+      !blocked && decision === "allow",
     );
+    assertLine("loop_suspect incident opened", incidentTypes.has("loop_suspect"));
   } else if (scenario === "token_explosion") {
-    assertLine("token_explosion warn triggered", !blocked && decision === "warn" && reason === "token_explosion");
+    assertLine("token_explosion stayed allowed at preflight", !blocked && decision === "allow");
+    assertLine("token_explosion incident opened", incidentTypes.has("token_explosion"));
   } else if (scenario === "cooldown") {
     assertLine("cooldown active", blocked && providerCallsDelta === 0);
     assertLine("cooldown active - repeated call blocked", blocked && providerCallsDelta === 0);

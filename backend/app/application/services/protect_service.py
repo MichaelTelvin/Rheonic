@@ -6,19 +6,12 @@ from time import perf_counter
 from typing import Callable
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
-from app.application.interfaces.event_repository import EventRepository
 from app.application.interfaces.project_repository import ProjectRepository
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.transport_service import TransportService, build_transport_dedupe_key
 from app.config import Settings, app_config
-from app.domain.detectors.contracts import DetectionContext
-from app.domain.detectors.loop_suspect_detector import LoopSuspectDetector
-from app.domain.detectors.near_cap_detector import NearCapDetector
-from app.domain.detectors.registry import DetectorRegistry
-from app.domain.detectors.retry_storm_detector import RetryStormDetector
-from app.domain.detectors.token_explosion_detector import TokenExplosionDetector, resolve_previous_estimated_tokens
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.logger import get_logger
 
@@ -41,7 +34,7 @@ class ProtectDecision:
 
 @dataclass(slots=True)
 class ProtectDecisionContext:
-    # Optional request context used for proactive predictive warning.
+    # Optional request context used for clamp and budget calculations.
     max_output_tokens: int | None = None
     input_tokens_estimate: int | None = None
     environment: str | None = None
@@ -61,26 +54,13 @@ class ProtectService:
         protect_block_cooldown_seconds: int,
         project_repository: ProjectRepository | None = None,
         incident_dedup_window_seconds: int | None = None,
-        event_repository: EventRepository | None = None,
         webhook_dispatcher: WebhookDispatcher | None = None,
         transport_service: TransportService | None = None,
         now_provider: Callable[[], datetime] | None = None,
         protect_decision_timeout_ms: int | None = None,
-        retry_storm_window_seconds: int = app_config.retry_storm_window_seconds,
-        retry_storm_count: int = app_config.retry_storm_count,
-        loop_window_seconds: int = app_config.loop_window_seconds,
-        loop_count: int = app_config.loop_count,
-        loop_max_gap_seconds: float = app_config.loop_max_gap_seconds,
-        loop_concurrency_threshold: int = app_config.loop_concurrency_threshold,
-        token_explosion_ratio: float = app_config.token_explosion_ratio,
-        token_explosion_abs: int = app_config.token_explosion_abs,
-        token_explosion_growth_ratio: float = app_config.token_explosion_growth_ratio,
-        token_explosion_growth_count: int = app_config.token_explosion_growth_count,
-        token_explosion_growth_min_tokens: int = app_config.token_explosion_growth_min_tokens,
-        token_explosion_concurrency_threshold: int = app_config.token_explosion_concurrency_threshold,
+        protect_clamp_factor: float = app_config.protect_clamp_factor,
     ) -> None:
         self._ingest_key_service = ingest_key_service
-        self._event_repository = event_repository
         self._realtime_counters = realtime_counters
         self._protect_action_store = protect_action_store
         self._protect_block_cooldown_seconds = protect_block_cooldown_seconds
@@ -98,26 +78,7 @@ class ProtectService:
             if protect_decision_timeout_ms is not None
             else Settings().protect_decision_timeout_ms
         )
-        self._retry_storm_window_seconds = retry_storm_window_seconds
-        self._retry_storm_count = retry_storm_count
-        self._loop_window_seconds = loop_window_seconds
-        self._loop_count = loop_count
-        self._loop_max_gap_seconds = loop_max_gap_seconds
-        self._loop_concurrency_threshold = loop_concurrency_threshold
-        self._token_explosion_ratio = token_explosion_ratio
-        self._token_explosion_abs = token_explosion_abs
-        self._token_explosion_growth_ratio = token_explosion_growth_ratio
-        self._token_explosion_growth_count = token_explosion_growth_count
-        self._token_explosion_growth_min_tokens = token_explosion_growth_min_tokens
-        self._token_explosion_concurrency_threshold = token_explosion_concurrency_threshold
-        self._fast_warn_detector_registry = DetectorRegistry(detectors=[NearCapDetector()])
-        self._behavioral_warn_detector_registry = DetectorRegistry(
-            detectors=[
-                RetryStormDetector(),
-                LoopSuspectDetector(),
-            ]
-        )
-        self._deferred_warn_detector_registry = DetectorRegistry(detectors=[TokenExplosionDetector()])
+        self._protect_clamp_factor = protect_clamp_factor
 
     def evaluate_decision(
         self,
@@ -268,255 +229,43 @@ class ProtectService:
             input_estimate = max(ctx.input_tokens_estimate, 0)
             output_estimate = max(ctx.max_output_tokens, 0) if isinstance(ctx.max_output_tokens, int) else 0
             estimated_next_tokens = input_estimate + output_estimate
-        detector_ctx = DetectionContext(
-            project_id=project_id,
-            provider=provider,
-            model=ctx.model,
-            environment=ctx.environment,
-            request_endpoint="/chat/completions",
-            request_feature=ctx.feature,
-            now=now,
-            current_requests_60s=requests_60s,
+        clamp = self._build_clamp(
+            clamp_factor=self._protect_clamp_factor,
+            max_tok=max_tok,
             current_tokens_60s=tokens_60s,
-            req_cap=max_req,
-            tok_cap=max_tok,
-            protect_enabled=True,
+            max_output_tokens=ctx.max_output_tokens,
             estimated_next_tokens=estimated_next_tokens,
-            token_explosion_tokens=ctx.input_tokens_estimate,
-            previous_estimated_tokens=None,
-            current_event=None,
-            recent_events=[],
-            warn_ratio=app_config.protect_near_cap_factor,
-            retry_storm_window_seconds=self._retry_storm_window_seconds,
-            retry_storm_count=self._retry_storm_count,
-            loop_window_seconds=self._loop_window_seconds,
-            loop_count=self._loop_count,
-            loop_max_gap_seconds=self._loop_max_gap_seconds,
-            loop_concurrency_threshold=self._loop_concurrency_threshold,
-            token_explosion_ratio=self._token_explosion_ratio,
-            token_explosion_abs=self._token_explosion_abs,
-            token_explosion_growth_ratio=self._token_explosion_growth_ratio,
-            token_explosion_growth_count=self._token_explosion_growth_count,
-            token_explosion_growth_min_tokens=self._token_explosion_growth_min_tokens,
-            token_explosion_concurrency_threshold=self._token_explosion_concurrency_threshold,
         )
-        warn_signals = self._fast_warn_detector_registry.detect(detector_ctx)
-        if warn_signals:
-            warn_signal = warn_signals[0]
-            reason = str(warn_signal.detector)
-            clamp = self._build_clamp(
-                reason=reason,
-                max_tok=max_tok,
-                current_tokens_60s=tokens_60s,
-                max_output_tokens=ctx.max_output_tokens,
-                estimated_next_tokens=estimated_next_tokens,
-            )
+        if (
+            apply_clamp_enabled
+            and isinstance(clamp, dict)
+            and isinstance(ctx.max_output_tokens, int)
+            and isinstance(clamp.get("recommended_max_output_tokens"), int)
+            and int(clamp["recommended_max_output_tokens"]) < ctx.max_output_tokens
+        ):
             if self._should_emit_live_notifications(
                 evaluation_started_at=evaluation_started_at,
                 decision_timeout_ms=decision_timeout_ms,
                 project_id=project_id,
                 provider=provider,
-                reason=reason,
+                reason="token_clamp",
             ):
-                self._enqueue_warn_notifications(
+                self._enqueue_clamp_started_notifications(
                     project_id=project_id,
                     scoped_id=scoped_id,
                     provider=provider,
                     model=ctx.model,
                     environment=ctx.environment,
-                    reason=reason,
                     requests_60s=requests_60s,
                     tokens_60s=tokens_60s,
                     max_req=max_req,
                     max_tok=max_tok,
                     estimated_next_tokens=estimated_next_tokens,
-                    token_explosion_tokens=None,
-                    max_output_tokens=ctx.max_output_tokens,
-                    apply_clamp_enabled=apply_clamp_enabled,
                     clamp=clamp,
                 )
             return project_id, ProtectDecision(
-                decision="warn",
-                reason=reason,
-                fail_mode=fail_mode,
-                decision_timeout_ms=decision_timeout_ms,
-                retry_after_seconds=None,
-                blocked_until=None,
-                snapshot={
-                    "requests_60s": requests_60s,
-                    "tokens_60s": tokens_60s,
-                    "threshold_req_60s": max_req,
-                    "threshold_tok_60s": max_tok,
-                    "decision_timeout_ms": decision_timeout_ms,
-                    "predictive": {
-                        "enabled": bool(estimated_next_tokens is not None),
-                        "estimated_next_tokens": estimated_next_tokens,
-                        "would_exceed_tokens_cap": bool(
-                            max_tok is not None
-                            and estimated_next_tokens is not None
-                            and (tokens_60s + estimated_next_tokens >= max_tok)
-                        ),
-                    },
-                },
-                apply_clamp_enabled=apply_clamp_enabled,
-                clamp=clamp,
-            )
-
-        recent_events = []
-        if self._event_repository is not None:
-            recent_limit = max(int(app_config.retry_storm_count), int(app_config.loop_count)) + 8
-            recent_fetch_started_at = perf_counter()
-            recent_events = self._event_repository.list_recent(
-                project_id=project_id, limit=recent_limit, provider=provider
-            )
-            logger.debug(
-                "Loaded recent events for protect evaluation",
-                extra={
-                    "project_id": project_id,
-                    "provider": provider,
-                    "recent_events_count": len(recent_events),
-                    "recent_events_fetch_ms": int((perf_counter() - recent_fetch_started_at) * 1000),
-                },
-            )
-        previous_estimated_tokens = resolve_previous_estimated_tokens(
-            recent_events=recent_events,
-            provider=provider,
-            model=ctx.model,
-            request_endpoint="/chat/completions",
-            request_feature=ctx.feature,
-        )
-        detector_ctx = DetectionContext(
-            project_id=project_id,
-            provider=provider,
-            model=ctx.model,
-            environment=ctx.environment,
-            request_endpoint="/chat/completions",
-            request_feature=ctx.feature,
-            now=now,
-            current_requests_60s=requests_60s,
-            current_tokens_60s=tokens_60s,
-            req_cap=max_req,
-            tok_cap=max_tok,
-            protect_enabled=True,
-            estimated_next_tokens=estimated_next_tokens,
-            token_explosion_tokens=ctx.input_tokens_estimate,
-            previous_estimated_tokens=previous_estimated_tokens,
-            current_event=None,
-            recent_events=recent_events,
-            warn_ratio=app_config.protect_near_cap_factor,
-            retry_storm_window_seconds=self._retry_storm_window_seconds,
-            retry_storm_count=self._retry_storm_count,
-            loop_window_seconds=self._loop_window_seconds,
-            loop_count=self._loop_count,
-            loop_max_gap_seconds=self._loop_max_gap_seconds,
-            loop_concurrency_threshold=self._loop_concurrency_threshold,
-            token_explosion_ratio=self._token_explosion_ratio,
-            token_explosion_abs=self._token_explosion_abs,
-            token_explosion_growth_ratio=self._token_explosion_growth_ratio,
-            token_explosion_growth_count=self._token_explosion_growth_count,
-            token_explosion_growth_min_tokens=self._token_explosion_growth_min_tokens,
-            token_explosion_concurrency_threshold=self._token_explosion_concurrency_threshold,
-        )
-        warn_signals = self._behavioral_warn_detector_registry.detect(detector_ctx)
-        if warn_signals:
-            warn_signal = warn_signals[0]
-            reason = str(warn_signal.detector)
-            clamp = self._build_clamp(
-                reason=reason,
-                max_tok=max_tok,
-                current_tokens_60s=tokens_60s,
-                max_output_tokens=ctx.max_output_tokens,
-                estimated_next_tokens=estimated_next_tokens,
-            )
-            if self._should_emit_live_notifications(
-                evaluation_started_at=evaluation_started_at,
-                decision_timeout_ms=decision_timeout_ms,
-                project_id=project_id,
-                provider=provider,
-                reason=reason,
-            ):
-                self._enqueue_warn_notifications(
-                    project_id=project_id,
-                    scoped_id=scoped_id,
-                    provider=provider,
-                    model=ctx.model,
-                    environment=ctx.environment,
-                    reason=reason,
-                    requests_60s=requests_60s,
-                    tokens_60s=tokens_60s,
-                    max_req=max_req,
-                    max_tok=max_tok,
-                    estimated_next_tokens=estimated_next_tokens,
-                    token_explosion_tokens=None,
-                    max_output_tokens=ctx.max_output_tokens,
-                    apply_clamp_enabled=apply_clamp_enabled,
-                    clamp=clamp,
-                )
-            return project_id, ProtectDecision(
-                decision="warn",
-                reason=reason,
-                fail_mode=fail_mode,
-                decision_timeout_ms=decision_timeout_ms,
-                retry_after_seconds=None,
-                blocked_until=None,
-                snapshot={
-                    "requests_60s": requests_60s,
-                    "tokens_60s": tokens_60s,
-                    "threshold_req_60s": max_req,
-                    "threshold_tok_60s": max_tok,
-                    "decision_timeout_ms": decision_timeout_ms,
-                    "predictive": {
-                        "enabled": bool(estimated_next_tokens is not None),
-                        "estimated_next_tokens": estimated_next_tokens,
-                        "would_exceed_tokens_cap": bool(
-                            max_tok is not None
-                            and estimated_next_tokens is not None
-                            and (tokens_60s + estimated_next_tokens >= max_tok)
-                        ),
-                    },
-                },
-                apply_clamp_enabled=apply_clamp_enabled,
-                clamp=clamp,
-            )
-
-        warn_signals = self._deferred_warn_detector_registry.detect(detector_ctx)
-        if warn_signals:
-            warn_signal = warn_signals[0]
-            reason = str(warn_signal.detector)
-            clamp = self._build_clamp(
-                reason=reason,
-                max_tok=max_tok,
-                current_tokens_60s=tokens_60s,
-                max_output_tokens=ctx.max_output_tokens,
-                estimated_next_tokens=estimated_next_tokens,
-            )
-            if self._should_emit_live_notifications(
-                evaluation_started_at=evaluation_started_at,
-                decision_timeout_ms=decision_timeout_ms,
-                project_id=project_id,
-                provider=provider,
-                reason=reason,
-            ):
-                self._enqueue_warn_notifications(
-                    project_id=project_id,
-                    scoped_id=scoped_id,
-                    provider=provider,
-                    model=ctx.model,
-                    environment=ctx.environment,
-                    reason=reason,
-                    requests_60s=requests_60s,
-                    tokens_60s=tokens_60s,
-                    max_req=max_req,
-                    max_tok=max_tok,
-                    estimated_next_tokens=estimated_next_tokens,
-                    token_explosion_tokens=ctx.input_tokens_estimate,
-                    max_output_tokens=ctx.max_output_tokens,
-                    apply_clamp_enabled=apply_clamp_enabled,
-                    clamp=clamp,
-                )
-            return project_id, ProtectDecision(
-                decision="warn",
-                reason=reason,
+                decision="clamp",
+                reason="token_clamp",
                 fail_mode=fail_mode,
                 decision_timeout_ms=decision_timeout_ms,
                 retry_after_seconds=None,
@@ -680,7 +429,7 @@ class ProtectService:
             "provider": provider,
             "model": model,
             "environment": environment,
-            "reason": "cap_breach",
+            "reason": detail_reason,
             "detail_reason": detail_reason,
             "requests_60s": requests_60s,
             "tokens_60s": tokens_60s,
@@ -729,7 +478,7 @@ class ProtectService:
                 extra={"project_id": project_id, "provider": provider, "reason": detail_reason},
             )
 
-    def _enqueue_warn_notifications(
+    def _enqueue_clamp_started_notifications(
         self,
         *,
         project_id: str,
@@ -737,89 +486,44 @@ class ProtectService:
         provider: str,
         model: str | None,
         environment: str | None,
-        reason: str,
         requests_60s: int,
         tokens_60s: int,
         max_req: int | None,
         max_tok: int | None,
         estimated_next_tokens: int | None,
-        token_explosion_tokens: int | None,
-        max_output_tokens: int | None,
-        apply_clamp_enabled: bool,
         clamp: dict[str, int | bool] | None,
     ) -> None:
         now = self._now_provider()
-        payload: dict[str, object] = {
-            "event": "protection.warn",
+        if not self._protect_action_store.mark_report_sent(
+            project_id=scoped_id,
+            report_type="clamp_started",
+            marker="token_clamp",
+            ttl_seconds=self._incident_dedup_window_seconds,
+        ):
+            return
+        clamp_payload: dict[str, object] = {
+            "event": "protection.clamp_started",
             "project_id": project_id,
             "provider": provider,
             "model": model,
             "environment": environment,
-            "reason": reason,
+            "reason": "token_clamp",
             "requests_60s": requests_60s,
             "tokens_60s": tokens_60s,
             "req_cap": max_req,
             "tok_cap": max_tok,
             "estimated_next_tokens": estimated_next_tokens,
-            **({"token_explosion_tokens": token_explosion_tokens} if isinstance(token_explosion_tokens, int) else {}),
-            "apply_clamp_enabled": apply_clamp_enabled,
             "clamp": clamp,
             "sent_at": now.isoformat(),
         }
-        clamp_started = bool(
-            apply_clamp_enabled
-            and isinstance(clamp, dict)
-            and isinstance(max_output_tokens, int)
-            and max_output_tokens > 0
-            and isinstance(clamp.get("recommended_max_output_tokens"), int)
-            and int(clamp["recommended_max_output_tokens"]) < max_output_tokens
+        self._enqueue_protection_event(
+            event_type="protection.clamp_started",
+            template="protection_clamp_started",
+            project_id=project_id,
+            provider=provider,
+            payload=clamp_payload,
+            dedupe_seed="token_clamp",
         )
-        if self._protect_action_store.mark_report_sent(
-            project_id=scoped_id,
-            report_type="warn",
-            marker=reason,
-            ttl_seconds=self._incident_dedup_window_seconds,
-        ):
-            self._enqueue_protection_event(
-                event_type="protection.warn",
-                template="protection_warn",
-                project_id=project_id,
-                provider=provider,
-                payload=payload,
-                dedupe_seed=reason,
-                send_webhook=not clamp_started,
-                send_email=not clamp_started,
-            )
-
-        if clamp_started and self._protect_action_store.mark_report_sent(
-            project_id=scoped_id,
-            report_type="clamp_started",
-            marker=reason,
-            ttl_seconds=self._incident_dedup_window_seconds,
-        ):
-            clamp_payload: dict[str, object] = {
-                "event": "protection.clamp_started",
-                "project_id": project_id,
-                "provider": provider,
-                "model": model,
-                "environment": environment,
-                "reason": reason,
-                "requests_60s": requests_60s,
-                "tokens_60s": tokens_60s,
-                "req_cap": max_req,
-                "tok_cap": max_tok,
-                "estimated_next_tokens": estimated_next_tokens,
-                "clamp": clamp,
-                "sent_at": now.isoformat(),
-            }
-            self._enqueue_protection_event(
-                event_type="protection.clamp_started",
-                template="protection_clamp_started",
-                project_id=project_id,
-                provider=provider,
-                payload=clamp_payload,
-                dedupe_seed=f"{reason}:clamp",
-            )
 
     def report_fail_closed_block(
         self,
@@ -967,19 +671,20 @@ class ProtectService:
     def _build_clamp(
         self,
         *,
-        reason: str,
+        clamp_factor: float,
         max_tok: int | None,
         current_tokens_60s: int,
         max_output_tokens: int | None,
         estimated_next_tokens: int | None,
     ) -> dict[str, int | bool] | None:
-        if reason != "near_cap":
-            return None
         if max_tok is None or max_tok <= 0:
             return None
         if not isinstance(max_output_tokens, int) or max_output_tokens <= 0:
             return None
         if not isinstance(estimated_next_tokens, int):
+            return None
+        projected_tokens = current_tokens_60s + estimated_next_tokens
+        if projected_tokens < int(max_tok * clamp_factor):
             return None
         input_estimate = estimated_next_tokens - max_output_tokens
         if input_estimate < 0:

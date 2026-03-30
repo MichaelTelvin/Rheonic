@@ -311,14 +311,9 @@ def _record_preflight_incident_if_needed(
     payload: ProtectDecisionIn,
     decision: ProtectDecision,
 ) -> None:
-    # Keep a visible near-cap incident aligned with the live preflight warning even though most
-    # incident truth comes from ingest. Without this protect-time upsert, a request can warn for
-    # near_cap before the provider call, then the later post-call ingest event can open a different
-    # incident type (for example token_explosion) and the earlier near-cap state disappears from the
-    # dashboard. This block preserves the first protect-time warning as a visible incident tradeoff.
-    if decision.decision != "warn" or decision.reason != app_config.incident_type_near_cap:
+    if decision.decision != "block" or decision.reason not in {"req_cap_breach", "tok_cap_breach"}:
         return
-    signal = _build_near_cap_signal_from_decision(project_id=project_id, payload=payload, decision=decision)
+    signal = _build_block_signal_from_decision(project_id=project_id, payload=payload, decision=decision)
     incident_manager.process_signal(
         project_id=project_id,
         provider=payload.provider,
@@ -330,29 +325,17 @@ def _record_preflight_incident_if_needed(
     )
 
 
-def _build_near_cap_signal_from_decision(
+def _build_block_signal_from_decision(
     *,
     project_id: str,
     payload: ProtectDecisionIn,
     decision: ProtectDecision,
 ) -> Signal:
-    # Derive the same near-cap fingerprint and evidence shape from the predictive decision snapshot.
     snapshot = decision.snapshot or {}
-    predictive = snapshot.get("predictive", {}) if isinstance(snapshot, dict) else {}
     requests_60s = _safe_int(snapshot.get("requests_60s"))
     tokens_60s = _safe_int(snapshot.get("tokens_60s"))
     req_cap = _safe_int(snapshot.get("threshold_req_60s"))
     tok_cap = _safe_int(snapshot.get("threshold_tok_60s"))
-    estimated_next_tokens = _safe_int(predictive.get("estimated_next_tokens")) if isinstance(predictive, dict) else None
-    req_ratio = ((requests_60s + 1) / req_cap) if (requests_60s is not None and req_cap) else None
-    tok_ratio = (
-        ((tokens_60s + estimated_next_tokens) / tok_cap)
-        if (tokens_60s is not None and tok_cap and estimated_next_tokens is not None)
-        else None
-    )
-    req_near_cap = bool(req_ratio is not None and req_ratio >= app_config.protect_near_cap_factor)
-    tok_near_cap = bool(tok_ratio is not None and tok_ratio >= app_config.protect_near_cap_factor)
-    near_cap_type = "both" if req_near_cap and tok_near_cap else ("req" if req_near_cap else "tok")
     evidence: dict[str, object] = {
         "provider": payload.provider,
         "model": payload.model,
@@ -361,19 +344,14 @@ def _build_near_cap_signal_from_decision(
         "tokens_60s": tokens_60s,
         "req_cap": req_cap,
         "tok_cap": tok_cap,
-        "warn_ratio": app_config.protect_near_cap_factor,
-        "estimated_next_tokens": estimated_next_tokens,
-        "req_ratio_to_cap": _round_ratio(req_ratio),
-        "tok_ratio_to_cap": _round_ratio(tok_ratio),
-        "req_near_cap": req_near_cap,
-        "tok_near_cap": tok_near_cap,
-        "near_cap_type": near_cap_type,
-        "reason": app_config.incident_type_near_cap,
+        "reason": decision.reason,
+        "blocked_until": decision.blocked_until,
+        "retry_after_seconds": decision.retry_after_seconds,
     }
     return Signal(
-        detector=app_config.incident_type_near_cap,
+        detector=app_config.incident_type_block,
         scope_provider=payload.provider,
-        fingerprint=f"{project_id}:{payload.provider}:{app_config.incident_type_near_cap}:{near_cap_type}",
+        fingerprint=f"{project_id}:{payload.provider}:{app_config.incident_type_block}:{decision.reason}",
         evidence=evidence,
     )
 
@@ -387,14 +365,6 @@ def _safe_int(value: object) -> int | None:
         return None
     except (TypeError, ValueError):
         return None
-
-
-def _round_ratio(value: float | None) -> float | None:
-    if value is None:
-        return None
-    return round(value, 4)
-
-
 @router.get("/protect/config", response_model=ProtectRuntimeConfigOut)
 def get_protect_runtime_config(
     ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),

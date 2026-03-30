@@ -19,16 +19,10 @@ def _humanize_value(value: str) -> str:
 
 def _reason_copy(reason: str, detail_reason: str) -> tuple[str, str]:
     normalized = (reason or "").strip().lower()
-    detail = (detail_reason or "").strip().lower()
-    if normalized == "cap_breach":
-        if detail == "tok_cap_breach":
-            return "Token cap exceeded", "Protect blocked traffic because the project crossed its configured token cap."
-        if detail == "req_cap_breach":
-            return (
-                "Request cap exceeded",
-                "Protect blocked traffic because the project crossed its configured request cap.",
-            )
-        return "Cap breach", "Protect blocked traffic because the project crossed a configured cap."
+    if normalized == "tok_cap_breach":
+        return "Token cap exceeded", "Protect blocked traffic because the project crossed its configured token cap."
+    if normalized == "req_cap_breach":
+        return "Request cap exceeded", "Protect blocked traffic because the project crossed its configured request cap."
     if normalized == "cooldown_active":
         return "Cooldown active", "Protect blocked traffic because the project is still inside a cooldown window."
     if normalized == "fail_closed":

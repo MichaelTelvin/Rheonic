@@ -18,7 +18,7 @@ def test_format_timestamp_renders_human_readable_utc() -> None:
 
 def test_email_template_helpers_render_human_readable_values() -> None:
     assert humanize_incident_type("retry_storm") == "Retry storm"
-    assert humanize_incident_type("cap_breach") == "Cap breach"
+    assert humanize_incident_type("block") == "Block"
     assert format_page_location("/app/alerts") == "Dashboard / Alerts"
     evidence_copy = format_evidence(
         {
@@ -61,24 +61,22 @@ def test_feedback_template_snapshot_is_deterministic() -> None:
 def test_operational_templates_snapshots_are_deterministic() -> None:
     cases = [
         (
-            "protection_warn",
+            "incident_warn",
             {
                 "project_id": "p1",
+                "incident_id": "inc-1",
+                "incident_type": "retry_storm",
                 "provider": "anthropic",
                 "model": "claude-3.7-sonnet",
                 "environment": "prod",
-                "reason": "retry_storm",
-                "requests_60s": 22,
-                "tokens_60s": 900,
-                "req_cap": 400,
-                "tok_cap": 1700,
-                "estimated_next_tokens": 80,
+                "evidence": {"failure_count": 5, "window_seconds": 60},
+                "created_at": "2026-03-05T10:00:00Z",
+                "last_seen_at": "2026-03-05T10:01:10Z",
                 "sent_at": "2026-03-05T10:01:10Z",
-                "clamp": None,
             },
-            "[Rheonic] Protect alert: Retry storm (p1)",
-            "Warning issued",
-            "Action: Warn",
+            "[Rheonic] Incident opened: Retry storm (p1)",
+            "Incident opened",
+            "Incident Type: Retry storm",
         ),
         (
             "protection_block",
@@ -87,7 +85,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "provider": "google",
                 "model": "gemini-1.5-pro",
                 "environment": "prod",
-                "reason": "cap_breach",
+                "reason": "tok_cap_breach",
                 "detail_reason": "tok_cap_breach",
                 "requests_60s": 2,
                 "tokens_60s": 2000,
@@ -103,13 +101,31 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
             "Action: Blocked",
         ),
         (
+            "incident_block",
+            {
+                "project_id": "p2",
+                "incident_id": "inc-block",
+                "incident_type": "block",
+                "provider": "google",
+                "model": "gemini-1.5-pro",
+                "environment": "prod",
+                "created_at": "2026-03-05T10:00:00Z",
+                "last_seen_at": "2026-03-05T10:00:30Z",
+                "evidence": {"reason": "tok_cap_breach", "tokens_60s": 2000, "tok_cap": 1500},
+                "sent_at": "2026-03-05T10:00:00Z",
+            },
+            "[Rheonic] Incident opened: Block (p2)",
+            "Protect block incident opened",
+            "Incident Type: Block",
+        ),
+        (
             "protection_clamp_started",
             {
                 "project_id": "p2",
                 "provider": "google",
                 "model": "gemini-1.5-pro",
                 "environment": "prod",
-                "reason": "near_cap",
+                "reason": "token_clamp",
                 "requests_60s": 95,
                 "tokens_60s": 1600,
                 "req_cap": 100,
@@ -118,7 +134,7 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
                 "clamp": {"recommended_max_output_tokens": 32},
                 "sent_at": "2026-03-05T10:00:00Z",
             },
-            "[Rheonic] Protect alert: Clamp started - Near cap (p2)",
+            "[Rheonic] Protect alert: Clamp started - Token Clamp (p2)",
             "Clamp started",
             "Action: Clamp",
         ),
@@ -170,49 +186,6 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
         assert "UTC" in rendered["text"]
         assert render_template(template, payload) == rendered
 
-    warn_rendered = render_template(
-        "protection_warn",
-        {
-            "project_id": "p1",
-            "provider": "openai",
-            "model": "gpt-4o-mini",
-            "environment": "staging-test",
-            "reason": "retry_storm",
-            "requests_60s": 5,
-            "tokens_60s": 250,
-            "req_cap": 400,
-            "tok_cap": 1700,
-            "estimated_next_tokens": 50,
-            "sent_at": "2026-03-05T10:01:10Z",
-            "clamp": {"recommended_max_output_tokens": 40},
-        },
-    )
-    assert "Reason: Retry storm" in warn_rendered["text"]
-    assert "Estimated Next Tokens: 50" in warn_rendered["text"]
-    assert "Clamp Recommendation: Recommended max output tokens: 40" in warn_rendered["text"]
-
-    token_explosion_rendered = render_template(
-        "protection_warn",
-        {
-            "project_id": "p1",
-            "provider": "openai",
-            "model": "gpt-4o-mini",
-            "environment": "staging-test",
-            "reason": "token_explosion",
-            "requests_60s": 5,
-            "tokens_60s": 250,
-            "req_cap": 400,
-            "tok_cap": 1700,
-            "estimated_next_tokens": 50,
-            "token_explosion_tokens": 36,
-            "sent_at": "2026-03-05T10:01:10Z",
-            "clamp": None,
-        },
-    )
-    assert "Reason: Token explosion" in token_explosion_rendered["text"]
-    assert "Token Explosion Tokens: 36" in token_explosion_rendered["text"]
-    assert "Estimated Next Tokens:" not in token_explosion_rendered["text"]
-
 
 def test_fail_closed_protection_block_omits_blank_rows() -> None:
     rendered = render_template(
@@ -262,10 +235,6 @@ def test_fail_closed_protection_block_includes_metrics_when_present() -> None:
 
 
 def test_removed_templates_are_not_registered() -> None:
-    with pytest.raises(ValueError, match="unknown email template: incident_warn"):
-        render_template("incident_warn", {})
-    with pytest.raises(ValueError, match="unknown email template: incident_block"):
-        render_template("incident_block", {})
     with pytest.raises(ValueError, match="unknown email template: decision_warn"):
         render_template("decision_warn", {})
     with pytest.raises(ValueError, match="unknown email template: policy_gap_detected"):

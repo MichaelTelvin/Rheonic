@@ -203,7 +203,7 @@ def test_protect_decision_ignores_auto_resolved_incidents(tmp_path) -> None:
                 id="inc-stale",
                 project_id=project_id,
                 provider="openai",
-                type="cap_breach",
+                type="block",
                 status="open",
                 evidence={},
                 created_at=old_seen,

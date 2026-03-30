@@ -225,8 +225,7 @@ export function Incidents(): JSX.Element {
                   }}
                 >
                   <option value="all">All</option>
-                  <option value="near_cap">Near cap</option>
-                  <option value="cap_breach">Cap breach</option>
+                  <option value="block">Block</option>
                   <option value="retry_storm">Retry storm</option>
                   <option value="loop_suspect">Loop suspect</option>
                   <option value="token_explosion">Token explosion</option>

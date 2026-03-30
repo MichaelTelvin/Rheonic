@@ -7,7 +7,7 @@ export interface RealtimeMetrics {
 
 export interface ProtectMetrics {
   allowed_60m: number;
-  warned_60m: number;
+  clamped_60m: number;
   blocked_60m: number;
   decision_timeouts_60m: number;
   decision_latency_p50_60m_ms: number | null;

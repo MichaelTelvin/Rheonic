@@ -14,8 +14,8 @@ from app.logger import get_logger
 logger = get_logger(__name__)
 
 
-def _warn_key(project_id: str) -> str:
-    return f"pa:{project_id}:warn:60m"
+def _clamp_key(project_id: str) -> str:
+    return f"pa:{project_id}:clamp:60m"
 
 
 def _block_key(project_id: str) -> str:
@@ -113,14 +113,14 @@ class ProtectActionStore:
         # Read 60-minute protect decision counters and last decision snapshot.
         try:
             allowed = self._read_int(_allow_key(project_id))
-            warn = self._read_int(_warn_key(project_id))
+            clamp = self._read_int(_clamp_key(project_id))
             block = self._read_int(_block_key(project_id))
             decision_timeouts = self._read_int(_timeout_key(project_id))
             last_raw = self._redis_client.get(_last_key(project_id))
             health = self.get_health(project_id=project_id)
             return {
                 "allowed_60m": allowed,
-                "warned_60m": warn,
+                "clamped_60m": clamp,
                 "blocked_60m": block,
                 "decision_timeouts_60m": decision_timeouts,
                 "last": self._parse_last(last_raw),
@@ -131,7 +131,7 @@ class ProtectActionStore:
             logger.warning("Failed reading protect decision counters", extra={"project_id": project_id})
             return {
                 "allowed_60m": 0,
-                "warned_60m": 0,
+                "clamped_60m": 0,
                 "blocked_60m": 0,
                 "decision_timeouts_60m": 0,
                 "last": None,
@@ -217,8 +217,8 @@ class ProtectActionStore:
         key = (
             _allow_key(project_id)
             if decision == "allow"
-            else _warn_key(project_id)
-            if decision == "warn"
+            else _clamp_key(project_id)
+            if decision == "clamp"
             else _block_key(project_id)
             if decision == "block"
             else None

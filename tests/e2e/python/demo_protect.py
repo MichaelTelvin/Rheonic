@@ -237,7 +237,7 @@ def _assert_delivery(client: Client, *, expected_min_sent: int = 0) -> None:
 
 def _print_config_hint() -> None:
     target_hint = (os.getenv("RHEONIC_DEMO_TARGET_HINT") or "").strip() or "protect-prod-python"
-    print(f"Run: make {target_hint} RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=cap_breach")
+    print(f"Run: make {target_hint} RHEONIC_PROVIDER=openai RHEONIC_MODEL=gpt-4o-mini RHEONIC_SCENARIO=tok_cap_breach")
     print("Optional exact provider-call visibility: python3 tests/e2e/provider_stub.py")
 
 
@@ -394,21 +394,10 @@ def _print_incidents(
 ) -> None:
     incidents = _list_open_incidents(dashboard_session, project_id, provider, auth_email)
     counts: dict[str, int] = {}
-    near_types: list[str] = []
     for incident in incidents:
         incident_type = str(incident.get("type", "unknown"))
         counts[incident_type] = counts.get(incident_type, 0) + 1
-        if incident_type == "near_cap":
-            evidence = incident.get("evidence")
-            if isinstance(evidence, dict):
-                near_type = str(evidence.get("near_cap_type", "")).strip()
-                if near_type:
-                    near_types.append(near_type)
     compact = ", ".join(f"{k}={counts[k]}" for k in sorted(counts)) if counts else "none"
-    if near_types:
-        near_compact = ",".join(sorted(set(near_types)))
-        print(f"[INCIDENTS] open={len(incidents)} types={compact} near_cap_types={near_compact}")
-        return
     print(f"[INCIDENTS] open={len(incidents)} types={compact}")
 
 
@@ -602,38 +591,38 @@ def main() -> None:
         prompt_text = "protect demo request"
         print(f"[DEMO] max_tokens(before call)={max_tokens}")
 
-        if scenario == "near_cap":
-            print("\n[STEP] Seed near-cap traffic then expect warn")
-            seed_tokens = int(os.getenv("RHEONIC_NEAR_CAP_SEED_TOKENS", "1600"))
+        if scenario == "clamp":
+            print("\n[STEP] Seed clamp traffic then expect clamp")
+            seed_tokens = int(os.getenv("RHEONIC_CLAMP_SEED_TOKENS", "1600"))
             _send_ingest_event(
                 transport,
                 ingest_key,
                 provider,
                 model,
                 total_tokens=seed_tokens,
-                feature="near-cap-seed",
+                feature="clamp-seed",
                 environment=env,
             )
             time.sleep(pause_ms / 1000)
-        elif scenario == "cap_breach":
-            print("\n[STEP] Seed cap breach then expect block")
-            breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
+        elif scenario == "tok_cap_breach":
+            print("\n[STEP] Seed token-cap breach then expect block")
+            breach_tokens = int(os.getenv("RHEONIC_TOK_CAP_BREACH_TOKENS", "5000"))
             _send_ingest_event(
                 transport,
                 ingest_key,
                 provider,
                 model,
                 total_tokens=breach_tokens,
-                feature="cap-breach-seed",
+                feature="tok-cap-breach-seed",
                 environment=env,
             )
             call_max_tokens = max(max_tokens, breach_tokens)
-            print(f"[STEP] cap_breach call max_tokens={call_max_tokens}")
+            print(f"[STEP] tok_cap_breach call max_tokens={call_max_tokens}")
             time.sleep(pause_ms / 1000)
         elif scenario == "req_cap_breach":
             print("\n[STEP] Seed req cap breach then expect block")
             count = int(os.getenv("RHEONIC_REQ_CAP_BREACH_COUNT", "6"))
-            req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
+            req_tokens = int(os.getenv("RHEONIC_REQ_CAP_BREACH_TOKENS", "1"))
             req_cap = _get_project_req_cap(dashboard_session, project_id, auth_email)
             if isinstance(req_cap, int):
                 count = max(count, req_cap + 1)
@@ -654,7 +643,7 @@ def main() -> None:
                 time.sleep(pause_ms / 1000)
             print(f"[STEP] req_cap_breach ingest events sent={count} (provider_calls_delta tracks provider calls only)")
         elif scenario == "retry_storm":
-            print("\n[STEP] Seed failed attempts for retry storm then expect warn")
+            print("\n[STEP] Seed failed attempts for retry storm then expect incident")
             count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "5"))
             for i in range(count):
                 _send_ingest_event(
@@ -671,7 +660,7 @@ def main() -> None:
                 )
                 time.sleep(pause_ms / 1000)
         elif scenario == "loop_suspect":
-            print("\n[STEP] Seed a rapid repeated sequence for loop suspect then expect warn")
+            print("\n[STEP] Seed a rapid repeated sequence for loop suspect then expect incident")
             count = int(os.getenv("RHEONIC_LOOP_COUNT", "6"))
             for _ in range(count):
                 _send_ingest_event(
@@ -685,7 +674,7 @@ def main() -> None:
                 )
                 time.sleep(pause_ms / 1000)
         elif scenario == "token_explosion":
-            print("\n[STEP] Seed token explosion growth history then expect warn")
+            print("\n[STEP] Seed token explosion growth history then expect incident")
             peak = max(int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "5500")), 5500)
             step_one = 1900
             step_two_min = int(ceil(step_one * 1.7))
@@ -709,15 +698,15 @@ def main() -> None:
             print(f"[STEP] token_explosion history={growth_steps} live={peak}")
             time.sleep(pause_ms / 1000)
         elif scenario == "cooldown":
-            print("\n[STEP] Seed cap breach then verify cooldown blocks repeated call")
-            breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "5000"))
+            print("\n[STEP] Seed token-cap breach then verify cooldown blocks repeated call")
+            breach_tokens = int(os.getenv("RHEONIC_TOK_CAP_BREACH_TOKENS", "5000"))
             _send_ingest_event(
                 transport,
                 ingest_key,
                 provider,
                 model,
                 total_tokens=breach_tokens,
-                feature="cooldown-breach-seed",
+                feature="cooldown-block-seed",
                 environment=env,
             )
             call_max_tokens = max(max_tokens, breach_tokens)
@@ -751,7 +740,7 @@ def main() -> None:
         )
 
         print(f"[RESULT] blocked={blocked} provider_calls_delta={provider_calls_delta}")
-        if scenario == "near_cap":
+        if scenario == "clamp":
             print(f"[CLAMP] recommended={clamp_recommended} applied={clamp_applied} used_max_tokens={used_max_tokens}")
         if project_id and dashboard_session is not None:
             _print_incidents(dashboard_session, project_id, provider, auth_email)
@@ -763,10 +752,10 @@ def main() -> None:
                 "allow passed",
                 not blocked and provider_calls_delta >= 1 and decision_value == "allow",
             )
-        elif scenario == "near_cap":
+        elif scenario == "clamp":
             _assert_line(
-                "near_cap warn triggered",
-                decision_value == "warn" and decision_reason == "near_cap" and not blocked,
+                "clamp triggered",
+                decision_value == "clamp" and decision_reason == "token_clamp" and not blocked,
             )
             clamp_is_recommended = isinstance(clamp_recommended, int) and clamp_recommended > 0
             clamp_should_apply = clamp_is_recommended and isinstance(max_tokens, int) and clamp_recommended < max_tokens
@@ -779,29 +768,34 @@ def main() -> None:
                     "clamp not applied",
                     not bool(clamp_applied) and not clamp_used,
                 )
-        elif scenario == "cap_breach":
-            _assert_line("cap breach blocked", blocked and provider_calls_delta == 0)
+        elif scenario == "tok_cap_breach":
+            _assert_line("token cap breach blocked", blocked and provider_calls_delta == 0 and decision_reason == "tok_cap_breach")
+            _assert_line("block incident opened", any(str(row.get("type")) == "block" for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)))
         elif scenario == "req_cap_breach":
-            _assert_line("req_cap breach blocked", blocked and provider_calls_delta == 0)
+            _assert_line("req_cap breach blocked", blocked and provider_calls_delta == 0 and decision_reason == "req_cap_breach")
+            _assert_line("block incident opened", any(str(row.get("type")) == "block" for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)))
             _assert_line(
                 "req_cap breach triggered block",
                 blocked and provider_calls_delta == 0,
             )
         elif scenario == "retry_storm":
             _assert_line(
-                "retry_storm warn triggered from failed attempts",
-                decision_value == "warn" and decision_reason == "retry_storm" and not blocked,
+                "retry_storm stayed allowed at preflight",
+                decision_value == "allow" and not blocked,
             )
+            _assert_line("retry_storm incident opened", any(str(row.get("type")) == "retry_storm" for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)))
         elif scenario == "loop_suspect":
             _assert_line(
-                "loop_suspect warn triggered from a rapid repeated sequence",
-                decision_value == "warn" and decision_reason == "loop_suspect" and not blocked,
+                "loop_suspect stayed allowed at preflight",
+                decision_value == "allow" and not blocked,
             )
+            _assert_line("loop_suspect incident opened", any(str(row.get("type")) == "loop_suspect" for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)))
         elif scenario == "token_explosion":
             _assert_line(
-                "token_explosion warn triggered",
-                decision_value == "warn" and decision_reason == "token_explosion" and not blocked,
+                "token_explosion stayed allowed at preflight",
+                decision_value == "allow" and not blocked,
             )
+            _assert_line("token_explosion incident opened", any(str(row.get("type")) == "token_explosion" for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)))
         elif scenario == "cooldown":
             _assert_line("cooldown active", blocked and provider_calls_delta == 0)
             _assert_line(

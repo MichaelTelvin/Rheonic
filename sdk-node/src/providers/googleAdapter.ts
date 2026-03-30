@@ -85,8 +85,8 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
             feature: options.feature,
             token_explosion_tokens: typeof estimatedInputTokens === "number" ? estimatedInputTokens : undefined,
             input_tokens_estimate: typeof estimatedInputTokens === "number" ? estimatedInputTokens : undefined,
-            protect_decision: protectDecision.decision === "warn" ? "warn" : undefined,
-            protect_reason: protectDecision.decision === "warn" ? protectDecision.reason : undefined,
+            protect_decision: protectDecision.decision !== "allow" ? protectDecision.decision : undefined,
+            protect_reason: protectDecision.decision !== "allow" ? protectDecision.reason : undefined,
           },
           response: {
             latency_ms: Date.now() - startedAt,
@@ -107,8 +107,8 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
             feature: options.feature,
             token_explosion_tokens: typeof estimatedInputTokens === "number" ? estimatedInputTokens : undefined,
             input_tokens_estimate: typeof estimatedInputTokens === "number" ? estimatedInputTokens : undefined,
-            protect_decision: protectDecision.decision === "warn" ? "warn" : undefined,
-            protect_reason: protectDecision.decision === "warn" ? protectDecision.reason : undefined,
+            protect_decision: protectDecision.decision !== "allow" ? protectDecision.decision : undefined,
+            protect_reason: protectDecision.decision !== "allow" ? protectDecision.reason : undefined,
           },
           response: {
             latency_ms: Date.now() - startedAt,
@@ -210,7 +210,7 @@ function extractHttpStatus(error: unknown): number | undefined {
 }
 
 function maybeApplyGoogleClamp(args: unknown[], decision: ProtectEvaluation): unknown[] {
-  if (decision.decision !== "warn" || decision.reason !== "near_cap") {
+  if (decision.decision !== "clamp") {
     return args;
   }
   if (!decision.applyClampEnabled) {

@@ -172,7 +172,7 @@ describe("Alerts webhook settings", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "View payload" }));
     expect(
-      screen.getByRole("heading", { name: "Sample payload for protection warn event" }),
+      screen.getByRole("heading", { name: "Sample payload for protection clamp event" }),
     ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Copy JSON" }));

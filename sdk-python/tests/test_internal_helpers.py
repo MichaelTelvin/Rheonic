@@ -130,8 +130,8 @@ def test_openai_apply_clamp_handles_payload_and_default_insertion_paths() -> Non
     assert unchanged == ((), {})
 
     decision = {
-        "decision": "warn",
-        "reason": "near_cap",
+        "decision": "clamp",
+        "reason": "token_clamp",
         "apply_clamp_enabled": True,
         "clamp": {"recommended_max_output_tokens": 16, "applied": False},
     }
@@ -141,8 +141,8 @@ def test_openai_apply_clamp_handles_payload_and_default_insertion_paths() -> Non
     assert decision["clamp"]["applied"] is True
 
     second_decision = {
-        "decision": "warn",
-        "reason": "near_cap",
+        "decision": "clamp",
+        "reason": "token_clamp",
         "apply_clamp_enabled": True,
         "clamp": {"recommended_max_output_tokens": 20, "applied": False},
     }
@@ -189,8 +189,8 @@ def test_google_extractors_cover_request_payload_and_usage_shapes() -> None:
 
 def test_google_apply_clamp_covers_kwargs_args_and_default_paths() -> None:
     decision = {
-        "decision": "warn",
-        "reason": "near_cap",
+        "decision": "clamp",
+        "reason": "token_clamp",
         "apply_clamp_enabled": True,
         "clamp": {"recommended_max_output_tokens": 32, "applied": False},
     }
@@ -199,8 +199,8 @@ def test_google_apply_clamp_covers_kwargs_args_and_default_paths() -> None:
     assert decision["clamp"]["applied"] is True
 
     decision = {
-        "decision": "warn",
-        "reason": "near_cap",
+        "decision": "clamp",
+        "reason": "token_clamp",
         "apply_clamp_enabled": True,
         "clamp": {"recommended_max_output_tokens": 21, "applied": False},
     }
@@ -209,8 +209,8 @@ def test_google_apply_clamp_covers_kwargs_args_and_default_paths() -> None:
     assert kwargs == {}
 
     decision = {
-        "decision": "warn",
-        "reason": "near_cap",
+        "decision": "clamp",
+        "reason": "token_clamp",
         "apply_clamp_enabled": True,
         "clamp": {"recommended_max_output_tokens": 11, "applied": False},
     }
@@ -259,8 +259,8 @@ def test_anthropic_status_and_clamp_helpers_cover_remaining_paths() -> None:
     assert anthropic._extract_http_status(RuntimeError("boom")) is None
 
     decision = {
-        "decision": "warn",
-        "reason": "near_cap",
+        "decision": "clamp",
+        "reason": "token_clamp",
         "apply_clamp_enabled": True,
         "clamp": {"recommended_max_output_tokens": 12, "applied": False},
     }
@@ -269,8 +269,8 @@ def test_anthropic_status_and_clamp_helpers_cover_remaining_paths() -> None:
     assert decision["clamp"]["applied"] is True
 
     decision = {
-        "decision": "warn",
-        "reason": "near_cap",
+        "decision": "clamp",
+        "reason": "token_clamp",
         "apply_clamp_enabled": True,
         "clamp": {"recommended_max_output_tokens": 14, "applied": False},
     }

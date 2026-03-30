@@ -1,124 +1,21 @@
-Rheonic — Scope (Current State)
+# Scope
 
-Status: MVP Core is complete. Core platform, protect mode, scheduled operations, webhook alerts, provider scoping, and docs viewer are implemented.
+## Product Split
+- Observe watches behavior.
+- Protect enforces runtime policy.
 
-========================================
-Implemented
-========================================
+## Incident Types
+- `retry_storm`
+- `loop_suspect`
+- `token_explosion`
+- `block`
 
-Backend foundation
-- FastAPI backend with layered architecture
-- PostgreSQL + Redis
-- RQ workers + scheduler bootstrap
-- Health endpoint
+## Protect Decisions
+- `allow`
+- `clamp`
+- `block`
 
-Auth and tenancy
-- User auth (`/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/refresh`, `/api/v1/auth/logout`, `/api/v1/auth/me`) via secure cookies
-- Project ownership enforcement across project/key/metrics/incidents APIs
-- Ingest auth via project ingest key
-
-Event ingest and realtime
-- `POST /api/v1/events`
-- Redis rolling 60s counters scoped by `(project_id, provider)`
-- Postgres event persistence
-- Idempotency and ingest key rate limiting
-- Realtime metrics endpoints (project totals aggregated across providers; optional provider filter)
-
-Incident engine
-- Deterministic detector pipeline (`Detector(s)` -> `Signal` -> `IncidentManager`)
-- Incident types: `near_cap`, `cap_breach`, `retry_storm`, `loop_suspect`, `token_explosion`
-- Dedup window merge for matching open incidents in `(project_id, provider, incident_type)` scope
-- No warmup/ratio/escalation dependency in runtime decisions
-- Policy-gap first-seen detection for new `(provider, model)` combinations (record + one-time webhook; no incident)
-- Manual resolve endpoint + auto-close incidents job
-
-Protect mode
-- Project-level protect settings (`GET/PUT /api/v1/projects/{project_id}/protect`)
-- Decision endpoint (`POST /api/v1/protect/decision`)
-- Provider-scoped decision inputs/state (counters + cooldown + deterministic warn signals)
-- Decision ordering: cooldown -> hard caps (block) -> warn signals (`near_cap`/`retry_storm`/`loop_suspect`/`token_explosion`) -> allow
-- Always-on SDK preflight (decision endpoint called in observe/protect), with server-side mode deciding enforceability
-- Fail-open / fail-closed handling for decision timeout/error
-- Protect metrics and health endpoints (project totals with optional provider filter)
-
-Alerts (webhook)
-- Project webhook config + test API
-- Unified transport hub (shared outbox + RQ worker) for webhook + email delivery
-- Raw webhook contract visible in UI/docs via sample payload (protect warning example + field notes)
-- Webhook dispatch events:
-- observe incident opens (`incident.warn`)
-- protect warnings (`protection.warn`)
-- protect clamp activation (`protection.clamp_started`)
-- protect blocks (`protection.block`)
-- incident resolved in observe/protect (manual/auto)
-- policy-gap first-seen tuples in observe/protect (`policy_gap.detected`)
-- webhook test (`webhook.test`, mode-independent)
-- Delivery failures sourced from `transport_outbox` (`failed` / `dead`) via metrics endpoint
-
-Feedback email
-- `POST /api/v1/feedback` is enqueue-only (`202` response)
-- Email jobs are processed asynchronously by transport worker
-- Resend email delivery is implemented for lifecycle alerts and feedback workflows
-
-Frontend/docs
-- Control Center layout with auth-gated routes
-- Dashboard metrics + provider filter
-- Dedicated Incidents page with provider/type/status filters
-- Docs page + docs/chart viewer and flow charts
-- Alerts page exposes:
-  - Email (Protect-only)
-  - Raw webhook (Observe + Protect)
-  - sample raw webhook JSON via modal/copy, without a payload editor
-
-========================================
-MVP Core Complete
-========================================
-
-Core quality and launch gating
-- Auth + project isolation enforcement complete and tested
-- Ingest/protect/incidents/webhook paths stable under `/api/v1/...`
-- Provider-scoped incidents/counters/decisions isolated with no cross-provider bleed
-- Coherent docs set (API spec, protect spec, thresholds, diagrams) aligned to runtime behavior
-- Backend tests, SDK tests, frontend tests, and existing e2e target green
-
-Operational readiness
-- Dashboard/incident UX polished for MVP operator workflows
-- Baseline alerting runbook for webhook failures (status visibility and retry behavior)
-- Smoke-test scripts/demos for launch validation scenarios implemented (allow, near-cap warn, cap-breach block, retry storm, loop suspect, token explosion, lifecycle)
-- Built a production landing page for public launch funnel
-
-========================================
-V1 Next Phase (Active)
-========================================
-
-Productization and deployment
-- Package and deploy backend/frontend to production infrastructure (with environment and secrets management)
-- Publish SDK packages to npm and PyPI for external consumption
-- Integrate Stripe for billing and subscription lifecycle required for launch
-- Finalize release/versioning workflow and launch runbook (rollback + health checks)
-
-========================================
-Planned in V2
-========================================
-
-Detectors and intelligence
-- Additional anomaly families and detector-specific tuning presets
-
-Providers and policy actions
-- Additional provider wrappers beyond current set
-- Model downgrade actioning
-- Cached response/message strategies tied to policy outcomes
-- Webhook-backed integrations (Telegram, Slack)
-- Integration-specific message templates
-
-Cost and reconciliation
-- Authoritative cost reconciliation pipeline
-- Pricing drift warnings
-- Budget-triggered policy actions
-
-Aggregation and analytics
-- Durable rollups and longer-term aggregation views
-- Advanced protect/incident trend analytics
-
-Multitenancy evolution
-- Org/workspace RBAC multitenancy (roles, workspace scoping, delegated access)
+## Out of Scope
+- preflight behavioral anomaly detection
+- clamp as an incident type
+- protect anomaly warn notifications

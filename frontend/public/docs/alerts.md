@@ -25,9 +25,10 @@ Rheonic can notify you about incident lifecycle and Protect reporting events. Al
 - `policy_gap.detected` by webhook only after the project already has baseline provider/model history
 
 ### Protect mode
-- `protection.warn`
 - `protection.clamp_started`
 - `protection.block`
+- `incident.warn`
+- `incident.block`
 - `incident.resolved`
 - `policy_gap.detected` by webhook only after the project already has baseline provider/model history
 - `webhook.delivery_failed` by email when webhook delivery reaches a terminal failure
@@ -42,24 +43,26 @@ Use the `Test webhook` action from the dashboard. Rheonic queues a test payload 
 
 Raw webhooks always send the canonical Rheonic payload in MVP. Human-facing provider formatting such as Telegram or Slack is planned as a V2 integration layer rather than a raw webhook editor.
 
-Sample payload for `protection.warn`:
+Sample payload for `protection.clamp_started`:
 
 ```json
 {
-  "event": "protection.warn",
+  "event": "protection.clamp_started",
   "project_id": "proj_123",
   "provider": "openai",
   "model": "gpt-4o-mini",
   "environment": "staging",
-  "reason": "retry_storm",
+  "reason": "token_clamp",
   "requests_60s": 12,
   "tokens_60s": 640,
   "req_cap": 400,
   "tok_cap": 1700,
   "estimated_next_tokens": 120,
-  "apply_clamp_enabled": false,
   "sent_at": "2026-03-17T06:23:20Z",
-  "clamp": null
+  "clamp": {
+    "recommended_max_output_tokens": 64,
+    "applied": false
+  }
 }
 ```
 
@@ -69,14 +72,12 @@ Field notes:
 - `provider`: provider associated with the decision/report
 - `model`: model associated with the request when available
 - `environment`: environment associated with the request when available
-- `reason`: Protect reason such as `retry_storm` or `near_cap`
+- `reason`: Protect enforcement reason such as `token_clamp` or `req_cap_breach`
 - `requests_60s`: rolling request count for the scoped `(project, provider)`
 - `tokens_60s`: rolling token count for the scoped `(project, provider)`
 - `req_cap`: configured request cap when present
 - `tok_cap`: configured token cap when present
 - `estimated_next_tokens`: predictive token estimate used by the decision engine when available
-- `token_explosion_tokens`: optional request-context signal included when `reason=token_explosion`
-- `apply_clamp_enabled`: whether auto clamp is enabled for the project
 - `clamp`: clamp recommendation or applied clamp context when relevant
 - `sent_at`: when Rheonic queued the webhook payload
 

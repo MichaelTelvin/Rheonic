@@ -185,15 +185,6 @@ def _make_client(
     webhook_dispatcher: FakeWebhookDispatcher | None = None,
     transport_service: FakeTransportService | None = None,
     event_repository: FakeEventRepository | None = None,
-    retry_storm_count: int | None = None,
-    loop_count: int | None = None,
-    loop_concurrency_threshold: int | None = None,
-    token_explosion_ratio: float | None = None,
-    token_explosion_abs: int | None = None,
-    token_explosion_growth_ratio: float | None = None,
-    token_explosion_growth_count: int | None = None,
-    token_explosion_growth_min_tokens: int | None = None,
-    token_explosion_concurrency_threshold: int | None = None,
 ) -> tuple[TestClient, RollingWindow, FakeEventRepository]:
     db_url = f"sqlite:///{tmp_path}/protect_decision.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
@@ -211,44 +202,12 @@ def _make_client(
     protect_action_store = ProtectActionStore(redis_client=redis_client)  # type: ignore[arg-type]
     protect_service = ProtectService(
         ingest_key_service=ingest_key_service,
-        event_repository=event_repository,  # type: ignore[arg-type]
         realtime_counters=rolling_window,
         protect_action_store=protect_action_store,
         protect_block_cooldown_seconds=cooldown_seconds,
         project_repository=project_repository,
         webhook_dispatcher=webhook_dispatcher,  # type: ignore[arg-type]
         transport_service=transport_service,  # type: ignore[arg-type]
-        retry_storm_count=retry_storm_count if retry_storm_count is not None else app_config.retry_storm_count,
-        loop_count=loop_count if loop_count is not None else app_config.loop_count,
-        loop_concurrency_threshold=(
-            loop_concurrency_threshold
-            if loop_concurrency_threshold is not None
-            else app_config.loop_concurrency_threshold
-        ),
-        token_explosion_ratio=(
-            token_explosion_ratio if token_explosion_ratio is not None else app_config.token_explosion_ratio
-        ),
-        token_explosion_abs=token_explosion_abs if token_explosion_abs is not None else app_config.token_explosion_abs,
-        token_explosion_growth_ratio=(
-            token_explosion_growth_ratio
-            if token_explosion_growth_ratio is not None
-            else app_config.token_explosion_growth_ratio
-        ),
-        token_explosion_growth_count=(
-            token_explosion_growth_count
-            if token_explosion_growth_count is not None
-            else app_config.token_explosion_growth_count
-        ),
-        token_explosion_growth_min_tokens=(
-            token_explosion_growth_min_tokens
-            if token_explosion_growth_min_tokens is not None
-            else app_config.token_explosion_growth_min_tokens
-        ),
-        token_explosion_concurrency_threshold=(
-            token_explosion_concurrency_threshold
-            if token_explosion_concurrency_threshold is not None
-            else app_config.token_explosion_concurrency_threshold
-        ),
     )
     metrics_service = MetricsService(
         realtime_counters=rolling_window,
@@ -443,7 +402,7 @@ def test_late_block_decision_does_not_enqueue_protection_block_notifications(tmp
     _cleanup_overrides()
 
 
-def test_near_cap_warns_when_predictive_reaches_warn_ratio(tmp_path) -> None:
+def test_clamp_decision_is_returned_when_predictive_budget_needs_reduction(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
@@ -459,16 +418,14 @@ def test_near_cap_warns_when_predictive_reaches_warn_ratio(tmp_path) -> None:
             "max_output_tokens": 64,
         },
     )
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "near_cap"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     assert decision["apply_clamp_enabled"] is False
-    assert isinstance(decision["clamp"], dict)
-    assert int(decision["clamp"]["recommended_max_output_tokens"]) > 0
-    assert decision["clamp"]["applied"] is False
+    assert decision["clamp"] is None
     _cleanup_overrides()
 
 
-def test_near_cap_warn_short_circuits_recent_event_lookup(tmp_path) -> None:
+def test_clamp_decision_does_not_depend_on_recent_event_history(tmp_path) -> None:
     event_repository = FakeEventRepository()
     client, rolling_window, _ = _make_client(tmp_path, event_repository=event_repository)
     project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Fast Path")
@@ -485,13 +442,13 @@ def test_near_cap_warn_short_circuits_recent_event_lookup(tmp_path) -> None:
             "max_output_tokens": 64,
         },
     )
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "near_cap"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     assert event_repository.list_recent_calls == 0
     _cleanup_overrides()
 
 
-def test_near_cap_warn_includes_apply_clamp_flag_when_enabled(tmp_path) -> None:
+def test_clamp_decision_includes_apply_clamp_flag_when_enabled(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Clamp")
     _set_protect(client, project_id, protect_enabled=True, apply_clamp=True, protect_max_tok_per_min=200)
@@ -502,55 +459,23 @@ def test_near_cap_warn_includes_apply_clamp_flag_when_enabled(tmp_path) -> None:
         ingest_key,
         body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 10, "max_output_tokens": 64},
     )
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "near_cap"
+    assert decision["decision"] == "clamp"
+    assert decision["reason"] == "token_clamp"
     assert decision["apply_clamp_enabled"] is True
     assert decision["clamp"]["applied"] is False
     assert int(decision["clamp"]["recommended_max_output_tokens"]) <= 64
     metrics = _protect_metrics(client, project_id)
-    assert metrics["warned_60m"] == 1
+    assert metrics["clamped_60m"] == 1
     assert metrics["last"] == {
-        "decision": "warn",
-        "reason": "near_cap",
+        "decision": "clamp",
+        "reason": "token_clamp",
         "source": "live",
         "ts": metrics["last"]["ts"],
     }
     _cleanup_overrides()
 
 
-def test_near_cap_warn_dispatches_protection_warn_webhook(tmp_path) -> None:
-    dispatcher = FakeWebhookDispatcher()
-    client, rolling_window, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher)
-    project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Webhook")
-    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
-    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=150)
-
-    decision = _decision(
-        client,
-        ingest_key,
-        body={
-            "provider": "openai",
-            "model": "gpt-4o-mini",
-            "environment": "dev",
-            "input_tokens_estimate": 10,
-            "max_output_tokens": 64,
-        },
-    )
-    assert decision["decision"] == "warn"
-    warn_calls = [call for call in dispatcher.calls if call[1] == "protection.warn"]
-    assert len(warn_calls) == 1
-    _, _, payload = warn_calls[0]
-    assert payload["event"] == "protection.warn"
-    assert payload["provider"] == "openai"
-    assert payload["model"] == "gpt-4o-mini"
-    assert payload["environment"] == "dev"
-    assert payload["reason"] == "near_cap"
-    assert payload["apply_clamp_enabled"] is False
-    assert isinstance(payload["clamp"], dict)
-    _cleanup_overrides()
-
-
-def test_near_cap_warn_dispatches_clamp_started_when_clamp_enabled(tmp_path) -> None:
+def test_clamp_decision_dispatches_clamp_started_webhook_when_enabled(tmp_path) -> None:
     dispatcher = FakeWebhookDispatcher()
     client, rolling_window, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher)
     project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Clamp Webhook")
@@ -568,14 +493,13 @@ def test_near_cap_warn_dispatches_clamp_started_when_clamp_enabled(tmp_path) -> 
             "max_output_tokens": 64,
         },
     )
-    assert decision["decision"] == "warn"
+    assert decision["decision"] == "clamp"
     event_types = [event_type for _, event_type, _ in dispatcher.calls]
-    assert "protection.warn" not in event_types
     assert "protection.clamp_started" in event_types
     _cleanup_overrides()
 
 
-def test_near_cap_warn_with_clamp_enabled_skips_warn_email_and_keeps_clamp_email(tmp_path) -> None:
+def test_clamp_decision_dispatches_clamp_started_email(tmp_path) -> None:
     dispatcher = FakeWebhookDispatcher()
     transport = FakeTransportService()
     client, rolling_window, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher, transport_service=transport)
@@ -594,16 +518,15 @@ def test_near_cap_warn_with_clamp_enabled_skips_warn_email_and_keeps_clamp_email
             "max_output_tokens": 64,
         },
     )
-    assert decision["decision"] == "warn"
+    assert decision["decision"] == "clamp"
     event_types = [event_type for _, event_type, _ in dispatcher.calls]
-    assert "protection.warn" not in event_types
     assert "protection.clamp_started" in event_types
     assert [call["event_type"] for call in transport.calls] == ["protection.clamp_started"]
     assert [call["template"] for call in transport.calls] == ["protection_clamp_started"]
     _cleanup_overrides()
 
 
-def test_near_cap_warn_with_clamp_enabled_but_no_reduction_keeps_warn_email_only(tmp_path) -> None:
+def test_clamp_decision_allows_when_no_reduction_is_needed(tmp_path) -> None:
     dispatcher = FakeWebhookDispatcher()
     transport = FakeTransportService()
     client, rolling_window, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher, transport_service=transport)
@@ -622,21 +545,19 @@ def test_near_cap_warn_with_clamp_enabled_but_no_reduction_keeps_warn_email_only
             "max_output_tokens": 32,
         },
     )
-    assert decision["decision"] == "warn"
+    assert decision["decision"] == "allow"
     assert decision["apply_clamp_enabled"] is True
-    assert int(decision["clamp"]["recommended_max_output_tokens"]) == 32
+    assert decision["clamp"] is None
     event_types = [event_type for _, event_type, _ in dispatcher.calls]
-    assert "protection.warn" in event_types
     assert "protection.clamp_started" not in event_types
-    assert [call["event_type"] for call in transport.calls] == ["protection.warn"]
-    assert [call["template"] for call in transport.calls] == ["protection_warn"]
+    assert transport.calls == []
     _cleanup_overrides()
 
 
-def test_near_cap_warn_creates_visible_incident_from_preflight(tmp_path) -> None:
+def test_clamp_decision_does_not_create_incident_from_preflight(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
-    project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Incident")
-    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Clamp No Incident")
+    _set_protect(client, project_id, protect_enabled=True, apply_clamp=True, protect_max_tok_per_min=200)
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=150)
 
     decision = _decision(
@@ -650,15 +571,13 @@ def test_near_cap_warn_creates_visible_incident_from_preflight(tmp_path) -> None
             "max_output_tokens": 64,
         },
     )
-    assert decision["decision"] == "warn"
+    assert decision["decision"] == "clamp"
     incidents = _incidents(client, project_id, provider="openai")
-    assert len(incidents) == 1
-    assert incidents[0]["type"] == "near_cap"
-    assert incidents[0]["evidence"]["near_cap_type"] == "tok"
+    assert incidents == []
     _cleanup_overrides()
 
 
-def test_retry_storm_warns_in_preflight(tmp_path) -> None:
+def test_retry_storm_does_not_trigger_preflight(tmp_path) -> None:
     client, _, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Retry Storm")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
@@ -721,12 +640,12 @@ def test_retry_storm_warns_in_preflight(tmp_path) -> None:
     )
 
     decision = _decision(client, ingest_key)
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "retry_storm"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     _cleanup_overrides()
 
 
-def test_retry_storm_warns_in_preflight_when_recent_events_use_resolved_model_name(tmp_path) -> None:
+def test_retry_storm_does_not_trigger_preflight_when_recent_events_use_resolved_model_name(tmp_path) -> None:
     client, _, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Retry Storm Resolved Model")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
@@ -754,8 +673,8 @@ def test_retry_storm_warns_in_preflight_when_recent_events_use_resolved_model_na
             "environment": "dev",
         },
     )
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "retry_storm"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     _cleanup_overrides()
 
 
@@ -793,12 +712,12 @@ def test_retry_storm_preflight_ignores_retry_status_and_only_counts_failures(tmp
     )
 
     decision = _decision(client, ingest_key)
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "retry_storm"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     _cleanup_overrides()
 
 
-def test_loop_suspect_warns_in_preflight_when_feature_matches(tmp_path) -> None:
+def test_loop_suspect_does_not_trigger_preflight_when_feature_matches(tmp_path) -> None:
     client, _, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
@@ -828,12 +747,12 @@ def test_loop_suspect_warns_in_preflight_when_feature_matches(tmp_path) -> None:
             "feature": "manual-protect-demo",
         },
     )
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "loop_suspect"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     _cleanup_overrides()
 
 
-def test_loop_suspect_warns_in_preflight_when_recent_events_use_resolved_model_name(tmp_path) -> None:
+def test_loop_suspect_does_not_trigger_preflight_when_recent_events_use_resolved_model_name(tmp_path) -> None:
     client, _, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Resolved Model")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
@@ -863,13 +782,13 @@ def test_loop_suspect_warns_in_preflight_when_recent_events_use_resolved_model_n
             "feature": "manual-protect-demo",
         },
     )
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "loop_suspect"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     _cleanup_overrides()
 
 
-def test_loop_suspect_warns_in_preflight_for_error_sequence(tmp_path) -> None:
-    client, _, events = _make_client(tmp_path, retry_storm_count=10, loop_count=3)
+def test_loop_suspect_preflight_ignores_error_sequence(tmp_path) -> None:
+    client, _, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Error Sequence")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -899,13 +818,13 @@ def test_loop_suspect_warns_in_preflight_for_error_sequence(tmp_path) -> None:
         },
     )
 
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "loop_suspect"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     _cleanup_overrides()
 
 
 def test_loop_suspect_preflight_is_suppressed_under_high_concurrency(tmp_path) -> None:
-    client, rolling_window, events = _make_client(tmp_path, loop_count=3, loop_concurrency_threshold=3)
+    client, rolling_window, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Concurrency")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -944,14 +863,8 @@ def test_loop_suspect_preflight_is_suppressed_under_high_concurrency(tmp_path) -
     _cleanup_overrides()
 
 
-def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit(tmp_path) -> None:
-    client, rolling_window, events = _make_client(
-        tmp_path,
-        token_explosion_growth_ratio=1.7,
-        token_explosion_growth_count=2,
-        token_explosion_growth_min_tokens=1_800,
-        token_explosion_abs=10_000,
-    )
+def test_token_explosion_growth_does_not_trigger_preflight(tmp_path) -> None:
+    client, rolling_window, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Growth")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -993,14 +906,14 @@ def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit
         },
     )
 
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "token_explosion"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     _cleanup_overrides()
 
 
-def test_token_explosion_warn_webhook_uses_dedicated_request_context_signal(tmp_path) -> None:
+def test_token_explosion_does_not_emit_preflight_webhook(tmp_path) -> None:
     dispatcher = FakeWebhookDispatcher()
-    client, _, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher, token_explosion_abs=200)
+    client, _, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher)
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Warn Payload")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1016,24 +929,14 @@ def test_token_explosion_warn_webhook_uses_dedicated_request_context_signal(tmp_
         },
     )
 
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "token_explosion"
-    warn_calls = [call for call in dispatcher.calls if call[1] == "protection.warn"]
-    assert len(warn_calls) == 1
-    payload = warn_calls[0][2]
-    assert payload["reason"] == "token_explosion"
-    assert payload["token_explosion_tokens"] == 240
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
+    assert dispatcher.calls == []
     _cleanup_overrides()
 
 
 def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_window_activity(tmp_path) -> None:
-    client, _, events = _make_client(
-        tmp_path,
-        token_explosion_growth_ratio=1.7,
-        token_explosion_growth_count=2,
-        token_explosion_growth_min_tokens=1_800,
-        token_explosion_abs=10_000,
-    )
+    client, _, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Idle Growth")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1080,13 +983,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_
 
 
 def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path) -> None:
-    client, rolling_window, events = _make_client(
-        tmp_path,
-        token_explosion_growth_ratio=1.7,
-        token_explosion_growth_count=2,
-        token_explosion_growth_min_tokens=1_800,
-        token_explosion_abs=10_000,
-    )
+    client, rolling_window, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Latest Match")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1128,20 +1025,13 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
         },
     )
 
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "token_explosion"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     _cleanup_overrides()
 
 
 def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrency(tmp_path) -> None:
-    client, rolling_window, events = _make_client(
-        tmp_path,
-        token_explosion_growth_ratio=1.7,
-        token_explosion_growth_count=2,
-        token_explosion_growth_min_tokens=1_800,
-        token_explosion_abs=10_000,
-        token_explosion_concurrency_threshold=2,
-    )
+    client, rolling_window, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Concurrency")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1191,13 +1081,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrenc
 
 
 def test_token_explosion_growth_is_suppressed_in_preflight_for_tiny_requests(tmp_path) -> None:
-    client, rolling_window, events = _make_client(
-        tmp_path,
-        token_explosion_growth_ratio=1.7,
-        token_explosion_growth_count=2,
-        token_explosion_growth_min_tokens=1_800,
-        token_explosion_abs=10_000,
-    )
+    client, rolling_window, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Tiny Growth")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1234,13 +1118,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_for_tiny_requests(tmp
 
 
 def test_token_explosion_growth_ignores_unrelated_feature_history_in_preflight(tmp_path) -> None:
-    client, rolling_window, events = _make_client(
-        tmp_path,
-        token_explosion_growth_ratio=1.7,
-        token_explosion_growth_count=2,
-        token_explosion_growth_min_tokens=1_800,
-        token_explosion_abs=10_000,
-    )
+    client, rolling_window, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Feature Match")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1296,12 +1174,12 @@ def test_token_explosion_growth_ignores_unrelated_feature_history_in_preflight(t
         },
     )
 
-    assert decision["decision"] == "warn"
-    assert decision["reason"] == "token_explosion"
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "ok"
     _cleanup_overrides()
 
 
-def test_protect_decision_records_allow_warn_block_outcomes(tmp_path) -> None:
+def test_protect_decision_records_allow_clamp_block_outcomes(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
 
     allow_project_id, allow_ingest_key = _create_project_and_key(client, "Protect Outcome Allow")
@@ -1320,25 +1198,25 @@ def test_protect_decision_records_allow_warn_block_outcomes(tmp_path) -> None:
         "ts": allow_metrics["last"]["ts"],
     }
 
-    warn_project_id, warn_ingest_key = _create_project_and_key(client, "Protect Outcome Warn")
-    _set_protect(client, warn_project_id, protect_enabled=True, protect_max_tok_per_min=200)
+    clamp_project_id, clamp_ingest_key = _create_project_and_key(client, "Protect Outcome Clamp")
+    _set_protect(client, clamp_project_id, protect_enabled=True, apply_clamp=True, protect_max_tok_per_min=200)
     rolling_window.increment_project_60s(
-        project_id=scoped_project_provider_id(warn_project_id, "openai"), total_tokens=170
+        project_id=scoped_project_provider_id(clamp_project_id, "openai"), total_tokens=170
     )
-    warn_before = int(_protect_metrics(client, warn_project_id)["warned_60m"])
+    clamp_before = int(_protect_metrics(client, clamp_project_id)["clamped_60m"])
     _decision(
         client,
-        warn_ingest_key,
-        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 20},
+        clamp_ingest_key,
+        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 20, "max_output_tokens": 64},
     )
-    warn_metrics = _protect_metrics(client, warn_project_id)
-    warn_after = int(warn_metrics["warned_60m"])
-    assert warn_after == warn_before + 1
-    assert warn_metrics["last"] == {
-        "decision": "warn",
-        "reason": "near_cap",
+    clamp_metrics = _protect_metrics(client, clamp_project_id)
+    clamp_after = int(clamp_metrics["clamped_60m"])
+    assert clamp_after == clamp_before + 1
+    assert clamp_metrics["last"] == {
+        "decision": "clamp",
+        "reason": "token_clamp",
         "source": "live",
-        "ts": warn_metrics["last"]["ts"],
+        "ts": clamp_metrics["last"]["ts"],
     }
 
     block_project_id, block_ingest_key = _create_project_and_key(client, "Protect Outcome Block")
@@ -1373,7 +1251,7 @@ def test_observe_mode_preflight_does_not_increment_protect_decision_counters(tmp
 
     assert response["decision"] == "allow"
     assert after["allowed_60m"] == before["allowed_60m"] == 0
-    assert after["warned_60m"] == before["warned_60m"] == 0
+    assert after["clamped_60m"] == before["clamped_60m"] == 0
     assert after["blocked_60m"] == before["blocked_60m"] == 0
     assert after["last"] is None
     assert after["decision_latency_p50_60m_ms"] is not None
@@ -1387,35 +1265,39 @@ def test_protect_metrics_support_provider_filter_with_same_schema(tmp_path) -> N
 
     _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})  # allow
     _decision(
-        client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 180}
-    )  # warn
+        client,
+        ingest_key,
+        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 180, "max_output_tokens": 64},
+    )  # allow when clamp disabled
 
     _decision(
-        client, ingest_key, body={"provider": "anthropic", "model": "claude-3-5-sonnet", "input_tokens_estimate": 180}
-    )  # warn
+        client,
+        ingest_key,
+        body={"provider": "anthropic", "model": "claude-3-5-sonnet", "input_tokens_estimate": 180, "max_output_tokens": 64},
+    )  # allow when clamp disabled
 
     all_metrics = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
     assert all_metrics.status_code == 200
     payload = all_metrics.json()
     assert set(payload.keys()) == {
         "allowed_60m",
-        "warned_60m",
+        "clamped_60m",
         "blocked_60m",
         "decision_timeouts_60m",
         "last",
         "decision_latency_p50_60m_ms",
         "decision_latency_p95_60m_ms",
     }
-    assert payload["allowed_60m"] >= 1
-    assert payload["warned_60m"] >= 2
+    assert payload["allowed_60m"] >= 3
+    assert payload["clamped_60m"] == 0
 
     openai_metrics = client.get(f"/api/v1/metrics/protect?project_id={project_id}&provider=openai")
     assert openai_metrics.status_code == 200
-    assert openai_metrics.json()["warned_60m"] >= 1
+    assert openai_metrics.json()["clamped_60m"] == 0
 
     anthropic_metrics = client.get(f"/api/v1/metrics/protect?project_id={project_id}&provider=anthropic")
     assert anthropic_metrics.status_code == 200
-    assert anthropic_metrics.json()["warned_60m"] >= 1
+    assert anthropic_metrics.json()["clamped_60m"] == 0
     _cleanup_overrides()
 
 
@@ -1435,7 +1317,7 @@ def test_timeout_report_reconciles_late_warn_decision_metrics(tmp_path) -> None:
         json={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 20},
     )
     assert decision_response.status_code == 200
-    assert decision_response.json()["decision"] == "warn"
+    assert decision_response.json()["decision"] == "allow"
 
     timeout_response = client.post(
         "/api/v1/protect/decision-timeout",
@@ -1449,7 +1331,7 @@ def test_timeout_report_reconciles_late_warn_decision_metrics(tmp_path) -> None:
 
     metrics = _protect_metrics(client, project_id)
     assert metrics["allowed_60m"] == 1
-    assert metrics["warned_60m"] == 0
+    assert metrics["clamped_60m"] == 0
     assert metrics["decision_timeouts_60m"] == 1
     assert metrics["last"] == {
         "decision": "allow",

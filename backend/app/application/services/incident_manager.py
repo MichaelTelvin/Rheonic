@@ -4,6 +4,8 @@ from uuid import uuid4
 
 from app.application.interfaces.incident_repository import IncidentRepository
 from app.application.interfaces.webhook_dispatcher import WebhookDispatcher
+from app.application.services.transport_service import TransportService, build_transport_dedupe_key
+from app.config import app_config
 from app.domain.detectors.contracts import Signal
 from app.domain.models.incident import Incident
 from app.logger import get_logger
@@ -20,10 +22,12 @@ class IncidentManager:
         incident_repository: IncidentRepository,
         incident_dedup_window_seconds: int,
         webhook_dispatcher: WebhookDispatcher | None = None,
+        transport_service: TransportService | None = None,
     ) -> None:
         self._incident_repository = incident_repository
         self._incident_dedup_window_seconds = incident_dedup_window_seconds
         self._webhook_dispatcher = webhook_dispatcher
+        self._transport_service = transport_service
 
     def process_signals(
         self,
@@ -103,9 +107,8 @@ class IncidentManager:
         self._enqueue_detection_notifications(incident=incident, mode=mode)
 
     def _enqueue_detection_notifications(self, *, incident: Incident, mode: str) -> None:
-        if mode != "observe":
-            return
-        event_type = "incident.warn"
+        event_type = "incident.block" if incident.incident_type == app_config.incident_type_block else "incident.warn"
+        template = "incident_block" if event_type == "incident.block" else "incident_warn"
         evidence = _build_webhook_evidence(incident.evidence)
         payload: dict[str, object] = {
             "event": event_type,
@@ -117,6 +120,7 @@ class IncidentManager:
             "environment": _string_or_none(incident.evidence.get("environment")),
             "created_at": incident.created_at.isoformat(),
             "last_seen_at": (incident.last_seen_at.isoformat() if incident.last_seen_at is not None else None),
+            "mode": mode,
             "sent_at": datetime.now(timezone.utc).isoformat(),
             "evidence": evidence,
         }
@@ -132,6 +136,31 @@ class IncidentManager:
                     "Failed to enqueue incident webhook",
                     extra={"incident_id": incident.id},
                 )
+        if self._transport_service is None:
+            return
+        try:
+            dedupe_key = build_transport_dedupe_key(
+                project_id=incident.project_id,
+                kind="email",
+                event_type=event_type,
+                payload=payload,
+                seed=incident.id,
+            )
+            self._transport_service.enqueue(
+                project_id=incident.project_id,
+                kind="email",
+                event_type=event_type,
+                payload=payload,
+                dedupe_key=dedupe_key,
+                template=template,
+                provider=incident.provider,
+                environment=_string_or_none(incident.evidence.get("environment")),
+            )
+        except Exception:
+            logger.exception(
+                "Failed to enqueue incident email",
+                extra={"incident_id": incident.id, "event_type": event_type},
+            )
 
 
 def _signal_episode_window_seconds(signal: Signal, fallback_seconds: int) -> int:

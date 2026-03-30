@@ -4,7 +4,7 @@ import { sdkNodeConfig } from "./config.js";
 import { requestJson } from "./httpTransport.js";
 import { bindTraceContext, generateSpanId, generateTraceId, getTraceId } from "./logger.js";
 
-export type ProtectDecision = "allow" | "warn" | "block";
+export type ProtectDecision = "allow" | "clamp" | "block";
 export type ProtectFailMode = "open" | "closed";
 
 export interface ProtectContext {
@@ -285,7 +285,7 @@ function parseBlockedUntilMs(value: unknown): number | null {
 }
 
 function parseDecision(value: unknown): ProtectDecision {
-  if (value === "warn" || value === "block" || value === "allow") {
+  if (value === "clamp" || value === "block" || value === "allow") {
     return value;
   }
   return "allow";

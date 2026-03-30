@@ -2210,7 +2210,6 @@ select {
   border: 1px solid transparent;
 }
 
-.badge.near_cap,
 .badge.retry_storm,
 .badge.loop_suspect,
 .badge.token_explosion,
@@ -2228,7 +2227,7 @@ select {
   background: rgba(252, 211, 143, 0.15);
 }
 
-.badge.cap_breach,
+.badge.block,
 .badge.resolved,
 .badge.high {
   color: #fda4af;

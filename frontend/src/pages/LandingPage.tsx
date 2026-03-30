@@ -120,16 +120,15 @@ export function LandingPage(): JSX.Element {
                 <div className="landing-mock-bottom-grid">
                   <article className="landing-mock-list-card">
                     <h4>Incidents</h4>
-                    <p><span>Near cap</span><strong>0</strong></p>
                     <p><span>Retry storm</span><strong>0</strong></p>
                     <p><span>Loop suspect</span><strong>0</strong></p>
                     <p><span>Token explosion</span><strong>0</strong></p>
-                    <p><span>Cap breach</span><strong>1</strong></p>
+                    <p><span>Block</span><strong>1</strong></p>
                   </article>
                   <article className="landing-mock-list-card">
                     <h4>Preflight decisions (60m)</h4>
                     <p><span>Allowed</span><strong>2</strong></p>
-                    <p><span>Warned</span><strong>0</strong></p>
+                    <p><span>Clamped</span><strong>0</strong></p>
                     <p><span>Blocked</span><strong>1</strong></p>
                   </article>
                 </div>
@@ -174,7 +173,7 @@ export function LandingPage(): JSX.Element {
                     <h3>Budget drain</h3>
                     <p>Minutes later, the bill is real.</p>
                   </div>
-                  <span className="landing-pain-chip">$ / cap breach</span>
+                  <span className="landing-pain-chip">$ / hard stop</span>
                 </article>
               </div>
             </article>
@@ -239,7 +238,7 @@ export function LandingPage(): JSX.Element {
                 </span>
                 <h3>Incident detection</h3>
               </div>
-              <p>Automatic incidents for near-cap, failed retry storms, rapid loop sequences, and sudden request-context explosions before they cascade.</p>
+              <p>Automatic incidents for failed retry storms, rapid loop sequences, and sudden request-context explosions before they cascade.</p>
             </article>
             <article className="landing-cap-card">
               <div className="landing-cap-head">
@@ -248,7 +247,7 @@ export function LandingPage(): JSX.Element {
                 </span>
                 <h3>Preflight enforcement</h3>
               </div>
-              <p>Apply allow / warn / block decisions before provider calls, with cooldown to stop repeat bursts.</p>
+              <p>Apply allow / clamp / block decisions before provider calls, with cooldown to stop repeat bursts.</p>
             </article>
           </div>
         </section>

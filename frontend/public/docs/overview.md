@@ -4,7 +4,7 @@ Rheonic helps you monitor and control LLM runtime risk across your application. 
 
 ## What You Can Do
 - Track live request and token volume by project.
-- Review incidents such as `near_cap`, `retry_storm`, `loop_suspect`, and `token_explosion`.
+- Review incidents such as `retry_storm`, `loop_suspect`, `token_explosion`, and `block`.
 - Enable Protect mode to warn or block when limits are about to be crossed.
 - Send alert notifications by email or webhook.
 - Instrument OpenAI, Anthropic, and Google calls from Node or Python.

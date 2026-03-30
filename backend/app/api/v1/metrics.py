@@ -39,7 +39,7 @@ def _metric_last(value: object) -> dict[str, str] | None:
 class ProtectMetricsOut(BaseModel):
     # Protect action counters for dashboard visibility.
     allowed_60m: int
-    warned_60m: int
+    clamped_60m: int
     blocked_60m: int
     decision_timeouts_60m: int
     last: dict[str, str] | None
@@ -89,13 +89,13 @@ def get_protect_metrics(
     project_service: ProjectService = Depends(get_project_service),
     current_user: User = Depends(get_current_user),
 ) -> ProtectMetricsOut:
-    # Return protect-mode warn/block counters for one project.
+    # Return protect-mode allow/clamp/block counters for one project.
     try:
         project_service.ensure_project_owned_by_user(project_id=project_id, user_id=current_user.id)
         metrics = service.get_protect_metrics(project_id=project_id, provider=provider)
         return ProtectMetricsOut(
             allowed_60m=_metric_int(metrics.get("allowed_60m")),
-            warned_60m=_metric_int(metrics.get("warned_60m")),
+            clamped_60m=_metric_int(metrics.get("clamped_60m")),
             blocked_60m=_metric_int(metrics.get("blocked_60m")),
             decision_timeouts_60m=_metric_int(metrics.get("decision_timeouts_60m")),
             last=_metric_last(metrics.get("last")),

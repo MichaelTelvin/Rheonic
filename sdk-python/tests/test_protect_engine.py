@@ -293,7 +293,7 @@ def test_parallel_calls_during_active_cooldown_block_locally_without_backend_dec
     client.close()
 
 
-def test_preflight_predictive_near_cap_warn_allows_provider_call() -> None:
+def test_preflight_clamp_allows_provider_call() -> None:
     client = Client(
         ingest_key="p1",
         base_url="http://localhost:8000",
@@ -301,7 +301,7 @@ def test_preflight_predictive_near_cap_warn_allows_provider_call() -> None:
         http_client=FakeHttpClient(  # type: ignore[arg-type]
             {
                 "decision": "warn",
-                "reason": "near_cap",
+                "reason": "token_clamp",
                 "fail_mode": "open",
                 "protect_decision_timeout_ms": 100,
             }
@@ -315,11 +315,11 @@ def test_preflight_predictive_near_cap_warn_allows_provider_call() -> None:
     client.close()
 
 
-def test_preflight_warn_allows_provider_call_and_tags_telemetry() -> None:
+def test_preflight_clamp_allows_provider_call_and_tags_telemetry() -> None:
     transport = FakeHttpClient(  # type: ignore[arg-type]
         {
-            "decision": "warn",
-            "reason": "loop_suspect",
+            "decision": "clamp",
+            "reason": "token_clamp",
             "fail_mode": "open",
             "protect_decision_timeout_ms": 100,
         }
@@ -338,8 +338,8 @@ def test_preflight_warn_allows_provider_call_and_tags_telemetry() -> None:
     assert len(calls) == 1
     assert len(transport.ingested_events) == 1
     request_payload = transport.ingested_events[0].get("request") or {}
-    assert request_payload.get("protect_decision") == "warn"
-    assert request_payload.get("protect_reason") == "loop_suspect"
+    assert request_payload.get("protect_decision") == "clamp"
+    assert request_payload.get("protect_reason") == "token_clamp"
     assert request_payload.get("token_explosion_tokens") is None
     client.close()
 

@@ -65,7 +65,7 @@ class ProtectEngine:
         self._cooldown_reason: str | None = None
 
     def evaluate(self, context: dict[str, object]) -> dict[str, object]:
-        # Return allow/warn/block decision from backend with fail-mode fallback.
+        # Return allow/clamp/block decision from backend with fail-mode fallback.
         now_ms = int(time.time() * 1000)
         if self._cooldown_until_ms is not None and now_ms < self._cooldown_until_ms:
             self._debug(
@@ -122,7 +122,7 @@ class ProtectEngine:
             elif self._cooldown_until_ms is not None and int(time.time() * 1000) >= self._cooldown_until_ms:
                 self._cooldown_until_ms = None
                 self._cooldown_reason = None
-            if decision not in {"allow", "warn", "block"}:
+            if decision not in {"allow", "clamp", "block"}:
                 decision = "allow"
             result: dict[str, object] = {"decision": decision, "reason": reason}
             apply_clamp_enabled = payload.get("apply_clamp_enabled")

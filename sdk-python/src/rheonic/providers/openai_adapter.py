@@ -200,8 +200,8 @@ def _capture_success(
                         if isinstance(estimated_input_tokens, int)
                         else {}
                     ),
-                    "protect_decision": "warn" if protect_decision == "warn" else None,
-                    "protect_reason": protect_reason if protect_decision == "warn" else None,
+                    "protect_decision": "clamp" if protect_decision == "clamp" else None,
+                    "protect_reason": protect_reason if protect_decision != "allow" else None,
                 },
                 response={
                     "latency_ms": latency_ms,
@@ -242,8 +242,8 @@ def _capture_failure(
                         if isinstance(estimated_input_tokens, int)
                         else {}
                     ),
-                    "protect_decision": "warn" if protect_decision == "warn" else None,
-                    "protect_reason": protect_reason if protect_decision == "warn" else None,
+                    "protect_decision": "clamp" if protect_decision == "clamp" else None,
+                    "protect_reason": protect_reason if protect_decision != "allow" else None,
                 },
                 response={
                     "latency_ms": latency_ms,
@@ -348,9 +348,7 @@ def _apply_openai_clamp(
     kwargs: dict[str, Any],
     protect_decision: dict[str, object],
 ) -> tuple[tuple[Any, ...], dict[str, Any]]:
-    if str(protect_decision.get("decision") or "") != "warn":
-        return args, kwargs
-    if str(protect_decision.get("reason") or "") != "near_cap":
+    if str(protect_decision.get("decision") or "") != "clamp":
         return args, kwargs
     if protect_decision.get("apply_clamp_enabled") is not True:
         return args, kwargs
