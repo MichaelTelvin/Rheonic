@@ -185,6 +185,15 @@ def _make_client(
     webhook_dispatcher: FakeWebhookDispatcher | None = None,
     transport_service: FakeTransportService | None = None,
     event_repository: FakeEventRepository | None = None,
+    retry_storm_count: int | None = None,
+    loop_count: int | None = None,
+    loop_concurrency_threshold: int | None = None,
+    token_explosion_ratio: float | None = None,
+    token_explosion_abs: int | None = None,
+    token_explosion_growth_ratio: float | None = None,
+    token_explosion_growth_count: int | None = None,
+    token_explosion_growth_min_tokens: int | None = None,
+    token_explosion_concurrency_threshold: int | None = None,
 ) -> tuple[TestClient, RollingWindow, FakeEventRepository]:
     db_url = f"sqlite:///{tmp_path}/protect_decision.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
@@ -209,6 +218,37 @@ def _make_client(
         project_repository=project_repository,
         webhook_dispatcher=webhook_dispatcher,  # type: ignore[arg-type]
         transport_service=transport_service,  # type: ignore[arg-type]
+        retry_storm_count=retry_storm_count if retry_storm_count is not None else app_config.retry_storm_count,
+        loop_count=loop_count if loop_count is not None else app_config.loop_count,
+        loop_concurrency_threshold=(
+            loop_concurrency_threshold
+            if loop_concurrency_threshold is not None
+            else app_config.loop_concurrency_threshold
+        ),
+        token_explosion_ratio=(
+            token_explosion_ratio if token_explosion_ratio is not None else app_config.token_explosion_ratio
+        ),
+        token_explosion_abs=token_explosion_abs if token_explosion_abs is not None else app_config.token_explosion_abs,
+        token_explosion_growth_ratio=(
+            token_explosion_growth_ratio
+            if token_explosion_growth_ratio is not None
+            else app_config.token_explosion_growth_ratio
+        ),
+        token_explosion_growth_count=(
+            token_explosion_growth_count
+            if token_explosion_growth_count is not None
+            else app_config.token_explosion_growth_count
+        ),
+        token_explosion_growth_min_tokens=(
+            token_explosion_growth_min_tokens
+            if token_explosion_growth_min_tokens is not None
+            else app_config.token_explosion_growth_min_tokens
+        ),
+        token_explosion_concurrency_threshold=(
+            token_explosion_concurrency_threshold
+            if token_explosion_concurrency_threshold is not None
+            else app_config.token_explosion_concurrency_threshold
+        ),
     )
     metrics_service = MetricsService(
         realtime_counters=rolling_window,
@@ -829,7 +869,7 @@ def test_loop_suspect_warns_in_preflight_when_recent_events_use_resolved_model_n
 
 
 def test_loop_suspect_warns_in_preflight_for_error_sequence(tmp_path) -> None:
-    client, _, events = _make_client(tmp_path)
+    client, _, events = _make_client(tmp_path, retry_storm_count=10, loop_count=3)
     project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Error Sequence")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -848,22 +888,16 @@ def test_loop_suspect_warns_in_preflight_for_error_sequence(tmp_path) -> None:
             )
         )
 
-    original_retry_storm_count = _set_app_config_value("retry_storm_count", 10)
-    original_loop_count = _set_app_config_value("loop_count", 3)
-    try:
-        decision = _decision(
-            client,
-            ingest_key,
-            body={
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "environment": "dev",
-                "feature": "manual-protect-demo",
-            },
-        )
-    finally:
-        object.__setattr__(app_config, "retry_storm_count", original_retry_storm_count)
-        object.__setattr__(app_config, "loop_count", original_loop_count)
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "feature": "manual-protect-demo",
+        },
+    )
 
     assert decision["decision"] == "warn"
     assert decision["reason"] == "loop_suspect"
@@ -871,7 +905,7 @@ def test_loop_suspect_warns_in_preflight_for_error_sequence(tmp_path) -> None:
 
 
 def test_loop_suspect_preflight_is_suppressed_under_high_concurrency(tmp_path) -> None:
-    client, rolling_window, events = _make_client(tmp_path)
+    client, rolling_window, events = _make_client(tmp_path, loop_count=3, loop_concurrency_threshold=3)
     project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Concurrency")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -894,22 +928,16 @@ def test_loop_suspect_preflight_is_suppressed_under_high_concurrency(tmp_path) -
     rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
     rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
 
-    original_loop_count = _set_app_config_value("loop_count", 3)
-    original_concurrency = _set_app_config_value("loop_concurrency_threshold", 3)
-    try:
-        decision = _decision(
-            client,
-            ingest_key,
-            body={
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "environment": "dev",
-                "feature": "manual-protect-demo",
-            },
-        )
-    finally:
-        object.__setattr__(app_config, "loop_count", original_loop_count)
-        object.__setattr__(app_config, "loop_concurrency_threshold", original_concurrency)
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "feature": "manual-protect-demo",
+        },
+    )
 
     assert decision["decision"] == "allow"
     assert decision["reason"] == "ok"
@@ -917,7 +945,13 @@ def test_loop_suspect_preflight_is_suppressed_under_high_concurrency(tmp_path) -
 
 
 def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit(tmp_path) -> None:
-    client, rolling_window, events = _make_client(tmp_path)
+    client, rolling_window, events = _make_client(
+        tmp_path,
+        token_explosion_growth_ratio=1.7,
+        token_explosion_growth_count=2,
+        token_explosion_growth_min_tokens=1_800,
+        token_explosion_abs=10_000,
+    )
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Growth")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -946,27 +980,17 @@ def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit
     )
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
 
-    original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 1.7)
-    original_growth_count = _set_app_config_value("token_explosion_growth_count", 2)
-    original_growth_min = _set_app_config_value("token_explosion_growth_min_tokens", 1_800)
-    original_abs = _set_app_config_value("token_explosion_abs", 10_000)
-    try:
-        decision = _decision(
-            client,
-            ingest_key,
-            body={
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "environment": "dev",
-                "input_tokens_estimate": 5_500,
-                "max_output_tokens": 0,
-            },
-        )
-    finally:
-        object.__setattr__(app_config, "token_explosion_growth_ratio", original_growth_ratio)
-        object.__setattr__(app_config, "token_explosion_growth_count", original_growth_count)
-        object.__setattr__(app_config, "token_explosion_growth_min_tokens", original_growth_min)
-        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "input_tokens_estimate": 5_500,
+            "max_output_tokens": 0,
+        },
+    )
 
     assert decision["decision"] == "warn"
     assert decision["reason"] == "token_explosion"
@@ -975,25 +999,21 @@ def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit
 
 def test_token_explosion_warn_webhook_uses_dedicated_request_context_signal(tmp_path) -> None:
     dispatcher = FakeWebhookDispatcher()
-    client, _, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher)
+    client, _, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher, token_explosion_abs=200)
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Warn Payload")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
-    original_abs = _set_app_config_value("token_explosion_abs", 200)
-    try:
-        decision = _decision(
-            client,
-            ingest_key,
-            body={
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "environment": "dev",
-                "input_tokens_estimate": 240,
-                "max_output_tokens": 0,
-            },
-        )
-    finally:
-        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "input_tokens_estimate": 240,
+            "max_output_tokens": 0,
+        },
+    )
 
     assert decision["decision"] == "warn"
     assert decision["reason"] == "token_explosion"
@@ -1006,7 +1026,13 @@ def test_token_explosion_warn_webhook_uses_dedicated_request_context_signal(tmp_
 
 
 def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_window_activity(tmp_path) -> None:
-    client, _, events = _make_client(tmp_path)
+    client, _, events = _make_client(
+        tmp_path,
+        token_explosion_growth_ratio=1.7,
+        token_explosion_growth_count=2,
+        token_explosion_growth_min_tokens=1_800,
+        token_explosion_abs=10_000,
+    )
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Idle Growth")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1034,27 +1060,17 @@ def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_
         )
     )
 
-    original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 1.7)
-    original_growth_count = _set_app_config_value("token_explosion_growth_count", 2)
-    original_growth_min = _set_app_config_value("token_explosion_growth_min_tokens", 1_800)
-    original_abs = _set_app_config_value("token_explosion_abs", 10_000)
-    try:
-        decision = _decision(
-            client,
-            ingest_key,
-            body={
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "environment": "dev",
-                "input_tokens_estimate": 5_500,
-                "max_output_tokens": 0,
-            },
-        )
-    finally:
-        object.__setattr__(app_config, "token_explosion_growth_ratio", original_growth_ratio)
-        object.__setattr__(app_config, "token_explosion_growth_count", original_growth_count)
-        object.__setattr__(app_config, "token_explosion_growth_min_tokens", original_growth_min)
-        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "input_tokens_estimate": 5_500,
+            "max_output_tokens": 0,
+        },
+    )
 
     assert decision["decision"] == "allow"
     assert decision["reason"] == "ok"
@@ -1062,7 +1078,13 @@ def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_
 
 
 def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path) -> None:
-    client, rolling_window, events = _make_client(tmp_path)
+    client, rolling_window, events = _make_client(
+        tmp_path,
+        token_explosion_growth_ratio=1.7,
+        token_explosion_growth_count=2,
+        token_explosion_growth_min_tokens=1_800,
+        token_explosion_abs=10_000,
+    )
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Latest Match")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1091,27 +1113,17 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
     )
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
 
-    original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 1.7)
-    original_growth_count = _set_app_config_value("token_explosion_growth_count", 2)
-    original_growth_min = _set_app_config_value("token_explosion_growth_min_tokens", 1_800)
-    original_abs = _set_app_config_value("token_explosion_abs", 10_000)
-    try:
-        decision = _decision(
-            client,
-            ingest_key,
-            body={
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "environment": "dev",
-                "input_tokens_estimate": 5_500,
-                "max_output_tokens": 0,
-            },
-        )
-    finally:
-        object.__setattr__(app_config, "token_explosion_growth_ratio", original_growth_ratio)
-        object.__setattr__(app_config, "token_explosion_growth_count", original_growth_count)
-        object.__setattr__(app_config, "token_explosion_growth_min_tokens", original_growth_min)
-        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "input_tokens_estimate": 5_500,
+            "max_output_tokens": 0,
+        },
+    )
 
     assert decision["decision"] == "warn"
     assert decision["reason"] == "token_explosion"
@@ -1119,7 +1131,14 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
 
 
 def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrency(tmp_path) -> None:
-    client, rolling_window, events = _make_client(tmp_path)
+    client, rolling_window, events = _make_client(
+        tmp_path,
+        token_explosion_growth_ratio=1.7,
+        token_explosion_growth_count=2,
+        token_explosion_growth_min_tokens=1_800,
+        token_explosion_abs=10_000,
+        token_explosion_concurrency_threshold=2,
+    )
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Concurrency")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1150,29 +1169,17 @@ def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrenc
     rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
     rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
 
-    original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 1.7)
-    original_growth_count = _set_app_config_value("token_explosion_growth_count", 2)
-    original_growth_min = _set_app_config_value("token_explosion_growth_min_tokens", 1_800)
-    original_abs = _set_app_config_value("token_explosion_abs", 10_000)
-    original_concurrency = _set_app_config_value("token_explosion_concurrency_threshold", 2)
-    try:
-        decision = _decision(
-            client,
-            ingest_key,
-            body={
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "environment": "dev",
-                "input_tokens_estimate": 5_500,
-                "max_output_tokens": 0,
-            },
-        )
-    finally:
-        object.__setattr__(app_config, "token_explosion_growth_ratio", original_growth_ratio)
-        object.__setattr__(app_config, "token_explosion_growth_count", original_growth_count)
-        object.__setattr__(app_config, "token_explosion_growth_min_tokens", original_growth_min)
-        object.__setattr__(app_config, "token_explosion_abs", original_abs)
-        object.__setattr__(app_config, "token_explosion_concurrency_threshold", original_concurrency)
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "input_tokens_estimate": 5_500,
+            "max_output_tokens": 0,
+        },
+    )
 
     assert decision["decision"] == "allow"
     assert decision["reason"] == "ok"
@@ -1180,7 +1187,13 @@ def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrenc
 
 
 def test_token_explosion_growth_is_suppressed_in_preflight_for_tiny_requests(tmp_path) -> None:
-    client, rolling_window, events = _make_client(tmp_path)
+    client, rolling_window, events = _make_client(
+        tmp_path,
+        token_explosion_growth_ratio=1.7,
+        token_explosion_growth_count=2,
+        token_explosion_growth_min_tokens=1_800,
+        token_explosion_abs=10_000,
+    )
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Tiny Growth")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1198,27 +1211,17 @@ def test_token_explosion_growth_is_suppressed_in_preflight_for_tiny_requests(tmp
     )
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
 
-    original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 1.7)
-    original_growth_count = _set_app_config_value("token_explosion_growth_count", 2)
-    original_growth_min = _set_app_config_value("token_explosion_growth_min_tokens", 1_800)
-    original_abs = _set_app_config_value("token_explosion_abs", 10_000)
-    try:
-        decision = _decision(
-            client,
-            ingest_key,
-            body={
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "environment": "dev",
-                "input_tokens_estimate": 363,
-                "max_output_tokens": 0,
-            },
-        )
-    finally:
-        object.__setattr__(app_config, "token_explosion_growth_ratio", original_growth_ratio)
-        object.__setattr__(app_config, "token_explosion_growth_count", original_growth_count)
-        object.__setattr__(app_config, "token_explosion_growth_min_tokens", original_growth_min)
-        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "input_tokens_estimate": 363,
+            "max_output_tokens": 0,
+        },
+    )
 
     assert decision["decision"] == "allow"
     assert decision["reason"] == "ok"
@@ -1226,7 +1229,13 @@ def test_token_explosion_growth_is_suppressed_in_preflight_for_tiny_requests(tmp
 
 
 def test_token_explosion_growth_ignores_unrelated_feature_history_in_preflight(tmp_path) -> None:
-    client, rolling_window, events = _make_client(tmp_path)
+    client, rolling_window, events = _make_client(
+        tmp_path,
+        token_explosion_growth_ratio=1.7,
+        token_explosion_growth_count=2,
+        token_explosion_growth_min_tokens=1_800,
+        token_explosion_abs=10_000,
+    )
     project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Feature Match")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
@@ -1269,28 +1278,18 @@ def test_token_explosion_growth_ignores_unrelated_feature_history_in_preflight(t
     )
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
 
-    original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 1.7)
-    original_growth_count = _set_app_config_value("token_explosion_growth_count", 2)
-    original_growth_min = _set_app_config_value("token_explosion_growth_min_tokens", 1_800)
-    original_abs = _set_app_config_value("token_explosion_abs", 10_000)
-    try:
-        decision = _decision(
-            client,
-            ingest_key,
-            body={
-                "provider": "openai",
-                "model": "gpt-4o-mini",
-                "environment": "dev",
-                "feature": "manual-protect-demo",
-                "input_tokens_estimate": 5_500,
-                "max_output_tokens": 0,
-            },
-        )
-    finally:
-        object.__setattr__(app_config, "token_explosion_growth_ratio", original_growth_ratio)
-        object.__setattr__(app_config, "token_explosion_growth_count", original_growth_count)
-        object.__setattr__(app_config, "token_explosion_growth_min_tokens", original_growth_min)
-        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "dev",
+            "feature": "manual-protect-demo",
+            "input_tokens_estimate": 5_500,
+            "max_output_tokens": 0,
+        },
+    )
 
     assert decision["decision"] == "warn"
     assert decision["reason"] == "token_explosion"
