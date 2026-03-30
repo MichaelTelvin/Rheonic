@@ -36,7 +36,7 @@ def _token_explosion_growth_steps(target_tokens: int) -> list[int]:
     peak = max(int(target_tokens), 5500)
     step_one = 1900
     step_two_min = int(ceil(step_one * 1.7))
-    step_two_max = int(floor(peak / 1.7))
+    step_two_max = int(floor((peak - 1) / 1.7))
     step_two = max(step_two_min, step_two_max)
     return [
         step_one,

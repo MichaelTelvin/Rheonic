@@ -447,7 +447,7 @@ async function main() {
     const peak = Math.max(envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 5500), 5500);
     const stepOne = 1900;
     const stepTwoMin = Math.ceil(stepOne * 1.7);
-    const stepTwoMax = Math.floor(peak / 1.7);
+    const stepTwoMax = Math.floor((peak - 1) / 1.7);
     const stepTwo = Math.max(stepTwoMin, stepTwoMax);
     const growthSteps = [stepOne, stepTwo];
     console.log(`[STEP] Seed token explosion growth history then expect incident (history=${growthSteps.join(" -> ")}, live=${peak})`);

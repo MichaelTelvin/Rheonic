@@ -678,7 +678,7 @@ def main() -> None:
             peak = max(int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "5500")), 5500)
             step_one = 1900
             step_two_min = int(ceil(step_one * 1.7))
-            step_two_max = int(floor(peak / 1.7))
+            step_two_max = int(floor((peak - 1) / 1.7))
             step_two = max(step_two_min, step_two_max)
             growth_steps = [step_one, step_two]
             for growth_value in growth_steps:
