@@ -66,6 +66,18 @@ class ProtectService:
         transport_service: TransportService | None = None,
         now_provider: Callable[[], datetime] | None = None,
         protect_decision_timeout_ms: int | None = None,
+        retry_storm_window_seconds: int = app_config.retry_storm_window_seconds,
+        retry_storm_count: int = app_config.retry_storm_count,
+        loop_window_seconds: int = app_config.loop_window_seconds,
+        loop_count: int = app_config.loop_count,
+        loop_max_gap_seconds: float = app_config.loop_max_gap_seconds,
+        loop_concurrency_threshold: int = app_config.loop_concurrency_threshold,
+        token_explosion_ratio: float = app_config.token_explosion_ratio,
+        token_explosion_abs: int = app_config.token_explosion_abs,
+        token_explosion_growth_ratio: float = app_config.token_explosion_growth_ratio,
+        token_explosion_growth_count: int = app_config.token_explosion_growth_count,
+        token_explosion_growth_min_tokens: int = app_config.token_explosion_growth_min_tokens,
+        token_explosion_concurrency_threshold: int = app_config.token_explosion_concurrency_threshold,
     ) -> None:
         self._ingest_key_service = ingest_key_service
         self._event_repository = event_repository
@@ -86,6 +98,18 @@ class ProtectService:
             if protect_decision_timeout_ms is not None
             else Settings().protect_decision_timeout_ms
         )
+        self._retry_storm_window_seconds = retry_storm_window_seconds
+        self._retry_storm_count = retry_storm_count
+        self._loop_window_seconds = loop_window_seconds
+        self._loop_count = loop_count
+        self._loop_max_gap_seconds = loop_max_gap_seconds
+        self._loop_concurrency_threshold = loop_concurrency_threshold
+        self._token_explosion_ratio = token_explosion_ratio
+        self._token_explosion_abs = token_explosion_abs
+        self._token_explosion_growth_ratio = token_explosion_growth_ratio
+        self._token_explosion_growth_count = token_explosion_growth_count
+        self._token_explosion_growth_min_tokens = token_explosion_growth_min_tokens
+        self._token_explosion_concurrency_threshold = token_explosion_concurrency_threshold
         self._fast_warn_detector_registry = DetectorRegistry(detectors=[NearCapDetector()])
         self._behavioral_warn_detector_registry = DetectorRegistry(
             detectors=[
@@ -263,18 +287,18 @@ class ProtectService:
             current_event=None,
             recent_events=[],
             warn_ratio=app_config.protect_near_cap_factor,
-            retry_storm_window_seconds=app_config.retry_storm_window_seconds,
-            retry_storm_count=app_config.retry_storm_count,
-            loop_window_seconds=app_config.loop_window_seconds,
-            loop_count=app_config.loop_count,
-            loop_max_gap_seconds=app_config.loop_max_gap_seconds,
-            loop_concurrency_threshold=app_config.loop_concurrency_threshold,
-            token_explosion_ratio=app_config.token_explosion_ratio,
-            token_explosion_abs=app_config.token_explosion_abs,
-            token_explosion_growth_ratio=app_config.token_explosion_growth_ratio,
-            token_explosion_growth_count=app_config.token_explosion_growth_count,
-            token_explosion_growth_min_tokens=app_config.token_explosion_growth_min_tokens,
-            token_explosion_concurrency_threshold=app_config.token_explosion_concurrency_threshold,
+            retry_storm_window_seconds=self._retry_storm_window_seconds,
+            retry_storm_count=self._retry_storm_count,
+            loop_window_seconds=self._loop_window_seconds,
+            loop_count=self._loop_count,
+            loop_max_gap_seconds=self._loop_max_gap_seconds,
+            loop_concurrency_threshold=self._loop_concurrency_threshold,
+            token_explosion_ratio=self._token_explosion_ratio,
+            token_explosion_abs=self._token_explosion_abs,
+            token_explosion_growth_ratio=self._token_explosion_growth_ratio,
+            token_explosion_growth_count=self._token_explosion_growth_count,
+            token_explosion_growth_min_tokens=self._token_explosion_growth_min_tokens,
+            token_explosion_concurrency_threshold=self._token_explosion_concurrency_threshold,
         )
         warn_signals = self._fast_warn_detector_registry.detect(detector_ctx)
         if warn_signals:
@@ -380,18 +404,18 @@ class ProtectService:
             current_event=None,
             recent_events=recent_events,
             warn_ratio=app_config.protect_near_cap_factor,
-            retry_storm_window_seconds=app_config.retry_storm_window_seconds,
-            retry_storm_count=app_config.retry_storm_count,
-            loop_window_seconds=app_config.loop_window_seconds,
-            loop_count=app_config.loop_count,
-            loop_max_gap_seconds=app_config.loop_max_gap_seconds,
-            loop_concurrency_threshold=app_config.loop_concurrency_threshold,
-            token_explosion_ratio=app_config.token_explosion_ratio,
-            token_explosion_abs=app_config.token_explosion_abs,
-            token_explosion_growth_ratio=app_config.token_explosion_growth_ratio,
-            token_explosion_growth_count=app_config.token_explosion_growth_count,
-            token_explosion_growth_min_tokens=app_config.token_explosion_growth_min_tokens,
-            token_explosion_concurrency_threshold=app_config.token_explosion_concurrency_threshold,
+            retry_storm_window_seconds=self._retry_storm_window_seconds,
+            retry_storm_count=self._retry_storm_count,
+            loop_window_seconds=self._loop_window_seconds,
+            loop_count=self._loop_count,
+            loop_max_gap_seconds=self._loop_max_gap_seconds,
+            loop_concurrency_threshold=self._loop_concurrency_threshold,
+            token_explosion_ratio=self._token_explosion_ratio,
+            token_explosion_abs=self._token_explosion_abs,
+            token_explosion_growth_ratio=self._token_explosion_growth_ratio,
+            token_explosion_growth_count=self._token_explosion_growth_count,
+            token_explosion_growth_min_tokens=self._token_explosion_growth_min_tokens,
+            token_explosion_concurrency_threshold=self._token_explosion_concurrency_threshold,
         )
         warn_signals = self._behavioral_warn_detector_registry.detect(detector_ctx)
         if warn_signals:
