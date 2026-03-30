@@ -16,7 +16,11 @@ from app.domain.detectors.loop_suspect_detector import LoopSuspectDetector
 from app.domain.detectors.near_cap_detector import NearCapDetector
 from app.domain.detectors.registry import DetectorRegistry
 from app.domain.detectors.retry_storm_detector import RetryStormDetector
-from app.domain.detectors.token_explosion_detector import TokenExplosionDetector, resolve_previous_estimated_tokens
+from app.domain.detectors.token_explosion_detector import (
+    TokenExplosionDetector,
+    resolve_previous_estimated_tokens,
+    resolve_recent_token_explosion_sequence,
+)
 from app.domain.models.event import Event
 from app.logger import get_logger
 
@@ -149,6 +153,7 @@ class IngestEventService:
                 token_explosion_concurrency_threshold=self._token_explosion_concurrency_threshold,
             )
             signals = self._detector_registry.detect(ctx)
+            self._log_token_explosion_evaluation(ctx=ctx, signals=signals)
             cap_breach_signals = self._cap_breach_signal_if_any(ctx)
             if cap_breach_signals:
                 # Dominance L3: cap_breach suppresses all other signals for this ingest event.
@@ -187,6 +192,59 @@ class IngestEventService:
         except Exception:
             logger.exception("Ingest service failed", extra={"project_id": event.project_id})
             raise
+
+    def _log_token_explosion_evaluation(self, *, ctx: DetectionContext, signals: list[Signal]) -> None:
+        if ctx.current_event is None or ctx.token_explosion_tokens is None:
+            return
+        current_tokens = max(int(ctx.token_explosion_tokens), 0)
+        sequence = resolve_recent_token_explosion_sequence(
+            recent_events=ctx.recent_events,
+            provider=ctx.provider,
+            model=ctx.model,
+            request_endpoint=ctx.request_endpoint,
+            request_feature=ctx.request_feature,
+            current_event=ctx.current_event,
+            current_tokens=current_tokens,
+            required_count=int(ctx.token_explosion_growth_count),
+        )
+        growth_floor = int(ctx.token_explosion_growth_min_tokens)
+        eligible_sequence = [value for value in sequence if value >= growth_floor]
+        required_points = int(ctx.token_explosion_growth_count) + 1
+        if len(eligible_sequence) >= required_points:
+            eligible_sequence = eligible_sequence[-required_points:]
+        adjacent_growth = [
+            float(current) / float(previous)
+            for previous, current in zip(eligible_sequence, eligible_sequence[1:], strict=False)
+            if previous > 0
+        ]
+        ratio_threshold = float(ctx.tok_cap) * float(ctx.token_explosion_ratio) if ctx.tok_cap else None
+        token_explosion_signal = next((signal for signal in signals if signal.detector == "token_explosion"), None)
+        logger.info(
+            "Token explosion ingest evaluated",
+            extra={
+                "project_id": ctx.project_id,
+                "provider": ctx.provider,
+                "model": ctx.model,
+                "environment": ctx.environment,
+                "request_endpoint": ctx.request_endpoint,
+                "request_feature": ctx.request_feature,
+                "token_explosion_tokens": current_tokens,
+                "previous_token_explosion_tokens": ctx.previous_estimated_tokens,
+                "recent_token_explosion_sequence": sequence,
+                "eligible_token_explosion_sequence": eligible_sequence,
+                "adjacent_growth_ratios": adjacent_growth,
+                "current_requests_60s": ctx.current_requests_60s,
+                "current_tokens_60s": ctx.current_tokens_60s,
+                "tok_cap": ctx.tok_cap,
+                "ratio_threshold_tokens": ratio_threshold,
+                "absolute_threshold_tokens": ctx.token_explosion_abs,
+                "growth_threshold": ctx.token_explosion_growth_ratio,
+                "growth_required_count": ctx.token_explosion_growth_count,
+                "growth_min_tokens": ctx.token_explosion_growth_min_tokens,
+                "token_explosion_emitted": token_explosion_signal is not None,
+                "token_explosion_evidence": token_explosion_signal.evidence if token_explosion_signal else None,
+            },
+        )
 
     def _cap_breach_signal_if_any(self, ctx: DetectionContext) -> list[Signal]:
         req_breach = bool(ctx.req_cap is not None and ctx.current_requests_60s >= ctx.req_cap)
