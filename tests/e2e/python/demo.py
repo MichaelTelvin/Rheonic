@@ -32,9 +32,9 @@ def _log_verbose(message: str) -> None:
 
 
 def _token_explosion_growth_steps(target_tokens: int) -> list[int]:
-    peak = max(int(target_tokens), 2600)
+    peak = max(int(target_tokens), 1900)
     return [
-        max(peak // 2, 1300),
+        max(int(peak / 1.72), 1100),
         peak,
     ]
 
@@ -213,7 +213,7 @@ def _usage() -> None:
     print("  RHEONIC_STEP_SLEEP_MS=200")
     print("  RHEONIC_RETRY_STORM_COUNT=5")
     print("  RHEONIC_LOOP_COUNT=6")
-    print("  RHEONIC_TOKEN_EXPLOSION_TOKENS=2600")
+    print("  RHEONIC_TOKEN_EXPLOSION_TOKENS=1900")
     print("  RHEONIC_CAP_BREACH_TOKENS=4000")
     print("  RHEONIC_REQ_CAP_BREACH_COUNT=6")
     print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
@@ -259,7 +259,7 @@ def main() -> None:
     step_sleep_ms = int(os.getenv("RHEONIC_STEP_SLEEP_MS", "200"))
     retry_storm_count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "5"))
     loop_count = int(os.getenv("RHEONIC_LOOP_COUNT", "6"))
-    token_explosion_tokens = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "2600"))
+    token_explosion_tokens = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "1900"))
     cap_breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "4000"))
     cap_breach_req_count = int(os.getenv("RHEONIC_REQ_CAP_BREACH_COUNT", "6"))
     cap_breach_req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))

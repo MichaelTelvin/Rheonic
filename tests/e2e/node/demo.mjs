@@ -39,7 +39,7 @@ function printUsageExamples() {
   console.log("  RHEONIC_STEP_SLEEP_MS=200");
   console.log("  RHEONIC_RETRY_STORM_COUNT=5");
   console.log("  RHEONIC_LOOP_COUNT=6");
-  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=2600");
+  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=1900");
   console.log("  RHEONIC_CAP_BREACH_TOKENS=4000");
   console.log("  RHEONIC_REQ_CAP_BREACH_COUNT=6");
   console.log("  RHEONIC_CAP_BREACH_REQ_TOKENS=1");
@@ -53,9 +53,9 @@ function sleep(ms) {
 }
 
 function tokenExplosionGrowthSteps(targetTokens) {
-  const peak = Math.max(Number(targetTokens), 2600);
+  const peak = Math.max(Number(targetTokens), 1900);
   return [
-    Math.max(Math.floor(peak / 2), 1300),
+    Math.max(Math.floor(peak / 1.72), 1100),
     peak,
   ];
 }
@@ -170,7 +170,7 @@ async function runDemo() {
   const stepSleepMs = Number(process.env.RHEONIC_STEP_SLEEP_MS ?? 200);
   const retryStormCount = Number(process.env.RHEONIC_RETRY_STORM_COUNT ?? 5);
   const loopCount = Number(process.env.RHEONIC_LOOP_COUNT ?? 6);
-  const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 2600);
+  const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 1900);
   const capBreachTokens = Number(process.env.RHEONIC_CAP_BREACH_TOKENS ?? 4000);
   const capBreachReqCount = Number(process.env.RHEONIC_REQ_CAP_BREACH_COUNT ?? 6);
   const capBreachReqTokens = Number(process.env.RHEONIC_CAP_BREACH_REQ_TOKENS ?? 1);

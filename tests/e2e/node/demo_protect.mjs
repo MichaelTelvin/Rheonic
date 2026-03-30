@@ -427,8 +427,8 @@ async function main() {
       await sleep(pauseMs);
     }
   } else if (scenario === "token_explosion") {
-    const peak = Math.max(envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 2600), 2600);
-    const growthSteps = [Math.max(Math.floor(peak / 2), 1300)];
+    const peak = Math.max(envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 1900), 1900);
+    const growthSteps = [Math.max(Math.floor(peak / 1.72), 1100)];
     console.log(`[STEP] Seed token explosion growth history then expect warn (history=${growthSteps.join(" -> ")}, live=${peak})`);
     for (const growthValue of growthSteps) {
       await sendIngestEvent(ingestKey, provider, model, growthValue, "token-explosion-growth", env, {

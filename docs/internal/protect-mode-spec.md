@@ -62,10 +62,10 @@ Protect preflight warns when either condition is met:
 - Growth-only detection is suppressed when request volume is high enough to suggest concurrency instead of one step feeding the next.
 - Default tuning is intentionally conservative for agentic workflows:
   - ratio `0.9`
-  - absolute floor `15000`
-  - growth ratio `2.0`
+  - absolute floor `10000`
+  - growth ratio `1.7`
   - growth sequence count `2`
-  - growth minimum tokens `2500`
+  - growth minimum tokens `1800`
   - concurrency threshold `8`
 
 ## Loop-Suspect Rule
