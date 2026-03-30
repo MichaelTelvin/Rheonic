@@ -4,7 +4,7 @@ import json as json_lib
 import os
 import sys
 import time
-from math import ceil
+from math import ceil, floor
 from pathlib import Path
 from typing import Any
 
@@ -658,7 +658,9 @@ def main() -> None:
             print("\n[STEP] Seed token explosion growth history then expect warn")
             peak = max(int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "5500")), 5500)
             step_one = 1900
-            step_two = max(int(ceil(peak / 1.7)), 3230)
+            step_two_min = int(ceil(step_one * 1.7))
+            step_two_max = int(floor(peak / 1.7))
+            step_two = max(step_two_min, step_two_max)
             growth_steps = [step_one, step_two]
             for growth_value in growth_steps:
                 _send_ingest_event(
