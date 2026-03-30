@@ -4,6 +4,7 @@ from app.application.services.transport_service import TransportService, build_t
 from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base, TransportOutboxRecord
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
+from app.logger import bind_trace_context, reset_trace_context
 
 
 def test_transport_service_dedupe_key_prevents_duplicates(tmp_path) -> None:
@@ -110,3 +111,35 @@ def test_build_transport_dedupe_key_is_stable_for_same_payload_semantics() -> No
     )
     assert first == second
     assert first != different
+
+
+def test_transport_service_origin_trace_id_uses_bound_context_not_worker_trace_override(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_service_origin_trace.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+
+    service = TransportService(
+        outbox_repository=TransportOutboxRepositoryImpl(session_factory=session_factory),
+        enqueue_job=lambda outbox_id, **kwargs: None,
+        now_provider=lambda: datetime.now(timezone.utc),
+    )
+
+    tokens = bind_trace_context(trace_id="backend-trace-123")
+    try:
+        outbox_id = service.enqueue(
+            project_id="p3",
+            kind="webhook",
+            event_type="incident.warn",
+            payload={"body": {"event": "incident.warn"}},
+            dedupe_key="origin-trace-dedupe-1",
+            trace_id="worker-trace-999",
+        )
+    finally:
+        reset_trace_context(tokens)
+
+    with session_factory.create_session() as session:
+        row = session.query(TransportOutboxRecord).filter(TransportOutboxRecord.id == outbox_id).first()
+        assert row is not None
+        transport_meta = row.payload.get("__transport_meta")
+        assert isinstance(transport_meta, dict)
+        assert transport_meta.get("origin_trace_id") == "backend-trace-123"

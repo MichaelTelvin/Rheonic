@@ -45,7 +45,11 @@ class TransportService:
         normalized_payload: dict[str, object] = dict(payload)
         transport_meta_value = normalized_payload.get("__transport_meta")
         transport_meta = dict(transport_meta_value) if isinstance(transport_meta_value, dict) else {}
-        origin_trace_id = (trace_id or get_trace_id() or "").strip()
+        # Preserve the trace that was already bound when the notification was
+        # created. The explicit trace_id passed here may be used only for the
+        # transport worker job itself and should not overwrite the original
+        # SDK/backend request trace recorded in outbox metadata.
+        origin_trace_id = (get_trace_id() or "").strip()
         if origin_trace_id:
             transport_meta.setdefault("origin_trace_id", origin_trace_id)
         if transport_meta:

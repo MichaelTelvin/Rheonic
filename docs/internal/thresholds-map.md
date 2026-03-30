@@ -74,7 +74,7 @@ This map reflects the deterministic anomaly model now used by ingest and protect
   - simple agents usually stay well below the absolute floor,
   - RAG flows can grow steadily without being anomalous,
   - only request-context values at or above the minimum floor count toward growth,
-  - once that floor is reached, `growth_count=2` means `baseline -> spike -> continuation`, for example `1900 -> 3300 -> 5600`,
+  - once that floor is reached, `growth_count=2` means `baseline -> spike -> continuation`, for example `1900 -> 3230 -> 5500`,
   - parallel tool or worker traffic should not look like one exploding sequence.
 
 ## Protect Enforcement
