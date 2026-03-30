@@ -185,22 +185,26 @@ async function assertProjectIsInProtectMode(projectId, dashboardSession) {
 }
 
 async function runProviderCall(provider, model, maxTokens, openai, anthropic, googleModel) {
+  return await runProviderCallWithPrompt(provider, model, maxTokens, "protect demo request", openai, anthropic, googleModel);
+}
+
+async function runProviderCallWithPrompt(provider, model, maxTokens, promptText, openai, anthropic, googleModel) {
   try {
     if (provider === "anthropic") {
       await anthropic.messages.create({
         model,
-        messages: [{ role: "user", content: "protect demo request" }],
+        messages: [{ role: "user", content: promptText }],
         max_tokens: maxTokens,
       });
     } else if (provider === "google") {
       await googleModel.generateContent({
-        prompt: "protect demo request",
+        prompt: promptText,
         generation_config: { max_output_tokens: maxTokens },
       });
     } else {
       await openai.chat.completions.create({
         model,
-        messages: [{ role: "user", content: "protect demo request" }],
+        messages: [{ role: "user", content: promptText }],
         max_tokens: maxTokens,
       });
     }
@@ -273,6 +277,7 @@ async function main() {
   let lastClampRecommended = null;
   let lastClampApplied = null;
   let lastDecisionPayload = null;
+  let promptText = "protect demo request";
   const originalEvaluateProtectDecision = client.evaluateProtectDecision.bind(client);
   client.evaluateProtectDecision = async (context) => {
     console.log("=== PROTECT DECISION REQUEST ===");
@@ -382,13 +387,18 @@ async function main() {
       await sleep(pauseMs);
     }
   } else if (scenario === "token_explosion") {
-    const seed = envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 10000);
-    console.log("[STEP] Seed token explosion from request-context growth then expect warn");
-    await sendIngestEvent(ingestKey, provider, model, seed, "token-explosion-seed", env, {
-      tokenExplosionTokens: seed,
-    });
-    callMaxTokens = Math.max(maxTokens, seed);
-    console.log(`[STEP] token_explosion call max_tokens=${callMaxTokens}`);
+    const peak = envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 10000);
+    const growthSteps = [Math.max(Math.floor(peak / 9), 256), Math.max(Math.floor(peak / 3), 768)];
+    console.log(`[STEP] Seed token explosion growth history then expect warn (history=${growthSteps.join(" -> ")}, live=${peak})`);
+    for (const [index, growthValue] of growthSteps.entries()) {
+      await sendIngestEvent(ingestKey, provider, model, 120 + index, "token-explosion-growth", env, {
+        tokenExplosionTokens: growthValue,
+      });
+      await sleep(pauseMs);
+    }
+    promptText = Array.from({ length: peak }, () => "growth").join(" ");
+    callMaxTokens = maxTokens;
+    console.log(`[STEP] token_explosion live prompt targets request-context growth to ~${peak} tokens`);
     await sleep(pauseMs);
   } else if (scenario === "cooldown") {
     const seed = envInt("RHEONIC_CAP_BREACH_TOKENS", 5000);
@@ -401,11 +411,27 @@ async function main() {
 
   let blocked;
   if (scenario === "cooldown") {
-    const blockedFirst = await runProviderCall(provider, model, callMaxTokens, openai, anthropic, googleModel);
-    const blockedSecond = await runProviderCall(provider, model, callMaxTokens, openai, anthropic, googleModel);
+    const blockedFirst = await runProviderCallWithPrompt(
+      provider,
+      model,
+      callMaxTokens,
+      promptText,
+      openai,
+      anthropic,
+      googleModel,
+    );
+    const blockedSecond = await runProviderCallWithPrompt(
+      provider,
+      model,
+      callMaxTokens,
+      promptText,
+      openai,
+      anthropic,
+      googleModel,
+    );
     blocked = blockedFirst && blockedSecond;
   } else {
-    blocked = await runProviderCall(provider, model, callMaxTokens, openai, anthropic, googleModel);
+    blocked = await runProviderCallWithPrompt(provider, model, callMaxTokens, promptText, openai, anthropic, googleModel);
   }
   await client.flush();
   const after = await providerCount();
@@ -480,7 +506,7 @@ async function main() {
       !blocked && decision === "warn" && reason === "loop_suspect",
     );
   } else if (scenario === "token_explosion") {
-    assertLine("token_explosion warn triggered", !blocked && decision === "warn" && (reason === "token_explosion" || reason === "near_cap"));
+    assertLine("token_explosion warn triggered", !blocked && decision === "warn" && reason === "token_explosion");
   } else if (scenario === "cooldown") {
     assertLine("cooldown active", blocked && providerCallsDelta === 0);
     assertLine("cooldown active - repeated call blocked", blocked && providerCallsDelta === 0);

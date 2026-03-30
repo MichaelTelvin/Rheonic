@@ -166,10 +166,14 @@ class ProjectRepositoryImpl(ProjectRepository):
         provider: str,
         model: str,
         first_seen_at: datetime,
-    ) -> bool:
-        # Insert first-seen provider/model tuple for project; ignore duplicates from retries/races.
+    ) -> tuple[bool, bool]:
+        # Insert first-seen provider/model tuple for project and report whether
+        # the project already had baseline provider/model history beforehand.
         try:
             with self._session_factory.create_session() as session:
+                existing_count = int(
+                    session.query(ProjectModelRecord).filter(ProjectModelRecord.project_id == project_id).count()
+                )
                 record = ProjectModelRecord(
                     id=str(uuid4()),
                     project_id=project_id,
@@ -179,9 +183,9 @@ class ProjectRepositoryImpl(ProjectRepository):
                 )
                 session.add(record)
                 session.commit()
-                return True
+                return True, existing_count > 0
         except IntegrityError:
-            return False
+            return False, True
         except Exception:
             logger.exception(
                 "Failed recording project model first seen",

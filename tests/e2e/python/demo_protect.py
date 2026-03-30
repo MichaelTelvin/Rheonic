@@ -422,6 +422,7 @@ def _run_provider_call(
     provider: str,
     model: str,
     max_tokens: int,
+    prompt_text: str,
     openai: Any,
     anthropic: Any,
     google: Any,
@@ -431,20 +432,20 @@ def _run_provider_call(
         if provider == "anthropic":
             anthropic.messages.create(
                 model=model,
-                messages=[{"role": "user", "content": "protect demo request"}],
+                messages=[{"role": "user", "content": prompt_text}],
                 max_tokens=max_tokens,
             )
         elif provider == "google":
             google.generate_content(
                 {
-                    "prompt": "protect demo request",
+                    "prompt": prompt_text,
                     "generation_config": {"max_output_tokens": max_tokens},
                 }
             )
         else:
             openai.chat.completions.create(
                 model=model,
-                messages=[{"role": "user", "content": "protect demo request"}],
+                messages=[{"role": "user", "content": prompt_text}],
                 max_tokens=max_tokens,
             )
     except RHEONICBlockedError:
@@ -525,6 +526,7 @@ def main() -> None:
 
         max_tokens = int(os.getenv("RHEONIC_MAX_TOKENS", "128"))
         call_max_tokens = max_tokens
+        prompt_text = "protect demo request"
         print(f"[DEMO] max_tokens(before call)={max_tokens}")
 
         if scenario == "near_cap":
@@ -610,20 +612,24 @@ def main() -> None:
                 )
                 time.sleep(pause_ms / 1000)
         elif scenario == "token_explosion":
-            print("\n[STEP] Seed token explosion from request-context growth then expect warn")
-            huge = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "10000"))
-            _send_ingest_event(
-                transport,
-                ingest_key,
-                provider,
-                model,
-                total_tokens=huge,
-                feature="token-explosion-seed",
-                environment=env,
-                token_explosion_tokens=huge,
-            )
-            call_max_tokens = max(max_tokens, huge)
-            print(f"[STEP] token_explosion call max_tokens={call_max_tokens}")
+            print("\n[STEP] Seed token explosion growth history then expect warn")
+            peak = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "10000"))
+            growth_steps = [max(peak // 9, 256), max(peak // 3, 768)]
+            for index, growth_value in enumerate(growth_steps):
+                _send_ingest_event(
+                    transport,
+                    ingest_key,
+                    provider,
+                    model,
+                    total_tokens=120 + index,
+                    feature="token-explosion-growth",
+                    environment=env,
+                    token_explosion_tokens=growth_value,
+                )
+                time.sleep(pause_ms / 1000)
+            prompt_text = " ".join(["growth"] * peak)
+            call_max_tokens = max_tokens
+            print(f"[STEP] token_explosion history={growth_steps} live={peak}")
             time.sleep(pause_ms / 1000)
         elif scenario == "cooldown":
             print("\n[STEP] Seed cap breach then verify cooldown blocks repeated call")
@@ -642,11 +648,15 @@ def main() -> None:
             time.sleep(pause_ms / 1000)
 
         if scenario == "cooldown":
-            first_blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
-            second_blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
+            first_blocked = _run_provider_call(
+                provider, model, call_max_tokens, prompt_text, openai, anthropic, google
+            )
+            second_blocked = _run_provider_call(
+                provider, model, call_max_tokens, prompt_text, openai, anthropic, google
+            )
             blocked = first_blocked and second_blocked
         else:
-            blocked = _run_provider_call(provider, model, call_max_tokens, openai, anthropic, google)
+            blocked = _run_provider_call(provider, model, call_max_tokens, prompt_text, openai, anthropic, google)
         client.flush()
         after_calls = _provider_count()
         provider_calls_delta = after_calls - before_calls
@@ -715,7 +725,7 @@ def main() -> None:
         elif scenario == "token_explosion":
             _assert_line(
                 "token_explosion warn triggered",
-                decision_value == "warn" and decision_reason in {"token_explosion", "near_cap"} and not blocked,
+                decision_value == "warn" and decision_reason == "token_explosion" and not blocked,
             )
         elif scenario == "cooldown":
             _assert_line("cooldown active", blocked and provider_calls_delta == 0)

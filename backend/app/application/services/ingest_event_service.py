@@ -219,7 +219,7 @@ class IngestEventService:
             return
         first_seen_at = self._now_provider()
         try:
-            is_new_combination = self._project_repository.record_project_model_first_seen(
+            is_new_combination, had_existing_models = self._project_repository.record_project_model_first_seen(
                 project_id=event.project_id,
                 provider=provider,
                 model=model,
@@ -232,6 +232,8 @@ class IngestEventService:
             )
             return
         if not is_new_combination:
+            return
+        if not had_existing_models:
             return
         logger.info(
             "Policy gap detected: first-seen provider/model tuple",

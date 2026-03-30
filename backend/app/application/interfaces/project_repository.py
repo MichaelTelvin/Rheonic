@@ -70,8 +70,9 @@ class ProjectRepository(ABC):
         provider: str,
         model: str,
         first_seen_at: datetime,
-    ) -> bool:
-        # Insert first-seen provider/model tuple for project; return True only when newly inserted.
+    ) -> tuple[bool, bool]:
+        # Insert first-seen provider/model tuple for project.
+        # Returns (is_new_combination, had_existing_models_before_insert).
         raise NotImplementedError
 
     @abstractmethod

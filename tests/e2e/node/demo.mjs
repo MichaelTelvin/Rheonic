@@ -52,6 +52,15 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function tokenExplosionGrowthSteps(targetTokens) {
+  const peak = Math.max(Number(targetTokens), 3000);
+  return [
+    Math.max(Math.floor(peak / 9), 256),
+    Math.max(Math.floor(peak / 3), 768),
+    peak,
+  ];
+}
+
 async function fetchRealtimeSnapshot(dashboardSession, projectId, provider, phase) {
   if (!dashboardSession || !projectId) {
     logVerbose(`[SNAPSHOT] ${phase}: (snapshot skipped: no dashboard session/project id)`);
@@ -238,11 +247,16 @@ async function runDemo() {
   };
 
   const runTokenExplosion = async () => {
-    logVerbose("\n[STEP] Token explosion from repeated request-context growth");
-    await sendEvent(client, provider, model, endpoint, tokenExplosionTokens, "token-explosion", {
-      tokenExplosionTokens,
-    });
+    const growthSteps = tokenExplosionGrowthSteps(tokenExplosionTokens);
+    logVerbose(`\n[STEP] Token explosion from repeated request-context growth (steps=${growthSteps.join(" -> ")})`);
+    for (const [index, growthValue] of growthSteps.entries()) {
+      await sendEvent(client, provider, model, endpoint, 120 + index, "token-explosion-growth", {
+        tokenExplosionTokens: growthValue,
+      });
+      await sleep(stepSleepMs);
+    }
     await client.flush();
+    await sleep(stepSleepMs);
     await printPhase(dashboardSession, "token_explosion", projectId, provider);
   };
 
@@ -298,7 +312,18 @@ async function runDemo() {
     return;
   }
 
-  const expectedSent = demoCase === "all" ? 8 : 1;
+  const expectedSent =
+    demoCase === "all"
+      ? 1 + 1 + retryStormCount + (loopCount + 1) + 3 + 1 + capBreachReqCount
+      : demoCase === "retry_storm"
+        ? retryStormCount
+        : demoCase === "loop_suspect"
+          ? loopCount + 1
+          : demoCase === "token_explosion"
+            ? 3
+            : demoCase === "req_cap_breach"
+              ? capBreachReqCount
+              : 1;
   assertDelivery(client, expectedSent);
   log("[DONE] observe demo complete");
   client.close();

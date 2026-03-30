@@ -113,7 +113,7 @@ For protect preflight, a live near_cap warn also upserts a visible near_cap inci
 - Observe mode:
   - `incident.warn` on incident open
   - `incident.resolved` on manual/auto resolve
-  - `policy_gap.detected` once per first-seen `(project, provider, model)`
+  - `policy_gap.detected` once per new `(project, provider, model)` after the project already has baseline provider/model history
 - Protect mode:
   - `protection.warn` on protect warn outcomes (`near_cap`, `retry_storm`, `loop_suspect`, `token_explosion`)
   - `protection.clamp_started` when clamp first begins affecting traffic
@@ -122,7 +122,7 @@ For protect preflight, a live near_cap warn also upserts a visible near_cap inci
     - `reason=cooldown_active`
     - `reason=fail_closed`
   - `incident.resolved` on manual/auto resolve
-  - `policy_gap.detected` once per first-seen `(project, provider, model)`
+  - `policy_gap.detected` once per new `(project, provider, model)` after the project already has baseline provider/model history
 - Mode independent:
   - `webhook.test` from `/api/v1/projects/{project_id}/webhook/test`
 - Delivery path:

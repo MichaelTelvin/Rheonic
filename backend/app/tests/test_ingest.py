@@ -195,13 +195,14 @@ class FakeProjectRepository:
 
     def record_project_model_first_seen(
         self, *, project_id: str, provider: str, model: str, first_seen_at: datetime
-    ) -> bool:
+    ) -> tuple[bool, bool]:
         _ = first_seen_at
         key = (project_id, provider, model)
         if key in self.seen:
-            return False
+            return False, True
+        had_existing_models = bool(self.seen)
         self.seen.add(key)
-        return True
+        return True, had_existing_models
 
     # Unused interface methods.
     def list_projects(self) -> list[Project]:
@@ -958,19 +959,20 @@ def test_dominance_behavioral_retry_suppresses_token_explosion_without_caps() ->
     assert all(row.incident_type != "cap_breach" for row in incidents.rows)
 
 
-def test_policy_gap_first_seen_webhook_only_once_and_no_incident() -> None:
+def test_policy_gap_first_seen_baseline_sends_no_webhook_and_no_incident() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=True)
     service.ingest(_event("p1", provider="openai", model="gpt-4o-mini", total_tokens=10, offset_seconds=0))
     service.ingest(_event("p1", provider="openai", model="gpt-4o-mini", total_tokens=12, offset_seconds=30))
 
     policy_gap_calls = [call for call in webhook.calls if call[1] == "policy_gap.detected"]
-    assert len(policy_gap_calls) == 1
+    assert len(policy_gap_calls) == 0
     assert incidents.rows == []
 
 
-def test_policy_gap_webhook_is_sent_in_observe_mode() -> None:
+def test_policy_gap_webhook_is_sent_only_after_project_has_baseline_history() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=False)
     service.ingest(_event("p1", provider="openai", model="gpt-4o-mini", total_tokens=10, offset_seconds=0))
+    service.ingest(_event("p1", provider="google", model="gemini-1.5-pro", total_tokens=12, offset_seconds=30))
 
     assert any(event_type == "policy_gap.detected" for _, event_type, _ in webhook.calls)
     assert incidents.rows == []

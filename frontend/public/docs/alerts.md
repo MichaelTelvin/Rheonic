@@ -22,14 +22,14 @@ Rheonic can notify you about incident lifecycle and Protect reporting events. Al
 ### Observe mode
 - `incident.warn`
 - `incident.resolved`
-- `policy_gap.detected` by webhook only
+- `policy_gap.detected` by webhook only after the project already has baseline provider/model history
 
 ### Protect mode
 - `protection.warn`
 - `protection.clamp_started`
 - `protection.block`
 - `incident.resolved`
-- `policy_gap.detected` by webhook only
+- `policy_gap.detected` by webhook only after the project already has baseline provider/model history
 - `webhook.delivery_failed` by email when webhook delivery reaches a terminal failure
 
 ### Explicit test event

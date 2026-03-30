@@ -107,13 +107,13 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - Observe:
   - `incident.warn` for any incident open
   - `incident.resolved` for manual and auto resolve
-  - `policy_gap.detected` once per first-seen `(project_id, provider, model)`
+  - `policy_gap.detected` once per new `(project_id, provider, model)` after the project already has baseline provider/model history
 - Protect:
   - `protection.warn` for protect warning outcomes
   - `protection.clamp_started` when clamp first activates
   - `protection.block` for protect block outcomes
   - `incident.resolved` for manual and auto resolve
-  - `policy_gap.detected` once per first-seen `(project_id, provider, model)`
+  - `policy_gap.detected` once per new `(project_id, provider, model)` after the project already has baseline provider/model history
 - Mode independent:
   - `webhook.test`
 

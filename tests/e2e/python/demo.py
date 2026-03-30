@@ -31,6 +31,15 @@ def _log_verbose(message: str) -> None:
         print(message)
 
 
+def _token_explosion_growth_steps(target_tokens: int) -> list[int]:
+    peak = max(int(target_tokens), 3000)
+    return [
+        max(peak // 9, 256),
+        max(peak // 3, 768),
+        peak,
+    ]
+
+
 def _assert_delivery(client: Any, *, expected_min_sent: int = 1) -> None:
     stats = client.stats()
     _log(f"[DEMO] sdk delivery stats: {stats}")
@@ -371,18 +380,22 @@ def main() -> None:
             )
 
         def run_token_explosion() -> None:
-            _log_verbose("\n[STEP] Token explosion from repeated request-context growth")
+            growth_steps = _token_explosion_growth_steps(token_explosion_tokens)
+            _log_verbose(f"\n[STEP] Token explosion from repeated request-context growth (steps={growth_steps})")
             phase_started_at = datetime.now().astimezone()
-            _send_event(
-                provider,
-                model,
-                endpoint,
-                token_explosion_tokens,
-                "token-explosion",
-                environment,
-                token_explosion_tokens=token_explosion_tokens,
-            )
+            for index, growth_value in enumerate(growth_steps):
+                _send_event(
+                    provider,
+                    model,
+                    endpoint,
+                    120 + index,
+                    "token-explosion-growth",
+                    environment,
+                    token_explosion_tokens=growth_value,
+                )
+                time.sleep(step_sleep_ms / 1000)
             client.flush()
+            time.sleep(step_sleep_ms / 1000)
             _print_phase(
                 dashboard_session,
                 "token_explosion",
@@ -464,7 +477,19 @@ def main() -> None:
             _usage()
             return
 
-        expected_sent = 8 if demo_case == "all" else 1
+        expected_sent = (
+            1 + 1 + retry_storm_count + (loop_count + 1) + 3 + 1 + cap_breach_req_count
+            if demo_case == "all"
+            else retry_storm_count
+            if demo_case == "retry_storm"
+            else loop_count + 1
+            if demo_case == "loop_suspect"
+            else 3
+            if demo_case == "token_explosion"
+            else cap_breach_req_count
+            if demo_case == "req_cap_breach"
+            else 1
+        )
         _assert_delivery(client, expected_min_sent=expected_sent)
         _log("[DONE] observe demo complete")
     finally:

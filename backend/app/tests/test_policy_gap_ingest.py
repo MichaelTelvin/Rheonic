@@ -128,7 +128,7 @@ def _make_service(
     )
 
 
-def test_new_provider_model_sends_webhook_once_and_creates_no_incident(tmp_path) -> None:
+def test_first_seen_provider_model_records_baseline_without_webhook(tmp_path) -> None:
     session_factory = _setup_db(tmp_path)
     _seed_project(session_factory, protect_enabled=True)
     dispatcher = FakeWebhookDispatcher()
@@ -153,15 +153,7 @@ def test_new_provider_model_sends_webhook_once_and_creates_no_incident(tmp_path)
         )
     assert models_count == 1
     assert incidents_count == 0
-    assert len(dispatcher.calls) == 1
-    project_id, payload, event_type = dispatcher.calls[0]
-    assert project_id == "p1"
-    assert event_type == "policy_gap.detected"
-    assert payload["event"] == "policy_gap.detected"
-    assert payload["provider"] == "openai"
-    assert payload["model"] == "gpt-4o-new"
-    assert isinstance(payload.get("first_seen_at"), str)
-    assert isinstance(payload.get("sent_at"), str)
+    assert dispatcher.calls == []
 
 
 def test_same_provider_model_does_not_send_webhook_again(tmp_path) -> None:
@@ -189,10 +181,10 @@ def test_same_provider_model_does_not_send_webhook_again(tmp_path) -> None:
         )
     assert models_count == 1
     assert incidents_count == 0
-    assert len(dispatcher.calls) == 1
+    assert dispatcher.calls == []
 
 
-def test_different_provider_same_model_is_distinct_and_sends_once_each(tmp_path) -> None:
+def test_second_distinct_provider_model_sends_webhook_once(tmp_path) -> None:
     session_factory = _setup_db(tmp_path)
     _seed_project(session_factory, protect_enabled=True)
     dispatcher = FakeWebhookDispatcher()
@@ -226,10 +218,15 @@ def test_different_provider_same_model_is_distinct_and_sends_once_each(tmp_path)
     assert openai_model_count == 1
     assert google_model_count == 1
     assert incidents_count == 0
-    assert len(dispatcher.calls) == 2
-    payloads = [payload for (_, payload, _) in dispatcher.calls]
-    providers = sorted(str(payload["provider"]) for payload in payloads)
-    assert providers == ["google", "openai"]
+    assert len(dispatcher.calls) == 1
+    project_id, payload, event_type = dispatcher.calls[0]
+    assert project_id == "p1"
+    assert event_type == "policy_gap.detected"
+    assert payload["event"] == "policy_gap.detected"
+    assert payload["provider"] == "google"
+    assert payload["model"] == "shared-model"
+    assert isinstance(payload.get("first_seen_at"), str)
+    assert isinstance(payload.get("sent_at"), str)
 
 
 def test_policy_gap_never_creates_incident_even_when_protect_disabled(tmp_path) -> None:
@@ -256,7 +253,7 @@ def test_policy_gap_never_creates_incident_even_when_protect_disabled(tmp_path) 
         )
     assert models_count == 1
     assert incidents_count == 0
-    assert len(dispatcher.calls) == 1
+    assert dispatcher.calls == []
 
 
 def test_webhook_dispatched_on_policy_gap_contains_required_fields(tmp_path) -> None:
@@ -265,6 +262,7 @@ def test_webhook_dispatched_on_policy_gap_contains_required_fields(tmp_path) -> 
     dispatcher = FakeWebhookDispatcher()
     service = _make_service(session_factory=session_factory, webhook_dispatcher=dispatcher)
 
+    service.ingest(_build_event(provider="openai", model="gpt-4o-mini"))
     service.ingest(_build_event(provider="google", model="gemini-new"))
 
     assert len(dispatcher.calls) == 1
