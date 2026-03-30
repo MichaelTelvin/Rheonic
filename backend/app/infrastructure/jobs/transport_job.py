@@ -38,7 +38,6 @@ _ALERT_EMAIL_EVENTS = {
     "protection.clamp_started",
     "protection.block",
     "incident.warn",
-    "incident.block",
     "incident.resolved",
     "webhook.delivery_failed",
 }

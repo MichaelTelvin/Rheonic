@@ -28,7 +28,6 @@ Rheonic can notify you about incident lifecycle and Protect reporting events. Al
 - `protection.clamp_started`
 - `protection.block`
 - `incident.warn`
-- `incident.block`
 - `incident.resolved`
 - `policy_gap.detected` by webhook only after the project already has baseline provider/model history
 - `webhook.delivery_failed` by email when webhook delivery reaches a terminal failure

@@ -73,4 +73,4 @@ This file documents the current behavior after the protect/observe separation re
 - Protect block:
   - `protection.block`
 - Block incident opened:
-  - `incident.block`
+  - `protection.block`

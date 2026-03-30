@@ -12,7 +12,6 @@ This document reflects the current alerting contract after the observe/protect s
 | Event type | Kind | Source | Meaning |
 |---|---|---|---|
 | `incident.warn` | webhook + email | `IncidentManager` | A new behavioral incident episode opened: `retry_storm`, `loop_suspect`, or `token_explosion` |
-| `incident.block` | webhook + email | `IncidentManager` | A protect block incident opened with `incident_type=block` |
 | `incident.resolved` | webhook + email | incident resolve flows | An open incident was resolved or auto-resolved |
 | `protection.clamp_started` | webhook + email | `ProtectService` | Protect started actively clamping output tokens |
 | `protection.block` | webhook + email | `ProtectService` | Protect blocked the request because of `req_cap_breach`, `tok_cap_breach`, `cooldown_active`, or `fail_closed` |
@@ -39,7 +38,6 @@ This document reflects the current alerting contract after the observe/protect s
 | Event | Observe | Protect |
 |---|---|---|
 | `incident.warn` | Yes | Yes |
-| `incident.block` | No | Yes |
 | `incident.resolved` | Yes | Yes |
 | `protection.clamp_started` | No | Yes |
 | `protection.block` | No | Yes |
@@ -48,7 +46,6 @@ This document reflects the current alerting contract after the observe/protect s
 
 ## Email Templates
 - `incident_warn`
-- `incident_block`
 - `incident_resolved`
 - `protection_clamp_started`
 - `protection_block`

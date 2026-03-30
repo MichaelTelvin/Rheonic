@@ -101,24 +101,6 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
             "Action: Blocked",
         ),
         (
-            "incident_block",
-            {
-                "project_id": "p2",
-                "incident_id": "inc-block",
-                "incident_type": "block",
-                "provider": "google",
-                "model": "gemini-1.5-pro",
-                "environment": "prod",
-                "created_at": "2026-03-05T10:00:00Z",
-                "last_seen_at": "2026-03-05T10:00:30Z",
-                "evidence": {"reason": "tok_cap_breach", "tokens_60s": 2000, "tok_cap": 1500},
-                "sent_at": "2026-03-05T10:00:00Z",
-            },
-            "[Rheonic] Incident opened: Block (p2)",
-            "Protect block incident opened",
-            "Incident Type: Block",
-        ),
-        (
             "protection_clamp_started",
             {
                 "project_id": "p2",
@@ -237,5 +219,7 @@ def test_fail_closed_protection_block_includes_metrics_when_present() -> None:
 def test_removed_templates_are_not_registered() -> None:
     with pytest.raises(ValueError, match="unknown email template: decision_warn"):
         render_template("decision_warn", {})
+    with pytest.raises(ValueError, match="unknown email template: incident_block"):
+        render_template("incident_block", {})
     with pytest.raises(ValueError, match="unknown email template: policy_gap_detected"):
         render_template("policy_gap_detected", {})

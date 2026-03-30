@@ -107,8 +107,10 @@ class IncidentManager:
         self._enqueue_detection_notifications(incident=incident, mode=mode)
 
     def _enqueue_detection_notifications(self, *, incident: Incident, mode: str) -> None:
-        event_type = "incident.block" if incident.incident_type == app_config.incident_type_block else "incident.warn"
-        template = "incident_block" if event_type == "incident.block" else "incident_warn"
+        if incident.incident_type == app_config.incident_type_block:
+            return
+        event_type = "incident.warn"
+        template = "incident_warn"
         evidence = _build_webhook_evidence(incident.evidence)
         payload: dict[str, object] = {
             "event": event_type,
