@@ -495,6 +495,7 @@ async function main() {
     blocked = await runProviderCallWithPrompt(provider, model, callMaxTokens, promptText, openai, anthropic, googleModel);
   }
   await client.flush();
+  await sleep(pauseMs);
   const after = await providerCount();
   const providerCallsDelta = after - before;
   const usedMaxTokens = extractUsedMaxTokens(providerLastCall());
@@ -569,6 +570,7 @@ async function main() {
   }
 
   await client.flush();
+  await sleep(pauseMs);
   assertDelivery(client, providerCallsDelta >= 1 ? 1 : 0);
   client.close();
 }

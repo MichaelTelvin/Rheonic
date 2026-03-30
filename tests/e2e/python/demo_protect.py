@@ -722,6 +722,7 @@ def main() -> None:
         else:
             blocked = _run_provider_call(provider, model, call_max_tokens, prompt_text, openai, anthropic, google)
         client.flush()
+        time.sleep(pause_ms / 1000)
         after_calls = _provider_count()
         provider_calls_delta = after_calls - before_calls
         decision_payload = transport.last_decision_payload if isinstance(transport.last_decision_payload, dict) else {}
@@ -805,6 +806,7 @@ def main() -> None:
 
         expected_sent = 1 if provider_calls_delta >= 1 else 0
         _assert_delivery(client, expected_min_sent=expected_sent)
+        time.sleep(pause_ms / 1000)
 
     finally:
         client.close()

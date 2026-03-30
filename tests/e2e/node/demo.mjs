@@ -13,8 +13,20 @@ function logVerbose(message) {
   }
 }
 
-function assertDelivery(client, expectedMinSent = 1) {
-  const stats = client.getStats();
+async function assertDelivery(client, expectedMinSent = 1) {
+  let stats = client.getStats();
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const sent = Number(stats.sent ?? 0);
+    const failed = Number(stats.failed ?? 0);
+    const queued = Number(stats.queued ?? 0);
+    if (sent >= expectedMinSent && failed === 0 && queued === 0) {
+      log(`[DEMO] sdk delivery stats: ${JSON.stringify(stats)}`);
+      return;
+    }
+    await client.flush();
+    await sleep(150);
+    stats = client.getStats();
+  }
   log(`[DEMO] sdk delivery stats: ${JSON.stringify(stats)}`);
   const sent = Number(stats.sent ?? 0);
   const failed = Number(stats.failed ?? 0);
@@ -279,7 +291,7 @@ async function runDemo() {
           : demoCase === "token_explosion"
             ? 3
             : 1;
-  assertDelivery(client, expectedSent);
+  await assertDelivery(client, expectedSent);
   log("[DONE] observe demo complete");
   client.close();
 }
