@@ -1651,6 +1651,81 @@ def test_cooldown_active_finalizes_live_block_outcome(tmp_path) -> None:
         "source": "live",
         "ts": metrics["last"]["ts"],
     }
+    incidents = _incidents(client, project_id, provider="openai")
+    assert len(incidents) == 1
+    assert incidents[0]["type"] == "block"
+    evidence = incidents[0]["evidence"]
+    assert evidence["reason"] == "cooldown_active"
+    assert evidence["previous_reason"] == "req_cap_breach"
+    assert evidence["count"] == 2
+    _cleanup_overrides()
+
+
+def test_timeout_fail_closed_updates_existing_block_incident(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path, cooldown_seconds=300)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Fail Closed Updates Block")
+    _set_protect(
+        client,
+        project_id,
+        protect_enabled=True,
+        protect_fail_mode="closed",
+        protect_max_req_per_min=1,
+        protect_max_tok_per_min=1000,
+    )
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=1)
+
+    first_decision = _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    assert first_decision["decision"] == "block"
+    assert first_decision["reason"] == "req_cap_breach"
+
+    timeout_response = client.post(
+        "/api/v1/protect/decision-timeout",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={"environment": "dev", "provider": "openai"},
+    )
+    assert timeout_response.status_code == 202
+
+    incidents = _incidents(client, project_id, provider="openai")
+    assert len(incidents) == 1
+    assert incidents[0]["type"] == "block"
+    evidence = incidents[0]["evidence"]
+    assert evidence["reason"] == "fail_closed"
+    assert evidence["previous_reason"] == "req_cap_breach"
+    assert evidence["count"] == 2
+    _cleanup_overrides()
+
+
+def test_unavailable_fail_closed_updates_existing_block_incident(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path, cooldown_seconds=300)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Fail Closed Unavailable Updates Block")
+    _set_protect(
+        client,
+        project_id,
+        protect_enabled=True,
+        protect_fail_mode="closed",
+        protect_max_req_per_min=1,
+        protect_max_tok_per_min=1000,
+    )
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=1)
+
+    first_decision = _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    assert first_decision["decision"] == "block"
+    assert first_decision["reason"] == "req_cap_breach"
+
+    unavailable_response = client.post(
+        "/api/v1/protect/decision-unavailable",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={"environment": "dev", "provider": "openai"},
+    )
+    assert unavailable_response.status_code == 202
+
+    incidents = _incidents(client, project_id, provider="openai")
+    assert len(incidents) == 1
+    assert incidents[0]["type"] == "block"
+    evidence = incidents[0]["evidence"]
+    assert evidence["reason"] == "fail_closed"
+    assert evidence["previous_reason"] == "req_cap_breach"
+    assert evidence["count"] == 2
     _cleanup_overrides()
 
 

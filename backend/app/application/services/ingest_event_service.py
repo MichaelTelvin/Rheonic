@@ -1,6 +1,6 @@
 # Application service for event ingestion.
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.application.interfaces.cache_provider import RealtimeCounterStore
 from app.application.interfaces.event_repository import EventRepository
@@ -146,6 +146,12 @@ class IngestEventService:
                 token_explosion_concurrency_threshold=self._token_explosion_concurrency_threshold,
             )
             signals = self._detector_registry.detect(ctx)
+            if protect_enabled and self._has_active_block_incident(
+                project_id=event.project_id,
+                provider=provider,
+                now=self._now_provider(),
+            ):
+                signals = [signal for signal in signals if signal.detector == app_config.incident_type_block]
             self._incident_manager.process_signals(
                 project_id=event.project_id,
                 provider=provider,
@@ -158,6 +164,15 @@ class IngestEventService:
         except Exception:
             logger.exception("Ingest service failed", extra={"project_id": event.project_id})
             raise
+
+    def _has_active_block_incident(self, *, project_id: str, provider: str, now: datetime) -> bool:
+        active_after = now - timedelta(seconds=max(int(self._incident_dedup_window_seconds), 1))
+        for incident in self._incident_repository.list_open_by_project_provider(project_id=project_id, provider=provider):
+            if incident.incident_type != app_config.incident_type_block:
+                continue
+            if (incident.last_seen_at or incident.created_at) >= active_after:
+                return True
+        return False
 
     def _detect_policy_gap_if_needed(self, *, event: Event) -> None:
         # Record first-seen project/provider/model tuples and emit one-time policy-gap webhook notification.

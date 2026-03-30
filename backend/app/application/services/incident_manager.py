@@ -106,6 +106,102 @@ class IncidentManager:
         self._incident_repository.create_incident(incident=incident)
         self._enqueue_detection_notifications(incident=incident, mode=mode)
 
+    def process_protect_block(
+        self,
+        *,
+        project_id: str,
+        provider: str,
+        model: str | None,
+        environment: str | None,
+        now: datetime,
+        reason: str,
+        requests_60s: int | None,
+        tokens_60s: int | None,
+        req_cap: int | None,
+        tok_cap: int | None,
+        blocked_until: str | None,
+        retry_after_seconds: int | None,
+    ) -> None:
+        evidence: dict[str, object] = {
+            "provider": provider,
+            "model": model,
+            "environment": environment,
+            "requests_60s": requests_60s,
+            "tokens_60s": tokens_60s,
+            "req_cap": req_cap,
+            "tok_cap": tok_cap,
+            "reason": reason,
+            "blocked_until": blocked_until,
+            "retry_after_seconds": retry_after_seconds,
+            "last_seen_at": now.isoformat(),
+        }
+        dedup_after = now - timedelta(seconds=max(int(self._incident_dedup_window_seconds), 1))
+        if reason in {"req_cap_breach", "tok_cap_breach"}:
+            fingerprint = f"{project_id}:{provider}:{app_config.incident_type_block}:{reason}"
+            open_incident = self._incident_repository.get_open_incident_by_fingerprint(
+                project_id=project_id,
+                provider=provider,
+                fingerprint=fingerprint,
+                active_after=dedup_after,
+            )
+            if open_incident is not None:
+                next_count = _int_value(open_incident.evidence.get("count")) + 1
+                merged_evidence = {
+                    **open_incident.evidence,
+                    **evidence,
+                    "count": next_count,
+                }
+                self._incident_repository.update_open_incident_activity(
+                    incident_id=open_incident.id,
+                    evidence=merged_evidence,
+                    last_seen_at=now,
+                )
+                return
+            incident = Incident(
+                id=str(uuid4()),
+                project_id=project_id,
+                provider=provider,
+                incident_type=app_config.incident_type_block,
+                status="open",
+                created_at=now,
+                resolved_at=None,
+                evidence={**evidence, "count": 1},
+                fingerprint=fingerprint,
+                last_seen_at=now,
+            )
+            self._incident_repository.create_incident(incident=incident)
+            self._enqueue_detection_notifications(incident=incident, mode="protect")
+            return
+
+        if reason not in {"cooldown_active", "fail_closed"}:
+            return
+
+        open_incidents = self._incident_repository.list_open_by_project_provider(project_id=project_id, provider=provider)
+        active_incidents = [
+            row
+            for row in open_incidents
+            if row.incident_type == app_config.incident_type_block
+            and ((row.last_seen_at or row.created_at) >= dedup_after)
+        ]
+        if not active_incidents:
+            return
+        active_incidents.sort(key=lambda row: (row.last_seen_at or row.created_at), reverse=True)
+        open_incident = active_incidents[0]
+        existing_reason = open_incident.evidence.get("reason")
+        next_count = _int_value(open_incident.evidence.get("count")) + 1
+        merged_evidence = {
+            **open_incident.evidence,
+            **evidence,
+            "count": next_count,
+        }
+        if isinstance(existing_reason, str) and existing_reason and existing_reason != reason:
+            merged_evidence["previous_reason"] = existing_reason
+        self._incident_repository.update_open_incident_activity(
+            incident_id=open_incident.id,
+            evidence=merged_evidence,
+            last_seen_at=now,
+        )
+
     def _enqueue_detection_notifications(self, *, incident: Incident, mode: str) -> None:
         if incident.incident_type == app_config.incident_type_block:
             return

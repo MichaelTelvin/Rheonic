@@ -761,6 +761,80 @@ def test_behavioral_retry_and_token_explosion_can_coexist_without_caps() -> None
     assert incident_types == ["retry_storm", "token_explosion"]
 
 
+def test_active_block_incident_suppresses_token_explosion_in_same_window() -> None:
+    service, incidents, webhook, transport = _service(
+        protect_enabled=True,
+        req_cap=None,
+        tok_cap=None,
+        token_explosion_abs=1500,
+    )
+    now = datetime.now(timezone.utc)
+    incidents.rows.append(
+        Incident(
+            id="inc-block-1",
+            project_id="p1",
+            provider="openai",
+            incident_type="block",
+            status="open",
+            created_at=now - timedelta(seconds=30),
+            resolved_at=None,
+            evidence={"reason": "req_cap_breach", "count": 1},
+            fingerprint="p1:openai:block:req_cap_breach",
+            last_seen_at=now - timedelta(seconds=5),
+        )
+    )
+
+    service.ingest(_event("p1", total_tokens=1800, feature="blocked-token-explosion", offset_seconds=0))
+
+    incident_types = sorted(row.incident_type for row in incidents.rows)
+    assert incident_types == ["block"]
+    assert _non_policy_gap_webhook_calls(webhook) == []
+    assert transport.calls == []
+
+
+def test_active_block_incident_suppresses_retry_and_loop_in_same_window() -> None:
+    service, incidents, webhook, transport = _service(
+        protect_enabled=True,
+        req_cap=None,
+        tok_cap=None,
+        retry_storm_count=1,
+        loop_count=1,
+    )
+    now = datetime.now(timezone.utc)
+    incidents.rows.append(
+        Incident(
+            id="inc-block-2",
+            project_id="p1",
+            provider="openai",
+            incident_type="block",
+            status="open",
+            created_at=now - timedelta(seconds=30),
+            resolved_at=None,
+            evidence={"reason": "tok_cap_breach", "count": 1},
+            fingerprint="p1:openai:block:tok_cap_breach",
+            last_seen_at=now - timedelta(seconds=5),
+        )
+    )
+
+    service.ingest(
+        _event(
+            "p1",
+            total_tokens=60,
+            status="error",
+            http_status=500,
+            error_type="provider_5xx",
+            feature="blocked-retry-loop",
+            offset_seconds=0,
+        )
+    )
+    service.ingest(_event("p1", total_tokens=60, feature="blocked-retry-loop", offset_seconds=1))
+
+    incident_types = sorted(row.incident_type for row in incidents.rows)
+    assert incident_types == ["block"]
+    assert _non_policy_gap_webhook_calls(webhook) == []
+    assert transport.calls == []
+
+
 def test_policy_gap_first_seen_baseline_sends_no_webhook_and_no_incident() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=True)
     service.ingest(_event("p1", provider="openai", model="gpt-4o-mini", total_tokens=10, offset_seconds=0))

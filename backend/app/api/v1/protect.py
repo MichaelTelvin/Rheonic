@@ -23,7 +23,6 @@ from app.dependencies import (
     get_protect_action_store,
     get_protect_service,
 )
-from app.domain.detectors.contracts import Signal
 from app.domain.models.user import User
 from app.infrastructure.redis.protect_action_store import ProtectActionStore
 from app.logger import build_log_extra, get_logger
@@ -188,6 +187,7 @@ def protect_decision_timeout(
     ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
     protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
     protect_service: ProtectService = Depends(get_protect_service),
+    incident_manager: IncidentManager = Depends(get_incident_manager),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
     request_id_header: str | None = Header(default=None, alias="X-Rheonic-Protect-Request-Id"),
 ) -> dict[str, str]:
@@ -235,6 +235,20 @@ def protect_decision_timeout(
                 source=app_config.protect_outcome_source_timeout_fallback,
                 request_id=resolved_request_id,
             )
+            incident_manager.process_protect_block(
+                project_id=project.id,
+                provider=provider,
+                model=payload.model,
+                environment=payload.environment,
+                now=datetime.now(timezone.utc),
+                reason="fail_closed",
+                requests_60s=None,
+                tokens_60s=None,
+                req_cap=project.protect_max_req_per_min,
+                tok_cap=project.protect_max_tok_per_min,
+                blocked_until=None,
+                retry_after_seconds=None,
+            )
         return {"status": "accepted"}
     except HTTPException:
         raise
@@ -249,6 +263,7 @@ def protect_decision_unavailable(
     ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
     protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
     protect_service: ProtectService = Depends(get_protect_service),
+    incident_manager: IncidentManager = Depends(get_incident_manager),
     ingest_key: str | None = Header(default=None, alias="X-Project-Ingest-Key"),
     request_id_header: str | None = Header(default=None, alias="X-Rheonic-Protect-Request-Id"),
 ) -> dict[str, str]:
@@ -296,6 +311,20 @@ def protect_decision_unavailable(
                 source=app_config.protect_outcome_source_unavailable_fallback,
                 request_id=resolved_request_id,
             )
+            incident_manager.process_protect_block(
+                project_id=project.id,
+                provider=provider,
+                model=payload.model,
+                environment=payload.environment,
+                now=datetime.now(timezone.utc),
+                reason="fail_closed",
+                requests_60s=None,
+                tokens_60s=None,
+                req_cap=project.protect_max_req_per_min,
+                tok_cap=project.protect_max_tok_per_min,
+                blocked_until=None,
+                retry_after_seconds=None,
+            )
         return {"status": "accepted"}
     except HTTPException:
         raise
@@ -311,48 +340,22 @@ def _record_preflight_incident_if_needed(
     payload: ProtectDecisionIn,
     decision: ProtectDecision,
 ) -> None:
-    if decision.decision != "block" or decision.reason not in {"req_cap_breach", "tok_cap_breach"}:
+    if decision.decision != "block" or decision.reason not in {"req_cap_breach", "tok_cap_breach", "cooldown_active"}:
         return
-    signal = _build_block_signal_from_decision(project_id=project_id, payload=payload, decision=decision)
-    incident_manager.process_signal(
+    snapshot = decision.snapshot or {}
+    incident_manager.process_protect_block(
         project_id=project_id,
         provider=payload.provider,
         model=payload.model,
         environment=payload.environment,
         now=datetime.now(timezone.utc),
-        signal=signal,
-        mode="protect",
-    )
-
-
-def _build_block_signal_from_decision(
-    *,
-    project_id: str,
-    payload: ProtectDecisionIn,
-    decision: ProtectDecision,
-) -> Signal:
-    snapshot = decision.snapshot or {}
-    requests_60s = _safe_int(snapshot.get("requests_60s"))
-    tokens_60s = _safe_int(snapshot.get("tokens_60s"))
-    req_cap = _safe_int(snapshot.get("threshold_req_60s"))
-    tok_cap = _safe_int(snapshot.get("threshold_tok_60s"))
-    evidence: dict[str, object] = {
-        "provider": payload.provider,
-        "model": payload.model,
-        "environment": payload.environment,
-        "requests_60s": requests_60s,
-        "tokens_60s": tokens_60s,
-        "req_cap": req_cap,
-        "tok_cap": tok_cap,
-        "reason": decision.reason,
-        "blocked_until": decision.blocked_until,
-        "retry_after_seconds": decision.retry_after_seconds,
-    }
-    return Signal(
-        detector=app_config.incident_type_block,
-        scope_provider=payload.provider,
-        fingerprint=f"{project_id}:{payload.provider}:{app_config.incident_type_block}:{decision.reason}",
-        evidence=evidence,
+        reason=decision.reason,
+        requests_60s=_safe_int(snapshot.get("requests_60s")),
+        tokens_60s=_safe_int(snapshot.get("tokens_60s")),
+        req_cap=_safe_int(snapshot.get("threshold_req_60s")),
+        tok_cap=_safe_int(snapshot.get("threshold_tok_60s")),
+        blocked_until=decision.blocked_until,
+        retry_after_seconds=decision.retry_after_seconds,
     )
 
 
