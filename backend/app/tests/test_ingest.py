@@ -416,6 +416,7 @@ def test_retry_storm_does_not_double_count_retry_state_updates() -> None:
     assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
     assert [call["template"] for call in transport.calls] == ["incident_warn"]
 
+
 def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_and_email() -> None:
     service, incidents, webhook, transport = _service(protect_enabled=False, loop_count=3)
     service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=0))
@@ -471,6 +472,7 @@ def test_loop_suspect_error_sequence_still_triggers_when_retry_storm_threshold_i
     assert len(warn_calls) == 1
     assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
     assert [call["template"] for call in transport.calls] == ["incident_warn"]
+
 
 def test_loop_suspect_and_retry_storm_can_both_open_for_error_sequence() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=True, retry_storm_count=3, loop_count=3)

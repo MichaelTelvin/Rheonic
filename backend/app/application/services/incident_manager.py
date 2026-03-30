@@ -176,16 +176,21 @@ class IncidentManager:
         if reason not in {"cooldown_active", "fail_closed"}:
             return
 
-        open_incidents = self._incident_repository.list_open_by_project_provider(project_id=project_id, provider=provider)
+        open_incidents = self._incident_repository.list_open_by_project_provider(
+            project_id=project_id, provider=provider
+        )
         active_incidents = [
             row
             for row in open_incidents
             if row.incident_type == app_config.incident_type_block
-            and ((row.last_seen_at or row.created_at) >= dedup_after)
+            and (_normalize_datetime(row.last_seen_at or row.created_at) >= dedup_after)
         ]
         if not active_incidents:
             return
-        active_incidents.sort(key=lambda row: (row.last_seen_at or row.created_at), reverse=True)
+        active_incidents.sort(
+            key=lambda row: _normalize_datetime(row.last_seen_at or row.created_at),
+            reverse=True,
+        )
         open_incident = active_incidents[0]
         existing_reason = open_incident.evidence.get("reason")
         next_count = _int_value(open_incident.evidence.get("count")) + 1
@@ -289,3 +294,9 @@ def _build_webhook_evidence(evidence: dict[str, object]) -> dict[str, object]:
     for key in ("provider", "model", "environment", "last_seen_at", "reason"):
         sanitized.pop(key, None)
     return sanitized
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

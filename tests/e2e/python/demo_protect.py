@@ -771,11 +771,28 @@ def main() -> None:
                     not bool(clamp_applied) and not clamp_used,
                 )
         elif scenario == "tok_cap_breach":
-            _assert_line("token cap breach blocked", blocked and provider_calls_delta == 0 and decision_reason == "tok_cap_breach")
-            _assert_line("block incident opened", any(str(row.get("type")) == "block" for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)))
+            _assert_line(
+                "token cap breach blocked",
+                blocked and provider_calls_delta == 0 and decision_reason == "tok_cap_breach",
+            )
+            _assert_line(
+                "block incident opened",
+                any(
+                    str(row.get("type")) == "block"
+                    for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+                ),
+            )
         elif scenario == "req_cap_breach":
-            _assert_line("req_cap breach blocked", blocked and provider_calls_delta == 0 and decision_reason == "req_cap_breach")
-            _assert_line("block incident opened", any(str(row.get("type")) == "block" for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)))
+            _assert_line(
+                "req_cap breach blocked", blocked and provider_calls_delta == 0 and decision_reason == "req_cap_breach"
+            )
+            _assert_line(
+                "block incident opened",
+                any(
+                    str(row.get("type")) == "block"
+                    for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+                ),
+            )
             _assert_line(
                 "req_cap breach triggered block",
                 blocked and provider_calls_delta == 0,
@@ -785,19 +802,37 @@ def main() -> None:
                 "retry_storm stayed allowed at preflight",
                 decision_value == "allow" and not blocked,
             )
-            _assert_line("retry_storm incident opened", any(str(row.get("type")) == "retry_storm" for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)))
+            _assert_line(
+                "retry_storm incident opened",
+                any(
+                    str(row.get("type")) == "retry_storm"
+                    for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+                ),
+            )
         elif scenario == "loop_suspect":
             _assert_line(
                 "loop_suspect stayed allowed at preflight",
                 decision_value == "allow" and not blocked,
             )
-            _assert_line("loop_suspect incident opened", any(str(row.get("type")) == "loop_suspect" for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)))
+            _assert_line(
+                "loop_suspect incident opened",
+                any(
+                    str(row.get("type")) == "loop_suspect"
+                    for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+                ),
+            )
         elif scenario == "token_explosion":
             _assert_line(
                 "token_explosion stayed allowed at preflight",
                 decision_value == "allow" and not blocked,
             )
-            _assert_line("token_explosion incident opened", any(str(row.get("type")) == "token_explosion" for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)))
+            _assert_line(
+                "token_explosion incident opened",
+                any(
+                    str(row.get("type")) == "token_explosion"
+                    for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+                ),
+            )
         elif scenario == "cooldown":
             _assert_line("cooldown active", blocked and provider_calls_delta == 0)
             _assert_line(

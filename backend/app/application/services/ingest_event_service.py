@@ -167,7 +167,9 @@ class IngestEventService:
 
     def _has_active_block_incident(self, *, project_id: str, provider: str, now: datetime) -> bool:
         active_after = now - timedelta(seconds=max(int(self._incident_dedup_window_seconds), 1))
-        for incident in self._incident_repository.list_open_by_project_provider(project_id=project_id, provider=provider):
+        for incident in self._incident_repository.list_open_by_project_provider(
+            project_id=project_id, provider=provider
+        ):
             if incident.incident_type != app_config.incident_type_block:
                 continue
             if (incident.last_seen_at or incident.created_at) >= active_after:

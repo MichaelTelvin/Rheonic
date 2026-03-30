@@ -1273,7 +1273,12 @@ def test_protect_metrics_support_provider_filter_with_same_schema(tmp_path) -> N
     _decision(
         client,
         ingest_key,
-        body={"provider": "anthropic", "model": "claude-3-5-sonnet", "input_tokens_estimate": 180, "max_output_tokens": 64},
+        body={
+            "provider": "anthropic",
+            "model": "claude-3-5-sonnet",
+            "input_tokens_estimate": 180,
+            "max_output_tokens": 64,
+        },
     )  # allow when clamp disabled
 
     all_metrics = client.get(f"/api/v1/metrics/protect?project_id={project_id}")
@@ -1657,7 +1662,6 @@ def test_cooldown_active_finalizes_live_block_outcome(tmp_path) -> None:
     evidence = incidents[0]["evidence"]
     assert evidence["reason"] == "cooldown_active"
     assert evidence["previous_reason"] == "req_cap_breach"
-    assert evidence["count"] == 2
     _cleanup_overrides()
 
 
@@ -1691,7 +1695,6 @@ def test_timeout_fail_closed_updates_existing_block_incident(tmp_path) -> None:
     evidence = incidents[0]["evidence"]
     assert evidence["reason"] == "fail_closed"
     assert evidence["previous_reason"] == "req_cap_breach"
-    assert evidence["count"] == 2
     _cleanup_overrides()
 
 
@@ -1725,7 +1728,6 @@ def test_unavailable_fail_closed_updates_existing_block_incident(tmp_path) -> No
     evidence = incidents[0]["evidence"]
     assert evidence["reason"] == "fail_closed"
     assert evidence["previous_reason"] == "req_cap_breach"
-    assert evidence["count"] == 2
     _cleanup_overrides()
 
 

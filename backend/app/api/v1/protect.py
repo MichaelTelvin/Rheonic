@@ -368,6 +368,8 @@ def _safe_int(value: object) -> int | None:
         return None
     except (TypeError, ValueError):
         return None
+
+
 @router.get("/protect/config", response_model=ProtectRuntimeConfigOut)
 def get_protect_runtime_config(
     ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
