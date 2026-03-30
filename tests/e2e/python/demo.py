@@ -32,9 +32,10 @@ def _log_verbose(message: str) -> None:
 
 
 def _token_explosion_growth_steps(target_tokens: int) -> list[int]:
-    peak = max(int(target_tokens), 1900)
+    peak = max(int(target_tokens), 3300)
     return [
-        max(int(peak / 1.72), 1100),
+        max(peak // 3, 1100),
+        max(int(peak / 1.72), 1900),
         peak,
     ]
 
@@ -213,7 +214,7 @@ def _usage() -> None:
     print("  RHEONIC_STEP_SLEEP_MS=200")
     print("  RHEONIC_RETRY_STORM_COUNT=5")
     print("  RHEONIC_LOOP_COUNT=6")
-    print("  RHEONIC_TOKEN_EXPLOSION_TOKENS=1900")
+    print("  RHEONIC_TOKEN_EXPLOSION_TOKENS=3300")
     print("  RHEONIC_CAP_BREACH_TOKENS=4000")
     print("  RHEONIC_REQ_CAP_BREACH_COUNT=6")
     print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
@@ -259,7 +260,7 @@ def main() -> None:
     step_sleep_ms = int(os.getenv("RHEONIC_STEP_SLEEP_MS", "200"))
     retry_storm_count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "5"))
     loop_count = int(os.getenv("RHEONIC_LOOP_COUNT", "6"))
-    token_explosion_tokens = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "1900"))
+    token_explosion_tokens = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "3300"))
     cap_breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "4000"))
     cap_breach_req_count = int(os.getenv("RHEONIC_REQ_CAP_BREACH_COUNT", "6"))
     cap_breach_req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
@@ -477,13 +478,13 @@ def main() -> None:
             return
 
         expected_sent = (
-            1 + 1 + retry_storm_count + (loop_count + 1) + 2 + 1 + cap_breach_req_count
+            1 + 1 + retry_storm_count + (loop_count + 1) + 3 + 1 + cap_breach_req_count
             if demo_case == "all"
             else retry_storm_count
             if demo_case == "retry_storm"
             else loop_count + 1
             if demo_case == "loop_suspect"
-            else 2
+            else 3
             if demo_case == "token_explosion"
             else cap_breach_req_count
             if demo_case == "req_cap_breach"

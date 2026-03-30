@@ -933,6 +933,17 @@ def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit
             created_at=now - timedelta(seconds=1),
         )
     )
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="ok",
+            http_status=200,
+            total_tokens=1_900,
+            created_at=now - timedelta(milliseconds=800),
+        )
+    )
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
 
     original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 1.7)
@@ -947,7 +958,7 @@ def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit
                 "provider": "openai",
                 "model": "gpt-4o-mini",
                 "environment": "dev",
-                "input_tokens_estimate": 1_900,
+                "input_tokens_estimate": 3_300,
                 "max_output_tokens": 0,
             },
         )
@@ -1011,6 +1022,17 @@ def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_
             created_at=now - timedelta(seconds=1),
         )
     )
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="ok",
+            http_status=200,
+            total_tokens=1_900,
+            created_at=now - timedelta(milliseconds=800),
+        )
+    )
 
     original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 1.7)
     original_growth_count = _set_app_config_value("token_explosion_growth_count", 2)
@@ -1024,7 +1046,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_
                 "provider": "openai",
                 "model": "gpt-4o-mini",
                 "environment": "dev",
-                "input_tokens_estimate": 1_900,
+                "input_tokens_estimate": 3_300,
                 "max_output_tokens": 0,
             },
         )
@@ -1067,6 +1089,17 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
             created_at=datetime(2026, 3, 29, 16, 32, 0, tzinfo=timezone.utc),
         )
     )
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini-2024-07-18",
+            status="ok",
+            http_status=200,
+            total_tokens=1_900,
+            created_at=datetime(2026, 3, 29, 16, 31, 0, tzinfo=timezone.utc),
+        )
+    )
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
 
     original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 1.7)
@@ -1081,7 +1114,7 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
                 "provider": "openai",
                 "model": "gpt-4o-mini",
                 "environment": "dev",
-                "input_tokens_estimate": 1_900,
+                "input_tokens_estimate": 3_300,
                 "max_output_tokens": 0,
             },
         )
@@ -1091,8 +1124,8 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
         object.__setattr__(app_config, "token_explosion_growth_min_tokens", original_growth_min)
         object.__setattr__(app_config, "token_explosion_abs", original_abs)
 
-    assert decision["decision"] == "allow"
-    assert decision["reason"] == "ok"
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "token_explosion"
     _cleanup_overrides()
 
 
@@ -1113,6 +1146,17 @@ def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrenc
             created_at=now - timedelta(seconds=1),
         )
     )
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="ok",
+            http_status=200,
+            total_tokens=1_900,
+            created_at=now - timedelta(milliseconds=800),
+        )
+    )
     scoped_id = scoped_project_provider_id(project_id, "openai")
     rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
     rolling_window.increment_project_60s(project_id=scoped_id, total_tokens=10)
@@ -1130,7 +1174,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrenc
                 "provider": "openai",
                 "model": "gpt-4o-mini",
                 "environment": "dev",
-                "input_tokens_estimate": 1_900,
+                "input_tokens_estimate": 3_300,
                 "max_output_tokens": 0,
             },
         )

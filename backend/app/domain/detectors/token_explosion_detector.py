@@ -31,7 +31,7 @@ class TokenExplosionDetector(Detector):
         # noisy for agentic traffic and should not be interpreted as explosion.
         growth_hit = False
         growth_ratio = None
-        growth_sequence_count = 1
+        growth_sequence_count = 0
         current_tokens = int(token_explosion_tokens)
         if current_tokens >= int(ctx.token_explosion_growth_min_tokens):
             previous_tokens = ctx.previous_estimated_tokens
@@ -46,13 +46,13 @@ class TokenExplosionDetector(Detector):
                 required_count=int(ctx.token_explosion_growth_count),
             )
             if sequence:
-                growth_sequence_count = len(sequence)
+                growth_sequence_count = max(len(sequence) - 1, 0)
                 adjacent_growth = [
                     float(current) / float(previous)
                     for previous, current in zip(sequence, sequence[1:], strict=False)
                     if previous > 0
                 ]
-                growth_hit = len(adjacent_growth) == len(sequence) - 1 and all(
+                growth_hit = len(adjacent_growth) == int(ctx.token_explosion_growth_count) and all(
                     ratio >= float(ctx.token_explosion_growth_ratio) for ratio in adjacent_growth
                 )
 
@@ -147,7 +147,8 @@ def resolve_recent_token_explosion_sequence(
     current_tokens: int,
     required_count: int,
 ) -> list[int]:
-    if required_count <= 1:
+    required_points = max(required_count, 0) + 1
+    if required_points <= 1:
         return [current_tokens]
     current_event_id = current_event.id if current_event is not None else None
     normalized_model = normalized_model_name(model)
@@ -165,6 +166,6 @@ def resolve_recent_token_explosion_sequence(
         else:
             sequence.append(max(int(event.total_tokens), 0))
     sequence.append(max(int(current_tokens), 0))
-    if len(sequence) < required_count:
+    if len(sequence) < required_points:
         return []
-    return sequence[-required_count:]
+    return sequence[-required_points:]

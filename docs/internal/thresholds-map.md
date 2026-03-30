@@ -74,7 +74,7 @@ This map reflects the deterministic anomaly model now used by ingest and protect
   - simple agents usually stay well below the absolute floor,
   - RAG flows can grow steadily without being anomalous,
   - growth-only hits should require the current request-context to have already reached the minimum floor before growth is even evaluated,
-  - once that floor is reached, a two-step pattern such as `1100 -> 1900` is enough to qualify,
+  - once that floor is reached, `growth_count=2` means `spike + continuation`, for example `1100 -> 1900 -> 3300`,
   - parallel tool or worker traffic should not look like one exploding sequence.
 
 ## Protect Enforcement
