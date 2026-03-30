@@ -1714,7 +1714,7 @@ select {
 }
 
 .card-title {
-  margin: 0 0 4px;
+  margin: 0 0 20px;
   font-size: 1.02rem;
   font-weight: 600;
 }
