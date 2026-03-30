@@ -62,11 +62,17 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - Signature uses provider/model/environment plus stable event characteristics.
 
 ## Token Explosion Detector
-- `token_explosion_ratio`: ratio threshold against token cap when cap exists.
-- `token_explosion_abs`: absolute token threshold when cap-independent trigger is needed.
-- `token_explosion_growth_ratio`: sequential growth threshold against the previous matching estimate.
-- `token_explosion_concurrency_threshold`: growth-only suppression threshold when request volume suggests concurrency.
-- Trigger condition: estimate/event tokens exceed ratio threshold, absolute threshold, or growth threshold.
+- Signal: dedicated request-side `token_explosion_tokens`, computed before the provider call and echoed into ingest so protect and observe use the same pattern input.
+- `token_explosion_ratio`: ratio threshold against token cap when cap exists. Default `0.9`.
+- `token_explosion_abs`: absolute token threshold when cap-independent trigger is needed. Default `10000`.
+- `token_explosion_growth_ratio`: sequential growth threshold against the previous matching request-context signal. Default `2.5`.
+- `token_explosion_concurrency_threshold`: growth-only suppression threshold when request volume suggests concurrency. Default `8`.
+- Trigger condition: request-context tokens exceed ratio threshold, absolute threshold, or growth threshold.
+- Default tuning is intentionally conservative for agentic workflows:
+  - simple agents usually stay well below the absolute floor,
+  - RAG flows can grow steadily without being anomalous,
+  - growth-only hits should require a sharp step-up rather than normal context accumulation,
+  - parallel tool or worker traffic should not look like one exploding sequence.
 
 ## Protect Enforcement
 - Hard block conditions (protect mode only):

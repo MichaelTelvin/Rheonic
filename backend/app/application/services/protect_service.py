@@ -1,5 +1,5 @@
 # Application service for protect mode decision and project protect settings.
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from math import ceil
 from time import perf_counter
@@ -240,16 +240,10 @@ class ProtectService:
             )
 
         estimated_next_tokens: int | None = None
-        token_explosion_estimated_next_tokens: int | None = None
         if isinstance(ctx.input_tokens_estimate, int):
             input_estimate = max(ctx.input_tokens_estimate, 0)
             output_estimate = max(ctx.max_output_tokens, 0) if isinstance(ctx.max_output_tokens, int) else 0
             estimated_next_tokens = input_estimate + output_estimate
-            # Near-cap prediction intentionally uses the worst-case prompt+output sum so we can
-            # act conservatively before a hard cap breach. Token-explosion preflight should be
-            # less pessimistic: summing both worst-case sides overstates likely realized usage
-            # and creates warn/no-incident mismatches because ingest evaluates actual totals.
-            token_explosion_estimated_next_tokens = max(input_estimate, output_estimate)
         detector_ctx = DetectionContext(
             project_id=project_id,
             provider=provider,
@@ -264,6 +258,7 @@ class ProtectService:
             tok_cap=max_tok,
             protect_enabled=True,
             estimated_next_tokens=estimated_next_tokens,
+            token_explosion_tokens=ctx.input_tokens_estimate,
             previous_estimated_tokens=None,
             current_event=None,
             recent_events=[],
@@ -309,6 +304,7 @@ class ProtectService:
                     max_req=max_req,
                     max_tok=max_tok,
                     estimated_next_tokens=estimated_next_tokens,
+                    token_explosion_tokens=None,
                     max_output_tokens=ctx.max_output_tokens,
                     apply_clamp_enabled=apply_clamp_enabled,
                     clamp=clamp,
@@ -375,6 +371,7 @@ class ProtectService:
             tok_cap=max_tok,
             protect_enabled=True,
             estimated_next_tokens=estimated_next_tokens,
+            token_explosion_tokens=ctx.input_tokens_estimate,
             previous_estimated_tokens=previous_estimated_tokens,
             current_event=None,
             recent_events=recent_events,
@@ -420,6 +417,7 @@ class ProtectService:
                     max_req=max_req,
                     max_tok=max_tok,
                     estimated_next_tokens=estimated_next_tokens,
+                    token_explosion_tokens=None,
                     max_output_tokens=ctx.max_output_tokens,
                     apply_clamp_enabled=apply_clamp_enabled,
                     clamp=clamp,
@@ -451,11 +449,7 @@ class ProtectService:
                 clamp=clamp,
             )
 
-        token_explosion_detector_ctx = replace(
-            detector_ctx,
-            estimated_next_tokens=token_explosion_estimated_next_tokens,
-        )
-        warn_signals = self._deferred_warn_detector_registry.detect(token_explosion_detector_ctx)
+        warn_signals = self._deferred_warn_detector_registry.detect(detector_ctx)
         if warn_signals:
             warn_signal = warn_signals[0]
             reason = str(warn_signal.detector)
@@ -464,7 +458,7 @@ class ProtectService:
                 max_tok=max_tok,
                 current_tokens_60s=tokens_60s,
                 max_output_tokens=ctx.max_output_tokens,
-                estimated_next_tokens=token_explosion_estimated_next_tokens,
+                estimated_next_tokens=estimated_next_tokens,
             )
             if self._should_emit_live_notifications(
                 evaluation_started_at=evaluation_started_at,
@@ -484,7 +478,8 @@ class ProtectService:
                     tokens_60s=tokens_60s,
                     max_req=max_req,
                     max_tok=max_tok,
-                    estimated_next_tokens=token_explosion_estimated_next_tokens,
+                    estimated_next_tokens=estimated_next_tokens,
+                    token_explosion_tokens=ctx.input_tokens_estimate,
                     max_output_tokens=ctx.max_output_tokens,
                     apply_clamp_enabled=apply_clamp_enabled,
                     clamp=clamp,
@@ -503,12 +498,12 @@ class ProtectService:
                     "threshold_tok_60s": max_tok,
                     "decision_timeout_ms": decision_timeout_ms,
                     "predictive": {
-                        "enabled": bool(token_explosion_estimated_next_tokens is not None),
-                        "estimated_next_tokens": token_explosion_estimated_next_tokens,
+                        "enabled": bool(estimated_next_tokens is not None),
+                        "estimated_next_tokens": estimated_next_tokens,
                         "would_exceed_tokens_cap": bool(
                             max_tok is not None
-                            and token_explosion_estimated_next_tokens is not None
-                            and (tokens_60s + token_explosion_estimated_next_tokens >= max_tok)
+                            and estimated_next_tokens is not None
+                            and (tokens_60s + estimated_next_tokens >= max_tok)
                         ),
                     },
                 },
@@ -718,6 +713,7 @@ class ProtectService:
         max_req: int | None,
         max_tok: int | None,
         estimated_next_tokens: int | None,
+        token_explosion_tokens: int | None,
         max_output_tokens: int | None,
         apply_clamp_enabled: bool,
         clamp: dict[str, int | bool] | None,
@@ -735,6 +731,7 @@ class ProtectService:
             "req_cap": max_req,
             "tok_cap": max_tok,
             "estimated_next_tokens": estimated_next_tokens,
+            **({"token_explosion_tokens": token_explosion_tokens} if isinstance(token_explosion_tokens, int) else {}),
             "apply_clamp_enabled": apply_clamp_enabled,
             "clamp": clamp,
             "sent_at": now.isoformat(),

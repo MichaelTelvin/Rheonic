@@ -340,6 +340,7 @@ def test_preflight_warn_allows_provider_call_and_tags_telemetry() -> None:
     request_payload = transport.ingested_events[0].get("request") or {}
     assert request_payload.get("protect_decision") == "warn"
     assert request_payload.get("protect_reason") == "loop_suspect"
+    assert request_payload.get("token_explosion_tokens") is None
     client.close()
 
 
@@ -365,6 +366,9 @@ def test_messages_request_includes_input_tokens_estimate() -> None:
     openai_client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": "hello"}])
     assert len(transport.decision_payloads) == 1
     assert transport.decision_payloads[0]["input_tokens_estimate"] == 222
+    client.flush()
+    request_payload = transport.ingested_events[0].get("request") or {}
+    assert request_payload.get("token_explosion_tokens") == 222
     _set_token_estimator_for_tests(None)
     client.close()
 
@@ -391,6 +395,9 @@ def test_token_estimation_failure_omits_input_tokens_estimate() -> None:
     openai_client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": "hello"}])
     assert len(transport.decision_payloads) == 1
     assert "input_tokens_estimate" not in transport.decision_payloads[0]
+    client.flush()
+    request_payload = transport.ingested_events[0].get("request") or {}
+    assert request_payload.get("token_explosion_tokens") is None
     _set_token_estimator_for_tests(None)
     client.close()
 

@@ -80,6 +80,7 @@ def instrument_openai(
                     response=response,
                     latency_ms=int((perf_counter() - started_at) * 1000),
                     requested_model=requested_model,
+                    estimated_input_tokens=estimated_input_tokens,
                     environment=environment,
                     endpoint=endpoint,
                     feature=feature,
@@ -93,6 +94,7 @@ def instrument_openai(
                     exc=exc,
                     latency_ms=int((perf_counter() - started_at) * 1000),
                     requested_model=requested_model,
+                    estimated_input_tokens=estimated_input_tokens,
                     environment=environment,
                     endpoint=endpoint,
                     feature=feature,
@@ -141,6 +143,7 @@ def instrument_openai(
                 response=response,
                 latency_ms=int((perf_counter() - started_at) * 1000),
                 requested_model=requested_model,
+                estimated_input_tokens=estimated_input_tokens,
                 environment=environment,
                 endpoint=endpoint,
                 feature=feature,
@@ -154,6 +157,7 @@ def instrument_openai(
                 exc=exc,
                 latency_ms=int((perf_counter() - started_at) * 1000),
                 requested_model=requested_model,
+                estimated_input_tokens=estimated_input_tokens,
                 environment=environment,
                 endpoint=endpoint,
                 feature=feature,
@@ -171,6 +175,7 @@ def _capture_success(
     response: Any,
     latency_ms: int,
     requested_model: str | None,
+    estimated_input_tokens: int | None,
     environment: str | None,
     endpoint: str | None,
     feature: str | None,
@@ -190,6 +195,11 @@ def _capture_success(
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
+                    **(
+                        {"token_explosion_tokens": estimated_input_tokens}
+                        if isinstance(estimated_input_tokens, int)
+                        else {}
+                    ),
                     "protect_decision": "warn" if protect_decision == "warn" else None,
                     "protect_reason": protect_reason if protect_decision == "warn" else None,
                 },
@@ -209,6 +219,7 @@ def _capture_failure(
     exc: Exception,
     latency_ms: int,
     requested_model: str | None,
+    estimated_input_tokens: int | None,
     environment: str | None,
     endpoint: str | None,
     feature: str | None,
@@ -226,6 +237,11 @@ def _capture_failure(
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
+                    **(
+                        {"token_explosion_tokens": estimated_input_tokens}
+                        if isinstance(estimated_input_tokens, int)
+                        else {}
+                    ),
                     "protect_decision": "warn" if protect_decision == "warn" else None,
                     "protect_reason": protect_reason if protect_decision == "warn" else None,
                 },

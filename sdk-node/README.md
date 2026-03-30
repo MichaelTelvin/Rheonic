@@ -120,11 +120,13 @@ await client.captureEvent(
   buildEvent({
     provider: "openai",
     model: "gpt-4o-mini",
-    request: { endpoint: "/chat/completions", feature: "assistant" },
+    request: { endpoint: "/chat/completions", feature: "assistant", token_explosion_tokens: 64 },
     response: { total_tokens: 64, latency_ms: 120, http_status: 200 },
   }),
 );
 ```
+
+`token_explosion_tokens` is optional. Set it only for custom/manual events when you want token-explosion detection to use the same request-context signal that the SDK instrumentation sends to both protect and ingest.
 
 ## Reference
 

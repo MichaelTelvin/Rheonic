@@ -24,6 +24,7 @@ class EventRequestIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     input_tokens: int | None = None
+    token_explosion_tokens: int | None = None
     endpoint: str | None = None
     feature: str | None = None
 
@@ -164,6 +165,11 @@ def ingest_event(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,
+            token_explosion_tokens=(
+                payload.request.token_explosion_tokens
+                if payload.request is not None and payload.request.token_explosion_tokens is not None
+                else None
+            ),
             latency_ms=(payload.response.latency_ms if payload.response is not None else payload.latency_ms),
             status=payload.status,
             error_type=(

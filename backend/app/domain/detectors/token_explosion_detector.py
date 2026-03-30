@@ -5,29 +5,37 @@ from app.domain.models.event import Event
 
 
 class TokenExplosionDetector(Detector):
-    # Detect unusually large estimates using the existing ratio/absolute thresholds
-    # plus abrupt sequential growth when request volume still looks sequential.
+    # Detect unusually large request-context growth using a dedicated signal that
+    # can be computed before a call and then echoed back on ingest, keeping
+    # protect and observe aligned without conflating pattern detection with spend.
     def detect(self, ctx: DetectionContext) -> list[Signal]:
-        estimate = ctx.estimated_next_tokens
-        if estimate is None and ctx.current_event is not None:
-            estimate = max(int(ctx.current_event.total_tokens), 0)
-        if estimate is None:
+        token_explosion_tokens = ctx.token_explosion_tokens
+        if token_explosion_tokens is None and ctx.current_event is not None:
+            token_explosion_tokens = ctx.current_event.token_explosion_tokens
+        if token_explosion_tokens is None:
+            token_explosion_tokens = ctx.estimated_next_tokens
+        if token_explosion_tokens is None and ctx.current_event is not None:
+            token_explosion_tokens = max(int(ctx.current_event.total_tokens), 0)
+        if token_explosion_tokens is None:
             return []
 
         ratio_threshold = None
         ratio_hit = False
         if ctx.tok_cap is not None and ctx.tok_cap > 0:
             ratio_threshold = float(ctx.tok_cap) * float(ctx.token_explosion_ratio)
-            ratio_hit = float(estimate) >= ratio_threshold
-        abs_hit = int(estimate) >= int(ctx.token_explosion_abs)
+            ratio_hit = float(token_explosion_tokens) >= ratio_threshold
+        abs_hit = int(token_explosion_tokens) >= int(ctx.token_explosion_abs)
 
-        # Growth detection compares the current estimate with the last matching event
-        # so runaway step-ups can surface even before absolute thresholds are crossed.
+        # Growth detection compares the current request-context size with the last
+        # matching request-context size so runaway accretion can surface before
+        # absolute thresholds are crossed.
         growth_hit = False
         growth_ratio = None
+        # DetectionContext keeps the legacy field name for backward compatibility;
+        # for token explosion it now carries the previous dedicated request-context signal.
         prev = ctx.previous_estimated_tokens
         if prev is not None and prev > 0:
-            growth_ratio = float(estimate) / float(prev)
+            growth_ratio = float(token_explosion_tokens) / float(prev)
             growth_hit = growth_ratio >= float(ctx.token_explosion_growth_ratio)
 
         # Growth needs live current-window activity to mean "step-up inside an
@@ -53,8 +61,8 @@ class TokenExplosionDetector(Detector):
             "tokens_60s": ctx.current_tokens_60s,
             "req_cap": ctx.req_cap,
             "tok_cap": ctx.tok_cap,
-            "estimated_next_tokens": estimate,
-            "previous_estimated_tokens": ctx.previous_estimated_tokens,
+            "token_explosion_tokens": token_explosion_tokens,
+            "previous_token_explosion_tokens": ctx.previous_estimated_tokens,
             "ratio_threshold_tokens": ratio_threshold,
             "absolute_threshold_tokens": ctx.token_explosion_abs,
             "growth_ratio": growth_ratio,
@@ -103,5 +111,7 @@ def resolve_previous_estimated_tokens(
             continue
         if current_event_id is not None and event.id == current_event_id:
             continue
+        if event.token_explosion_tokens is not None:
+            return max(int(event.token_explosion_tokens), 0)
         return max(int(event.total_tokens), 0)
     return None

@@ -239,7 +239,7 @@ export function LandingPage(): JSX.Element {
                 </span>
                 <h3>Incident detection</h3>
               </div>
-              <p>Automatic incidents for near-cap, failed retry storms, rapid loop sequences, and sudden token explosions before they cascade.</p>
+              <p>Automatic incidents for near-cap, failed retry storms, rapid loop sequences, and sudden request-context explosions before they cascade.</p>
             </article>
             <article className="landing-cap-card">
               <div className="landing-cap-head">

@@ -56,9 +56,15 @@ Protect preflight warns when either condition is met:
 - Retry intent/state by itself does not count as a failure.
 
 ## Token-Explosion Rule
-- Counts the current estimate/event against the existing ratio and absolute thresholds.
-- Also warns on abrupt sequential growth against the previous matching estimate.
+- Counts a dedicated request-side `token_explosion_tokens` signal against the existing ratio and absolute thresholds.
+- The SDK computes that signal before the provider call and ingested events persist the same signal, so protect and observe evaluate the same token-explosion pattern.
+- Also warns on abrupt sequential growth against the previous matching request-context signal.
 - Growth-only detection is suppressed when request volume is high enough to suggest concurrency instead of one step feeding the next.
+- Default tuning is intentionally conservative for agentic workflows:
+  - ratio `0.9`
+  - absolute floor `10000`
+  - growth ratio `2.5`
+  - concurrency threshold `8`
 
 ## Loop-Suspect Rule
 - Counts rapid consecutive repeats of the same signature, not scattered frequency across the full window.

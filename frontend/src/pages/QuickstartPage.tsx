@@ -92,7 +92,7 @@ await client.captureEvent(
   buildEvent({
     provider: "${provider}",
     model: "${selectedModel}",
-    request: { endpoint: "${provider === "google" ? "/models/generateContent" : "/chat/completions"}", feature: "assistant" },
+    request: { endpoint: "${provider === "google" ? "/models/generateContent" : "/chat/completions"}", feature: "assistant", token_explosion_tokens: 64 },
     response: { total_tokens: 64, latency_ms: 120, http_status: 200 },
   }),
 );`
@@ -108,7 +108,7 @@ client.capture_event(
     build_event(
         provider="${provider}",
         model="${selectedModel}",
-        request={"endpoint": "${provider === "google" ? "/models/generateContent" : "/chat/completions"}", "feature": "assistant"},
+        request={"endpoint": "${provider === "google" ? "/models/generateContent" : "/chat/completions"}", "feature": "assistant", "token_explosion_tokens": 64},
         response={"total_tokens": 64, "latency_ms": 120, "http_status": 200},
     )
 )`,

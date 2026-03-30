@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { instrumentAnthropic } from "./providers/anthropicAdapter.js";
-import { instrumentGoogle } from "./providers/googleAdapter.js";
-import { instrumentOpenAI } from "./providers/openaiAdapter.js";
+import { __setInputTokenEstimatorForTests as setAnthropicEstimatorForTests, instrumentAnthropic } from "./providers/anthropicAdapter.js";
+import { __setInputTokenEstimatorForTests as setGoogleEstimatorForTests, instrumentGoogle } from "./providers/googleAdapter.js";
+import { __setInputTokenEstimatorForTests as setOpenAIEstimatorForTests, instrumentOpenAI } from "./providers/openaiAdapter.js";
 
 function makeClient(decision: Record<string, unknown>) {
   const captured: unknown[] = [];
@@ -50,6 +50,7 @@ test("anthropic adapter returns original client when messages.create is missing"
 });
 
 test("google adapter injects generation_config clamp into dict payloads", async () => {
+  setGoogleEstimatorForTests(() => 77);
   const client = makeClient({
     decision: "warn",
     reason: "near_cap",
@@ -69,6 +70,8 @@ test("google adapter injects generation_config clamp into dict payloads", async 
   await google.generateContent("hello");
   assert.equal(client.captured.length, 1);
   assert.equal((client.captured[0] as any).response.total_tokens, 9);
+  assert.equal((client.captured[0] as any).request.token_explosion_tokens, 77);
+  setGoogleEstimatorForTests(null);
 });
 
 test("anthropic adapter captures failure status from response object", async () => {
@@ -161,6 +164,7 @@ test("openai adapter clamps max_output_tokens payloads and reads response.status
 });
 
 test("anthropic adapter applies clamp when max_tokens is missing and sums token usage", async () => {
+  setAnthropicEstimatorForTests(() => 88);
   const client = makeClient({
     decision: "warn",
     reason: "near_cap",
@@ -178,9 +182,11 @@ test("anthropic adapter applies clamp when max_tokens is missing and sums token 
   };
 
   instrumentAnthropic(anthropic, { client: client as any });
-  await anthropic.messages.create({ model: "claude-3-5-sonnet" });
+  await anthropic.messages.create({ model: "claude-3-5-sonnet", messages: [{ role: "user", content: "hello" }] });
   assert.equal(calls[0].max_tokens, 11);
   assert.equal((client.captured[0] as any).response.total_tokens, 13);
+  assert.equal((client.captured[0] as any).request.token_explosion_tokens, 88);
+  setAnthropicEstimatorForTests(null);
 });
 
 test("google adapter returns original object when generateContent is missing", () => {
@@ -194,6 +200,7 @@ test("openai adapter returns original object when completions.create is missing"
 });
 
 test("openai adapter injects recommended max_tokens when no output limit exists", async () => {
+  setOpenAIEstimatorForTests(() => 99);
   const client = makeClient({
     decision: "warn",
     reason: "near_cap",
@@ -216,6 +223,8 @@ test("openai adapter injects recommended max_tokens when no output limit exists"
   await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: "user", content: "hello" }] });
   assert.equal(calls[0].max_tokens, 13);
   assert.equal((client.captured[0] as any).response.total_tokens, undefined);
+  assert.equal((client.captured[0] as any).request.token_explosion_tokens, 99);
+  setOpenAIEstimatorForTests(null);
 });
 
 test("anthropic adapter returns undefined totals and http status from statusCode", async () => {

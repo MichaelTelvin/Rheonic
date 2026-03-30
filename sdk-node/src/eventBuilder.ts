@@ -3,6 +3,7 @@ export interface EventRequest {
   feature?: string;
   input_tokens?: number;
   input_tokens_estimate?: number;
+  token_explosion_tokens?: number;
   max_output_tokens?: number;
   protect_decision?: string;
   protect_reason?: string;

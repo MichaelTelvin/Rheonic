@@ -117,7 +117,14 @@ async function sendIngestEvent(ingestKey, provider, model, totalTokens, feature,
     latency_ms: 120,
     http_status: httpStatus,
     ...(options?.errorType ? { error_type: options.errorType } : {}),
-    request: { endpoint: "/chat/completions", feature, input_tokens: 1 },
+    request: {
+      endpoint: "/chat/completions",
+      feature,
+      input_tokens: 1,
+      ...(typeof options?.tokenExplosionTokens === "number"
+        ? { token_explosion_tokens: options.tokenExplosionTokens }
+        : {}),
+    },
     response: {
       output_tokens: 1,
       total_tokens: totalTokens,
@@ -375,9 +382,11 @@ async function main() {
       await sleep(pauseMs);
     }
   } else if (scenario === "token_explosion") {
-    const seed = envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 6000);
-    console.log("[STEP] Seed token explosion then expect warn");
-    await sendIngestEvent(ingestKey, provider, model, seed, "token-explosion-seed", env);
+    const seed = envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 10000);
+    console.log("[STEP] Seed token explosion from request-context growth then expect warn");
+    await sendIngestEvent(ingestKey, provider, model, seed, "token-explosion-seed", env, {
+      tokenExplosionTokens: seed,
+    });
     callMaxTokens = Math.max(maxTokens, seed);
     console.log(`[STEP] token_explosion call max_tokens=${callMaxTokens}`);
     await sleep(pauseMs);

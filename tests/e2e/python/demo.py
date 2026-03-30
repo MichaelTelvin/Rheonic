@@ -49,6 +49,7 @@ def _send_event(
     feature: str,
     environment: str,
     *,
+    token_explosion_tokens: int | None = None,
     status: str = "ok",
     http_status: int = 200,
     error_type: str | None = None,
@@ -57,7 +58,12 @@ def _send_event(
         provider=provider,
         model=model,
         environment=environment,
-        request={"endpoint": endpoint, "input_tokens": 1, "feature": feature},
+        request={
+            "endpoint": endpoint,
+            "input_tokens": 1,
+            "feature": feature,
+            **({"token_explosion_tokens": token_explosion_tokens} if isinstance(token_explosion_tokens, int) else {}),
+        },
         response={
             "output_tokens": 1,
             "total_tokens": total_tokens,
@@ -199,7 +205,7 @@ def _usage() -> None:
     print("  RHEONIC_STEP_SLEEP_MS=200")
     print("  RHEONIC_RETRY_STORM_COUNT=5")
     print("  RHEONIC_LOOP_COUNT=6")
-    print("  RHEONIC_TOKEN_EXPLOSION_TOKENS=6000")
+    print("  RHEONIC_TOKEN_EXPLOSION_TOKENS=10000")
     print("  RHEONIC_CAP_BREACH_TOKENS=4000")
     print("  RHEONIC_REQ_CAP_BREACH_COUNT=6")
     print("  RHEONIC_CAP_BREACH_REQ_TOKENS=1")
@@ -245,7 +251,7 @@ def main() -> None:
     step_sleep_ms = int(os.getenv("RHEONIC_STEP_SLEEP_MS", "200"))
     retry_storm_count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "5"))
     loop_count = int(os.getenv("RHEONIC_LOOP_COUNT", "6"))
-    token_explosion_tokens = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "6000"))
+    token_explosion_tokens = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "10000"))
     cap_breach_tokens = int(os.getenv("RHEONIC_CAP_BREACH_TOKENS", "4000"))
     cap_breach_req_count = int(os.getenv("RHEONIC_REQ_CAP_BREACH_COUNT", "6"))
     cap_breach_req_tokens = int(os.getenv("RHEONIC_CAP_BREACH_REQ_TOKENS", "1"))
@@ -361,7 +367,7 @@ def main() -> None:
             )
 
         def run_token_explosion() -> None:
-            _log_verbose("\n[STEP] Token explosion")
+            _log_verbose("\n[STEP] Token explosion from repeated request-context growth")
             phase_started_at = datetime.now().astimezone()
             _send_event(
                 provider,
@@ -370,6 +376,7 @@ def main() -> None:
                 token_explosion_tokens,
                 "token-explosion",
                 environment,
+                token_explosion_tokens=token_explosion_tokens,
             )
             client.flush()
             _print_phase(

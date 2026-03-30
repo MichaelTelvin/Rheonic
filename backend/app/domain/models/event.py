@@ -20,5 +20,6 @@ class Event:
     error_type: str | None
     http_status: int | None
     created_at: datetime
+    token_explosion_tokens: int | None = None
     request_endpoint: str | None = None
     request_feature: str | None = None

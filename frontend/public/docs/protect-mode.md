@@ -43,7 +43,7 @@ Available settings:
 - `loop_suspect`
 - `token_explosion`
 
-`token_explosion` can come from a large estimate, a cap-relative spike, or a sudden jump versus the previous matching step. Growth-only detection is suppressed when request volume suggests concurrency.
+`token_explosion` can come from a large request-context size, a cap-relative spike, or a sudden jump versus the previous matching step. The SDK computes one request-side token-explosion signal before the provider call and sends that same signal into ingest, so protect and observe evaluate the same pattern. Defaults are tuned conservatively for agentic workflows, and growth-only detection is suppressed when request volume suggests concurrency.
 
 `loop_suspect` is based on a rapid consecutive repeated sequence for the same signature, including failed steps. It is suppressed when request volume suggests concurrency instead of one looping sequence.
 

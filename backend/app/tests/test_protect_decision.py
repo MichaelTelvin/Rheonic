@@ -283,6 +283,7 @@ def _event(
     status: str,
     http_status: int,
     total_tokens: int,
+    token_explosion_tokens: int | None = None,
     created_at: datetime,
     request_endpoint: str | None = "/chat/completions",
     request_feature: str = "manual-protect-demo",
@@ -298,6 +299,7 @@ def _event(
         output_tokens=max(total_tokens // 2, 1),
         total_tokens=total_tokens,
         latency_ms=100,
+        token_explosion_tokens=token_explosion_tokens if token_explosion_tokens is not None else total_tokens,
         status=status,
         error_type="provider_error" if status == "error" else None,
         http_status=http_status,
@@ -953,6 +955,38 @@ def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit
 
     assert decision["decision"] == "warn"
     assert decision["reason"] == "token_explosion"
+    _cleanup_overrides()
+
+
+def test_token_explosion_warn_webhook_uses_dedicated_request_context_signal(tmp_path) -> None:
+    dispatcher = FakeWebhookDispatcher()
+    client, _, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Warn Payload")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    original_abs = _set_app_config_value("token_explosion_abs", 200)
+    try:
+        decision = _decision(
+            client,
+            ingest_key,
+            body={
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+                "environment": "dev",
+                "input_tokens_estimate": 240,
+                "max_output_tokens": 0,
+            },
+        )
+    finally:
+        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "token_explosion"
+    warn_calls = [call for call in dispatcher.calls if call[1] == "protection.warn"]
+    assert len(warn_calls) == 1
+    payload = warn_calls[0][2]
+    assert payload["reason"] == "token_explosion"
+    assert payload["token_explosion_tokens"] == 240
     _cleanup_overrides()
 
 

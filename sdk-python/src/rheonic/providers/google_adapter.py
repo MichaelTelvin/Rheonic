@@ -198,6 +198,11 @@ def _capture_success(
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
+                    **(
+                        {"token_explosion_tokens": estimated_input_tokens}
+                        if isinstance(estimated_input_tokens, int)
+                        else {}
+                    ),
                     "input_tokens_estimate": estimated_input_tokens
                     if isinstance(estimated_input_tokens, int)
                     else None,
@@ -236,6 +241,11 @@ def _capture_failure(
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
+                    **(
+                        {"token_explosion_tokens": estimated_input_tokens}
+                        if isinstance(estimated_input_tokens, int)
+                        else {}
+                    ),
                     "input_tokens_estimate": estimated_input_tokens
                     if isinstance(estimated_input_tokens, int)
                     else None,

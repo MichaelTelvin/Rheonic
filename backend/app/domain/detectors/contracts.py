@@ -31,6 +31,7 @@ class DetectionContext:
     request_endpoint: str | None = None
     request_feature: str | None = None
     estimated_next_tokens: int | None = None
+    token_explosion_tokens: int | None = None
     previous_estimated_tokens: int | None = None
     current_event: Event | None = None
     recent_events: list[Event] = field(default_factory=list)

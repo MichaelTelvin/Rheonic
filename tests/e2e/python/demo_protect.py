@@ -275,6 +275,7 @@ def _send_ingest_event(
     total_tokens: int,
     feature: str,
     environment: str,
+    token_explosion_tokens: int | None = None,
     status: str = "ok",
     http_status: int = 200,
     error_type: str | None = None,
@@ -291,6 +292,7 @@ def _send_ingest_event(
             "endpoint": "/chat/completions",
             "feature": feature,
             "input_tokens": 1,
+            **({"token_explosion_tokens": token_explosion_tokens} if isinstance(token_explosion_tokens, int) else {}),
         },
         "response": {
             "output_tokens": 1,
@@ -608,8 +610,8 @@ def main() -> None:
                 )
                 time.sleep(pause_ms / 1000)
         elif scenario == "token_explosion":
-            print("\n[STEP] Seed token explosion then expect warn")
-            huge = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "6000"))
+            print("\n[STEP] Seed token explosion from request-context growth then expect warn")
+            huge = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "10000"))
             _send_ingest_event(
                 transport,
                 ingest_key,
@@ -618,6 +620,7 @@ def main() -> None:
                 total_tokens=huge,
                 feature="token-explosion-seed",
                 environment=env,
+                token_explosion_tokens=huge,
             )
             call_max_tokens = max(max_tokens, huge)
             print(f"[STEP] token_explosion call max_tokens={call_max_tokens}")

@@ -191,6 +191,28 @@ def test_operational_templates_snapshots_are_deterministic() -> None:
     assert "Estimated Next Tokens: 50" in warn_rendered["text"]
     assert "Clamp Recommendation: Recommended max output tokens: 40" in warn_rendered["text"]
 
+    token_explosion_rendered = render_template(
+        "protection_warn",
+        {
+            "project_id": "p1",
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "environment": "staging-test",
+            "reason": "token_explosion",
+            "requests_60s": 5,
+            "tokens_60s": 250,
+            "req_cap": 400,
+            "tok_cap": 1700,
+            "estimated_next_tokens": 50,
+            "token_explosion_tokens": 36,
+            "sent_at": "2026-03-05T10:01:10Z",
+            "clamp": None,
+        },
+    )
+    assert "Reason: Token explosion" in token_explosion_rendered["text"]
+    assert "Token Explosion Tokens: 36" in token_explosion_rendered["text"]
+    assert "Estimated Next Tokens:" not in token_explosion_rendered["text"]
+
 
 def test_fail_closed_protection_block_omits_blank_rows() -> None:
     rendered = render_template(

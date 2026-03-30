@@ -39,7 +39,7 @@ function printUsageExamples() {
   console.log("  RHEONIC_STEP_SLEEP_MS=200");
   console.log("  RHEONIC_RETRY_STORM_COUNT=5");
   console.log("  RHEONIC_LOOP_COUNT=6");
-  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=6000");
+  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=10000");
   console.log("  RHEONIC_CAP_BREACH_TOKENS=4000");
   console.log("  RHEONIC_REQ_CAP_BREACH_COUNT=6");
   console.log("  RHEONIC_CAP_BREACH_REQ_TOKENS=1");
@@ -106,7 +106,13 @@ async function sendEvent(client, provider, model, endpoint, totalTokens, feature
     provider,
     model,
     environment: client.environment,
-    request: { endpoint, feature },
+    request: {
+      endpoint,
+      feature,
+      ...(typeof options?.tokenExplosionTokens === "number"
+        ? { token_explosion_tokens: options.tokenExplosionTokens }
+        : {}),
+    },
     response: {
       latency_ms: 120,
       total_tokens: totalTokens,
@@ -156,7 +162,7 @@ async function runDemo() {
   const stepSleepMs = Number(process.env.RHEONIC_STEP_SLEEP_MS ?? 200);
   const retryStormCount = Number(process.env.RHEONIC_RETRY_STORM_COUNT ?? 5);
   const loopCount = Number(process.env.RHEONIC_LOOP_COUNT ?? 6);
-  const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 6000);
+  const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 10000);
   const capBreachTokens = Number(process.env.RHEONIC_CAP_BREACH_TOKENS ?? 4000);
   const capBreachReqCount = Number(process.env.RHEONIC_REQ_CAP_BREACH_COUNT ?? 6);
   const capBreachReqTokens = Number(process.env.RHEONIC_CAP_BREACH_REQ_TOKENS ?? 1);
@@ -230,8 +236,10 @@ async function runDemo() {
   };
 
   const runTokenExplosion = async () => {
-    logVerbose("\n[STEP] Token explosion");
-    await sendEvent(client, provider, model, endpoint, tokenExplosionTokens, "token-explosion");
+    logVerbose("\n[STEP] Token explosion from repeated request-context growth");
+    await sendEvent(client, provider, model, endpoint, tokenExplosionTokens, "token-explosion", {
+      tokenExplosionTokens,
+    });
     await client.flush();
     await printPhase(dashboardSession, "token_explosion", projectId, provider);
   };

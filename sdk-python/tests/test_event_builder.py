@@ -10,7 +10,7 @@ def test_build_event_schema_excludes_project_id() -> None:
         provider="openai",
         model="gpt-4o-mini",
         environment="dev",
-        request={"endpoint": "/chat", "input_tokens": 3},
+        request={"endpoint": "/chat", "input_tokens": 3, "token_explosion_tokens": 5},
         response={"total_tokens": 10, "latency_ms": 42, "http_status": 200},
     )
 
@@ -20,6 +20,7 @@ def test_build_event_schema_excludes_project_id() -> None:
     assert "project_id" not in payload
     assert isinstance(payload["request"], dict)
     assert isinstance(payload["response"], dict)
+    assert payload["request"]["token_explosion_tokens"] == 5
 
 
 def test_event_builder_normalizes_optional_fields() -> None:

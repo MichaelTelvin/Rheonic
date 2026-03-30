@@ -9,7 +9,7 @@ const incident = {
   status: "open" as const,
   created_at: new Date("2026-02-19T10:00:00Z").toISOString(),
   resolved_at: null,
-  evidence: { estimated_next_tokens: 12000, tok_cap: 20000 },
+  evidence: { token_explosion_tokens: 12000, tok_cap: 20000 },
 };
 
 describe("IncidentItem", () => {
@@ -18,7 +18,7 @@ describe("IncidentItem", () => {
     render(<IncidentItem incident={incident} resolving={false} onResolve={onResolve} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Show details" }));
-    expect(screen.getByText(/"estimated_next_tokens": 12000/)).toBeDefined();
+    expect(screen.getByText(/"token_explosion_tokens": 12000/)).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Resolve" }));
     await waitFor(() => expect(onResolve).toHaveBeenCalledWith("inc-1"));

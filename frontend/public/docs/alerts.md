@@ -75,6 +75,7 @@ Field notes:
 - `req_cap`: configured request cap when present
 - `tok_cap`: configured token cap when present
 - `estimated_next_tokens`: predictive token estimate used by the decision engine when available
+- `token_explosion_tokens`: optional request-context signal included when `reason=token_explosion`
 - `apply_clamp_enabled`: whether auto clamp is enabled for the project
 - `clamp`: clamp recommendation or applied clamp context when relevant
 - `sent_at`: when Rheonic queued the webhook payload

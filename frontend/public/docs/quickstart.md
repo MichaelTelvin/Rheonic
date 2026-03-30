@@ -106,7 +106,7 @@ Keep one long-lived SDK client per app process. Initialize it during app startup
 
 Make one provider call. Open the dashboard and confirm traffic appears.
 
-Incidents surface detector states such as failed retry storms, rapid repeated loop sequences, and sudden token growth when those patterns appear.
+Incidents surface detector states such as failed retry storms, rapid repeated loop sequences, and sudden request-context growth when those patterns appear. Token-explosion defaults are intentionally conservative so healthy RAG and agent flows are less likely to be tagged as anomalous.
 
 Dashboard path: `Dashboard → Metrics` or `Incidents`
 
@@ -140,7 +140,7 @@ await client.captureEvent(
   buildEvent({
     provider: "openai",
     model: "gpt-4o-mini",
-    request: { endpoint: "/chat/completions", feature: "assistant" },
+    request: { endpoint: "/chat/completions", feature: "assistant", token_explosion_tokens: 64 },
     response: { total_tokens: 64, latency_ms: 120, http_status: 200 },
   }),
 );
@@ -161,7 +161,7 @@ client.capture_event(
     build_event(
         provider="openai",
         model="gpt-4o-mini",
-        request={"endpoint": "/chat/completions", "feature": "assistant"},
+        request={"endpoint": "/chat/completions", "feature": "assistant", "token_explosion_tokens": 64},
         response={"total_tokens": 64, "latency_ms": 120, "http_status": 200},
     )
 )

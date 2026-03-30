@@ -266,6 +266,7 @@ def _event(
     model: str = "gpt-4o-mini",
     *,
     total_tokens: int = 100,
+    token_explosion_tokens: int | None = None,
     status: str = "ok",
     http_status: int = 200,
     error_type: str | None = None,
@@ -285,6 +286,7 @@ def _event(
         output_tokens=max(total_tokens // 2, 1),
         total_tokens=total_tokens,
         latency_ms=120,
+        token_explosion_tokens=token_explosion_tokens if token_explosion_tokens is not None else total_tokens,
         status=status,
         error_type=error_type,
         http_status=http_status,
@@ -303,10 +305,10 @@ def _service(
     loop_count: int = 6,
     loop_max_gap_seconds: float = 2.0,
     loop_concurrency_threshold: int = 5,
-    token_explosion_abs: int = 6000,
-    token_explosion_ratio: float = 0.8,
-    token_explosion_growth_ratio: float = 2.0,
-    token_explosion_concurrency_threshold: int = 5,
+    token_explosion_abs: int = 10000,
+    token_explosion_ratio: float = 0.9,
+    token_explosion_growth_ratio: float = 2.5,
+    token_explosion_concurrency_threshold: int = 8,
     now_provider: Callable[[], datetime] | None = None,
 ) -> tuple[IngestEventService, FakeIncidentRepository, FakeWebhookDispatcher, FakeTransportService]:
     incidents = FakeIncidentRepository()
@@ -644,11 +646,30 @@ def test_token_explosion_triggers_on_growth_without_absolute_or_ratio_hit() -> N
     assert len(incidents.rows) == 1
     row = incidents.rows[0]
     assert row.incident_type == "token_explosion"
-    assert row.evidence.get("previous_estimated_tokens") == 120
+    assert row.evidence.get("previous_token_explosion_tokens") == 120
     assert row.evidence.get("growth_hit") is True
     assert row.evidence.get("growth_threshold") == 2.0
     assert row.evidence.get("absolute_hit") is False
     assert row.evidence.get("ratio_hit") is False
+    assert webhook.calls
+    assert transport.calls == []
+
+
+def test_token_explosion_uses_dedicated_request_context_signal_on_ingest() -> None:
+    service, incidents, webhook, transport = _service(
+        protect_enabled=False,
+        req_cap=None,
+        tok_cap=None,
+        token_explosion_abs=200,
+    )
+
+    service.ingest(_event("p1", total_tokens=50, token_explosion_tokens=240, feature="context-growth"))
+
+    assert len(incidents.rows) == 1
+    row = incidents.rows[0]
+    assert row.incident_type == "token_explosion"
+    assert row.evidence.get("token_explosion_tokens") == 240
+    assert row.evidence.get("absolute_hit") is True
     assert webhook.calls
     assert transport.calls == []
 

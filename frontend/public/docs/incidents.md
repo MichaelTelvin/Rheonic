@@ -7,7 +7,7 @@ Incidents are the main way Rheonic surfaces risky runtime behavior. They are cre
 - `cap_breach`: traffic has crossed a hard request or token cap.
 - `retry_storm`: failed attempts are repeating fast enough to suggest an unhealthy retry loop; retry state by itself does not count as a failure.
 - `loop_suspect`: a rapid consecutive sequence with the same request signature suggests the app is stuck in a loop. Failed steps still count, and detection is suppressed when traffic looks highly concurrent.
-- `token_explosion`: token usage has jumped sharply because the request is large, near a cap-driven threshold, or suddenly much bigger than the previous matching step. Growth-only detection is suppressed when traffic looks highly concurrent.
+- `token_explosion`: request-context size has jumped sharply because the request is large, near a cap-driven threshold, or suddenly much bigger than the previous matching step. Rheonic evaluates the same request-side signal in protect and observe so warn decisions and incidents stay aligned. Defaults are tuned conservatively for agentic workflows like simple agents and RAG, and growth-only detection is suppressed when traffic looks highly concurrent.
 
 ## Where to Review Incidents
 Open `Incidents` in the dashboard. You can filter by:

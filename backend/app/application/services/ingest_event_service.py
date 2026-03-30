@@ -123,6 +123,7 @@ class IngestEventService:
                 request_endpoint=event.request_endpoint,
                 request_feature=event.request_feature,
                 estimated_next_tokens=event.total_tokens,
+                token_explosion_tokens=event.token_explosion_tokens,
                 previous_estimated_tokens=previous_estimated_tokens,
                 current_event=event,
                 recent_events=recent_events,

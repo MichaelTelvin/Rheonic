@@ -14,6 +14,7 @@ def render_protection_warn(payload: dict[str, object]) -> dict[str, str]:
     req_cap = str(payload.get("req_cap") or "-")
     tok_cap = str(payload.get("tok_cap") or "-")
     estimated_next_tokens = str(payload.get("estimated_next_tokens") or "-")
+    token_explosion_tokens = str(payload.get("token_explosion_tokens") or "-")
     clamp_value = payload.get("clamp")
     clamp = clamp_value if isinstance(clamp_value, dict) else None
     clamp_copy = "-"
@@ -38,7 +39,11 @@ def render_protection_warn(payload: dict[str, object]) -> dict[str, str]:
             ("Tokens / 60s", tokens_60s),
             ("Request cap", req_cap),
             ("Token cap", tok_cap),
-            ("Estimated next tokens", estimated_next_tokens),
+            *(
+                [("Token explosion tokens", token_explosion_tokens)]
+                if token_explosion_tokens != "-"
+                else [("Estimated next tokens", estimated_next_tokens)]
+            ),
             ("Clamp recommendation", clamp_copy),
             ("Sent at", sent_at),
         ],

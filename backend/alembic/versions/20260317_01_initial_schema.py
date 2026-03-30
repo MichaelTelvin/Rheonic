@@ -72,6 +72,7 @@ def upgrade() -> None:
         sa.Column("input_tokens", sa.Integer(), nullable=False),
         sa.Column("output_tokens", sa.Integer(), nullable=False),
         sa.Column("total_tokens", sa.Integer(), nullable=False),
+        sa.Column("token_explosion_tokens", sa.Integer(), nullable=True),
         sa.Column("latency_ms", sa.Integer(), nullable=True),
         sa.Column("status", sa.String(length=32), nullable=True),
         sa.Column("error_type", sa.String(length=64), nullable=True),
