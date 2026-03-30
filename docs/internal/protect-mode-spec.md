@@ -64,6 +64,7 @@ Protect preflight warns when either condition is met:
   - ratio `0.9`
   - absolute floor `10000`
   - growth ratio `2.5`
+  - growth minimum tokens `3000`
   - concurrency threshold `8`
 
 ## Loop-Suspect Rule

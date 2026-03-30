@@ -309,6 +309,7 @@ def _service(
     token_explosion_abs: int = 10000,
     token_explosion_ratio: float = 0.9,
     token_explosion_growth_ratio: float = 2.5,
+    token_explosion_growth_min_tokens: int = 3000,
     token_explosion_concurrency_threshold: int = 8,
     now_provider: Callable[[], datetime] | None = None,
 ) -> tuple[IngestEventService, FakeIncidentRepository, FakeWebhookDispatcher, FakeTransportService]:
@@ -342,6 +343,7 @@ def _service(
         token_explosion_abs=token_explosion_abs,
         token_explosion_ratio=token_explosion_ratio,
         token_explosion_growth_ratio=token_explosion_growth_ratio,
+        token_explosion_growth_min_tokens=token_explosion_growth_min_tokens,
         token_explosion_concurrency_threshold=token_explosion_concurrency_threshold,
         now_provider=now_provider,
     )
@@ -637,22 +639,41 @@ def test_token_explosion_triggers_on_growth_without_absolute_or_ratio_hit() -> N
         tok_cap=None,
         token_explosion_abs=10_000,
         token_explosion_growth_ratio=2.0,
+        token_explosion_growth_min_tokens=3_000,
     )
 
-    service.ingest(_event("p1", total_tokens=120, feature="growth-seed", offset_seconds=0))
+    service.ingest(_event("p1", total_tokens=1_200, feature="growth-seed", offset_seconds=0))
     assert incidents.rows == []
 
-    service.ingest(_event("p1", total_tokens=300, feature="growth-seed", offset_seconds=1))
+    service.ingest(_event("p1", total_tokens=3_600, feature="growth-seed", offset_seconds=1))
 
     assert len(incidents.rows) == 1
     row = incidents.rows[0]
     assert row.incident_type == "token_explosion"
-    assert row.evidence.get("previous_token_explosion_tokens") == 120
+    assert row.evidence.get("previous_token_explosion_tokens") == 1_200
     assert row.evidence.get("growth_hit") is True
     assert row.evidence.get("growth_threshold") == 2.0
+    assert row.evidence.get("growth_min_tokens") == 3_000
     assert row.evidence.get("absolute_hit") is False
     assert row.evidence.get("ratio_hit") is False
     assert webhook.calls
+    assert transport.calls == []
+
+
+def test_token_explosion_growth_ignores_tiny_request_context_jumps() -> None:
+    service, incidents, webhook, transport = _service(
+        protect_enabled=False,
+        tok_cap=None,
+        token_explosion_abs=10_000,
+        token_explosion_growth_ratio=2.0,
+        token_explosion_growth_min_tokens=3_000,
+    )
+
+    service.ingest(_event("p1", total_tokens=120, feature="growth-noise", offset_seconds=0))
+    service.ingest(_event("p1", total_tokens=363, feature="growth-noise", offset_seconds=1))
+
+    assert incidents.rows == []
+    assert _non_policy_gap_webhook_calls(webhook) == []
     assert transport.calls == []
 
 
@@ -681,11 +702,12 @@ def test_token_explosion_growth_is_suppressed_under_high_concurrency() -> None:
         tok_cap=None,
         token_explosion_abs=10_000,
         token_explosion_growth_ratio=2.0,
+        token_explosion_growth_min_tokens=3_000,
         token_explosion_concurrency_threshold=2,
     )
 
-    service.ingest(_event("p1", total_tokens=120, feature="growth-concurrency", offset_seconds=0))
-    service.ingest(_event("p1", total_tokens=300, feature="growth-concurrency", offset_seconds=1))
+    service.ingest(_event("p1", total_tokens=1_200, feature="growth-concurrency", offset_seconds=0))
+    service.ingest(_event("p1", total_tokens=3_600, feature="growth-concurrency", offset_seconds=1))
 
     assert incidents.rows == []
     assert _non_policy_gap_webhook_calls(webhook) == []

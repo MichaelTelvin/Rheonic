@@ -46,4 +46,5 @@ class DetectionContext:
     token_explosion_ratio: float = 0.8
     token_explosion_abs: int = 6000
     token_explosion_growth_ratio: float = 2.0
+    token_explosion_growth_min_tokens: int = 3000
     token_explosion_concurrency_threshold: int = 5

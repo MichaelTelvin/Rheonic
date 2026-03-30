@@ -272,6 +272,7 @@ class ProtectService:
             token_explosion_ratio=app_config.token_explosion_ratio,
             token_explosion_abs=app_config.token_explosion_abs,
             token_explosion_growth_ratio=app_config.token_explosion_growth_ratio,
+            token_explosion_growth_min_tokens=app_config.token_explosion_growth_min_tokens,
             token_explosion_concurrency_threshold=app_config.token_explosion_concurrency_threshold,
         )
         warn_signals = self._fast_warn_detector_registry.detect(detector_ctx)
@@ -385,6 +386,7 @@ class ProtectService:
             token_explosion_ratio=app_config.token_explosion_ratio,
             token_explosion_abs=app_config.token_explosion_abs,
             token_explosion_growth_ratio=app_config.token_explosion_growth_ratio,
+            token_explosion_growth_min_tokens=app_config.token_explosion_growth_min_tokens,
             token_explosion_concurrency_threshold=app_config.token_explosion_concurrency_threshold,
         )
         warn_signals = self._behavioral_warn_detector_registry.detect(detector_ctx)

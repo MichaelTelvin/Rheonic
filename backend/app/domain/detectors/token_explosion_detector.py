@@ -28,7 +28,8 @@ class TokenExplosionDetector(Detector):
 
         # Growth detection compares the current request-context size with the last
         # matching request-context size so runaway accretion can surface before
-        # absolute thresholds are crossed.
+        # absolute thresholds are crossed, but only once the request-context size
+        # is already meaningfully large enough to avoid tiny-ratio noise.
         growth_hit = False
         growth_ratio = None
         # DetectionContext keeps the legacy field name for backward compatibility;
@@ -36,7 +37,10 @@ class TokenExplosionDetector(Detector):
         prev = ctx.previous_estimated_tokens
         if prev is not None and prev > 0:
             growth_ratio = float(token_explosion_tokens) / float(prev)
-            growth_hit = growth_ratio >= float(ctx.token_explosion_growth_ratio)
+            growth_hit = (
+                growth_ratio >= float(ctx.token_explosion_growth_ratio)
+                and int(token_explosion_tokens) >= int(ctx.token_explosion_growth_min_tokens)
+            )
 
         # Growth needs live current-window activity to mean "step-up inside an
         # active burst". With zero current traffic, the last persisted event may
@@ -67,6 +71,7 @@ class TokenExplosionDetector(Detector):
             "absolute_threshold_tokens": ctx.token_explosion_abs,
             "growth_ratio": growth_ratio,
             "growth_threshold": ctx.token_explosion_growth_ratio,
+            "growth_min_tokens": ctx.token_explosion_growth_min_tokens,
             "ratio_hit": ratio_hit,
             "absolute_hit": abs_hit,
             "growth_hit": growth_hit,

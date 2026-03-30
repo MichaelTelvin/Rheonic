@@ -106,7 +106,7 @@ Keep one long-lived SDK client per app process. Initialize it during app startup
 
 Make one provider call. Open the dashboard and confirm traffic appears.
 
-Incidents surface detector states such as failed retry storms, rapid repeated loop sequences, and sudden request-context growth when those patterns appear. Token-explosion defaults are intentionally conservative so healthy RAG and agent flows are less likely to be tagged as anomalous.
+Incidents surface detector states such as failed retry storms, rapid repeated loop sequences, and sudden request-context growth when those patterns appear. Token-explosion defaults are intentionally conservative so healthy RAG and agent flows are less likely to be tagged as anomalous, and tiny prompt jumps should not be mistaken for explosions.
 
 Dashboard path: `Dashboard → Metrics` or `Incidents`
 

@@ -66,12 +66,13 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - `token_explosion_ratio`: ratio threshold against token cap when cap exists. Default `0.9`.
 - `token_explosion_abs`: absolute token threshold when cap-independent trigger is needed. Default `10000`.
 - `token_explosion_growth_ratio`: sequential growth threshold against the previous matching request-context signal. Default `2.5`.
+- `token_explosion_growth_min_tokens`: minimum current request-context size required before growth-only detection is allowed. Default `3000`.
 - `token_explosion_concurrency_threshold`: growth-only suppression threshold when request volume suggests concurrency. Default `8`.
 - Trigger condition: request-context tokens exceed ratio threshold, absolute threshold, or growth threshold.
 - Default tuning is intentionally conservative for agentic workflows:
   - simple agents usually stay well below the absolute floor,
   - RAG flows can grow steadily without being anomalous,
-  - growth-only hits should require a sharp step-up rather than normal context accumulation,
+  - growth-only hits should require both a sharp step-up and a meaningfully large current request-context size,
   - parallel tool or worker traffic should not look like one exploding sequence.
 
 ## Protect Enforcement
