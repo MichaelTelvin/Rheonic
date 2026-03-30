@@ -4,6 +4,7 @@ import json as json_lib
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from math import ceil, floor
 from pathlib import Path
 from typing import Any
@@ -330,7 +331,7 @@ def _send_ingest_event(
     }
     endpoint = endpoint_by_provider.get(provider, "/chat/completions")
     payload = {
-        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "ts": datetime.now(timezone.utc).isoformat(),
         "provider": provider,
         "model": model,
         "environment": environment,
