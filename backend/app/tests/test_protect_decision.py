@@ -1225,6 +1225,78 @@ def test_token_explosion_growth_is_suppressed_in_preflight_for_tiny_requests(tmp
     _cleanup_overrides()
 
 
+def test_token_explosion_growth_ignores_unrelated_feature_history_in_preflight(tmp_path) -> None:
+    client, rolling_window, events = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Token Explosion Feature Match")
+    _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
+
+    now = datetime.now(timezone.utc)
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="ok",
+            http_status=200,
+            total_tokens=9_000,
+            created_at=now - timedelta(seconds=2),
+            request_feature="other-feature",
+        )
+    )
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="ok",
+            http_status=200,
+            total_tokens=1_900,
+            created_at=now - timedelta(seconds=1),
+            request_feature="manual-protect-demo",
+        )
+    )
+    events.add_recent(
+        _event(
+            project_id,
+            "openai",
+            "gpt-4o-mini",
+            status="ok",
+            http_status=200,
+            total_tokens=3_230,
+            created_at=now - timedelta(milliseconds=800),
+            request_feature="manual-protect-demo",
+        )
+    )
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
+
+    original_growth_ratio = _set_app_config_value("token_explosion_growth_ratio", 1.7)
+    original_growth_count = _set_app_config_value("token_explosion_growth_count", 2)
+    original_growth_min = _set_app_config_value("token_explosion_growth_min_tokens", 1_800)
+    original_abs = _set_app_config_value("token_explosion_abs", 10_000)
+    try:
+        decision = _decision(
+            client,
+            ingest_key,
+            body={
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+                "environment": "dev",
+                "feature": "manual-protect-demo",
+                "input_tokens_estimate": 5_500,
+                "max_output_tokens": 0,
+            },
+        )
+    finally:
+        object.__setattr__(app_config, "token_explosion_growth_ratio", original_growth_ratio)
+        object.__setattr__(app_config, "token_explosion_growth_count", original_growth_count)
+        object.__setattr__(app_config, "token_explosion_growth_min_tokens", original_growth_min)
+        object.__setattr__(app_config, "token_explosion_abs", original_abs)
+
+    assert decision["decision"] == "warn"
+    assert decision["reason"] == "token_explosion"
+    _cleanup_overrides()
+
+
 def test_protect_decision_records_allow_warn_block_outcomes(tmp_path) -> None:
     client, rolling_window, _ = _make_client(tmp_path)
 

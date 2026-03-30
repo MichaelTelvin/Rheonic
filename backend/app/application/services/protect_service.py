@@ -358,6 +358,8 @@ class ProtectService:
             recent_events=recent_events,
             provider=provider,
             model=ctx.model,
+            request_endpoint="/chat/completions",
+            request_feature=ctx.feature,
         )
         detector_ctx = DetectionContext(
             project_id=project_id,

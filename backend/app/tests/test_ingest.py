@@ -723,6 +723,29 @@ def test_token_explosion_growth_is_suppressed_under_high_concurrency() -> None:
     assert transport.calls == []
 
 
+def test_token_explosion_growth_ignores_unrelated_feature_history() -> None:
+    service, incidents, webhook, transport = _service(
+        protect_enabled=False,
+        tok_cap=None,
+        token_explosion_abs=10_000,
+        token_explosion_growth_ratio=1.7,
+        token_explosion_growth_count=2,
+        token_explosion_growth_min_tokens=1_800,
+    )
+
+    service.ingest(_event("p1", total_tokens=9_000, feature="other-feature", offset_seconds=0))
+    service.ingest(_event("p1", total_tokens=1_900, feature="token-explosion-growth", offset_seconds=1))
+    service.ingest(_event("p1", total_tokens=3_230, feature="token-explosion-growth", offset_seconds=2))
+    service.ingest(_event("p1", total_tokens=5_500, feature="token-explosion-growth", offset_seconds=3))
+
+    assert len(incidents.rows) == 1
+    row = incidents.rows[0]
+    assert row.incident_type == "token_explosion"
+    assert row.evidence.get("previous_token_explosion_tokens") == 3_230
+    assert webhook.calls
+    assert transport.calls == []
+
+
 def test_near_cap_opens_incident_in_observe_with_warn_webhook() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=False, req_cap=None, tok_cap=1000)
     service.ingest(_event("p1", total_tokens=900, offset_seconds=0))

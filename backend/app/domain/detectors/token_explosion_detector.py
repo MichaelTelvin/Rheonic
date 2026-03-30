@@ -42,6 +42,8 @@ class TokenExplosionDetector(Detector):
                 recent_events=ctx.recent_events,
                 provider=ctx.provider,
                 model=ctx.model,
+                request_endpoint=ctx.request_endpoint,
+                request_feature=ctx.request_feature,
                 current_event=ctx.current_event,
                 current_tokens=current_tokens,
                 required_count=int(ctx.token_explosion_growth_count),
@@ -125,10 +127,13 @@ def resolve_previous_estimated_tokens(
     recent_events: list[Event],
     provider: str,
     model: str | None,
+    request_endpoint: str | None = None,
+    request_feature: str | None = None,
     current_event: Event | None = None,
 ) -> int | None:
     current_event_id = current_event.id if current_event is not None else None
     normalized_model = normalized_model_name(model)
+    expected_signature = _request_signature(request_endpoint=request_endpoint, request_feature=request_feature)
     # Normalize ordering here so growth compares against the latest matching event
     # regardless of whether the caller hands us newest-first repository rows or
     # append-ordered test doubles.
@@ -139,6 +144,8 @@ def resolve_previous_estimated_tokens(
         if normalized_model_name(event.model) != normalized_model:
             continue
         if current_event_id is not None and event.id == current_event_id:
+            continue
+        if _event_signature(event) != expected_signature:
             continue
         if event.token_explosion_tokens is not None:
             return max(int(event.token_explosion_tokens), 0)
@@ -151,6 +158,8 @@ def resolve_recent_token_explosion_sequence(
     recent_events: list[Event],
     provider: str,
     model: str | None,
+    request_endpoint: str | None = None,
+    request_feature: str | None = None,
     current_event: Event | None = None,
     current_tokens: int,
     required_count: int,
@@ -160,6 +169,7 @@ def resolve_recent_token_explosion_sequence(
         return [current_tokens]
     current_event_id = current_event.id if current_event is not None else None
     normalized_model = normalized_model_name(model)
+    expected_signature = _request_signature(request_endpoint=request_endpoint, request_feature=request_feature)
     ordered_events = sorted(recent_events, key=lambda event: event.ts.timestamp())
     sequence: list[int] = []
     for event in ordered_events:
@@ -169,6 +179,8 @@ def resolve_recent_token_explosion_sequence(
             continue
         if current_event_id is not None and event.id == current_event_id:
             continue
+        if _event_signature(event) != expected_signature:
+            continue
         if event.token_explosion_tokens is not None:
             sequence.append(max(int(event.token_explosion_tokens), 0))
         else:
@@ -177,3 +189,16 @@ def resolve_recent_token_explosion_sequence(
     if len(sequence) < required_points:
         return []
     return sequence
+
+
+def _request_signature(*, request_endpoint: str | None, request_feature: str | None) -> str:
+    endpoint = (request_endpoint or "na").strip()
+    feature = (request_feature or "unknown").strip() or "unknown"
+    return f"{endpoint}:{feature}"
+
+
+def _event_signature(event: Event) -> str:
+    return _request_signature(
+        request_endpoint=event.request_endpoint,
+        request_feature=event.request_feature,
+    )

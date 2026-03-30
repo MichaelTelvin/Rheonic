@@ -111,6 +111,8 @@ class IngestEventService:
                 recent_events=recent_events,
                 provider=provider,
                 model=event.model,
+                request_endpoint=event.request_endpoint,
+                request_feature=event.request_feature,
                 current_event=event,
             )
             ctx = DetectionContext(
