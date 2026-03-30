@@ -249,8 +249,8 @@ async function runDemo() {
   const runTokenExplosion = async () => {
     const growthSteps = tokenExplosionGrowthSteps(tokenExplosionTokens);
     logVerbose(`\n[STEP] Token explosion from repeated request-context growth (steps=${growthSteps.join(" -> ")})`);
-    for (const [index, growthValue] of growthSteps.entries()) {
-      await sendEvent(client, provider, model, endpoint, 120 + index, "token-explosion-growth", {
+    for (const growthValue of growthSteps) {
+      await sendEvent(client, provider, model, endpoint, growthValue, "token-explosion-growth", {
         tokenExplosionTokens: growthValue,
       });
       await sleep(stepSleepMs);

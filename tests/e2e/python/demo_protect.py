@@ -171,9 +171,51 @@ def _extract_used_max_tokens(payload: dict[str, Any] | None) -> int | None:
 
 def _resolve_simulated_total_tokens(payload: dict[str, Any] | None, fallback: int = 10) -> int:
     used_max_tokens = _extract_used_max_tokens(payload)
-    if isinstance(used_max_tokens, int) and used_max_tokens > 0:
-        return used_max_tokens
-    return fallback
+    prompt_tokens = _estimate_prompt_tokens(payload)
+    return max(
+        used_max_tokens if isinstance(used_max_tokens, int) and used_max_tokens > 0 else 0,
+        prompt_tokens,
+        fallback,
+    )
+
+
+def _collect_prompt_fragments(value: Any, parts: list[str]) -> None:
+    if isinstance(value, str):
+        trimmed = value.strip()
+        if trimmed:
+            parts.append(trimmed)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _collect_prompt_fragments(item, parts)
+        return
+    if not isinstance(value, dict):
+        return
+    text = value.get("text")
+    if isinstance(text, str):
+        _collect_prompt_fragments(text, parts)
+    if "content" in value:
+        _collect_prompt_fragments(value.get("content"), parts)
+
+
+def _estimate_prompt_tokens(payload: dict[str, Any] | None) -> int:
+    if not isinstance(payload, dict):
+        return 0
+    parts: list[str] = []
+    prompt = payload.get("prompt")
+    if isinstance(prompt, str):
+        _collect_prompt_fragments(prompt, parts)
+    messages = payload.get("messages")
+    if isinstance(messages, list):
+        for message in messages:
+            if isinstance(message, dict):
+                _collect_prompt_fragments(message.get("content"), parts)
+    text = " ".join(parts).strip()
+    if not text:
+        return 0
+    word_estimate = len(text.split())
+    char_estimate = (len(text) + 3) // 4
+    return max(word_estimate, char_estimate)
 
 
 def _assert_line(label: str, passed: bool) -> None:
@@ -615,13 +657,13 @@ def main() -> None:
             print("\n[STEP] Seed token explosion growth history then expect warn")
             peak = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "10000"))
             growth_steps = [max(peak // 9, 256), max(peak // 3, 768)]
-            for index, growth_value in enumerate(growth_steps):
+            for growth_value in growth_steps:
                 _send_ingest_event(
                     transport,
                     ingest_key,
                     provider,
                     model,
-                    total_tokens=120 + index,
+                    total_tokens=growth_value,
                     feature="token-explosion-growth",
                     environment=env,
                     token_explosion_tokens=growth_value,

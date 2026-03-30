@@ -383,12 +383,12 @@ def main() -> None:
             growth_steps = _token_explosion_growth_steps(token_explosion_tokens)
             _log_verbose(f"\n[STEP] Token explosion from repeated request-context growth (steps={growth_steps})")
             phase_started_at = datetime.now().astimezone()
-            for index, growth_value in enumerate(growth_steps):
+            for growth_value in growth_steps:
                 _send_event(
                     provider,
                     model,
                     endpoint,
-                    120 + index,
+                    growth_value,
                     "token-explosion-growth",
                     environment,
                     token_explosion_tokens=growth_value,

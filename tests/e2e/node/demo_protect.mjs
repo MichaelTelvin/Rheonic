@@ -82,7 +82,47 @@ function extractUsedMaxTokens(payload) {
 
 function resolveSimulatedTotalTokens(payload, fallback = 10) {
   const maxTokens = extractUsedMaxTokens(payload);
-  return typeof maxTokens === "number" && maxTokens > 0 ? maxTokens : fallback;
+  const promptTokens = estimatePromptTokens(payload);
+  return Math.max(typeof maxTokens === "number" && maxTokens > 0 ? maxTokens : 0, promptTokens, fallback);
+}
+
+function collectPromptFragments(value, parts) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed) parts.push(trimmed);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectPromptFragments(item, parts);
+    }
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  if (typeof value.text === "string") {
+    collectPromptFragments(value.text, parts);
+  }
+  if ("content" in value) {
+    collectPromptFragments(value.content, parts);
+  }
+}
+
+function estimatePromptTokens(payload) {
+  if (!payload || typeof payload !== "object") return 0;
+  const parts = [];
+  if (typeof payload.prompt === "string") {
+    collectPromptFragments(payload.prompt, parts);
+  }
+  if (Array.isArray(payload.messages)) {
+    for (const message of payload.messages) {
+      collectPromptFragments(message?.content, parts);
+    }
+  }
+  const text = parts.join(" ").trim();
+  if (!text) return 0;
+  const wordEstimate = text.split(/\s+/).length;
+  const charEstimate = Math.ceil(text.length / 4);
+  return Math.max(wordEstimate, charEstimate);
 }
 
 function printConfigHint() {
@@ -390,8 +430,8 @@ async function main() {
     const peak = envInt("RHEONIC_TOKEN_EXPLOSION_TOKENS", 10000);
     const growthSteps = [Math.max(Math.floor(peak / 9), 256), Math.max(Math.floor(peak / 3), 768)];
     console.log(`[STEP] Seed token explosion growth history then expect warn (history=${growthSteps.join(" -> ")}, live=${peak})`);
-    for (const [index, growthValue] of growthSteps.entries()) {
-      await sendIngestEvent(ingestKey, provider, model, 120 + index, "token-explosion-growth", env, {
+    for (const growthValue of growthSteps) {
+      await sendIngestEvent(ingestKey, provider, model, growthValue, "token-explosion-growth", env, {
         tokenExplosionTokens: growthValue,
       });
       await sleep(pauseMs);
