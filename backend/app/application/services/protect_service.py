@@ -272,6 +272,7 @@ class ProtectService:
             token_explosion_ratio=app_config.token_explosion_ratio,
             token_explosion_abs=app_config.token_explosion_abs,
             token_explosion_growth_ratio=app_config.token_explosion_growth_ratio,
+            token_explosion_growth_count=app_config.token_explosion_growth_count,
             token_explosion_growth_min_tokens=app_config.token_explosion_growth_min_tokens,
             token_explosion_concurrency_threshold=app_config.token_explosion_concurrency_threshold,
         )
@@ -386,6 +387,7 @@ class ProtectService:
             token_explosion_ratio=app_config.token_explosion_ratio,
             token_explosion_abs=app_config.token_explosion_abs,
             token_explosion_growth_ratio=app_config.token_explosion_growth_ratio,
+            token_explosion_growth_count=app_config.token_explosion_growth_count,
             token_explosion_growth_min_tokens=app_config.token_explosion_growth_min_tokens,
             token_explosion_concurrency_threshold=app_config.token_explosion_concurrency_threshold,
         )

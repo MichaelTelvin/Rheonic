@@ -45,6 +45,7 @@ class IngestEventService:
         token_explosion_ratio: float = app_config.token_explosion_ratio,
         token_explosion_abs: int = app_config.token_explosion_abs,
         token_explosion_growth_ratio: float = app_config.token_explosion_growth_ratio,
+        token_explosion_growth_count: int = app_config.token_explosion_growth_count,
         token_explosion_growth_min_tokens: int = app_config.token_explosion_growth_min_tokens,
         token_explosion_concurrency_threshold: int = app_config.token_explosion_concurrency_threshold,
     ) -> None:
@@ -61,6 +62,7 @@ class IngestEventService:
         self._token_explosion_ratio = token_explosion_ratio
         self._token_explosion_abs = token_explosion_abs
         self._token_explosion_growth_ratio = token_explosion_growth_ratio
+        self._token_explosion_growth_count = token_explosion_growth_count
         self._token_explosion_growth_min_tokens = token_explosion_growth_min_tokens
         self._token_explosion_concurrency_threshold = token_explosion_concurrency_threshold
         self._incident_dedup_window_seconds = incident_dedup_window_seconds
@@ -140,6 +142,7 @@ class IngestEventService:
                 token_explosion_ratio=self._token_explosion_ratio,
                 token_explosion_abs=self._token_explosion_abs,
                 token_explosion_growth_ratio=self._token_explosion_growth_ratio,
+                token_explosion_growth_count=self._token_explosion_growth_count,
                 token_explosion_growth_min_tokens=self._token_explosion_growth_min_tokens,
                 token_explosion_concurrency_threshold=self._token_explosion_concurrency_threshold,
             )

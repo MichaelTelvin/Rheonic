@@ -655,8 +655,8 @@ def main() -> None:
                 time.sleep(pause_ms / 1000)
         elif scenario == "token_explosion":
             print("\n[STEP] Seed token explosion growth history then expect warn")
-            peak = int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "10000"))
-            growth_steps = [max(peak // 9, 256), max(peak // 3, 768)]
+            peak = max(int(os.getenv("RHEONIC_TOKEN_EXPLOSION_TOKENS", "2600")), 2600)
+            growth_steps = [max(peak // 2, 1300)]
             for growth_value in growth_steps:
                 _send_ingest_event(
                     transport,

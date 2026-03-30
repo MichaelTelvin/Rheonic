@@ -26,21 +26,35 @@ class TokenExplosionDetector(Detector):
             ratio_hit = float(token_explosion_tokens) >= ratio_threshold
         abs_hit = int(token_explosion_tokens) >= int(ctx.token_explosion_abs)
 
-        # Growth detection compares the current request-context size with the last
-        # matching request-context size so runaway accretion can surface before
-        # absolute thresholds are crossed, but only once the request-context size
-        # is already meaningfully large enough to avoid tiny-ratio noise.
+        # Growth detection only starts once the current request-context signal is
+        # already meaningfully large. Below that floor, ratio changes are too
+        # noisy for agentic traffic and should not be interpreted as explosion.
         growth_hit = False
         growth_ratio = None
-        # DetectionContext keeps the legacy field name for backward compatibility;
-        # for token explosion it now carries the previous dedicated request-context signal.
-        prev = ctx.previous_estimated_tokens
-        if prev is not None and prev > 0:
-            growth_ratio = float(token_explosion_tokens) / float(prev)
-            growth_hit = (
-                growth_ratio >= float(ctx.token_explosion_growth_ratio)
-                and int(token_explosion_tokens) >= int(ctx.token_explosion_growth_min_tokens)
+        growth_sequence_count = 1
+        current_tokens = int(token_explosion_tokens)
+        if current_tokens >= int(ctx.token_explosion_growth_min_tokens):
+            previous_tokens = ctx.previous_estimated_tokens
+            if previous_tokens is not None and previous_tokens > 0:
+                growth_ratio = float(current_tokens) / float(previous_tokens)
+            sequence = resolve_recent_token_explosion_sequence(
+                recent_events=ctx.recent_events,
+                provider=ctx.provider,
+                model=ctx.model,
+                current_event=ctx.current_event,
+                current_tokens=current_tokens,
+                required_count=int(ctx.token_explosion_growth_count),
             )
+            if sequence:
+                growth_sequence_count = len(sequence)
+                adjacent_growth = [
+                    float(current) / float(previous)
+                    for previous, current in zip(sequence, sequence[1:], strict=False)
+                    if previous > 0
+                ]
+                growth_hit = len(adjacent_growth) == len(sequence) - 1 and all(
+                    ratio >= float(ctx.token_explosion_growth_ratio) for ratio in adjacent_growth
+                )
 
         # Growth needs live current-window activity to mean "step-up inside an
         # active burst". With zero current traffic, the last persisted event may
@@ -71,6 +85,8 @@ class TokenExplosionDetector(Detector):
             "absolute_threshold_tokens": ctx.token_explosion_abs,
             "growth_ratio": growth_ratio,
             "growth_threshold": ctx.token_explosion_growth_ratio,
+            "growth_sequence_count": growth_sequence_count,
+            "growth_required_count": ctx.token_explosion_growth_count,
             "growth_min_tokens": ctx.token_explosion_growth_min_tokens,
             "ratio_hit": ratio_hit,
             "absolute_hit": abs_hit,
@@ -120,3 +136,35 @@ def resolve_previous_estimated_tokens(
             return max(int(event.token_explosion_tokens), 0)
         return max(int(event.total_tokens), 0)
     return None
+
+
+def resolve_recent_token_explosion_sequence(
+    *,
+    recent_events: list[Event],
+    provider: str,
+    model: str | None,
+    current_event: Event | None = None,
+    current_tokens: int,
+    required_count: int,
+) -> list[int]:
+    if required_count <= 1:
+        return [current_tokens]
+    current_event_id = current_event.id if current_event is not None else None
+    normalized_model = normalized_model_name(model)
+    ordered_events = sorted(recent_events, key=lambda event: event.ts.timestamp())
+    sequence: list[int] = []
+    for event in ordered_events:
+        if event.provider != provider:
+            continue
+        if normalized_model_name(event.model) != normalized_model:
+            continue
+        if current_event_id is not None and event.id == current_event_id:
+            continue
+        if event.token_explosion_tokens is not None:
+            sequence.append(max(int(event.token_explosion_tokens), 0))
+        else:
+            sequence.append(max(int(event.total_tokens), 0))
+    sequence.append(max(int(current_tokens), 0))
+    if len(sequence) < required_count:
+        return []
+    return sequence[-required_count:]
