@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from datetime import datetime
+from math import ceil
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,7 @@ def _log_verbose(message: str) -> None:
 def _token_explosion_growth_steps(target_tokens: int) -> list[int]:
     peak = max(int(target_tokens), 5500)
     step_one = 1900
-    step_two = max(int(peak / 1.7), 3230)
+    step_two = max(int(ceil(peak / 1.7)), 3230)
     return [
         step_one,
         step_two,

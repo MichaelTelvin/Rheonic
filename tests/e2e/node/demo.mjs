@@ -55,7 +55,7 @@ function sleep(ms) {
 function tokenExplosionGrowthSteps(targetTokens) {
   const peak = Math.max(Number(targetTokens), 5500);
   const stepOne = 1900;
-  const stepTwo = Math.max(Math.floor(peak / 1.7), 3230);
+  const stepTwo = Math.max(Math.ceil(peak / 1.7), 3230);
   return [
     stepOne,
     stepTwo,
