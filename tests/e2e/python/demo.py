@@ -345,9 +345,12 @@ def main() -> None:
             )
 
         def run_loop_suspect() -> None:
-            _log_verbose("\n[STEP] Loop suspect from a rapid repeated sequence")
+            seeded_events = loop_count + 1
+            _log_verbose(
+                f"\n[STEP] Loop suspect from a rapid repeated sequence (events={seeded_events}, threshold={loop_count})"
+            )
             phase_started_at = datetime.now().astimezone()
-            for i in range(loop_count):
+            for _ in range(seeded_events):
                 _send_event(
                     provider,
                     model,
@@ -358,6 +361,7 @@ def main() -> None:
                 )
                 time.sleep(step_sleep_ms / 1000)
             client.flush()
+            time.sleep(step_sleep_ms / 1000)
             _print_phase(
                 dashboard_session,
                 "loop_suspect",
@@ -460,7 +464,7 @@ def main() -> None:
             _usage()
             return
 
-        expected_sent = 7 if demo_case == "all" else 1
+        expected_sent = 8 if demo_case == "all" else 1
         _assert_delivery(client, expected_min_sent=expected_sent)
         _log("[DONE] observe demo complete")
     finally:

@@ -226,12 +226,14 @@ async function runDemo() {
   };
 
   const runLoopSuspect = async () => {
-    logVerbose("\n[STEP] Loop suspect from a rapid repeated sequence");
-    for (let i = 0; i < loopCount; i += 1) {
+    const seededEvents = loopCount + 1;
+    logVerbose(`\n[STEP] Loop suspect from a rapid repeated sequence (events=${seededEvents}, threshold=${loopCount})`);
+    for (let i = 0; i < seededEvents; i += 1) {
       await sendEvent(client, provider, model, endpoint, 60, "loop-fixed-signature");
       await sleep(stepSleepMs);
     }
     await client.flush();
+    await sleep(stepSleepMs);
     await printPhase(dashboardSession, "loop_suspect", projectId, provider);
   };
 
@@ -296,7 +298,7 @@ async function runDemo() {
     return;
   }
 
-  const expectedSent = demoCase === "all" ? 7 : 1;
+  const expectedSent = demoCase === "all" ? 8 : 1;
   assertDelivery(client, expectedSent);
   log("[DONE] observe demo complete");
   client.close();
