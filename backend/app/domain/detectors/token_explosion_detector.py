@@ -33,7 +33,8 @@ class TokenExplosionDetector(Detector):
         growth_ratio = None
         growth_sequence_count = 0
         current_tokens = int(token_explosion_tokens)
-        if current_tokens >= int(ctx.token_explosion_growth_min_tokens):
+        growth_floor = int(ctx.token_explosion_growth_min_tokens)
+        if current_tokens >= growth_floor:
             previous_tokens = ctx.previous_estimated_tokens
             if previous_tokens is not None and previous_tokens > 0:
                 growth_ratio = float(current_tokens) / float(previous_tokens)
@@ -46,10 +47,17 @@ class TokenExplosionDetector(Detector):
                 required_count=int(ctx.token_explosion_growth_count),
             )
             if sequence:
-                growth_sequence_count = max(len(sequence) - 1, 0)
+                # Only count points at or above the floor. That makes
+                # "growth_count=2" mean three valid points:
+                # baseline -> spike -> confirmation.
+                eligible_sequence = [value for value in sequence if value >= growth_floor]
+                required_points = int(ctx.token_explosion_growth_count) + 1
+                if len(eligible_sequence) >= required_points:
+                    eligible_sequence = eligible_sequence[-required_points:]
+                growth_sequence_count = max(len(eligible_sequence) - 1, 0)
                 adjacent_growth = [
                     float(current) / float(previous)
-                    for previous, current in zip(sequence, sequence[1:], strict=False)
+                    for previous, current in zip(eligible_sequence, eligible_sequence[1:], strict=False)
                     if previous > 0
                 ]
                 growth_hit = len(adjacent_growth) == int(ctx.token_explosion_growth_count) and all(
@@ -168,4 +176,4 @@ def resolve_recent_token_explosion_sequence(
     sequence.append(max(int(current_tokens), 0))
     if len(sequence) < required_points:
         return []
-    return sequence[-required_points:]
+    return sequence

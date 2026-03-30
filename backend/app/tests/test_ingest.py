@@ -645,16 +645,16 @@ def test_token_explosion_triggers_on_growth_without_absolute_or_ratio_hit() -> N
         token_explosion_growth_min_tokens=1_800,
     )
 
-    service.ingest(_event("p1", total_tokens=1_100, feature="growth-seed", offset_seconds=0))
-    service.ingest(_event("p1", total_tokens=1_900, feature="growth-seed", offset_seconds=1))
+    service.ingest(_event("p1", total_tokens=1_900, feature="growth-seed", offset_seconds=0))
+    service.ingest(_event("p1", total_tokens=3_300, feature="growth-seed", offset_seconds=1))
     assert incidents.rows == []
 
-    service.ingest(_event("p1", total_tokens=3_300, feature="growth-seed", offset_seconds=2))
+    service.ingest(_event("p1", total_tokens=5_600, feature="growth-seed", offset_seconds=2))
 
     assert len(incidents.rows) == 1
     row = incidents.rows[0]
     assert row.incident_type == "token_explosion"
-    assert row.evidence.get("previous_token_explosion_tokens") == 1_900
+    assert row.evidence.get("previous_token_explosion_tokens") == 3_300
     assert row.evidence.get("growth_hit") is True
     assert row.evidence.get("growth_threshold") == 1.7
     assert row.evidence.get("growth_required_count") == 2
@@ -714,9 +714,9 @@ def test_token_explosion_growth_is_suppressed_under_high_concurrency() -> None:
         token_explosion_concurrency_threshold=2,
     )
 
-    service.ingest(_event("p1", total_tokens=1_100, feature="growth-concurrency", offset_seconds=0))
-    service.ingest(_event("p1", total_tokens=1_900, feature="growth-concurrency", offset_seconds=1))
-    service.ingest(_event("p1", total_tokens=3_300, feature="growth-concurrency", offset_seconds=2))
+    service.ingest(_event("p1", total_tokens=1_900, feature="growth-concurrency", offset_seconds=0))
+    service.ingest(_event("p1", total_tokens=3_300, feature="growth-concurrency", offset_seconds=1))
+    service.ingest(_event("p1", total_tokens=5_600, feature="growth-concurrency", offset_seconds=2))
 
     assert incidents.rows == []
     assert _non_policy_gap_webhook_calls(webhook) == []

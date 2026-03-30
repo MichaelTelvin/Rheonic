@@ -929,7 +929,7 @@ def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit
             "gpt-4o-mini",
             status="ok",
             http_status=200,
-            total_tokens=1_100,
+            total_tokens=1_900,
             created_at=now - timedelta(seconds=1),
         )
     )
@@ -940,7 +940,7 @@ def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit
             "gpt-4o-mini",
             status="ok",
             http_status=200,
-            total_tokens=1_900,
+            total_tokens=3_300,
             created_at=now - timedelta(milliseconds=800),
         )
     )
@@ -958,7 +958,7 @@ def test_token_explosion_growth_warns_in_preflight_without_absolute_or_ratio_hit
                 "provider": "openai",
                 "model": "gpt-4o-mini",
                 "environment": "dev",
-                "input_tokens_estimate": 3_300,
+                "input_tokens_estimate": 5_600,
                 "max_output_tokens": 0,
             },
         )
@@ -1018,7 +1018,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_
             "gpt-4o-mini",
             status="ok",
             http_status=200,
-            total_tokens=1_100,
+            total_tokens=1_900,
             created_at=now - timedelta(seconds=1),
         )
     )
@@ -1029,7 +1029,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_
             "gpt-4o-mini",
             status="ok",
             http_status=200,
-            total_tokens=1_900,
+            total_tokens=3_300,
             created_at=now - timedelta(milliseconds=800),
         )
     )
@@ -1046,7 +1046,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_
                 "provider": "openai",
                 "model": "gpt-4o-mini",
                 "environment": "dev",
-                "input_tokens_estimate": 3_300,
+                "input_tokens_estimate": 5_600,
                 "max_output_tokens": 0,
             },
         )
@@ -1074,18 +1074,7 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
             "gpt-4o-mini-2024-07-18",
             status="ok",
             http_status=200,
-            total_tokens=1_600,
-            created_at=datetime(2026, 3, 29, 16, 33, 38, tzinfo=timezone.utc),
-        )
-    )
-    events.add_recent(
-        _event(
-            project_id,
-            "openai",
-            "gpt-4o-mini",
-            status="ok",
-            http_status=200,
-            total_tokens=900,
+            total_tokens=1_900,
             created_at=datetime(2026, 3, 29, 16, 32, 0, tzinfo=timezone.utc),
         )
     )
@@ -1096,8 +1085,8 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
             "gpt-4o-mini-2024-07-18",
             status="ok",
             http_status=200,
-            total_tokens=1_900,
-            created_at=datetime(2026, 3, 29, 16, 31, 0, tzinfo=timezone.utc),
+            total_tokens=3_300,
+            created_at=datetime(2026, 3, 29, 16, 34, 38, tzinfo=timezone.utc),
         )
     )
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=10)
@@ -1114,7 +1103,7 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
                 "provider": "openai",
                 "model": "gpt-4o-mini",
                 "environment": "dev",
-                "input_tokens_estimate": 3_300,
+                "input_tokens_estimate": 5_600,
                 "max_output_tokens": 0,
             },
         )
@@ -1142,7 +1131,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrenc
             "gpt-4o-mini",
             status="ok",
             http_status=200,
-            total_tokens=1_100,
+            total_tokens=1_900,
             created_at=now - timedelta(seconds=1),
         )
     )
@@ -1153,7 +1142,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrenc
             "gpt-4o-mini",
             status="ok",
             http_status=200,
-            total_tokens=1_900,
+            total_tokens=3_300,
             created_at=now - timedelta(milliseconds=800),
         )
     )
@@ -1174,7 +1163,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrenc
                 "provider": "openai",
                 "model": "gpt-4o-mini",
                 "environment": "dev",
-                "input_tokens_estimate": 3_300,
+                "input_tokens_estimate": 5_600,
                 "max_output_tokens": 0,
             },
         )

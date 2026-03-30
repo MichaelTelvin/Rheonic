@@ -66,15 +66,15 @@ This map reflects the deterministic anomaly model now used by ingest and protect
 - `token_explosion_ratio`: ratio threshold against token cap when cap exists. Default `0.9`.
 - `token_explosion_abs`: absolute token threshold when cap-independent trigger is needed. Default `10000`.
 - `token_explosion_growth_ratio`: minimum step-over-step growth ratio inside a sustained sequence. Default `1.7`.
-- `token_explosion_growth_count`: minimum matching request count in the sustained growth sequence. Default `2`.
-- `token_explosion_growth_min_tokens`: minimum current request-context size required before growth-only detection is allowed. Default `1800`.
+- `token_explosion_growth_count`: minimum growth transitions required in the sustained growth sequence. Default `2`.
+- `token_explosion_growth_min_tokens`: minimum request-context size required before growth transitions start counting. Default `1800`.
 - `token_explosion_concurrency_threshold`: growth-only suppression threshold when request volume suggests concurrency. Default `8`.
 - Trigger condition: request-context tokens exceed ratio threshold, absolute threshold, or a sustained growth sequence threshold.
 - Default tuning is intentionally conservative for agentic workflows:
   - simple agents usually stay well below the absolute floor,
   - RAG flows can grow steadily without being anomalous,
-  - growth-only hits should require the current request-context to have already reached the minimum floor before growth is even evaluated,
-  - once that floor is reached, `growth_count=2` means `spike + continuation`, for example `1100 -> 1900 -> 3300`,
+  - only request-context values at or above the minimum floor count toward growth,
+  - once that floor is reached, `growth_count=2` means `baseline -> spike -> continuation`, for example `1900 -> 3300 -> 5600`,
   - parallel tool or worker traffic should not look like one exploding sequence.
 
 ## Protect Enforcement

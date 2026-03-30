@@ -39,7 +39,7 @@ function printUsageExamples() {
   console.log("  RHEONIC_STEP_SLEEP_MS=200");
   console.log("  RHEONIC_RETRY_STORM_COUNT=5");
   console.log("  RHEONIC_LOOP_COUNT=6");
-  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=3300");
+  console.log("  RHEONIC_TOKEN_EXPLOSION_TOKENS=5600");
   console.log("  RHEONIC_CAP_BREACH_TOKENS=4000");
   console.log("  RHEONIC_REQ_CAP_BREACH_COUNT=6");
   console.log("  RHEONIC_CAP_BREACH_REQ_TOKENS=1");
@@ -53,10 +53,12 @@ function sleep(ms) {
 }
 
 function tokenExplosionGrowthSteps(targetTokens) {
-  const peak = Math.max(Number(targetTokens), 3300);
+  const peak = Math.max(Number(targetTokens), 5600);
+  const stepTwo = Math.max(Math.floor(peak / 1.7), 3300);
+  const stepOne = Math.max(Math.floor(stepTwo / 1.7), 1900);
   return [
-    Math.max(Math.floor(peak / 3), 1100),
-    Math.max(Math.floor(peak / 1.72), 1900),
+    stepOne,
+    stepTwo,
     peak,
   ];
 }
@@ -171,7 +173,7 @@ async function runDemo() {
   const stepSleepMs = Number(process.env.RHEONIC_STEP_SLEEP_MS ?? 200);
   const retryStormCount = Number(process.env.RHEONIC_RETRY_STORM_COUNT ?? 5);
   const loopCount = Number(process.env.RHEONIC_LOOP_COUNT ?? 6);
-  const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 3300);
+  const tokenExplosionTokens = Number(process.env.RHEONIC_TOKEN_EXPLOSION_TOKENS ?? 5600);
   const capBreachTokens = Number(process.env.RHEONIC_CAP_BREACH_TOKENS ?? 4000);
   const capBreachReqCount = Number(process.env.RHEONIC_REQ_CAP_BREACH_COUNT ?? 6);
   const capBreachReqTokens = Number(process.env.RHEONIC_CAP_BREACH_REQ_TOKENS ?? 1);
@@ -314,13 +316,13 @@ async function runDemo() {
 
   const expectedSent =
     demoCase === "all"
-      ? 1 + 1 + retryStormCount + (loopCount + 1) + 2 + 1 + capBreachReqCount
+      ? 1 + 1 + retryStormCount + (loopCount + 1) + 3 + 1 + capBreachReqCount
       : demoCase === "retry_storm"
         ? retryStormCount
         : demoCase === "loop_suspect"
           ? loopCount + 1
           : demoCase === "token_explosion"
-            ? 2
+            ? 3
             : demoCase === "req_cap_breach"
               ? capBreachReqCount
               : 1;

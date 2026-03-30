@@ -58,8 +58,8 @@ Protect preflight warns when either condition is met:
 ## Token-Explosion Rule
 - Counts a dedicated request-side `token_explosion_tokens` signal against the existing ratio and absolute thresholds.
 - The SDK computes that signal before the provider call and ingested events persist the same signal, so protect and observe evaluate the same token-explosion pattern.
-- Also warns on growth only after the current request-context has reached the minimum floor; below that floor, growth is ignored as noise.
-- `growth_count=2` means two consecutive growth hits, not one jump. In practice that is `baseline -> spike -> confirmation`.
+- Also warns on growth only from values at or above the minimum floor; below that floor, points are ignored as noise.
+- `growth_count=2` means two consecutive growth hits across three valid points above that floor. In practice that is `baseline -> spike -> confirmation`, for example `1900 -> 3300 -> 5600`.
 - Growth-only detection is suppressed when request volume is high enough to suggest concurrency instead of one step feeding the next.
 - Default tuning is intentionally conservative for agentic workflows:
   - ratio `0.9`
