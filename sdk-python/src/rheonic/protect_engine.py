@@ -11,6 +11,7 @@ from rheonic.logger import (
     generate_span_id,
     generate_trace_id,
     get_logger,
+    get_span_id,
     get_trace_id,
     reset_trace_context,
 )
@@ -81,27 +82,36 @@ class ProtectEngine:
     def evaluate(self, context: dict[str, object]) -> dict[str, object]:
         # Return allow/clamp/block decision from backend with fail-mode fallback.
         request_id = uuid4().hex
-        trace_id = generate_trace_id()
+        trace_id_value = context.get("trace_id")
+        span_id_value = context.get("span_id")
+        trace_id = str(trace_id_value).strip() if isinstance(trace_id_value, str) else ""
+        span_id = str(span_id_value).strip() if isinstance(span_id_value, str) else ""
+        trace_id = trace_id or generate_trace_id()
+        span_id = span_id or generate_span_id()
         now_ms = int(time.time() * 1000)
         if self._cooldown_until_ms is not None and now_ms < self._cooldown_until_ms:
-            self._debug(
-                "Protect preflight blocked locally from cached cooldown",
-                provider=context.get("provider"),
-                decision="block",
-                reason=self._cooldown_reason or "cooldown_active",
-            )
-            return {
-                "decision": "block",
-                "reason": self._cooldown_reason or "cooldown_active",
-                "trace_id": trace_id,
-                "request_id": request_id,
-                "blocked_until": _format_blocked_until_ms(self._cooldown_until_ms),
-                "retry_after_seconds": _to_retry_after_seconds(self._cooldown_until_ms, now_ms),
-            }
+            context_tokens = bind_trace_context(trace_id=trace_id, span_id=span_id)
+            try:
+                self._debug(
+                    "Protect preflight blocked locally from cached cooldown",
+                    provider=context.get("provider"),
+                    decision="block",
+                    reason=self._cooldown_reason or "cooldown_active",
+                )
+                return {
+                    "decision": "block",
+                    "reason": self._cooldown_reason or "cooldown_active",
+                    "trace_id": trace_id,
+                    "request_id": request_id,
+                    "blocked_until": _format_blocked_until_ms(self._cooldown_until_ms),
+                    "retry_after_seconds": _to_retry_after_seconds(self._cooldown_until_ms, now_ms),
+                }
+            finally:
+                reset_trace_context(context_tokens)
 
         timeout_s = max(self._decision_timeout_ms, 1) / 1000.0
         started_at = time.perf_counter()
-        context_tokens = bind_trace_context(trace_id=trace_id)
+        context_tokens = bind_trace_context(trace_id=trace_id, span_id=span_id)
         try:
             response = self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision",
@@ -110,6 +120,7 @@ class ProtectEngine:
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
                     "X-Trace-ID": get_trace_id(),
+                    "X-Span-ID": get_span_id(),
                     "X-Rheonic-Protect-Request-Id": request_id,
                 },
                 timeout_s=timeout_s,

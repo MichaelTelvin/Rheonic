@@ -341,11 +341,6 @@ class ProtectService:
         blocked_until_ms = now_ms + (cooldown_seconds * 1000)
         blocked_until = datetime.fromtimestamp(blocked_until_ms / 1000, tz=timezone.utc).isoformat()
         retry_after_seconds = max(0, ceil((blocked_until_ms - now_ms) / 1000))
-        self._protect_action_store.set_block_cooldown(
-            project_id=scoped_id,
-            blocked_until_ms=blocked_until_ms,
-            cooldown_seconds=cooldown_seconds,
-        )
         if emit_notifications:
             self._enqueue_block_notifications(
                 project_id=project_id,

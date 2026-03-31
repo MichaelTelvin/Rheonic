@@ -166,7 +166,11 @@ export class Client {
 
   public async evaluateProtectDecision(context: ProtectContext): Promise<ProtectEvaluation> {
     await this.ensureWarmup();
-    return this.protectEngine.evaluate(context);
+    return this.protectEngine.evaluate({
+      ...context,
+      trace_id: context.trace_id ?? getTraceId() ?? undefined,
+      span_id: context.span_id ?? getSpanId() ?? undefined,
+    });
   }
 
   public async warmConnections(): Promise<void> {
@@ -195,20 +199,28 @@ export class Client {
 
   private async runWarmup(): Promise<void> {
     try {
-      const response = await bindTraceContext(generateTraceId(), generateSpanId(), async () => await requestJson(`${this.baseUrl}/health`, {
-        method: "GET",
-        headers: {
-          "X-Trace-ID": getTraceId(),
-          "X-Span-ID": getSpanId(),
-        },
-      }));
-      this.debugLog("SDK connection warmup completed", { status_code: response.status });
+      const traceId = generateTraceId();
+      const spanId = generateSpanId();
+      await bindTraceContext(traceId, spanId, async () => {
+        const response = await requestJson(`${this.baseUrl}/health`, {
+          method: "GET",
+          headers: {
+            "X-Trace-ID": getTraceId(),
+            "X-Span-ID": getSpanId(),
+          },
+        });
+        this.debugLog("SDK connection warmup completed", { status_code: response.status });
+      });
     } catch {
       this.debugLog("SDK connection warmup failed");
     }
     try {
-      await this.protectEngine.bootstrap();
-      this.debugLog("SDK protect config bootstrap completed");
+      const traceId = generateTraceId();
+      const spanId = generateSpanId();
+      await bindTraceContext(traceId, spanId, async () => {
+        await this.protectEngine.bootstrap();
+        this.debugLog("SDK protect config bootstrap completed");
+      });
     } catch {
       this.debugLog("SDK protect config bootstrap failed");
     }

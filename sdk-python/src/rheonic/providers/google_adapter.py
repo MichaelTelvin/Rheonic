@@ -5,7 +5,7 @@ from typing import Any
 
 from rheonic.client import Client, get_default_client
 from rheonic.event_builder import build_event
-from rheonic.logger import get_logger
+from rheonic.logger import bind_trace_context, generate_span_id, generate_trace_id, get_logger, reset_trace_context
 from rheonic.protect_engine import RHEONICBlockedError
 from rheonic.provider_model_validation import validate_provider_model
 from rheonic.token_estimator import estimate_input_tokens
@@ -40,6 +40,73 @@ def instrument_google(
     if inspect.iscoroutinefunction(original_generate):
 
         async def wrapped_generate_async(*args: Any, **kwargs: Any) -> Any:
+            try:
+                context_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+                try:
+                    started_at = perf_counter()
+                    requested_model = _extract_requested_model(google_model, args, kwargs)
+                    validate_provider_model("google", requested_model)
+                    request_payload = _extract_request_payload(requested_model, args, kwargs)
+                    token_estimate_started_at = perf_counter()
+                    estimated_input_tokens = _estimate_input_tokens(request_payload)
+                    resolved_client.debug_log(
+                        "Protect token estimation completed",
+                        provider="google",
+                        model=requested_model,
+                        latency_ms=int((perf_counter() - token_estimate_started_at) * 1000),
+                        estimated_input_tokens=estimated_input_tokens,
+                    )
+                    protect_decision = _preflight(
+                        sdk_client=resolved_client,
+                        requested_model=requested_model,
+                        estimated_input_tokens=estimated_input_tokens,
+                        max_output_tokens=_extract_max_output_tokens(args, kwargs),
+                        environment=environment or resolved_client.environment,
+                        feature=feature,
+                    )
+                    if protect_decision.get("decision") == "block":
+                        raise _blocked_error_from_decision(protect_decision)
+                    call_args, call_kwargs = _apply_google_clamp(args, kwargs, protect_decision)
+                    try:
+                        response = await original_generate(*call_args, **call_kwargs)
+                        _capture_success(
+                            sdk_client=resolved_client,
+                            response=response,
+                            latency_ms=int((perf_counter() - started_at) * 1000),
+                            requested_model=requested_model,
+                            estimated_input_tokens=estimated_input_tokens,
+                            environment=environment,
+                            endpoint=endpoint,
+                            feature=feature,
+                            protect_decision=str(protect_decision.get("decision") or "allow"),
+                            protect_reason=str(protect_decision.get("reason") or "ok"),
+                        )
+                        return response
+                    except Exception as exc:
+                        _capture_failure(
+                            sdk_client=resolved_client,
+                            exc=exc,
+                            latency_ms=int((perf_counter() - started_at) * 1000),
+                            requested_model=requested_model,
+                            estimated_input_tokens=estimated_input_tokens,
+                            environment=environment,
+                            endpoint=endpoint,
+                            feature=feature,
+                            protect_decision=str(protect_decision.get("decision") or "allow"),
+                            protect_reason=str(protect_decision.get("reason") or "ok"),
+                        )
+                        raise
+                finally:
+                    reset_trace_context(context_tokens)
+            except Exception:
+                raise
+
+        google_model.generate_content = wrapped_generate_async
+        return google_model
+
+    def wrapped_generate(*args: Any, **kwargs: Any) -> Any:
+        context_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+        try:
             started_at = perf_counter()
             requested_model = _extract_requested_model(google_model, args, kwargs)
             validate_provider_model("google", requested_model)
@@ -65,7 +132,7 @@ def instrument_google(
                 raise _blocked_error_from_decision(protect_decision)
             call_args, call_kwargs = _apply_google_clamp(args, kwargs, protect_decision)
             try:
-                response = await original_generate(*call_args, **call_kwargs)
+                response = original_generate(*call_args, **call_kwargs)
                 _capture_success(
                     sdk_client=resolved_client,
                     response=response,
@@ -93,64 +160,8 @@ def instrument_google(
                     protect_reason=str(protect_decision.get("reason") or "ok"),
                 )
                 raise
-
-        google_model.generate_content = wrapped_generate_async
-        return google_model
-
-    def wrapped_generate(*args: Any, **kwargs: Any) -> Any:
-        started_at = perf_counter()
-        requested_model = _extract_requested_model(google_model, args, kwargs)
-        validate_provider_model("google", requested_model)
-        request_payload = _extract_request_payload(requested_model, args, kwargs)
-        token_estimate_started_at = perf_counter()
-        estimated_input_tokens = _estimate_input_tokens(request_payload)
-        resolved_client.debug_log(
-            "Protect token estimation completed",
-            provider="google",
-            model=requested_model,
-            latency_ms=int((perf_counter() - token_estimate_started_at) * 1000),
-            estimated_input_tokens=estimated_input_tokens,
-        )
-        protect_decision = _preflight(
-            sdk_client=resolved_client,
-            requested_model=requested_model,
-            estimated_input_tokens=estimated_input_tokens,
-            max_output_tokens=_extract_max_output_tokens(args, kwargs),
-            environment=environment or resolved_client.environment,
-            feature=feature,
-        )
-        if protect_decision.get("decision") == "block":
-            raise _blocked_error_from_decision(protect_decision)
-        call_args, call_kwargs = _apply_google_clamp(args, kwargs, protect_decision)
-        try:
-            response = original_generate(*call_args, **call_kwargs)
-            _capture_success(
-                sdk_client=resolved_client,
-                response=response,
-                latency_ms=int((perf_counter() - started_at) * 1000),
-                requested_model=requested_model,
-                estimated_input_tokens=estimated_input_tokens,
-                environment=environment,
-                endpoint=endpoint,
-                feature=feature,
-                protect_decision=str(protect_decision.get("decision") or "allow"),
-                protect_reason=str(protect_decision.get("reason") or "ok"),
-            )
-            return response
-        except Exception as exc:
-            _capture_failure(
-                sdk_client=resolved_client,
-                exc=exc,
-                latency_ms=int((perf_counter() - started_at) * 1000),
-                requested_model=requested_model,
-                estimated_input_tokens=estimated_input_tokens,
-                environment=environment,
-                endpoint=endpoint,
-                feature=feature,
-                protect_decision=str(protect_decision.get("decision") or "allow"),
-                protect_reason=str(protect_decision.get("reason") or "ok"),
-            )
-            raise
+        finally:
+            reset_trace_context(context_tokens)
 
     google_model.generate_content = wrapped_generate
     return google_model

@@ -1591,6 +1591,8 @@ def test_late_live_decision_is_ignored_after_timeout_fallback_finalizes_request(
         "source": "timeout_fallback",
         "ts": metrics["last"]["ts"],
     }
+    incidents = _incidents(client, project_id)
+    assert incidents == []
     _cleanup_overrides()
 
 
@@ -1631,6 +1633,48 @@ def test_late_live_decision_is_ignored_after_unavailable_fallback_finalizes_requ
         "source": "unavailable_fallback",
         "ts": metrics["last"]["ts"],
     }
+    incidents = _incidents(client, project_id)
+    assert incidents == []
+    _cleanup_overrides()
+
+
+def test_timeout_fallback_allow_reconciles_superseded_live_block_side_effects(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Timeout Reconciles Live Block")
+    _set_protect(client, project_id, protect_enabled=True, protect_fail_mode="open", protect_max_tok_per_min=100)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=100)
+
+    request_id = "req-timeout-reconcile-live-block"
+    decision_response = client.post(
+        "/api/v1/protect/decision",
+        headers={
+            "X-Project-Ingest-Key": ingest_key,
+            "X-Rheonic-Protect-Request-Id": request_id,
+        },
+        json={"provider": "openai", "model": "gpt-4o-mini"},
+    )
+    assert decision_response.status_code == 200
+    assert decision_response.json()["decision"] == "block"
+    assert _incidents(client, project_id)[0]["type"] == "block"
+
+    timeout_response = client.post(
+        "/api/v1/protect/decision-timeout",
+        headers={
+            "X-Project-Ingest-Key": ingest_key,
+            "X-Rheonic-Protect-Request-Id": request_id,
+        },
+        json={"environment": "dev", "provider": "openai", "request_id": request_id},
+    )
+    assert timeout_response.status_code == 202
+
+    metrics = _protect_metrics(client, project_id)
+    assert metrics["allowed_60m"] == 1
+    assert metrics["blocked_60m"] == 0
+    incidents = _incidents(client, project_id)
+    assert incidents == []
+
+    protect_action_store = app.dependency_overrides[get_protect_action_store]()
+    assert protect_action_store.get_block_cooldown_until_ms(scoped_project_provider_id(project_id, "openai")) is None
     _cleanup_overrides()
 
 

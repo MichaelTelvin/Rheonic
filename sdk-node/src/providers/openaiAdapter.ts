@@ -1,4 +1,5 @@
 import { buildEvent } from "../eventBuilder.js";
+import { bindTraceContext, generateSpanId, generateTraceId } from "../logger.js";
 import { RHEONICBlockedError, type ProtectEvaluation } from "../protectEngine.js";
 import { validateProviderModel } from "../providerModelValidation.js";
 import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
@@ -29,51 +30,58 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
   const originalCreate = targetCreate.bind(openaiClient.chat.completions);
 
   openaiClient.chat.completions.create = async (...args: unknown[]) => {
-    const startedAt = Date.now();
-    const model = extractRequestedModel(args);
-    validateProviderModel("openai", model);
-    const requestPayload = extractRequestPayload(args);
-    const tokenEstimateStartedAt = Date.now();
-    const estimatedInputTokens = requestPayload
-      ? (estimatorOverrideForTests
-          ? estimatorOverrideForTests(requestPayload)
-          : estimateInputTokensFromRequest(requestPayload))
-      : null;
-    options.client.debugLog("Protect token estimation completed", {
-      provider: "openai",
-      model,
-      latency_ms: Date.now() - tokenEstimateStartedAt,
-      estimated_input_tokens: estimatedInputTokens ?? undefined,
-    });
-    const protectPayload: {
-      provider: string;
-      model: string | null;
-      environment?: string;
-      feature?: string;
-      max_output_tokens?: number;
-      input_tokens_estimate?: number;
-    } = {
-      provider: "openai",
-      model,
-      environment: options.environment ?? options.client.environment,
-      feature: options.feature,
-      max_output_tokens: extractMaxOutputTokens(args),
-    };
-    if (typeof estimatedInputTokens === "number") {
-      protectPayload.input_tokens_estimate = estimatedInputTokens;
-    }
-    const protectDecision = await options.client.evaluateProtectDecision({
-      ...protectPayload,
-    });
-    if (protectDecision.decision === "block") {
-      throw new RHEONICBlockedError(protectDecision);
-    }
-    const callArgs = maybeApplyOpenAIClamp(args, protectDecision);
-    markClampAppliedIfChanged(protectDecision, extractMaxOutputTokens(args), extractMaxOutputTokens(callArgs));
+    const traceId = generateTraceId();
+    const spanId = generateSpanId();
+    return bindTraceContext(traceId, spanId, async () => {
+      const startedAt = Date.now();
+      const model = extractRequestedModel(args);
+      validateProviderModel("openai", model);
+      const requestPayload = extractRequestPayload(args);
+      const tokenEstimateStartedAt = Date.now();
+      const estimatedInputTokens = requestPayload
+        ? (estimatorOverrideForTests
+            ? estimatorOverrideForTests(requestPayload)
+            : estimateInputTokensFromRequest(requestPayload))
+        : null;
+      options.client.debugLog("Protect token estimation completed", {
+        provider: "openai",
+        model,
+        latency_ms: Date.now() - tokenEstimateStartedAt,
+        estimated_input_tokens: estimatedInputTokens ?? undefined,
+      });
+      const protectPayload: {
+        provider: string;
+        model: string | null;
+        environment?: string;
+        feature?: string;
+        max_output_tokens?: number;
+        input_tokens_estimate?: number;
+        trace_id?: string;
+        span_id?: string;
+      } = {
+        provider: "openai",
+        model,
+        environment: options.environment ?? options.client.environment,
+        feature: options.feature,
+        max_output_tokens: extractMaxOutputTokens(args),
+        trace_id: traceId,
+        span_id: spanId,
+      };
+      if (typeof estimatedInputTokens === "number") {
+        protectPayload.input_tokens_estimate = estimatedInputTokens;
+      }
+      const protectDecision = await options.client.evaluateProtectDecision({
+        ...protectPayload,
+      });
+      if (protectDecision.decision === "block") {
+        throw new RHEONICBlockedError(protectDecision);
+      }
+      const callArgs = maybeApplyOpenAIClamp(args, protectDecision);
+      markClampAppliedIfChanged(protectDecision, extractMaxOutputTokens(args), extractMaxOutputTokens(callArgs));
 
-    try {
-      const response = await originalCreate(...callArgs);
-      await options.client.captureEventAndFlush(buildEvent({
+      try {
+        const response = await originalCreate(...callArgs);
+        await options.client.captureEventAndFlush(buildEvent({
           provider: "openai",
           model: extractResponseModel(response) ?? model,
           environment: options.environment ?? options.client.environment,
@@ -90,9 +98,9 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
             http_status: 200,
           },
         }));
-      return response;
-    } catch (error) {
-      await options.client.captureEventAndFlush(buildEvent({
+        return response;
+      } catch (error) {
+        await options.client.captureEventAndFlush(buildEvent({
           provider: "openai",
           model,
           environment: options.environment ?? options.client.environment,
@@ -109,8 +117,9 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
             http_status: extractHttpStatus(error),
           },
         }));
-      throw error;
-    }
+        throw error;
+      }
+    });
   };
 
   return openaiClient;

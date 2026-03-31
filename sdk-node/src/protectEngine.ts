@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { sdkNodeConfig } from "./config.js";
 import { requestJson } from "./httpTransport.js";
-import { bindTraceContext, generateSpanId, generateTraceId, getTraceId } from "./logger.js";
+import { bindTraceContext, generateSpanId, generateTraceId, getSpanId, getTraceId } from "./logger.js";
 
 export type ProtectDecision = "allow" | "clamp" | "block";
 export type ProtectFailMode = "open" | "closed";
@@ -13,6 +13,8 @@ export interface ProtectContext {
   feature?: string;
   max_output_tokens?: number;
   input_tokens_estimate?: number;
+  trace_id?: string;
+  span_id?: string;
 }
 
 interface ProtectDecisionResponse {
@@ -105,60 +107,62 @@ export class ProtectEngine {
 
   public async evaluate(context: ProtectContext): Promise<ProtectEvaluation> {
     const requestId = randomUUID();
-    const traceId = generateTraceId();
-    const nowMs = Date.now();
-    if (this.cooldownUntilMs !== null && nowMs < this.cooldownUntilMs) {
-      this.debugLog?.("Protect preflight blocked locally from cached cooldown", {
-        provider: context.provider,
-        decision: "block",
-        reason: this.cooldownReason ?? "cooldown_active",
-      });
-      return {
-        decision: "block",
-        reason: this.cooldownReason ?? "cooldown_active",
-        trace_id: traceId,
-        request_id: requestId,
-        blocked_until: formatBlockedUntilMs(this.cooldownUntilMs),
-        retry_after_seconds: toRetryAfterSeconds(this.cooldownUntilMs, nowMs),
-      };
-    }
+    const traceId = context.trace_id?.trim() || generateTraceId();
+    const spanId = context.span_id?.trim() || generateSpanId();
 
-    const controller = new AbortController();
-    const timeoutMs = this.decisionTimeoutMs > 0 ? this.decisionTimeoutMs : this.fallbackRequestTimeoutMs;
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    timeout.unref?.();
-    const startedAt = Date.now();
-    const spanId = generateSpanId();
-
-    try {
-      const response = await bindTraceContext(traceId, spanId, async () => await requestJson(`${this.baseUrl}/api/v1/protect/decision`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Project-Ingest-Key": this.ingestKey,
-          "X-Trace-ID": getTraceId(),
-          "X-Span-ID": spanId,
-          "X-Rheonic-Protect-Request-Id": requestId,
-        },
-        body: JSON.stringify(context),
-        signal: controller.signal,
-      }));
-
-      clearTimeout(timeout);
-      if (!response.ok) {
-        this.debugLog?.("Protect preflight returned non-success status", {
+    return bindTraceContext(traceId, spanId, async () => {
+      const nowMs = Date.now();
+      if (this.cooldownUntilMs !== null && nowMs < this.cooldownUntilMs) {
+        this.debugLog?.("Protect preflight blocked locally from cached cooldown", {
           provider: context.provider,
-          status_code: response.status,
-          latency_ms: Date.now() - startedAt,
+          decision: "block",
+          reason: this.cooldownReason ?? "cooldown_active",
         });
-        void this.reportDecisionUnavailable(
-          context.provider,
-          typeof context.model === "string" ? context.model : undefined,
-          requestId,
-          traceId,
-        );
-        return this.fallbackEvaluation(traceId, requestId);
+        return {
+          decision: "block",
+          reason: this.cooldownReason ?? "cooldown_active",
+          trace_id: traceId,
+          request_id: requestId,
+          blocked_until: formatBlockedUntilMs(this.cooldownUntilMs),
+          retry_after_seconds: toRetryAfterSeconds(this.cooldownUntilMs, nowMs),
+        };
       }
+
+      const controller = new AbortController();
+      const timeoutMs = this.decisionTimeoutMs > 0 ? this.decisionTimeoutMs : this.fallbackRequestTimeoutMs;
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      timeout.unref?.();
+      const startedAt = Date.now();
+
+      try {
+        const response = await requestJson(`${this.baseUrl}/api/v1/protect/decision`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Project-Ingest-Key": this.ingestKey,
+            "X-Trace-ID": getTraceId(),
+            "X-Span-ID": getSpanId(),
+            "X-Rheonic-Protect-Request-Id": requestId,
+          },
+          body: JSON.stringify(context),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+        if (!response.ok) {
+          this.debugLog?.("Protect preflight returned non-success status", {
+            provider: context.provider,
+            status_code: response.status,
+            latency_ms: Date.now() - startedAt,
+          });
+          void this.reportDecisionUnavailable(
+            context.provider,
+            typeof context.model === "string" ? context.model : undefined,
+            requestId,
+            traceId,
+          );
+          return this.fallbackEvaluation(traceId, requestId);
+        }
 
       const parsed = (await response.json()) as ProtectDecisionResponse;
       const decision = parseDecision(parsed.decision);
@@ -187,46 +191,47 @@ export class ProtectEngine {
         latency_ms: Date.now() - startedAt,
         timeout_ms: this.decisionTimeoutMs,
       });
-      return {
-        decision,
-        reason,
-        trace_id: traceId,
-        request_id: requestId,
-        blocked_until: typeof parsed.blocked_until === "string" ? parsed.blocked_until : undefined,
-        retry_after_seconds: parseRetryAfterSeconds(parsed.retry_after_seconds),
-        snapshot: parseSnapshot(parsed.snapshot),
-        applyClampEnabled: typeof parsed.apply_clamp_enabled === "boolean" ? parsed.apply_clamp_enabled : undefined,
-        clamp: parseClamp(parsed.clamp),
-      };
-    } catch (error) {
-      clearTimeout(timeout);
-      if (isAbortError(error)) {
-        this.debugLog?.("Protect preflight timed out", {
-          provider: context.provider,
-          latency_ms: Date.now() - startedAt,
-          timeout_ms: timeoutMs,
-        });
-        void this.reportDecisionTimeout(
-          context.provider,
-          typeof context.model === "string" ? context.model : undefined,
-          requestId,
-          traceId,
-        );
-      } else {
-        this.debugLog?.("Protect preflight failed", {
-          provider: context.provider,
-          latency_ms: Date.now() - startedAt,
-          error_type: extractErrorType(error),
-        });
-        void this.reportDecisionUnavailable(
-          context.provider,
-          typeof context.model === "string" ? context.model : undefined,
-          requestId,
-          traceId,
-        );
+        return {
+          decision,
+          reason,
+          trace_id: traceId,
+          request_id: requestId,
+          blocked_until: typeof parsed.blocked_until === "string" ? parsed.blocked_until : undefined,
+          retry_after_seconds: parseRetryAfterSeconds(parsed.retry_after_seconds),
+          snapshot: parseSnapshot(parsed.snapshot),
+          applyClampEnabled: typeof parsed.apply_clamp_enabled === "boolean" ? parsed.apply_clamp_enabled : undefined,
+          clamp: parseClamp(parsed.clamp),
+        };
+      } catch (error) {
+        clearTimeout(timeout);
+        if (isAbortError(error)) {
+          this.debugLog?.("Protect preflight timed out", {
+            provider: context.provider,
+            latency_ms: Date.now() - startedAt,
+            timeout_ms: timeoutMs,
+          });
+          void this.reportDecisionTimeout(
+            context.provider,
+            typeof context.model === "string" ? context.model : undefined,
+            requestId,
+            traceId,
+          );
+        } else {
+          this.debugLog?.("Protect preflight failed", {
+            provider: context.provider,
+            latency_ms: Date.now() - startedAt,
+            error_type: extractErrorType(error),
+          });
+          void this.reportDecisionUnavailable(
+            context.provider,
+            typeof context.model === "string" ? context.model : undefined,
+            requestId,
+            traceId,
+          );
+        }
+        return this.fallbackEvaluation(traceId, requestId);
       }
-      return this.fallbackEvaluation(traceId, requestId);
-    }
+    });
   }
 
   private fallbackEvaluation(traceId: string, requestId: string): ProtectEvaluation {

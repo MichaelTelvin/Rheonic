@@ -4,7 +4,9 @@ All notable changes to `@rheonic/sdk` will be documented in this file.
 
 ## Unreleased
 
-- Publish-ready changelog entries will be added here for the next release.
+### Fixed
+- SDK debug logs now always emit non-empty `trace_id` and `span_id`, including warmup, token-estimation, and protect preflight paths.
+- Provider instrumentation now keeps the full protected call lifecycle under one trace so SDK debug logs correlate cleanly with backend requests.
 
 ## 0.1.0-beta.7
 

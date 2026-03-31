@@ -50,6 +50,10 @@ def _report_key(project_id: str, report_type: str, marker: str) -> str:
     return f"pa:{project_id}:report:{report_type}:{marker}"
 
 
+def _cooldown_owner_key(project_id: str) -> str:
+    return f"protect:cooldown-owner:{project_id}"
+
+
 class ProtectActionStore:
     # Stores protect decision counters and last decision snapshot in Redis.
 
@@ -65,7 +69,7 @@ class ProtectActionStore:
         source: str,
         request_id: str | None = None,
         ts: datetime | None = None,
-    ) -> None:
+    ) -> tuple[bool, dict[str, str] | None]:
         # Finalize one canonical protect outcome and derive counters from it.
         timestamp = (ts or datetime.now(timezone.utc)).isoformat()
         payload = {
@@ -88,7 +92,7 @@ class ProtectActionStore:
                                 "incoming_source": source,
                             },
                         )
-                        return
+                        return False, existing_payload
                     self._remove_outcome_counters(
                         project_id=project_id, payload=existing_payload, request_id=request_id
                     )
@@ -103,11 +107,13 @@ class ProtectActionStore:
                 json.dumps(payload),
                 app_config.protect_action_counter_ttl_seconds,
             )
+            return True, existing_payload if request_id else None
         except Exception:
             logger.warning(
                 "Failed finalizing protect outcome",
                 extra={"project_id": project_id, "request_id": request_id, "decision": decision, "source": source},
             )
+            return False, None
 
     def get_metrics(self, project_id: str) -> dict[str, Any]:
         # Read 60-minute protect decision counters and last decision snapshot.
@@ -153,7 +159,9 @@ class ProtectActionStore:
         except Exception:
             logger.warning("Failed recording protect health counters", extra={"project_id": project_id})
 
-    def set_block_cooldown(self, project_id: str, blocked_until_ms: int, cooldown_seconds: int) -> None:
+    def set_block_cooldown(
+        self, project_id: str, blocked_until_ms: int, cooldown_seconds: int, request_id: str | None = None
+    ) -> None:
         # Persist project-level protect cooldown window in Redis.
         try:
             self._redis_client.set(
@@ -161,6 +169,12 @@ class ProtectActionStore:
                 str(int(blocked_until_ms)),
                 max(int(cooldown_seconds), 1),
             )
+            if request_id:
+                self._redis_client.set(
+                    _cooldown_owner_key(project_id),
+                    request_id,
+                    max(int(cooldown_seconds), 1),
+                )
         except Exception:
             logger.warning("Failed setting protect cooldown", extra={"project_id": project_id})
 
@@ -176,6 +190,24 @@ class ProtectActionStore:
         except Exception:
             logger.warning("Failed reading protect cooldown", extra={"project_id": project_id})
             return None
+
+    def clear_block_cooldown(self, project_id: str, request_id: str | None = None) -> bool:
+        # Clear active protect cooldown, optionally only when owned by a specific request id.
+        try:
+            if request_id is not None:
+                owner_raw = self._redis_client.get(_cooldown_owner_key(project_id))
+                owner = owner_raw.decode("utf-8") if isinstance(owner_raw, bytes) else str(owner_raw or "")
+                if owner != request_id:
+                    return False
+            self._redis_client.delete(f"protect:cooldown:{project_id}")
+            self._redis_client.delete(_cooldown_owner_key(project_id))
+            return True
+        except Exception:
+            logger.warning(
+                "Failed clearing protect cooldown",
+                extra={"project_id": project_id, "request_id": request_id},
+            )
+            return False
 
     def mark_report_sent(self, *, project_id: str, report_type: str, marker: str, ttl_seconds: int) -> bool:
         # Return True only when this report marker is first observed inside the TTL window.

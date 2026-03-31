@@ -49,6 +49,8 @@ export function emitLog(params: {
   spanId?: string;
   environment?: string;
 }): void {
+  const traceId = params.traceId ?? getTraceId();
+  const spanId = params.spanId ?? getSpanId();
   const payload: LogEnvelope = {
     timestamp: new Date().toISOString(),
     level: params.level,
@@ -61,8 +63,8 @@ export function emitLog(params: {
       process.env.ENV ??
       "unknown"
     ).toLowerCase(),
-    trace_id: params.traceId ?? getTraceId(),
-    span_id: params.spanId ?? getSpanId(),
+    trace_id: traceId || generateTraceId(),
+    span_id: spanId || generateSpanId(),
     event: sanitizeEvent(params.event),
     message: params.message,
     metadata: sanitizeMetadata(params.metadata ?? {}),

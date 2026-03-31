@@ -307,6 +307,45 @@ class IncidentManager:
             ),
         )
 
+    def reconcile_timeout_superseded_live_block(
+        self,
+        *,
+        project_id: str,
+        provider: str,
+        request_id: str | None,
+        source: str,
+    ) -> None:
+        if not request_id:
+            return
+        open_incidents = self._incident_repository.list_open_by_project_provider(
+            project_id=project_id, provider=provider
+        )
+        for incident in open_incidents:
+            if incident.incident_type != app_config.incident_type_block:
+                continue
+            evidence_request_id = incident.evidence.get("request_id")
+            evidence_source = incident.evidence.get("source")
+            if evidence_request_id != request_id or evidence_source != app_config.protect_outcome_source_live:
+                continue
+            resolved = self._incident_repository.resolve_incident(incident.id)
+            if resolved is None:
+                continue
+            logger.info(
+                "Incident resolved",
+                extra=build_log_extra(
+                    event="incident_resolved",
+                    metadata={
+                        "incident_id": incident.id,
+                        "project_id": project_id,
+                        "provider": provider,
+                        "incident_type": app_config.incident_type_block,
+                        "trigger": "timeout_fallback_reconciliation",
+                        "request_id": request_id,
+                        "source": source,
+                    },
+                ),
+            )
+
     def _enqueue_detection_notifications(self, *, incident: Incident, mode: str) -> None:
         if incident.incident_type == app_config.incident_type_block:
             return

@@ -104,3 +104,14 @@ def test_json_formatter_includes_exception_and_context_fields() -> None:
     assert payload["metadata"]["authorization"] == "[REDACTED]"
     assert payload["metadata"]["error_message"] == "boom"
     assert "RuntimeError: boom" in payload["metadata"]["stack_trace"]
+
+
+def test_json_formatter_generates_trace_and_span_when_unbound() -> None:
+    formatter = logger_module._JsonFormatter()
+    record = logging.LogRecord("sdk", logging.INFO, __file__, 10, "hello", (), None)
+    payload = json.loads(formatter.format(record))
+
+    assert isinstance(payload["trace_id"], str)
+    assert payload["trace_id"] != ""
+    assert isinstance(payload["span_id"], str)
+    assert payload["span_id"] != ""

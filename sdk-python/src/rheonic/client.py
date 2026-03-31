@@ -23,6 +23,7 @@ from rheonic.logger import (
     generate_span_id,
     generate_trace_id,
     get_logger,
+    get_span_id,
     get_trace_id,
     reset_trace_context,
 )
@@ -327,7 +328,13 @@ class Client:
     def preflight_protect_decision(self, context: dict[str, object]) -> dict[str, object]:
         # Evaluate protect decision for provider call preflight.
         try:
-            return self._protect_engine.evaluate(context)
+            return self._protect_engine.evaluate(
+                {
+                    **context,
+                    "trace_id": context.get("trace_id") or get_trace_id() or None,
+                    "span_id": context.get("span_id") or get_span_id() or None,
+                }
+            )
         except Exception:
             logger.exception("protect preflight failed unexpectedly", extra=build_log_extra(event="error"))
             trace_id = generate_trace_id()
@@ -348,7 +355,7 @@ class Client:
 
     def warm_connections(self) -> None:
         # Best-effort warmup of the shared backend HTTP connection and protect runtime config.
-        context_tokens = bind_trace_context(trace_id=generate_trace_id())
+        context_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
         try:
             response = self._http_client.get(
                 f"{self.base_url}/health",
@@ -360,11 +367,16 @@ class Client:
         except Exception:
             self.debug_log("SDK connection warmup failed")
         try:
-            self._protect_engine.bootstrap()
-            self.debug_log("SDK protect config bootstrap completed")
+            bootstrap_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+            try:
+                self._protect_engine.bootstrap()
+                self.debug_log("SDK protect config bootstrap completed")
+            finally:
+                reset_trace_context(bootstrap_tokens)
         except Exception:
             self.debug_log("SDK protect config bootstrap failed")
-        reset_trace_context(context_tokens)
+        finally:
+            reset_trace_context(context_tokens)
 
     def instrument_openai(
         self,

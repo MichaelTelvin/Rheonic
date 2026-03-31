@@ -48,3 +48,30 @@ test("emitLog sanitizes events and redacts sensitive metadata", () => {
   assert.equal(payload.metadata.nested.authorization, "[REDACTED]");
   assert.equal(payload.metadata.items[0].password, "[REDACTED]");
 });
+
+test("emitLog generates trace and span ids when no context is bound", () => {
+  const writes: string[] = [];
+  const originalWrite = process.stdout.write.bind(process.stdout);
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    writes.push(String(chunk));
+    return true;
+  }) as typeof process.stdout.write;
+
+  try {
+    emitLog({
+      level: "debug",
+      event: "sdk_debug",
+      message: "hello",
+      metadata: {},
+      environment: "prod",
+    });
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+
+  const payload = JSON.parse(writes[0]);
+  assert.equal(typeof payload.trace_id, "string");
+  assert.notEqual(payload.trace_id, "");
+  assert.equal(typeof payload.span_id, "string");
+  assert.notEqual(payload.span_id, "");
+});
