@@ -246,12 +246,14 @@ describe("api client", () => {
     );
     expect(incidentCallsBeforeRefresh).toHaveLength(0);
 
-    resolveRefresh?.(
-      new Response(JSON.stringify({ user: { id: "u1", email: "u@example.com" } }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
+    if (resolveRefresh) {
+      resolveRefresh(
+        new Response(JSON.stringify({ user: { id: "u1", email: "u@example.com" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }
 
     await firstRequest;
     await secondRequestPromise;

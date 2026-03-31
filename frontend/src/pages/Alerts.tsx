@@ -141,7 +141,7 @@ export function Alerts(): JSX.Element {
 
     let cancelled = false;
     const loadSettings = async (): Promise<void> => {
-      const cached = readAlertsMemoryCache(projectId) ?? readAlertsCache(projectId);
+      const cached = readAlertsMemoryCache(projectId);
       setLoadingSettings(cached === null);
       try {
         const [settings, protectSettings] = await Promise.all([
