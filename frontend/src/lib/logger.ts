@@ -2,6 +2,14 @@ type LogLevel = "debug" | "info" | "warn" | "error";
 
 const SENSITIVE_MARKERS = ["api_key", "apikey", "authorization", "cookie", "password", "secret", "token"];
 
+export function generateFrontendTraceId(): string {
+  return crypto.randomUUID();
+}
+
+export function generateFrontendSpanId(): string {
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+}
+
 export function emitFrontendLog(params: {
   level: LogLevel;
   event: string;

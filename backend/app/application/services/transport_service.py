@@ -45,13 +45,12 @@ class TransportService:
         normalized_payload: dict[str, object] = dict(payload)
         transport_meta_value = normalized_payload.get("__transport_meta")
         transport_meta = dict(transport_meta_value) if isinstance(transport_meta_value, dict) else {}
-        # Preserve the trace that was already bound when the notification was
-        # created. The explicit trace_id passed here may be used only for the
-        # transport worker job itself and should not overwrite the original
-        # SDK/backend request trace recorded in outbox metadata.
-        origin_trace_id = (get_trace_id() or "").strip()
-        if origin_trace_id:
-            transport_meta.setdefault("origin_trace_id", origin_trace_id)
+        # Preserve one canonical end-to-end trace for the notification chain.
+        # Worker jobs should bind to this stored trace instead of inventing a
+        # second unrelated request trace for the same notification.
+        canonical_trace_id = (get_trace_id() or "").strip()
+        if canonical_trace_id:
+            transport_meta.setdefault("trace_id", canonical_trace_id)
         if transport_meta:
             normalized_payload["__transport_meta"] = transport_meta
         if severity is not None:
@@ -111,7 +110,7 @@ def _dedupe_safe_payload(payload: dict[str, object]) -> dict[str, object]:
     if not isinstance(transport_meta_value, dict):
         return sanitized
     transport_meta = dict(transport_meta_value)
-    transport_meta.pop("origin_trace_id", None)
+    transport_meta.pop("trace_id", None)
     if transport_meta:
         sanitized["__transport_meta"] = transport_meta
     else:

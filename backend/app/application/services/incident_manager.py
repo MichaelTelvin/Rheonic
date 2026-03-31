@@ -8,7 +8,7 @@ from app.application.services.transport_service import TransportService, build_t
 from app.config import app_config
 from app.domain.detectors.contracts import Signal
 from app.domain.models.incident import Incident
-from app.logger import get_logger
+from app.logger import build_log_extra, get_logger
 
 logger = get_logger(__name__)
 
@@ -89,6 +89,25 @@ class IncidentManager:
                 evidence=merged_evidence,
                 last_seen_at=now,
             )
+            logger.info(
+                "Incident updated",
+                extra=build_log_extra(
+                    event="incident_updated",
+                    metadata={
+                        "incident_id": open_incident.id,
+                        "project_id": project_id,
+                        "provider": provider,
+                        "model": model,
+                        "environment": environment,
+                        "incident_type": signal.detector,
+                        "trigger": "detector",
+                        "reason": evidence.get("reason"),
+                        "trigger_event_id": evidence.get("trigger_event_id"),
+                        "fingerprint": signal.fingerprint,
+                        "count": next_count,
+                    },
+                ),
+            )
             return
 
         incident = Incident(
@@ -104,6 +123,25 @@ class IncidentManager:
             last_seen_at=now,
         )
         self._incident_repository.create_incident(incident=incident)
+        logger.info(
+            "Incident opened",
+            extra=build_log_extra(
+                event="incident_opened",
+                metadata={
+                    "incident_id": incident.id,
+                    "project_id": project_id,
+                    "provider": provider,
+                    "model": model,
+                    "environment": environment,
+                    "incident_type": signal.detector,
+                    "trigger": "detector",
+                    "reason": evidence.get("reason"),
+                    "trigger_event_id": evidence.get("trigger_event_id"),
+                    "fingerprint": signal.fingerprint,
+                    "count": 1,
+                },
+            ),
+        )
         self._enqueue_detection_notifications(incident=incident, mode=mode)
 
     def process_protect_block(
@@ -121,6 +159,8 @@ class IncidentManager:
         tok_cap: int | None,
         blocked_until: str | None,
         retry_after_seconds: int | None,
+        request_id: str | None = None,
+        source: str | None = None,
     ) -> None:
         evidence: dict[str, object] = {
             "provider": provider,
@@ -133,6 +173,8 @@ class IncidentManager:
             "reason": reason,
             "blocked_until": blocked_until,
             "retry_after_seconds": retry_after_seconds,
+            "request_id": request_id,
+            "source": source,
             "last_seen_at": now.isoformat(),
         }
         dedup_after = now - timedelta(seconds=max(int(self._incident_dedup_window_seconds), 1))
@@ -156,6 +198,25 @@ class IncidentManager:
                     evidence=merged_evidence,
                     last_seen_at=now,
                 )
+                logger.info(
+                    "Incident updated",
+                    extra=build_log_extra(
+                        event="incident_updated",
+                        metadata={
+                            "incident_id": open_incident.id,
+                            "project_id": project_id,
+                            "provider": provider,
+                            "model": model,
+                            "environment": environment,
+                            "incident_type": app_config.incident_type_block,
+                            "trigger": "protect_decision",
+                            "reason": reason,
+                            "request_id": request_id,
+                            "source": source,
+                            "count": next_count,
+                        },
+                    ),
+                )
                 return
             incident = Incident(
                 id=str(uuid4()),
@@ -170,6 +231,25 @@ class IncidentManager:
                 last_seen_at=now,
             )
             self._incident_repository.create_incident(incident=incident)
+            logger.info(
+                "Incident opened",
+                extra=build_log_extra(
+                    event="incident_opened",
+                    metadata={
+                        "incident_id": incident.id,
+                        "project_id": project_id,
+                        "provider": provider,
+                        "model": model,
+                        "environment": environment,
+                        "incident_type": app_config.incident_type_block,
+                        "trigger": "protect_decision",
+                        "reason": reason,
+                        "request_id": request_id,
+                        "source": source,
+                        "count": 1,
+                    },
+                ),
+            )
             self._enqueue_detection_notifications(incident=incident, mode="protect")
             return
 
@@ -205,6 +285,26 @@ class IncidentManager:
             incident_id=open_incident.id,
             evidence=merged_evidence,
             last_seen_at=now,
+        )
+        logger.info(
+            "Incident updated",
+            extra=build_log_extra(
+                event="incident_updated",
+                metadata={
+                    "incident_id": open_incident.id,
+                    "project_id": project_id,
+                    "provider": provider,
+                    "model": model,
+                    "environment": environment,
+                    "incident_type": app_config.incident_type_block,
+                    "trigger": "protect_decision",
+                    "reason": reason,
+                    "previous_reason": existing_reason,
+                    "request_id": request_id,
+                    "source": source,
+                    "count": next_count,
+                },
+            ),
         )
 
     def _enqueue_detection_notifications(self, *, incident: Incident, mode: str) -> None:

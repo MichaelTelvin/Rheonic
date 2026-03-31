@@ -146,6 +146,11 @@ class IngestEventService:
                 token_explosion_concurrency_threshold=self._token_explosion_concurrency_threshold,
             )
             signals = self._detector_registry.detect(ctx)
+            for signal in signals:
+                signal.evidence.setdefault("trigger_event_id", event.id)
+                signal.evidence.setdefault("trigger_event_ts", event.ts.isoformat())
+                signal.evidence.setdefault("trigger_request_endpoint", event.request_endpoint)
+                signal.evidence.setdefault("trigger_request_feature", event.request_feature)
             if protect_enabled and self._has_active_block_incident(
                 project_id=event.project_id,
                 provider=provider,

@@ -104,6 +104,7 @@ class ProtectEngine:
                     provider=str(context.get("provider")) if isinstance(context.get("provider"), str) else None,
                     model=str(context.get("model")) if isinstance(context.get("model"), str) else None,
                     request_id=request_id,
+                    trace_id=get_trace_id(),
                 )
                 return self._fallback_decision()
             payload = self._parse_json_payload(response)
@@ -160,6 +161,7 @@ class ProtectEngine:
                     provider=str(provider) if isinstance(provider, str) else None,
                     model=str(context.get("model")) if isinstance(context.get("model"), str) else None,
                     request_id=request_id,
+                    trace_id=get_trace_id(),
                 )
             else:
                 provider = context.get("provider")
@@ -173,6 +175,7 @@ class ProtectEngine:
                     provider=str(provider) if isinstance(provider, str) else None,
                     model=str(context.get("model")) if isinstance(context.get("model"), str) else None,
                     request_id=request_id,
+                    trace_id=get_trace_id(),
                 )
             return self._fallback_decision()
         finally:
@@ -265,7 +268,7 @@ class ProtectEngine:
         return False
 
     def _report_decision_timeout_fire_and_forget(
-        self, provider: str | None, model: str | None, request_id: str
+        self, provider: str | None, model: str | None, request_id: str, trace_id: str | None
     ) -> None:
         # Report decision timeout without blocking caller flow.
         try:
@@ -275,7 +278,7 @@ class ProtectEngine:
                 headers={
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
-                    "X-Trace-ID": get_trace_id() or generate_trace_id(),
+                    "X-Trace-ID": trace_id or generate_trace_id(),
                     "X-Span-ID": generate_span_id(),
                     "X-Rheonic-Protect-Request-Id": request_id,
                 },
@@ -285,7 +288,7 @@ class ProtectEngine:
             return
 
     def _report_decision_unavailable_fire_and_forget(
-        self, provider: str | None, model: str | None, request_id: str
+        self, provider: str | None, model: str | None, request_id: str, trace_id: str | None
     ) -> None:
         # Report non-timeout preflight fallback without blocking caller flow.
         try:
@@ -295,7 +298,7 @@ class ProtectEngine:
                 headers={
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
-                    "X-Trace-ID": get_trace_id() or generate_trace_id(),
+                    "X-Trace-ID": trace_id or generate_trace_id(),
                     "X-Span-ID": generate_span_id(),
                     "X-Rheonic-Protect-Request-Id": request_id,
                 },

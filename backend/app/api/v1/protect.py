@@ -146,6 +146,7 @@ def protect_decision(
                     project_id=project_id,
                     payload=payload,
                     decision=decision,
+                    request_id=request_id,
                 )
         logger.info(
             "Protect decision evaluated",
@@ -248,6 +249,8 @@ def protect_decision_timeout(
                 tok_cap=project.protect_max_tok_per_min,
                 blocked_until=None,
                 retry_after_seconds=None,
+                request_id=resolved_request_id,
+                source=app_config.protect_outcome_source_timeout_fallback,
             )
         return {"status": "accepted"}
     except HTTPException:
@@ -324,6 +327,8 @@ def protect_decision_unavailable(
                 tok_cap=project.protect_max_tok_per_min,
                 blocked_until=None,
                 retry_after_seconds=None,
+                request_id=resolved_request_id,
+                source=app_config.protect_outcome_source_unavailable_fallback,
             )
         return {"status": "accepted"}
     except HTTPException:
@@ -339,6 +344,7 @@ def _record_preflight_incident_if_needed(
     project_id: str,
     payload: ProtectDecisionIn,
     decision: ProtectDecision,
+    request_id: str | None = None,
 ) -> None:
     if decision.decision != "block" or decision.reason not in {"req_cap_breach", "tok_cap_breach", "cooldown_active"}:
         return
@@ -356,6 +362,8 @@ def _record_preflight_incident_if_needed(
         tok_cap=_safe_int(snapshot.get("threshold_tok_60s")),
         blocked_until=decision.blocked_until,
         retry_after_seconds=decision.retry_after_seconds,
+        request_id=request_id,
+        source=app_config.protect_outcome_source_live,
     )
 
 

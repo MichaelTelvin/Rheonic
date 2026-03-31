@@ -59,9 +59,11 @@ def enqueue_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
 def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span_id: str | None = None) -> None:
     settings = Settings()
     configure_logging(service_name="worker", level=settings.log_level)
-    context_tokens = bind_trace_context(trace_id=trace_id, span_id=span_id)
-    now = datetime.now(timezone.utc)
     repository = TransportOutboxRepositoryImpl(session_factory=DatabaseSessionFactory())
+    initial_outbox = repository.get_by_id(outbox_id)
+    canonical_trace_id = _resolve_transport_trace_id(outbox=initial_outbox, fallback_trace_id=trace_id)
+    context_tokens = bind_trace_context(trace_id=canonical_trace_id, span_id=span_id)
+    now = datetime.now(timezone.utc)
     outbox = repository.claim_for_send(outbox_id=outbox_id, now=now)
     if outbox is None:
         logger.info(
@@ -165,7 +167,7 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
                 process_outbox_delivery,
                 kwargs={
                     "outbox_id": outbox.id,
-                    "trace_id": trace_id or generate_trace_id(),
+                    "trace_id": get_trace_id() or canonical_trace_id or generate_trace_id(),
                     "span_id": generate_span_id(),
                 },
             )
@@ -193,14 +195,34 @@ def _outbox_correlation_metadata(outbox: TransportOutbox) -> dict[str, object]:
     body_payload_value = payload.get("body")
     body_payload = body_payload_value if isinstance(body_payload_value, dict) else payload
     metadata: dict[str, object] = {}
-    origin_trace_id = transport_meta.get("origin_trace_id")
-    if isinstance(origin_trace_id, str) and origin_trace_id.strip():
-        metadata["origin_trace_id"] = origin_trace_id.strip()
-    for field in ("incident_id", "provider", "model", "environment"):
+    for field in (
+        "incident_id",
+        "incident_type",
+        "provider",
+        "model",
+        "environment",
+        "reason",
+        "detail_reason",
+        "request_id",
+        "source",
+    ):
         value = body_payload.get(field)
         if isinstance(value, str) and value.strip():
             metadata[field] = value.strip()
     return metadata
+
+
+def _resolve_transport_trace_id(*, outbox: TransportOutbox | None, fallback_trace_id: str | None) -> str:
+    if outbox is not None:
+        payload = dict(outbox.payload or {})
+        transport_meta_value = payload.get("__transport_meta")
+        transport_meta = transport_meta_value if isinstance(transport_meta_value, dict) else {}
+        stored_trace_id = transport_meta.get("trace_id")
+        if isinstance(stored_trace_id, str) and stored_trace_id.strip():
+            return stored_trace_id.strip()
+    if isinstance(fallback_trace_id, str) and fallback_trace_id.strip():
+        return fallback_trace_id.strip()
+    return generate_trace_id()
 
 
 def _deliver_webhook(*, outbox_id: str) -> dict[str, object]:

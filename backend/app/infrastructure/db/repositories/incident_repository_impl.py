@@ -37,7 +37,6 @@ class IncidentRepositoryImpl(IncidentRepository):
                 )
                 session.add(record)
                 session.commit()
-            logger.info("Incident created", extra={"project_id": incident.project_id, "incident_id": incident.id})
             return incident
         except Exception:
             logger.exception("Failed creating incident", extra={"project_id": incident.project_id})

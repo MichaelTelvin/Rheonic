@@ -113,8 +113,8 @@ def test_build_transport_dedupe_key_is_stable_for_same_payload_semantics() -> No
     assert first != different
 
 
-def test_transport_service_origin_trace_id_uses_bound_context_not_worker_trace_override(tmp_path) -> None:
-    db_url = f"sqlite:///{tmp_path}/transport_service_origin_trace.db"
+def test_transport_service_stores_canonical_trace_id_from_bound_context(tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_service_trace.db"
     session_factory = DatabaseSessionFactory(database_url=db_url)
     Base.metadata.create_all(bind=session_factory.engine)
 
@@ -131,7 +131,7 @@ def test_transport_service_origin_trace_id_uses_bound_context_not_worker_trace_o
             kind="webhook",
             event_type="incident.warn",
             payload={"body": {"event": "incident.warn"}},
-            dedupe_key="origin-trace-dedupe-1",
+            dedupe_key="trace-dedupe-1",
             trace_id="worker-trace-999",
         )
     finally:
@@ -142,4 +142,4 @@ def test_transport_service_origin_trace_id_uses_bound_context_not_worker_trace_o
         assert row is not None
         transport_meta = row.payload.get("__transport_meta")
         assert isinstance(transport_meta, dict)
-        assert transport_meta.get("origin_trace_id") == "backend-trace-123"
+        assert transport_meta.get("trace_id") == "backend-trace-123"

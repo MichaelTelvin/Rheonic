@@ -55,6 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "X-Trace-ID",
             "X-Span-ID",
             "X-Request-ID",
+            "X-Rheonic-Protect-Request-Id",
         ],
     )
 
@@ -65,9 +66,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> Response:
         trace_id = request.headers.get("X-Trace-ID") or request.headers.get("X-Request-ID") or generate_trace_id()
         span_id = request.headers.get("X-Span-ID") or generate_span_id()
+        request_id = request.headers.get("X-Request-ID") or request.headers.get("X-Rheonic-Protect-Request-Id")
         request.state.trace_id = trace_id
         request.state.span_id = span_id
-        request.state.request_id = trace_id
+        request.state.request_id = request_id
         context_tokens = bind_trace_context(trace_id=trace_id, span_id=span_id)
         try:
             response = await call_next(request)
@@ -76,7 +78,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise
         response.headers.setdefault("X-Trace-ID", trace_id)
         response.headers.setdefault("X-Span-ID", span_id)
-        response.headers.setdefault("X-Request-ID", trace_id)
+        if request_id:
+            response.headers.setdefault("X-Request-ID", request_id)
         response.headers.setdefault("X-App-Version", _settings.app_version)
         reset_trace_context(context_tokens)
         return response

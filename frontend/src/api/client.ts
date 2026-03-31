@@ -1,4 +1,5 @@
 import { frontendConfig } from "../config";
+import { generateFrontendSpanId, generateFrontendTraceId } from "../lib/logger";
 
 export interface RealtimeMetrics {
   requests_60s: number;
@@ -144,11 +145,15 @@ export interface ApiVersionResponse {
 export class ApiError extends Error {
   status: number;
   code?: string;
+  traceId?: string;
+  spanId?: string;
 
-  constructor(status: number, message: string, code?: string) {
+  constructor(status: number, message: string, code?: string, traceId?: string, spanId?: string) {
     super(message);
     this.status = status;
     this.code = code;
+    this.traceId = traceId;
+    this.spanId = spanId;
   }
 }
 
@@ -173,6 +178,12 @@ async function executeRequest(path: string, init?: RequestInit): Promise<Respons
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
+  }
+  if (!headers.has("X-Trace-ID")) {
+    headers.set("X-Trace-ID", generateFrontendTraceId());
+  }
+  if (!headers.has("X-Span-ID")) {
+    headers.set("X-Span-ID", generateFrontendSpanId());
   }
   return await fetch(`${frontendConfig.apiBaseUrl}${path}`, {
     headers,
@@ -212,6 +223,8 @@ async function runSerializedProtectedRequest<T>(task: () => Promise<T>): Promise
 async function parseApiError(response: Response): Promise<ApiError> {
   let responseMessage = `Request failed: ${response.status}`;
   let responseCode: string | undefined;
+  const responseTraceId = response.headers.get("X-Trace-ID") ?? undefined;
+  const responseSpanId = response.headers.get("X-Span-ID") ?? undefined;
   try {
     const errorBody = (await response.clone().json()) as {
       error?: { code?: string; message?: string };
@@ -226,7 +239,7 @@ async function parseApiError(response: Response): Promise<ApiError> {
   } catch {
     // ignore non-json error payloads
   }
-  return new ApiError(response.status, responseMessage, responseCode);
+  return new ApiError(response.status, responseMessage, responseCode, responseTraceId, responseSpanId);
 }
 
 async function requestInternal<T>(path: string, init: RequestInit | undefined, isAuthRoute: boolean): Promise<T> {
@@ -284,6 +297,8 @@ async function refreshSession(): Promise<boolean> {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Trace-ID": generateFrontendTraceId(),
+          "X-Span-ID": generateFrontendSpanId(),
         },
         credentials: "include",
       });
@@ -323,6 +338,8 @@ export async function logout(): Promise<{ status: string }> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "X-Trace-ID": generateFrontendTraceId(),
+      "X-Span-ID": generateFrontendSpanId(),
     },
     credentials: "include",
   });
@@ -330,7 +347,13 @@ export async function logout(): Promise<{ status: string }> {
     return { status: "ok" };
   }
   if (!response.ok) {
-    throw new ApiError(response.status, `Request failed: ${response.status}`);
+    throw new ApiError(
+      response.status,
+      `Request failed: ${response.status}`,
+      undefined,
+      response.headers.get("X-Trace-ID") ?? undefined,
+      response.headers.get("X-Span-ID") ?? undefined,
+    );
   }
   return (await response.json()) as { status: string };
 }

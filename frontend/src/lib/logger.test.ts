@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { emitFrontendLog } from "./logger";
+import { emitFrontendLog, generateFrontendSpanId, generateFrontendTraceId } from "./logger";
 
 describe("emitFrontendLog", () => {
   const consoleDebug = vi.spyOn(console, "debug").mockImplementation(() => undefined);
@@ -64,5 +64,12 @@ describe("emitFrontendLog", () => {
     expect(infoPayload.trace_id).toBe("");
     expect(infoPayload.span_id).toBe("");
     expect(infoPayload.metadata).toEqual({ maybe: null });
+  });
+
+  it("generates trace and span ids with the expected shapes", () => {
+    expect(generateFrontendTraceId()).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+    expect(generateFrontendSpanId()).toMatch(/^[0-9a-f]{16}$/i);
   });
 });

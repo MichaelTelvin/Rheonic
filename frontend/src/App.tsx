@@ -270,6 +270,8 @@ export function App(): JSX.Element {
             event: "http_response",
             message: "Failed to restore browser session",
             metadata: { error },
+            traceId: error instanceof ApiError ? error.traceId : undefined,
+            spanId: error instanceof ApiError ? error.spanId : undefined,
           });
           setUser(cachedUser);
         } else {
@@ -298,6 +300,8 @@ export function App(): JSX.Element {
         event: "http_response",
         message: "Logout request failed",
         metadata: { error },
+        traceId: error instanceof ApiError ? error.traceId : undefined,
+        spanId: error instanceof ApiError ? error.spanId : undefined,
       });
     } finally {
       clearSession();
