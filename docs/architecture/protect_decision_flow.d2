@@ -62,7 +62,7 @@ hard_limit: "Hard limit hit?\nCap exceeded or cooldown active" {
   }
 }
 
-risk_check: "Warning needed?\nNear cap or unusual spike" {
+clamp_check: "Clamp needed?\nPredictive token budget\nneeds reduction" {
   style: {
     fill: "#eef3fb"
     stroke: "#7e95be"
@@ -82,7 +82,7 @@ allow: "Allow\nRequest goes through" {
   }
 }
 
-warn: "Warn\nRequest goes through\nAlert is recorded" {
+clamp: "Clamp\nRequest goes through\nOutput budget is reduced" {
   style: {
     fill: "#f6efd8"
     stroke: "#c6ac63"
@@ -112,7 +112,7 @@ provider: "Provider call" {
   }
 }
 
-alerts: "Alerts\nWebhook or email\nfor warn and block events" {
+alerts: "Alerts\nWebhook or email\nfor clamp and block events" {
   style: {
     fill: "#e4edf8"
     stroke: "#7e95be"
@@ -158,12 +158,12 @@ mode_gate -> preflight: "Protect"
 observe -> provider
 preflight -> hard_limit
 hard_limit -> block: "Yes"
-hard_limit -> risk_check: "No"
-risk_check -> warn: "Yes"
-risk_check -> allow: "No"
+hard_limit -> clamp_check: "No"
+clamp_check -> clamp: "Yes"
+clamp_check -> allow: "No"
 allow -> provider
-warn -> provider
-warn -> alerts
+clamp -> provider
+clamp -> alerts
 block -> alerts
 provider -> recording
 observe -> recording
