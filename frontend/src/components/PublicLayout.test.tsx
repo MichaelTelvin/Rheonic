@@ -72,7 +72,7 @@ describe("PublicLayout", () => {
     const footer = document.querySelector(".public-footer-quickstart-legal");
     expect(footer).not.toBeNull();
     expect(within(footer as HTMLElement).getByRole("link", { name: "Home" }).getAttribute("href")).toBe("/");
-    expect(within(footer as HTMLElement).getByRole("link", { name: "Docs" }).getAttribute("href")).toBe("/login");
+    expect(within(footer as HTMLElement).getByRole("link", { name: "Docs" }).getAttribute("href")).toBe("/docs/viewer.html?doc=overview");
     expect(within(footer as HTMLElement).getByRole("link", { name: "Privacy" }).getAttribute("href")).toBe("/privacy");
     expect(screen.getByText("© 2026 Rheonic")).toBeDefined();
   });

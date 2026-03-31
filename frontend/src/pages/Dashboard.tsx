@@ -118,6 +118,9 @@ export function Dashboard(): JSX.Element {
   const [lastProtectHealthSuccessAt, setLastProtectHealthSuccessAt] = useState<string | null>(initialDashboardState?.lastProtectHealthSuccessAt ?? null);
   const [, setMetricsFetchFailed] = useState<boolean>(false);
   const [protectHealthFetchFailed, setProtectHealthFetchFailed] = useState<boolean>(false);
+  const [protectHealthResolved, setProtectHealthResolved] = useState<boolean>(
+    Boolean(initialDashboardState?.lastProtectHealthSuccessAt),
+  );
   const [protectHealth, setProtectHealth] = useState<ProtectHealthMetrics | null>(initialDashboardState?.protectHealth ?? null);
   const [protectDecisionStats, setProtectDecisionStats] = useState<{
     allowed_60m: number | null;
@@ -198,6 +201,7 @@ export function Dashboard(): JSX.Element {
     setProtectHealth(cached?.protectHealth ?? null);
     setLastProtectHealthSuccessAt(cached?.lastProtectHealthSuccessAt ?? null);
     setProtectHealthFetchFailed(false);
+    setProtectHealthResolved(Boolean(cached?.lastProtectHealthSuccessAt));
     setProviders(warm?.providers ?? []);
     setSelectedProvider(cached?.selectedProvider ?? "all");
     setHasIngestKey(cached?.hasIngestKey ?? warm?.hasIngestKey ?? false);
@@ -464,10 +468,12 @@ export function Dashboard(): JSX.Element {
         }
         setProtectHealth(data);
         setProtectHealthFetchFailed(false);
+        setProtectHealthResolved(true);
         setLastProtectHealthSuccessAt(new Date().toISOString());
       } catch {
         if (!cancelled) {
           setProtectHealthFetchFailed(true);
+          setProtectHealthResolved(true);
           setProtectHealth(null);
         }
       }
@@ -674,9 +680,20 @@ export function Dashboard(): JSX.Element {
         tone: "awaiting",
       };
     }
+    if (!protectHealthResolved) {
+      return {
+        label: "Checking",
+        tone: "checking",
+      };
+    }
+    if (protectHealthFetchFailed) {
+      return {
+        label: "Unavailable",
+        tone: "unavailable",
+      };
+    }
     if (
-      protectHealthFetchFailed ||
-      !lastProtectHealthSuccessAt ||
+      lastProtectHealthSuccessAt &&
       Date.now() - new Date(lastProtectHealthSuccessAt).getTime() > frontendConfig.dashboardProtectStatsPollMs * 2
     ) {
       return {
@@ -700,7 +717,7 @@ export function Dashboard(): JSX.Element {
       label: "Healthy",
       tone: "healthy",
     };
-  }, [lastProtectHealthSuccessAt, loadingProjects, projectId, protectHealth, protectHealthFetchFailed, setupStage, setupStatusResolved]);
+  }, [lastProtectHealthSuccessAt, loadingProjects, projectId, protectHealth, protectHealthFetchFailed, protectHealthResolved, setupStage, setupStatusResolved]);
 
   return (
     <main className="dashboard">
