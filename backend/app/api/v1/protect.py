@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from time import perf_counter
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from app.application.provider_scope import scoped_project_provider_id
@@ -98,6 +98,7 @@ class DecisionUnavailableIn(BaseModel):
 def protect_decision(
     payload: ProtectDecisionIn,
     response: Response,
+    background_tasks: BackgroundTasks,
     service: ProtectService = Depends(get_protect_service),
     protect_action_store: ProtectActionStore = Depends(get_protect_action_store),
     ingest_key_service: IngestKeyService = Depends(get_ingest_key_service),
@@ -120,6 +121,7 @@ def protect_decision(
                 model=payload.model,
                 feature=payload.feature,
             ),
+            emit_notifications=False,
         )
         if decision is None:
             raise HTTPException(status_code=401, detail="invalid ingest key")
@@ -156,12 +158,15 @@ def protect_decision(
                 latency_ms=latency_ms,
             )
             if project is not None and project.protect_enabled and finalized:
-                _record_preflight_incident_if_needed(
+                background_tasks.add_task(
+                    _postprocess_live_preflight_decision,
+                    service=service,
                     incident_manager=incident_manager,
                     project_id=project_id,
                     payload=payload,
                     decision=decision,
                     request_id=request_id,
+                    latency_ms=latency_ms,
                 )
         logger.info(
             "Protect decision evaluated",
@@ -414,6 +419,87 @@ def _record_preflight_incident_if_needed(
         retry_after_seconds=decision.retry_after_seconds,
         request_id=request_id,
         source=app_config.protect_outcome_source_live,
+    )
+
+
+def _postprocess_live_preflight_decision(
+    *,
+    service: ProtectService,
+    incident_manager: IncidentManager,
+    project_id: str,
+    payload: ProtectDecisionIn,
+    decision: ProtectDecision,
+    request_id: str | None,
+    latency_ms: int,
+) -> None:
+    should_emit_notifications = latency_ms <= max(int(decision.decision_timeout_ms), 0)
+    snapshot = decision.snapshot or {}
+    requests_60s = _safe_int(snapshot.get("requests_60s"))
+    tokens_60s = _safe_int(snapshot.get("tokens_60s"))
+    req_cap = _safe_int(snapshot.get("threshold_req_60s"))
+    tok_cap = _safe_int(snapshot.get("threshold_tok_60s"))
+    scoped_id = scoped_project_provider_id(project_id, payload.provider)
+
+    if should_emit_notifications:
+        if decision.decision == "block" and decision.reason in {"req_cap_breach", "tok_cap_breach"}:
+            service.enqueue_live_block_notifications(
+                project_id=project_id,
+                provider=payload.provider,
+                model=payload.model,
+                environment=payload.environment,
+                detail_reason=decision.reason,
+                requests_60s=requests_60s or 0,
+                tokens_60s=tokens_60s or 0,
+                max_req=req_cap,
+                max_tok=tok_cap,
+                blocked_until=decision.blocked_until,
+                retry_after_seconds=decision.retry_after_seconds,
+                source=app_config.protect_outcome_source_live,
+            )
+        elif (
+            decision.decision == "block"
+            and decision.reason == "cooldown_active"
+            and decision.blocked_until
+            and decision.retry_after_seconds is not None
+        ):
+            service.enqueue_live_cooldown_block_if_needed(
+                project_id=project_id,
+                scoped_id=scoped_id,
+                provider=payload.provider,
+                model=payload.model,
+                environment=payload.environment,
+                requests_60s=requests_60s or 0,
+                tokens_60s=tokens_60s or 0,
+                max_req=req_cap,
+                max_tok=tok_cap,
+                blocked_until=decision.blocked_until,
+                retry_after_seconds=decision.retry_after_seconds,
+            )
+        elif decision.decision == "clamp" and decision.reason == "token_clamp":
+            predictive = snapshot.get("predictive")
+            estimated_next_tokens = None
+            if isinstance(predictive, dict):
+                estimated_next_tokens = _safe_int(predictive.get("estimated_next_tokens"))
+            service.enqueue_live_clamp_started_notifications(
+                project_id=project_id,
+                scoped_id=scoped_id,
+                provider=payload.provider,
+                model=payload.model,
+                environment=payload.environment,
+                requests_60s=requests_60s or 0,
+                tokens_60s=tokens_60s or 0,
+                max_req=req_cap,
+                max_tok=tok_cap,
+                estimated_next_tokens=estimated_next_tokens,
+                clamp=decision.clamp,
+            )
+
+    _record_preflight_incident_if_needed(
+        incident_manager=incident_manager,
+        project_id=project_id,
+        payload=payload,
+        decision=decision,
+        request_id=request_id,
     )
 
 

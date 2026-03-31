@@ -84,6 +84,8 @@ class ProtectService:
         self,
         ingest_key: str,
         context: ProtectDecisionContext | None = None,
+        *,
+        emit_notifications: bool = True,
     ) -> tuple[str | None, ProtectDecision | None]:
         evaluation_started_at = perf_counter()
         project = self._ingest_key_service.resolve_project(plaintext_key=ingest_key)
@@ -132,7 +134,7 @@ class ProtectService:
         if cooldown_until_ms is not None and now_ms < cooldown_until_ms:
             retry_after_seconds = max(0, ceil((cooldown_until_ms - now_ms) / 1000))
             blocked_until = datetime.fromtimestamp(cooldown_until_ms / 1000, tz=timezone.utc).isoformat()
-            if self._should_emit_live_notifications(
+            if emit_notifications and self._should_emit_live_notifications(
                 evaluation_started_at=evaluation_started_at,
                 decision_timeout_ms=decision_timeout_ms,
                 project_id=project_id,
@@ -191,7 +193,8 @@ class ProtectService:
                 decision_timeout_ms=decision_timeout_ms,
                 now_ms=now_ms,
                 apply_clamp_enabled=apply_clamp_enabled,
-                emit_notifications=self._should_emit_live_notifications(
+                emit_notifications=emit_notifications
+                and self._should_emit_live_notifications(
                     evaluation_started_at=evaluation_started_at,
                     decision_timeout_ms=decision_timeout_ms,
                     project_id=project_id,
@@ -215,7 +218,8 @@ class ProtectService:
                 decision_timeout_ms=decision_timeout_ms,
                 now_ms=now_ms,
                 apply_clamp_enabled=apply_clamp_enabled,
-                emit_notifications=self._should_emit_live_notifications(
+                emit_notifications=emit_notifications
+                and self._should_emit_live_notifications(
                     evaluation_started_at=evaluation_started_at,
                     decision_timeout_ms=decision_timeout_ms,
                     project_id=project_id,
@@ -243,7 +247,7 @@ class ProtectService:
             and isinstance(clamp.get("recommended_max_output_tokens"), int)
             and int(clamp["recommended_max_output_tokens"]) < ctx.max_output_tokens
         ):
-            if self._should_emit_live_notifications(
+            if emit_notifications and self._should_emit_live_notifications(
                 evaluation_started_at=evaluation_started_at,
                 decision_timeout_ms=decision_timeout_ms,
                 project_id=project_id,
@@ -473,6 +477,37 @@ class ProtectService:
                 extra={"project_id": project_id, "provider": provider, "reason": detail_reason},
             )
 
+    def enqueue_live_block_notifications(
+        self,
+        *,
+        project_id: str,
+        provider: str,
+        model: str | None,
+        environment: str | None,
+        detail_reason: str,
+        requests_60s: int,
+        tokens_60s: int,
+        max_req: int | None,
+        max_tok: int | None,
+        blocked_until: str | None,
+        retry_after_seconds: int | None,
+        source: str = "live",
+    ) -> None:
+        self._enqueue_block_notifications(
+            project_id=project_id,
+            provider=provider,
+            model=model,
+            environment=environment,
+            detail_reason=detail_reason,
+            requests_60s=requests_60s,
+            tokens_60s=tokens_60s,
+            max_req=max_req,
+            max_tok=max_tok,
+            blocked_until=blocked_until,
+            retry_after_seconds=retry_after_seconds,
+            source=source,
+        )
+
     def _enqueue_clamp_started_notifications(
         self,
         *,
@@ -518,6 +553,35 @@ class ProtectService:
             provider=provider,
             payload=clamp_payload,
             dedupe_seed="token_clamp",
+        )
+
+    def enqueue_live_clamp_started_notifications(
+        self,
+        *,
+        project_id: str,
+        scoped_id: str,
+        provider: str,
+        model: str | None,
+        environment: str | None,
+        requests_60s: int,
+        tokens_60s: int,
+        max_req: int | None,
+        max_tok: int | None,
+        estimated_next_tokens: int | None,
+        clamp: dict[str, int | bool] | None,
+    ) -> None:
+        self._enqueue_clamp_started_notifications(
+            project_id=project_id,
+            scoped_id=scoped_id,
+            provider=provider,
+            model=model,
+            environment=environment,
+            requests_60s=requests_60s,
+            tokens_60s=tokens_60s,
+            max_req=max_req,
+            max_tok=max_tok,
+            estimated_next_tokens=estimated_next_tokens,
+            clamp=clamp,
         )
 
     def report_fail_closed_block(
@@ -612,6 +676,35 @@ class ProtectService:
             provider=provider,
             payload=payload,
             dedupe_seed=f"cooldown:{blocked_until}",
+        )
+
+    def enqueue_live_cooldown_block_if_needed(
+        self,
+        *,
+        project_id: str,
+        scoped_id: str,
+        provider: str,
+        model: str | None,
+        environment: str | None,
+        requests_60s: int,
+        tokens_60s: int,
+        max_req: int | None,
+        max_tok: int | None,
+        blocked_until: str,
+        retry_after_seconds: int,
+    ) -> None:
+        self._enqueue_cooldown_block_if_needed(
+            project_id=project_id,
+            scoped_id=scoped_id,
+            provider=provider,
+            model=model,
+            environment=environment,
+            requests_60s=requests_60s,
+            tokens_60s=tokens_60s,
+            max_req=max_req,
+            max_tok=max_tok,
+            blocked_until=blocked_until,
+            retry_after_seconds=retry_after_seconds,
         )
 
     def _enqueue_protection_event(

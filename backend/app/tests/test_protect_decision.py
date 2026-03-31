@@ -6,11 +6,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.application.provider_scope import scoped_project_provider_id
-from app.application.services import protect_service as protect_service_module
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.metrics_service import MetricsService
 from app.application.services.project_service import ProjectService
 from app.application.services.protect_service import ProtectService
+from app.api.v1 import protect as protect_api_module
 from app.config import app_config
 from app.dependencies import (
     get_current_user,
@@ -384,7 +384,7 @@ def test_late_block_decision_does_not_enqueue_protection_block_notifications(tmp
         calls["count"] += 1
         return 0.0 if calls["count"] == 1 else 0.2
 
-    monkeypatch.setattr(protect_service_module, "perf_counter", _fake_perf_counter)
+    monkeypatch.setattr(protect_api_module, "perf_counter", _fake_perf_counter)
 
     decision = _decision(
         client,
