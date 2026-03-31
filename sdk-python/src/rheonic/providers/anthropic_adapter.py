@@ -215,7 +215,7 @@ def _capture_success(
             output_tokens = getattr(usage, "output_tokens", None)
             if isinstance(input_tokens, int) and isinstance(output_tokens, int):
                 total_tokens = input_tokens + output_tokens
-        sdk_client.capture_event(
+        sdk_client.capture_event_and_flush(
             build_event(
                 provider="anthropic",
                 model=response_model if isinstance(response_model, str) else requested_model,
@@ -258,7 +258,7 @@ def _capture_failure(
     protect_reason: str,
 ) -> None:
     try:
-        sdk_client.capture_event(
+        sdk_client.capture_event_and_flush(
             build_event(
                 provider="anthropic",
                 model=requested_model,

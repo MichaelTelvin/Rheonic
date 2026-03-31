@@ -131,6 +131,11 @@ export class Client {
     }
   }
 
+  public async captureEventAndFlush(event: EventPayload): Promise<void> {
+    await this.captureEvent(event);
+    await this.flushWithTimeout();
+  }
+
   public getStats(): ClientStats {
     return {
       queued: this.queue.length,

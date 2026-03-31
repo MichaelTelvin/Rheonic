@@ -73,8 +73,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
 
     try {
       const response = await originalCreate(...callArgs);
-      void options.client.captureEvent(
-        buildEvent({
+      await options.client.captureEventAndFlush(buildEvent({
           provider: "openai",
           model: extractResponseModel(response) ?? model,
           environment: options.environment ?? options.client.environment,
@@ -90,12 +89,10 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
             total_tokens: extractTotalTokens(response),
             http_status: 200,
           },
-        }),
-      );
+        }));
       return response;
     } catch (error) {
-      void options.client.captureEvent(
-        buildEvent({
+      await options.client.captureEventAndFlush(buildEvent({
           provider: "openai",
           model,
           environment: options.environment ?? options.client.environment,
@@ -111,8 +108,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
             error_type: extractErrorType(error),
             http_status: extractHttpStatus(error),
           },
-        }),
-      );
+        }));
       throw error;
     }
   };
@@ -227,6 +223,7 @@ function extractErrorType(error: unknown): string {
   }
   return "unknown";
 }
+
 
 function extractHttpStatus(error: unknown): number | undefined {
   if (!error || typeof error !== "object") {

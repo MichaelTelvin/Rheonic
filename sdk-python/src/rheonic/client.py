@@ -266,6 +266,10 @@ class Client:
             logger.exception("capture_event enqueue failed", extra=build_log_extra(event="error"))
             return
 
+    def capture_event_and_flush(self, event: dict[str, Any], timeout_s: float | None = None) -> None:
+        self.capture_event(event)
+        self.flush(timeout_s=timeout_s)
+
     def flush(self, timeout_s: float | None = None) -> None:
         # Best-effort flush queued events with optional time budget.
         deadline = time.monotonic() + timeout_s if timeout_s is not None else None

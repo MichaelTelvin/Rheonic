@@ -203,7 +203,7 @@ def _capture_success(
         response_model = getattr(response, "model", None)
         usage = getattr(response, "usage", None)
         total_tokens = getattr(usage, "total_tokens", None)
-        sdk_client.capture_event(
+        sdk_client.capture_event_and_flush(
             build_event(
                 provider="openai",
                 model=response_model if isinstance(response_model, str) else requested_model,
@@ -245,7 +245,7 @@ def _capture_failure(
     # Emit error event when provider call fails.
     try:
         http_status = _extract_http_status(exc)
-        sdk_client.capture_event(
+        sdk_client.capture_event_and_flush(
             build_event(
                 provider="openai",
                 model=requested_model,

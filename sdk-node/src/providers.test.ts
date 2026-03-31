@@ -15,6 +15,9 @@ function makeClient(decision: Record<string, unknown>) {
       request_id: "request-test",
       ...decision,
     }),
+    captureEventAndFlush: async (event: unknown) => {
+      captured.push(event);
+    },
     captureEvent: async (event: unknown) => {
       captured.push(event);
     },

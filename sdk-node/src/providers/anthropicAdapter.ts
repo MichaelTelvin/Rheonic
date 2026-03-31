@@ -76,8 +76,7 @@ export function instrumentAnthropic<T extends Record<string, any>>(
 
     try {
       const response = await originalCreate(...callArgs);
-      void options.client.captureEvent(
-        buildEvent({
+      await options.client.captureEventAndFlush(buildEvent({
           provider: "anthropic",
           model: extractResponseModel(response) ?? requestedModel,
           environment: options.environment ?? options.client.environment,
@@ -94,12 +93,10 @@ export function instrumentAnthropic<T extends Record<string, any>>(
             total_tokens: extractTotalTokens(response),
             http_status: 200,
           },
-        }),
-      );
+        }));
       return response;
     } catch (error) {
-      void options.client.captureEvent(
-        buildEvent({
+      await options.client.captureEventAndFlush(buildEvent({
           provider: "anthropic",
           model: requestedModel,
           environment: options.environment ?? options.client.environment,
@@ -116,8 +113,7 @@ export function instrumentAnthropic<T extends Record<string, any>>(
             error_type: extractErrorType(error),
             http_status: extractHttpStatus(error),
           },
-        }),
-      );
+        }));
       throw error;
     }
   };
@@ -193,6 +189,7 @@ function extractHttpStatus(error: unknown): number | undefined {
   }
   return undefined;
 }
+
 
 function maybeApplyAnthropicClamp(args: unknown[], decision: ProtectEvaluation): unknown[] {
   if (decision.decision !== "clamp") {

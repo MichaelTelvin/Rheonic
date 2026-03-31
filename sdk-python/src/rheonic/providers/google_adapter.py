@@ -206,7 +206,7 @@ def _capture_success(
     protect_reason: str,
 ) -> None:
     try:
-        sdk_client.capture_event(
+        sdk_client.capture_event_and_flush(
             build_event(
                 provider="google",
                 model=requested_model,
@@ -249,7 +249,7 @@ def _capture_failure(
     protect_reason: str,
 ) -> None:
     try:
-        sdk_client.capture_event(
+        sdk_client.capture_event_and_flush(
             build_event(
                 provider="google",
                 model=requested_model,

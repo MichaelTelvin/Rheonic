@@ -75,8 +75,7 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
 
     try {
       const response = await originalGenerate(...callArgs);
-      void options.client.captureEvent(
-        buildEvent({
+      await options.client.captureEventAndFlush(buildEvent({
           provider: "google",
           model: requestedModel,
           environment: options.environment ?? options.client.environment,
@@ -93,12 +92,10 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
             total_tokens: extractTotalTokens(response),
             http_status: 200,
           },
-        }),
-      );
+        }));
       return response;
     } catch (error) {
-      void options.client.captureEvent(
-        buildEvent({
+      await options.client.captureEventAndFlush(buildEvent({
           provider: "google",
           model: requestedModel,
           environment: options.environment ?? options.client.environment,
@@ -115,8 +112,7 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
             error_type: extractErrorType(error),
             http_status: extractHttpStatus(error),
           },
-        }),
-      );
+        }));
       throw error;
     }
   };
@@ -208,6 +204,7 @@ function extractHttpStatus(error: unknown): number | undefined {
   }
   return undefined;
 }
+
 
 function maybeApplyGoogleClamp(args: unknown[], decision: ProtectEvaluation): unknown[] {
   if (decision.decision !== "clamp") {
