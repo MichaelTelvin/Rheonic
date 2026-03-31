@@ -7482,14 +7482,18 @@ html {
 
   .public-shell.public-shell--marketing,
   .public-shell.public-shell--quickstart {
-    width: min(calc(100% - 32px), 100%);
+    width: min(calc(100% - 20px), 100%);
     margin: 12px auto;
     border-radius: 20px;
-    padding: 14px 16px 30px;
+    padding: 14px 12px 30px;
   }
 
   .landing {
-    padding-top: 72px;
+    padding-top: 56px;
+  }
+
+  .landing-marketing {
+    margin-top: 28px;
   }
 
   .landing h2 {
@@ -7500,15 +7504,18 @@ html {
   }
 
   .landing-hero-cta {
-    gap: 14px;
+    gap: 18px;
     align-items: center;
     flex-direction: column;
+    width: 100%;
   }
 
   .landing-hero-cta .landing-link-button {
-    width: min(100%, 232px);
+    width: min(100%, 292px);
     min-width: 0;
-    max-width: min(100%, 232px);
+    max-width: min(100%, 292px);
+    min-height: 48px;
+    padding: 10px 16px;
     font-size: 0.9rem;
     text-align: center;
   }
@@ -7530,7 +7537,7 @@ html {
 
   .quickstart .quickstart-docs-content {
     border-radius: 14px;
-    padding: 16px;
+    padding: 14px;
   }
 
   .quickstart .quickstart-step-head {
@@ -7644,9 +7651,9 @@ html {
 
   .public-shell.public-shell--marketing,
   .public-shell.public-shell--quickstart {
-    width: min(calc(100% - 24px), 100%);
+    width: min(calc(100% - 16px), 100%);
     margin: 10px auto;
-    padding: 14px 16px 26px;
+    padding: 14px 10px 26px;
   }
 
   .landing-hero-copy h1 {
@@ -7663,7 +7670,7 @@ html {
 
   .quickstart .quickstart-step-card {
     margin-top: 24px;
-    padding: 14px 14px 16px;
+    padding: 14px 12px 16px;
   }
 
   .quickstart .quickstart-step-icon {
@@ -7704,13 +7711,13 @@ html {
 
   .public-shell.public-shell--marketing,
   .public-shell.public-shell--quickstart {
-    width: min(calc(100% - 20px), 100%);
+    width: min(calc(100% - 12px), 100%);
     margin: 8px auto;
-    padding: 12px 14px 22px;
+    padding: 12px 8px 22px;
   }
 
   .landing {
-    padding-top: 66px;
+    padding-top: 50px;
   }
 
   .landing h2 {
@@ -7721,14 +7728,14 @@ html {
   .landing-hero-cta .landing-link-button {
     min-height: 44px !important;
     height: 44px !important;
-    width: min(100%, 220px);
-    max-width: min(100%, 220px);
+    width: min(100%, 280px);
+    max-width: min(100%, 280px);
     font-size: 0.88rem;
   }
 
 
   .quickstart .quickstart-docs-content {
-    padding: 12px;
+    padding: 10px;
   }
 
   .quickstart .quickstart-step-head {
