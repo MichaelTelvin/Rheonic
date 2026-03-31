@@ -27,7 +27,7 @@ export function PublicLayout({
   showBetaBadge = false,
   children,
 }: PublicLayoutProps): JSX.Element {
-  const docsHref = "/login";
+  const docsHref = "/docs/viewer.html?doc=overview";
   const [scrolled, setScrolled] = useState(false);
   const [publicContactEmail, setPublicContactEmail] = useState<string>(frontendConfig.publicContactEmail || "feedback@example.com");
   const isV2Surface = shellClassName?.includes("public-shell--marketing") || shellClassName?.includes("public-shell--quickstart");
@@ -80,7 +80,7 @@ export function PublicLayout({
           <nav className="public-nav-links">
             {showHomeLink ? <Link to="/">Home</Link> : null}
             {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
-            {showDocsLink ? <Link to={docsHref}>{docsLinkLabel}</Link> : null}
+            {showDocsLink ? <a href={docsHref}>{docsLinkLabel}</a> : null}
             <Link className="public-login-link" to={navAuthHref}>{navAuthLabel}</Link>
           </nav>
         </header>
@@ -124,7 +124,7 @@ export function PublicLayout({
                 <span aria-hidden="true" className="public-footer-dot">
                   ·
                 </span>
-                <Link to={docsHref}>{docsLinkLabel}</Link>
+                <a href={docsHref}>{docsLinkLabel}</a>
                 <span aria-hidden="true" className="public-footer-dot">
                   ·
                 </span>
@@ -149,7 +149,7 @@ export function PublicLayout({
               <div className="public-footer-links">
                 {showHomeLink ? <Link to="/">Home</Link> : null}
                 {showQuickstartLink ? <Link to="/quickstart">Quickstart</Link> : null}
-                {showDocsLink ? <Link to={docsHref}>{docsLinkLabel}</Link> : null}
+                {showDocsLink ? <a href={docsHref}>{docsLinkLabel}</a> : null}
                 <Link to={navAuthHref}>{navAuthLabel}</Link>
               </div>
               <p>© {new Date().getFullYear()} Rheonic</p>
