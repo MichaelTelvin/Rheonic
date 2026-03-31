@@ -5,7 +5,7 @@ import { ApiError, fetchIncidents, fetchProjectProviders, resolveIncident, type 
 import { IncidentItem as IncidentRow } from "../components/IncidentItem";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
-import { mergeProjectWarmState, readProjectWarmState } from "../lib/projectWarmCache";
+import { mergeProjectWarmState, readProjectWarmState, subscribeProjectWarmState } from "../lib/projectWarmCache";
 
 type IncidentsViewCacheState = {
   providers: string[];
@@ -71,6 +71,18 @@ function shouldRefreshProjectWarmIncidents(provider: string, status: string, typ
   return provider === "all" && status === "open" && type === "all";
 }
 
+function readVisibleIncidentSnapshot(
+  projectId: string | null,
+  provider: string,
+  status: string,
+  type: string,
+): IncidentsViewCacheState | null {
+  if (!projectId) {
+    return null;
+  }
+  return readIncidentsCache(projectId, provider, status, type) ?? buildWarmIncidentsCache(projectId, provider, status, type);
+}
+
 function formatProviderLabel(provider: string): string {
   return provider
     .split(/[_-]/g)
@@ -83,9 +95,7 @@ export function Incidents(): JSX.Element {
   const { projectId } = useProjectContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialProvider = (searchParams.get("provider") ?? "all").toLowerCase();
-  const initialCache = projectId
-    ? (readIncidentsCache(projectId, initialProvider, "open", "all") ?? buildWarmIncidentsCache(projectId, initialProvider, "open", "all"))
-    : null;
+  const initialCache = readVisibleIncidentSnapshot(projectId, initialProvider, "open", "all");
   const initialProviders = projectId
     ? (() => {
         const cachedProviders = readIncidentProvidersCache(projectId);
@@ -116,12 +126,7 @@ export function Incidents(): JSX.Element {
     setSelectedType("all");
     setSelectedStatus("open");
     setSelectedProvider((searchParams.get("provider") ?? "all").toLowerCase());
-    const cache = projectId
-      ? (
-        readIncidentsCache(projectId, (searchParams.get("provider") ?? "all").toLowerCase(), "open", "all")
-        ?? buildWarmIncidentsCache(projectId, (searchParams.get("provider") ?? "all").toLowerCase(), "open", "all")
-      )
-      : null;
+    const cache = readVisibleIncidentSnapshot(projectId, (searchParams.get("provider") ?? "all").toLowerCase(), "open", "all");
     setProviders(
       projectId
         ? (() => {
@@ -218,6 +223,21 @@ export function Incidents(): JSX.Element {
       cancelled = true;
       window.clearInterval(interval);
     };
+  }, [projectId, selectedProvider, selectedStatus, selectedType]);
+
+  useEffect(() => {
+    const applyVisibleSnapshot = (): void => {
+      const snapshot = readVisibleIncidentSnapshot(projectId, selectedProvider, selectedStatus, selectedType);
+      if (!snapshot) {
+        return;
+      }
+      setProviders((current) => (current.length > 0 ? current : snapshot.providers));
+      setIncidents(snapshot.incidents);
+      setLoading(false);
+    };
+
+    applyVisibleSnapshot();
+    return subscribeProjectWarmState(projectId, applyVisibleSnapshot);
   }, [projectId, selectedProvider, selectedStatus, selectedType]);
 
   const onResolve = async (incidentId: string): Promise<void> => {

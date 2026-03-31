@@ -86,7 +86,27 @@ export function ProjectProvider({ children }: { children: ReactNode }): JSX.Elem
     if (!projectId) {
       return;
     }
-    void prefetchProjectWarmState(projectId);
+    let cancelled = false;
+
+    const warm = async (): Promise<void> => {
+      try {
+        await prefetchProjectWarmState(projectId);
+      } catch {
+        if (cancelled) {
+          return;
+        }
+      }
+    };
+
+    void warm();
+    const interval = window.setInterval(() => {
+      void warm();
+    }, frontendConfig.dashboardIncidentsPollMs);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, [projectId]);
 
   const value = useMemo<ProjectContextValue>(

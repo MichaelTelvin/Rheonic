@@ -31,6 +31,7 @@ export type ProjectWarmState = {
 
 const projectWarmCache = new Map<string, ProjectWarmState>();
 const projectWarmInflight = new Map<string, Promise<void>>();
+const projectWarmListeners = new Map<string, Set<() => void>>();
 
 export function readProjectWarmState(projectId: string | null): ProjectWarmState | null {
   if (!projectId) {
@@ -45,6 +46,31 @@ export function mergeProjectWarmState(projectId: string, patch: Partial<ProjectW
     ...current,
     ...patch,
   });
+  const listeners = projectWarmListeners.get(projectId);
+  if (listeners) {
+    for (const listener of listeners) {
+      listener();
+    }
+  }
+}
+
+export function subscribeProjectWarmState(projectId: string | null, listener: () => void): () => void {
+  if (!projectId) {
+    return () => undefined;
+  }
+  const listeners = projectWarmListeners.get(projectId) ?? new Set<() => void>();
+  listeners.add(listener);
+  projectWarmListeners.set(projectId, listeners);
+  return () => {
+    const current = projectWarmListeners.get(projectId);
+    if (!current) {
+      return;
+    }
+    current.delete(listener);
+    if (current.size === 0) {
+      projectWarmListeners.delete(projectId);
+    }
+  };
 }
 
 export async function prefetchProjectWarmState(projectId: string): Promise<void> {
