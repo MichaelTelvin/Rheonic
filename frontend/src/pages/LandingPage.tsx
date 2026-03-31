@@ -58,7 +58,9 @@ export function LandingPage(): JSX.Element {
           <div className="landing-hero-copy">
             <h1>Control your agent traffic before it controls your bill.</h1>
             <p>
-              Monitor request and token usage per provider, and enforce preflight guardrails before expensive calls are sent.
+              Monitor request and token usage per provider,
+              <br />
+              and enforce preflight guardrails before expensive calls are sent.
             </p>
             <small className="landing-hero-beta">Beta: actively testing. Expect changes.</small>
             <div className="landing-hero-cta">
