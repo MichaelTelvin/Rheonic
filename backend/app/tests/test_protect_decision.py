@@ -5,12 +5,12 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.v1 import protect as protect_api_module
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.ingest_key_service import IngestKeyService
 from app.application.services.metrics_service import MetricsService
 from app.application.services.project_service import ProjectService
 from app.application.services.protect_service import ProtectService
-from app.api.v1 import protect as protect_api_module
 from app.config import app_config
 from app.dependencies import (
     get_current_user,
