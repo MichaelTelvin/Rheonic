@@ -64,43 +64,18 @@ type DashboardCachedState = {
   } | null;
 };
 
+const dashboardMemoryCache = new Map<string, DashboardCachedState>();
+
 function buildInitialDashboardState(projectId: string | null | undefined): DashboardCachedState | null {
   return projectId ? readDashboardCache(projectId) : null;
 }
 
-function dashboardCacheKey(projectId: string): string {
-  return `rheonic:dashboard:${projectId}`;
-}
-
 function readDashboardCache(projectId: string): DashboardCachedState | null {
-  try {
-    const raw = window.sessionStorage.getItem(dashboardCacheKey(projectId));
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as Partial<DashboardCachedState>;
-    return {
-      selectedProvider: typeof parsed.selectedProvider === "string" ? normalizeProviderValue(parsed.selectedProvider) || "all" : "all",
-      hasIngestKey: Boolean(parsed.hasIngestKey),
-      hasEvents: Boolean(parsed.hasEvents),
-      setupStatusResolved: Boolean(parsed.setupStatusResolved),
-      metrics: parsed.metrics ?? null,
-      lastMetricsSuccessAt: parsed.lastMetricsSuccessAt ?? null,
-      protectHealth: parsed.protectHealth ?? null,
-      lastProtectHealthSuccessAt: parsed.lastProtectHealthSuccessAt ?? null,
-      protectDecisionStats: parsed.protectDecisionStats ?? null,
-    };
-  } catch {
-    return null;
-  }
+  return dashboardMemoryCache.get(projectId) ?? null;
 }
 
 function writeDashboardCache(projectId: string, state: DashboardCachedState): void {
-  try {
-    window.sessionStorage.setItem(dashboardCacheKey(projectId), JSON.stringify(state));
-  } catch {
-    // Ignore cache write failures and keep runtime state authoritative.
-  }
+  dashboardMemoryCache.set(projectId, state);
 }
 
 export function Dashboard(): JSX.Element {
@@ -654,9 +629,21 @@ export function Dashboard(): JSX.Element {
   const renderMetric = (value: number | null | undefined): string => (value === null || value === undefined ? "—" : String(value));
   const protectStatus = useMemo<{
     label: string;
-    tone: ProtectStatus;
+    tone: ProtectStatus | "checking";
   }>(() => {
-    if (!projectId || setupStage !== "complete") {
+    if (!projectId) {
+      return {
+        label: "Awaiting traffic",
+        tone: "awaiting",
+      };
+    }
+    if (loadingProjects || !setupStatusResolved) {
+      return {
+        label: "Checking",
+        tone: "checking",
+      };
+    }
+    if (setupStage !== "complete") {
       return {
         label: "Awaiting traffic",
         tone: "awaiting",
@@ -688,7 +675,7 @@ export function Dashboard(): JSX.Element {
       label: "Healthy",
       tone: "healthy",
     };
-  }, [lastProtectHealthSuccessAt, projectId, protectHealth, protectHealthFetchFailed, setupStage]);
+  }, [lastProtectHealthSuccessAt, loadingProjects, projectId, protectHealth, protectHealthFetchFailed, setupStage, setupStatusResolved]);
 
   return (
     <main className="dashboard">

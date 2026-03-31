@@ -51,51 +51,12 @@ const SAMPLE_CLAMP_PAYLOAD = JSON.stringify(
   2,
 );
 
-type AlertsStoredWebhookSettings = Pick<ProjectWebhookSettings, "enabled" | "email_enabled" | "last_status" | "last_at">;
-
-type AlertsCacheState = {
-  webhookSettings: AlertsStoredWebhookSettings | null;
-  protectEnabled: boolean;
-};
-
 type AlertsMemoryState = {
   webhookSettings: ProjectWebhookSettings | null;
   protectEnabled: boolean;
 };
 
 const alertsMemoryCache = new Map<string, AlertsMemoryState>();
-
-function alertsCacheKey(projectId: string): string {
-  return `rheonic:alerts:${projectId}`;
-}
-
-function readAlertsCache(projectId: string | null): AlertsMemoryState | null {
-  if (!projectId) {
-    return null;
-  }
-  try {
-    const raw = window.sessionStorage.getItem(alertsCacheKey(projectId));
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as Partial<AlertsCacheState>;
-    return {
-      webhookSettings: parsed.webhookSettings
-        ? {
-          enabled: Boolean(parsed.webhookSettings.enabled),
-          email_enabled: Boolean(parsed.webhookSettings.email_enabled),
-          url: null,
-          last_status: parsed.webhookSettings.last_status ?? null,
-          last_at: parsed.webhookSettings.last_at ?? null,
-          last_error: null,
-        }
-        : null,
-      protectEnabled: Boolean(parsed.protectEnabled),
-    };
-  } catch {
-    return null;
-  }
-}
 
 function readAlertsMemoryCache(projectId: string | null): AlertsMemoryState | null {
   if (!projectId) {
@@ -109,7 +70,7 @@ export function Alerts(): JSX.Element {
   const { user } = useAuthContext();
   const webhookTestMarkerKey = projectId ? `rheonic:webhookTestAt:${projectId}` : null;
   const initialMemoryCache = readAlertsMemoryCache(projectId);
-  const initialCache = initialMemoryCache ?? readAlertsCache(projectId);
+  const initialCache = initialMemoryCache;
 
   const [webhookSettings, setWebhookSettings] = useState<ProjectWebhookSettings | null>(initialCache?.webhookSettings ?? null);
   const [webhookEnabledInput, setWebhookEnabledInput] = useState<boolean>(initialCache?.webhookSettings?.enabled ?? false);
@@ -125,7 +86,7 @@ export function Alerts(): JSX.Element {
   const accountEmail = user?.email ?? "your account email";
 
   useLayoutEffect(() => {
-    const cached = readAlertsMemoryCache(projectId) ?? readAlertsCache(projectId);
+    const cached = readAlertsMemoryCache(projectId);
     const cachedSettings = cached?.webhookSettings ?? null;
     setWebhookSettings(cachedSettings);
     setWebhookEnabledInput(cachedSettings?.enabled ?? false);
@@ -144,30 +105,6 @@ export function Alerts(): JSX.Element {
       webhookSettings,
       protectEnabled,
     });
-  }, [projectId, protectEnabled, webhookSettings]);
-
-  useEffect(() => {
-    if (!projectId) {
-      return;
-    }
-    try {
-      window.sessionStorage.setItem(
-        alertsCacheKey(projectId),
-        JSON.stringify({
-          webhookSettings: webhookSettings
-            ? {
-              enabled: webhookSettings.enabled,
-              email_enabled: Boolean(webhookSettings.email_enabled),
-              last_status: webhookSettings.last_status ?? null,
-              last_at: webhookSettings.last_at ?? null,
-            }
-            : null,
-          protectEnabled,
-        } satisfies AlertsCacheState),
-      );
-    } catch {
-      // Ignore cache write failures.
-    }
   }, [projectId, protectEnabled, webhookSettings]);
 
   const reloadWebhookSettings = async (preserveInputs = false, showLoading = true): Promise<void> => {

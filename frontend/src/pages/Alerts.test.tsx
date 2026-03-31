@@ -179,7 +179,7 @@ describe("Alerts webhook settings", () => {
     await waitFor(() => expect(writeText).toHaveBeenCalled());
   });
 
-  it("hydrates non-sensitive settings from session cache on first render", async () => {
+  it("hydrates alert settings from in-memory cache on revisit", async () => {
     mocks.useProjectContext.mockReturnValue({
       projectId: "p-cache",
       projects: [{ id: "p-cache", name: "Cached Demo", created_at: new Date().toISOString() }],
@@ -188,18 +188,26 @@ describe("Alerts webhook settings", () => {
       setProjectId: vi.fn(),
       reloadProjects: vi.fn(),
     });
-    window.sessionStorage.setItem(
-      "rheonic:alerts:p-cache",
-      JSON.stringify({
-        webhookSettings: {
-          enabled: true,
-          email_enabled: false,
-          last_status: "success",
-          last_at: "2026-03-24T00:00:00Z",
-        },
-        protectEnabled: true,
-      }),
-    );
+    mocks.fetchProjectWebhook.mockResolvedValueOnce({
+      enabled: true,
+      email_enabled: false,
+      url: "https://hooks.example.test/cached",
+      last_status: "success",
+      last_at: "2026-03-24T00:00:00Z",
+      last_error: null,
+    });
+    mocks.fetchProjectProtect.mockResolvedValueOnce({
+      protect_enabled: true,
+      protect_fail_mode: "open",
+      apply_clamp: false,
+      protect_max_req_per_min: null,
+      protect_max_tok_per_min: null,
+    });
+
+    const firstRender = render(<Alerts />);
+    await screen.findByRole("button", { name: "Save alerts" });
+    firstRender.unmount();
+
     mocks.fetchProjectWebhook.mockImplementation(() => new Promise(() => {}));
     mocks.fetchProjectProtect.mockImplementation(() => new Promise(() => {}));
 
@@ -212,6 +220,6 @@ describe("Alerts webhook settings", () => {
     expect(emailToggle?.checked).toBe(false);
     expect(webhookToggle?.checked).toBe(true);
     expect(screen.getByText("Protect mode only. Sends lifecycle alerts to your account email.")).toBeTruthy();
-    expect((screen.getByLabelText("Webhook URL") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Webhook URL") as HTMLInputElement).value).toBe("https://hooks.example.test/cached");
   });
 });

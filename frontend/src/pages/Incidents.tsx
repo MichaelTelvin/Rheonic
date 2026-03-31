@@ -18,6 +18,28 @@ function incidentsViewCacheKey(projectId: string, provider: string, status: stri
   return `${projectId}:${provider}:${status}:${type}`;
 }
 
+function readIncidentsCache(projectId: string, provider: string, status: string, type: string): IncidentsViewCacheState | null {
+  return incidentsViewCache.get(incidentsViewCacheKey(projectId, provider, status, type)) ?? null;
+}
+
+function writeIncidentsCache(
+  projectId: string,
+  provider: string,
+  status: string,
+  type: string,
+  value: IncidentsViewCacheState,
+): void {
+  incidentsViewCache.set(incidentsViewCacheKey(projectId, provider, status, type), value);
+}
+
+function readIncidentProvidersCache(projectId: string): string[] {
+  return incidentProvidersCache.get(projectId) ?? [];
+}
+
+function writeIncidentProvidersCache(projectId: string, providers: string[]): void {
+  incidentProvidersCache.set(projectId, providers);
+}
+
 function formatProviderLabel(provider: string): string {
   return provider
     .split(/[_-]/g)
@@ -30,8 +52,8 @@ export function Incidents(): JSX.Element {
   const { projectId } = useProjectContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialProvider = (searchParams.get("provider") ?? "all").toLowerCase();
-  const initialCache = projectId ? incidentsViewCache.get(incidentsViewCacheKey(projectId, initialProvider, "open", "all")) ?? null : null;
-  const initialProviders = projectId ? incidentProvidersCache.get(projectId) ?? [] : [];
+  const initialCache = projectId ? readIncidentsCache(projectId, initialProvider, "open", "all") : null;
+  const initialProviders = projectId ? readIncidentProvidersCache(projectId) : [];
 
   const [providers, setProviders] = useState<string[]>(initialProviders.length > 0 ? initialProviders : (initialCache?.providers ?? []));
   const [selectedProvider, setSelectedProvider] = useState<string>(initialProvider);
@@ -39,7 +61,7 @@ export function Incidents(): JSX.Element {
   const [selectedType, setSelectedType] = useState<string>("all");
   const [incidents, setIncidents] = useState<IncidentItem[]>(initialCache?.incidents ?? []);
   const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
-  const [, setLoading] = useState<boolean>(projectId ? initialCache === null : false);
+  const [loading, setLoading] = useState<boolean>(projectId ? initialCache === null : false);
   const [warning, setWarning] = useState<string | null>(null);
   const providerRequestSeq = useRef<number>(0);
 
@@ -54,9 +76,9 @@ export function Incidents(): JSX.Element {
     setSelectedStatus("open");
     setSelectedProvider((searchParams.get("provider") ?? "all").toLowerCase());
     const cache = projectId
-      ? incidentsViewCache.get(incidentsViewCacheKey(projectId, (searchParams.get("provider") ?? "all").toLowerCase(), "open", "all")) ?? null
+      ? readIncidentsCache(projectId, (searchParams.get("provider") ?? "all").toLowerCase(), "open", "all")
       : null;
-    setProviders(projectId ? incidentProvidersCache.get(projectId) ?? (cache?.providers ?? []) : []);
+    setProviders(projectId ? (readIncidentProvidersCache(projectId) ?? (cache?.providers ?? [])) : []);
     setIncidents(cache?.incidents ?? []);
   }, [projectId, searchParams]);
 
@@ -72,7 +94,7 @@ export function Incidents(): JSX.Element {
         return;
       }
       setProviders(items);
-      incidentProvidersCache.set(projectId, items);
+      writeIncidentProvidersCache(projectId, items);
       setSelectedProvider((current) => (current !== "all" && !items.includes(current) ? "all" : current));
     } catch {
       if (requestSeq !== providerRequestSeq.current) {
@@ -94,8 +116,7 @@ export function Incidents(): JSX.Element {
       return undefined;
     }
     let cancelled = false;
-    const cacheKey = incidentsViewCacheKey(projectId, selectedProvider, selectedStatus, selectedType);
-    const cached = incidentsViewCache.get(cacheKey) ?? null;
+    const cached = readIncidentsCache(projectId, selectedProvider, selectedStatus, selectedType);
     setLoading(cached === null);
     const providerQuery = selectedProvider === "all" ? undefined : selectedProvider;
     const statusQuery = selectedStatus === "all" ? "all" : selectedStatus;
@@ -108,7 +129,7 @@ export function Incidents(): JSX.Element {
         }
         const filteredRows = selectedType === "all" ? rows : rows.filter((row) => row.type === selectedType);
         setIncidents(filteredRows);
-        incidentsViewCache.set(cacheKey, {
+        writeIncidentsCache(projectId, selectedProvider, selectedStatus, selectedType, {
           providers,
           incidents: filteredRows,
         });
@@ -153,7 +174,7 @@ export function Incidents(): JSX.Element {
       const updated = await fetchIncidents(projectId, providerQuery, statusQuery);
       const filteredRows = selectedType === "all" ? updated : updated.filter((row) => row.type === selectedType);
       setIncidents(filteredRows);
-      incidentsViewCache.set(incidentsViewCacheKey(projectId, selectedProvider, selectedStatus, selectedType), {
+      writeIncidentsCache(projectId, selectedProvider, selectedStatus, selectedType, {
         providers,
         incidents: filteredRows,
       });
@@ -254,7 +275,8 @@ export function Incidents(): JSX.Element {
 
           <section className="incidents-list-shell">
             <section className="incidents-scroll-panel">
-              {sortedIncidents.length === 0 ? <section className="empty">No incidents for current filters.</section> : null}
+              {loading && sortedIncidents.length === 0 ? <section className="empty">Loading incidents...</section> : null}
+              {!loading && sortedIncidents.length === 0 ? <section className="empty">No incidents for current filters.</section> : null}
               <div className="list">
                 {sortedIncidents.map((incident) => (
                   <IncidentRow key={incident.id} incident={incident} resolving={resolvingIds.has(incident.id)} onResolve={onResolve} />

@@ -28,7 +28,7 @@ import { TermsPage } from "./pages/TermsPage";
 
 const authUserCacheStorageKey = "auth_user_cache";
 const legacyAuthStorageKeys = ["rheonic_token", "rheonic_refresh_token", "rheonic_user"];
-const sensitiveSessionCachePrefixes = ["rheonic:alerts:", "rheonic:dashboard:"];
+const sensitiveSessionCachePrefixes = ["rheonic:alerts:", "rheonic:dashboard:", "rheonic:incidents:", "rheonic:incidentProviders:"];
 
 function clearLegacyAuthStorage(): void {
   try {
