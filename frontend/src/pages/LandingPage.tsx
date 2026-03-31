@@ -58,8 +58,7 @@ export function LandingPage(): JSX.Element {
           <div className="landing-hero-copy">
             <h1>Control your agent traffic before it controls your bill.</h1>
             <p>
-              Monitor model behavior per provider, detect anomalies early, and enforce preflight guardrails before
-              expensive calls are sent.
+              Monitor request and token usage per provider, and enforce preflight guardrails before expensive calls are sent.
             </p>
             <small className="landing-hero-beta">Beta: actively testing. Expect changes.</small>
             <div className="landing-hero-cta">
@@ -146,32 +145,32 @@ export function LandingPage(): JSX.Element {
                 <article className="landing-pain-step reveal-on-scroll">
                   <div className="landing-pain-step-copy">
                     <p className="landing-pain-time">T+00:20</p>
-                    <h3>Spike</h3>
-                    <p>Traffic jumps without warning.</p>
+                    <h3>Growing context</h3>
+                    <p>Each step adds more input than the previous one.</p>
                   </div>
-                  <span className="landing-pain-chip">+320% req/min</span>
+                  <span className="landing-pain-chip">+240% tokens</span>
                 </article>
                 <article className="landing-pain-step reveal-on-scroll">
                   <div className="landing-pain-step-copy">
                     <p className="landing-pain-time">T+00:45</p>
-                    <h3>Retry storm</h3>
-                    <p>Transient errors multiply into load.</p>
+                    <h3>Retry pressure</h3>
+                    <p>Failures trigger additional calls instead of resolving.</p>
                   </div>
                   <span className="landing-pain-chip">15 retries</span>
                 </article>
                 <article className="landing-pain-step reveal-on-scroll">
                   <div className="landing-pain-step-copy">
                     <p className="landing-pain-time">T+01:10</p>
-                    <h3>Loop runaway</h3>
-                    <p>One bug keeps calling until it hurts.</p>
+                    <h3>No termination</h3>
+                    <p>The agent continues without a stopping condition.</p>
                   </div>
                   <span className="landing-pain-chip">1,200 calls</span>
                 </article>
                 <article className="landing-pain-step reveal-on-scroll">
                   <div className="landing-pain-step-copy">
                     <p className="landing-pain-time">T+01:40</p>
-                    <h3>Budget drain</h3>
-                    <p>Minutes later, the bill is real.</p>
+                    <h3>Cost impact</h3>
+                    <p>Token usage reaches an unexpected level.</p>
                   </div>
                   <span className="landing-pain-chip">$ / hard stop</span>
                 </article>
@@ -189,7 +188,7 @@ export function LandingPage(): JSX.Element {
               <div className="landing-pain-compare-block is-positive">
                 <p className="landing-pain-compare-label">With Rheonic</p>
                 <h3>Control layer</h3>
-                <p>See anomalies in real time.</p>
+                <p>See token and request usage in real time.</p>
                 <p>Preflight decisions before expensive calls.</p>
                 <p>Warn or block with cooldown when needed.</p>
               </div>
@@ -229,25 +228,25 @@ export function LandingPage(): JSX.Element {
                 </span>
                 <h3>Per-provider telemetry</h3>
               </div>
-              <p>Real-time request and token rates per provider and project—so you see drift immediately.</p>
+              <p>See request and token rates per provider and project in real time.</p>
             </article>
             <article className="landing-cap-card">
               <div className="landing-cap-head">
                 <span className="landing-icon-circle anomaly">
                   <Activity size={16} />
                 </span>
-                <h3>Incident detection</h3>
+                <h3>Pattern detection</h3>
               </div>
-              <p>Automatic incidents for failed retry storms, rapid loop sequences, and sudden request-context explosions before they cascade.</p>
+              <p>Catch retry loops, runaway calls, and token growth as they happen.</p>
             </article>
             <article className="landing-cap-card">
               <div className="landing-cap-head">
                 <span className="landing-icon-circle enforcement">
                   <ShieldCheck size={16} />
                 </span>
-                <h3>Preflight enforcement</h3>
+                <h3>Preflight control</h3>
               </div>
-              <p>Apply allow / clamp / block decisions before provider calls, with cooldown to stop repeat bursts.</p>
+              <p>Block, throttle, or limit expensive calls before they hit the provider.</p>
             </article>
           </div>
         </section>
@@ -333,11 +332,9 @@ export function LandingPage(): JSX.Element {
             </article>
             <article className="landing-engineer-card">
               <Activity size={16} />
-              <h3>Real signals</h3>
+              <h3>Real usage signals</h3>
               <p>
-                Detect loop patterns and cost acceleration
-                <br />
-                before incidents.
+                Track request and token growth before costs increase.
               </p>
             </article>
           </div>
