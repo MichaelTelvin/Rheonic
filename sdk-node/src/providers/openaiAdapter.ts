@@ -66,7 +66,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
       ...protectPayload,
     });
     if (protectDecision.decision === "block") {
-      throw new RHEONICBlockedError(protectDecision.reason);
+      throw new RHEONICBlockedError(protectDecision);
     }
     const callArgs = maybeApplyOpenAIClamp(args, protectDecision);
     markClampAppliedIfChanged(protectDecision, extractMaxOutputTokens(args), extractMaxOutputTokens(callArgs));

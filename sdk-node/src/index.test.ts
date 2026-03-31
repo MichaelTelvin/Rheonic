@@ -7,7 +7,12 @@ function makeClient() {
   return {
     environment: "dev",
     debugLog: () => {},
-    evaluateProtectDecision: async () => ({ decision: "allow", reason: "ok" }),
+    evaluateProtectDecision: async () => ({
+      decision: "allow",
+      reason: "ok",
+      trace_id: "trace-test",
+      request_id: "request-test",
+    }),
     captureEvent: async () => {},
   };
 }

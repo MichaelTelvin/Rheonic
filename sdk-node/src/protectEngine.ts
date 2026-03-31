@@ -21,6 +21,7 @@ interface ProtectDecisionResponse {
   fail_mode?: unknown;
   protect_decision_timeout_ms?: unknown;
   blocked_until?: unknown;
+  retry_after_seconds?: unknown;
   snapshot?: unknown;
   apply_clamp_enabled?: unknown;
   clamp?: unknown;
@@ -29,6 +30,10 @@ interface ProtectDecisionResponse {
 export interface ProtectEvaluation {
   decision: ProtectDecision;
   reason: string;
+  trace_id: string;
+  request_id: string;
+  blocked_until?: string;
+  retry_after_seconds?: number;
   snapshot?: Record<string, unknown>;
   applyClampEnabled?: boolean;
   clamp?: {
@@ -39,11 +44,28 @@ export interface ProtectEvaluation {
 
 export class RHEONICBlockedError extends Error {
   public readonly reason: string;
+  public readonly trace_id: string;
+  public readonly request_id: string;
+  public readonly blocked_until?: string;
+  public readonly retry_after_seconds?: number;
+  public readonly snapshot?: Record<string, unknown>;
 
-  public constructor(reason: string) {
-    super(`Request blocked by Rheonic: ${reason}`);
+  public constructor(params: {
+    reason: string;
+    trace_id: string;
+    request_id: string;
+    blocked_until?: string;
+    retry_after_seconds?: number;
+    snapshot?: Record<string, unknown>;
+  }) {
+    super(`Request blocked by Rheonic: ${params.reason}`);
     this.name = "RHEONICBlockedError";
-    this.reason = reason;
+    this.reason = params.reason;
+    this.trace_id = params.trace_id;
+    this.request_id = params.request_id;
+    this.blocked_until = params.blocked_until;
+    this.retry_after_seconds = params.retry_after_seconds;
+    this.snapshot = params.snapshot;
   }
 }
 
@@ -82,6 +104,8 @@ export class ProtectEngine {
   }
 
   public async evaluate(context: ProtectContext): Promise<ProtectEvaluation> {
+    const requestId = randomUUID();
+    const traceId = generateTraceId();
     const nowMs = Date.now();
     if (this.cooldownUntilMs !== null && nowMs < this.cooldownUntilMs) {
       this.debugLog?.("Protect preflight blocked locally from cached cooldown", {
@@ -89,7 +113,14 @@ export class ProtectEngine {
         decision: "block",
         reason: this.cooldownReason ?? "cooldown_active",
       });
-      return { decision: "block", reason: this.cooldownReason ?? "cooldown_active" };
+      return {
+        decision: "block",
+        reason: this.cooldownReason ?? "cooldown_active",
+        trace_id: traceId,
+        request_id: requestId,
+        blocked_until: formatBlockedUntilMs(this.cooldownUntilMs),
+        retry_after_seconds: toRetryAfterSeconds(this.cooldownUntilMs, nowMs),
+      };
     }
 
     const controller = new AbortController();
@@ -97,8 +128,6 @@ export class ProtectEngine {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     timeout.unref?.();
     const startedAt = Date.now();
-    const requestId = randomUUID();
-    const traceId = generateTraceId();
     const spanId = generateSpanId();
 
     try {
@@ -128,9 +157,7 @@ export class ProtectEngine {
           requestId,
           traceId,
         );
-        return this.failMode === "closed"
-          ? { decision: "block", reason: "decision_unavailable" }
-          : { decision: "allow", reason: "decision_unavailable" };
+        return this.fallbackEvaluation(traceId, requestId);
       }
 
       const parsed = (await response.json()) as ProtectDecisionResponse;
@@ -163,6 +190,10 @@ export class ProtectEngine {
       return {
         decision,
         reason,
+        trace_id: traceId,
+        request_id: requestId,
+        blocked_until: typeof parsed.blocked_until === "string" ? parsed.blocked_until : undefined,
+        retry_after_seconds: parseRetryAfterSeconds(parsed.retry_after_seconds),
         snapshot: parseSnapshot(parsed.snapshot),
         applyClampEnabled: typeof parsed.apply_clamp_enabled === "boolean" ? parsed.apply_clamp_enabled : undefined,
         clamp: parseClamp(parsed.clamp),
@@ -194,10 +225,17 @@ export class ProtectEngine {
           traceId,
         );
       }
-      return this.failMode === "closed"
-        ? { decision: "block", reason: "decision_unavailable" }
-        : { decision: "allow", reason: "decision_unavailable" };
+      return this.fallbackEvaluation(traceId, requestId);
     }
+  }
+
+  private fallbackEvaluation(traceId: string, requestId: string): ProtectEvaluation {
+    return {
+      decision: this.failMode === "closed" ? "block" : "allow",
+      reason: this.failMode === "closed" ? "fail_closed" : "decision_unavailable",
+      trace_id: traceId,
+      request_id: requestId,
+    };
   }
 
   public async bootstrap(): Promise<void> {
@@ -314,6 +352,27 @@ function parseDecision(value: unknown): ProtectDecision {
     return value;
   }
   return "allow";
+}
+
+function parseRetryAfterSeconds(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return Math.floor(value);
+  }
+  return undefined;
+}
+
+function formatBlockedUntilMs(value: number | null): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  return new Date(value).toISOString();
+}
+
+function toRetryAfterSeconds(blockedUntilMs: number | null, nowMs: number): number | undefined {
+  if (typeof blockedUntilMs !== "number" || !Number.isFinite(blockedUntilMs) || blockedUntilMs <= nowMs) {
+    return undefined;
+  }
+  return Math.max(0, Math.ceil((blockedUntilMs - nowMs) / 1000));
 }
 
 function parseFailMode(value: unknown): ProtectFailMode | null {

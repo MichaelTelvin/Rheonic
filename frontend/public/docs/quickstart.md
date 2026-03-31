@@ -67,7 +67,13 @@ try {
   });
 } catch (error) {
   if (error instanceof RHEONICBlockedError) {
-    console.log("Blocked by protect preflight");
+    console.log(JSON.stringify({
+      reason: error.reason,
+      retry_after_seconds: error.retry_after_seconds,
+      blocked_until: error.blocked_until,
+      trace_id: error.trace_id,
+      request_id: error.request_id,
+    }, null, 2));
   }
 }
 ```
@@ -75,6 +81,7 @@ try {
 Python OpenAI:
 
 ```python
+import json
 import os
 from openai import OpenAI
 from rheonic import create_client, instrument_openai, RHEONICBlockedError
@@ -96,9 +103,35 @@ try:
         messages=[{"role": "user", "content": "hello"}],
         max_tokens=256,
     )
-except RHEONICBlockedError:
-    print("Blocked by protect preflight")
+except RHEONICBlockedError as error:
+    print(json.dumps({
+        "reason": error.reason,
+        "retry_after_seconds": error.retry_after_seconds,
+        "blocked_until": error.blocked_until,
+        "trace_id": error.trace_id,
+        "request_id": error.request_id,
+    }, indent=2))
 ```
+
+When Protect blocks a call, the SDK raises `RHEONICBlockedError` with agent-visible feedback. The main reasons are:
+- `tok_cap_breach`
+- `req_cap_breach`
+- `cooldown_active`
+- `fail_closed`
+
+Typical block feedback:
+
+```json
+{
+  "reason": "req_cap_breach",
+  "retry_after_seconds": 42,
+  "blocked_until": "2026-03-31T09:20:00Z",
+  "trace_id": "e8e1d3f0-8f54-4f89-9d4d-8ef58d71d9b1",
+  "request_id": "5f7c7bf11d0a43c28b4da6d97c9d145f"
+}
+```
+
+If Protect is `fail_open`, timeout or availability problems stay internal and the provider call continues. If Protect is `fail_closed`, the block reason is `fail_closed`.
 
 Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all capture and instrumentation calls so Rheonic can avoid repeated protect cold-start latency.
 

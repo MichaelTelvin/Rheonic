@@ -166,7 +166,15 @@ def test_anthropic_async_wrapper_blocks_and_supports_clamp() -> None:
 
 
 def test_anthropic_block_raises_blocked_error() -> None:
-    client = _client_with_decision({"decision": "block", "reason": "tok_limit"})
+    client = _client_with_decision(
+        {
+            "decision": "block",
+            "reason": "tok_limit",
+            "trace_id": "trace-test",
+            "request_id": "request-test",
+            "retry_after_seconds": 60,
+        }
+    )
 
     class _Messages:
         def create(self, **kwargs: Any) -> Any:
@@ -176,8 +184,12 @@ def test_anthropic_block_raises_blocked_error() -> None:
     anthropic = type("Anthropic", (), {"messages": _Messages()})()
     instrument_anthropic(anthropic, client=client)
 
-    with pytest.raises(RHEONICBlockedError):
+    with pytest.raises(RHEONICBlockedError) as exc_info:
         anthropic.messages.create(model="claude-3-5-sonnet")
+    assert exc_info.value.reason == "tok_limit"
+    assert exc_info.value.trace_id == "trace-test"
+    assert exc_info.value.request_id == "request-test"
+    assert exc_info.value.retry_after_seconds == 60
     client.close()
 
 

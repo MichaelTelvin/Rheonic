@@ -10,7 +10,11 @@ function makeClient(decision: Record<string, unknown>) {
   return {
     environment: "dev",
     debugLog: () => {},
-    evaluateProtectDecision: async () => decision,
+    evaluateProtectDecision: async () => ({
+      trace_id: "trace-test",
+      request_id: "request-test",
+      ...decision,
+    }),
     captureEvent: async (event: unknown) => {
       captured.push(event);
     },

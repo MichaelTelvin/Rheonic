@@ -145,8 +145,22 @@ test("decision block prevents provider call", async () => {
     const client = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
-    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
+    let blockedError: unknown = null;
+    await assert.rejects(async () => {
+      try {
+        await openai.chat.completions.create({ model: "gpt-4o-mini" });
+      } catch (error) {
+        blockedError = error as RHEONICBlockedError;
+        throw error;
+      }
+    }, RHEONICBlockedError);
     assert.equal(calls.length, 0);
+    assert.ok(blockedError instanceof RHEONICBlockedError);
+    assert.equal(blockedError.reason, "tok_limit");
+    assert.equal(typeof blockedError.trace_id, "string");
+    assert.ok(blockedError.trace_id.length > 0);
+    assert.equal(typeof blockedError.request_id, "string");
+    assert.ok(blockedError.request_id.length > 0);
     client.close();
   } finally {
     globalThis.fetch = originalFetch;
@@ -180,8 +194,20 @@ test("blocked_until short-circuits subsequent decision calls locally", async () 
     const { openai } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
     await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
-    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
+    let cachedBlockedError: unknown = null;
+    await assert.rejects(async () => {
+      try {
+        await openai.chat.completions.create({ model: "gpt-4o-mini" });
+      } catch (error) {
+        cachedBlockedError = error as RHEONICBlockedError;
+        throw error;
+      }
+    }, RHEONICBlockedError);
     assert.equal(decisionCalls, 1);
+    assert.ok(cachedBlockedError instanceof RHEONICBlockedError);
+    assert.equal(cachedBlockedError.reason, "cooldown_active");
+    assert.equal(cachedBlockedError.blocked_until, blockedUntil);
+    assert.ok((cachedBlockedError.retry_after_seconds ?? 0) > 0);
     client.close();
   } finally {
     globalThis.fetch = originalFetch;
@@ -528,11 +554,21 @@ test("decision timeout fail-closed blocks provider call", async () => {
     ((client as unknown as { protectEngine?: { decisionTimeoutMs?: number } }).protectEngine ?? {}).decisionTimeoutMs = 5;
     const { openai, calls } = makeOpenAIStub();
     instrumentOpenAI(openai, { client });
-    await assert.rejects(() => openai.chat.completions.create({ model: "gpt-4o-mini" }), RHEONICBlockedError);
+    let blockedError: unknown = null;
+    await assert.rejects(async () => {
+      try {
+        await openai.chat.completions.create({ model: "gpt-4o-mini" });
+      } catch (error) {
+        blockedError = error;
+        throw error;
+      }
+    }, RHEONICBlockedError);
     assert.equal(calls.length, 0);
     assert.equal(timeoutReports.length, 1);
     assert.equal(timeoutReports[0].environment, "staging");
     assert.equal(timeoutReports[0].provider, "openai");
+    assert.ok(blockedError instanceof RHEONICBlockedError);
+    assert.equal(blockedError.reason, "fail_closed");
     client.close();
   } finally {
     globalThis.fetch = originalFetch;

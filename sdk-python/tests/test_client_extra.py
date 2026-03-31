@@ -108,10 +108,11 @@ def test_preflight_protect_decision_uses_fail_closed_fallback_on_unexpected_erro
 
     client._protect_engine.evaluate = lambda _context: (_ for _ in ()).throw(RuntimeError("boom"))  # type: ignore[method-assign]
 
-    assert client.preflight_protect_decision({"provider": "openai"}) == {
-        "decision": "block",
-        "reason": "decision_unavailable",
-    }
+    decision = client.preflight_protect_decision({"provider": "openai"})
+    assert decision["decision"] == "block"
+    assert decision["reason"] == "fail_closed"
+    assert isinstance(decision["trace_id"], str) and decision["trace_id"]
+    assert isinstance(decision["request_id"], str) and decision["request_id"]
     client.close()
 
 
@@ -242,10 +243,11 @@ def test_preflight_protect_decision_uses_fail_open_fallback_on_unexpected_error(
 
     client._protect_engine.evaluate = lambda _context: (_ for _ in ()).throw(RuntimeError("boom"))  # type: ignore[method-assign]
 
-    assert client.preflight_protect_decision({"provider": "openai"}) == {
-        "decision": "allow",
-        "reason": "decision_unavailable",
-    }
+    decision = client.preflight_protect_decision({"provider": "openai"})
+    assert decision["decision"] == "allow"
+    assert decision["reason"] == "decision_unavailable"
+    assert isinstance(decision["trace_id"], str) and decision["trace_id"]
+    assert isinstance(decision["request_id"], str) and decision["request_id"]
     client.close()
 
 

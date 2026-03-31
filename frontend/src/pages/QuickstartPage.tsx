@@ -140,7 +140,13 @@ try {
   });
 } catch (error) {
   if (error instanceof RHEONICBlockedError) {
-    console.log("Blocked by protect preflight");
+    console.log(JSON.stringify({
+      reason: error.reason,
+      retry_after_seconds: error.retry_after_seconds,
+      blocked_until: error.blocked_until,
+      trace_id: error.trace_id,
+      request_id: error.request_id,
+    }, null, 2));
   }
 }`;
       }
@@ -163,7 +169,13 @@ try {
   });
 } catch (error) {
   if (error instanceof RHEONICBlockedError) {
-    console.log("Blocked by protect preflight");
+    console.log(JSON.stringify({
+      reason: error.reason,
+      retry_after_seconds: error.retry_after_seconds,
+      blocked_until: error.blocked_until,
+      trace_id: error.trace_id,
+      request_id: error.request_id,
+    }, null, 2));
   }
 }`;
       }
@@ -183,12 +195,19 @@ try {
   await model.generateContent("hello");
 } catch (error) {
   if (error instanceof RHEONICBlockedError) {
-    console.log("Blocked by protect preflight");
+    console.log(JSON.stringify({
+      reason: error.reason,
+      retry_after_seconds: error.retry_after_seconds,
+      blocked_until: error.blocked_until,
+      trace_id: error.trace_id,
+      request_id: error.request_id,
+    }, null, 2));
   }
 }`;
       }
       if (provider === "anthropic") {
-        return `import os
+        return `import json
+import os
 from anthropic import Anthropic
 from rheonic import create_client, RHEONICBlockedError
 
@@ -206,11 +225,18 @@ try:
         max_tokens=256,
         messages=[{"role": "user", "content": "hello"}],
     )
-except RHEONICBlockedError:
-    print("Blocked by protect preflight")`;
+except RHEONICBlockedError as error:
+    print(json.dumps({
+        "reason": error.reason,
+        "retry_after_seconds": error.retry_after_seconds,
+        "blocked_until": error.blocked_until,
+        "trace_id": error.trace_id,
+        "request_id": error.request_id,
+    }, indent=2))`;
       }
       if (provider === "google") {
-        return `import os
+        return `import json
+import os
 import google.generativeai as genai
 from rheonic import create_client, RHEONICBlockedError
 
@@ -223,10 +249,17 @@ google_model = rheonic.instrument_google(genai.GenerativeModel("gemini-1.5-pro")
 
 try:
     google_model.generate_content("hello")
-except RHEONICBlockedError:
-    print("Blocked by protect preflight")`;
+except RHEONICBlockedError as error:
+    print(json.dumps({
+        "reason": error.reason,
+        "retry_after_seconds": error.retry_after_seconds,
+        "blocked_until": error.blocked_until,
+        "trace_id": error.trace_id,
+        "request_id": error.request_id,
+    }, indent=2))`;
       }
-      return `import os
+      return `import json
+import os
 from openai import OpenAI
 from rheonic import create_client, instrument_openai, RHEONICBlockedError
 
@@ -247,8 +280,14 @@ try:
         messages=[{"role": "user", "content": "hello"}],
         max_tokens=256,
     )
-except RHEONICBlockedError:
-    print("Blocked by protect preflight")`;
+except RHEONICBlockedError as error:
+    print(json.dumps({
+        "reason": error.reason,
+        "retry_after_seconds": error.retry_after_seconds,
+        "blocked_until": error.blocked_until,
+        "trace_id": error.trace_id,
+        "request_id": error.request_id,
+    }, indent=2))`;
     },
     [runtime, provider],
   );
@@ -385,6 +424,17 @@ RHEONIC_BASE_URL=<value_shown_in_dashboard>`}
                   </button>
                 </div>
                 <CodeBlock code={protect} language={runtime === "node" ? "ts" : "python"} />
+              </div>
+              <div className="quickstart-step-callout">
+                <p>
+                  On block, SDK instrumentation raises <code>RHEONICBlockedError</code> with agent-visible feedback:
+                  <code>reason</code>, <code>retry_after_seconds</code>, <code>blocked_until</code>, <code>trace_id</code>,
+                  and <code>request_id</code>.
+                </p>
+                <p>
+                  The main reasons are <code>tok_cap_breach</code>, <code>req_cap_breach</code>, <code>cooldown_active</code>,
+                  and <code>fail_closed</code>.
+                </p>
               </div>
               <p className="quickstart-step-muted">
                 Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all

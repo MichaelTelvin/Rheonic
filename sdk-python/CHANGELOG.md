@@ -1,12 +1,18 @@
 # Changelog
 
-All notable changes to `rheonic` will be documented in this file.
+All notable changes to `rheonic-sdk` will be documented in this file.
 
 ## Unreleased
 
 - Publish-ready changelog entries will be added here for the next release.
 
-## 0.1.0
+## 0.1.0b7
+
+### Changed
+- `RHEONICBlockedError` now exposes structured block feedback for apps and agents: `reason`, `retry_after_seconds`, `blocked_until`, `trace_id`, `request_id`, and `snapshot`.
+- Fail-closed protect fallback now reports `reason="fail_closed"` instead of the generic `decision_unavailable` on blocked requests.
+
+## 0.1.0b6
 
 ### Added
 - Initial public beta release of the Rheonic Python SDK.

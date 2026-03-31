@@ -30,6 +30,10 @@ import {
   updateProjectWebhook,
 } from "./client";
 
+function resolveRefreshResponse(resolve: (value: Response) => void, response: Response): void {
+  resolve(response);
+}
+
 describe("api client", () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
@@ -246,14 +250,16 @@ describe("api client", () => {
     );
     expect(incidentCallsBeforeRefresh).toHaveLength(0);
 
-    if (resolveRefresh) {
-      resolveRefresh(
-        new Response(JSON.stringify({ user: { id: "u1", email: "u@example.com" } }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
+    if (!resolveRefresh) {
+      throw new Error("Expected refresh resolver to be set");
     }
+    resolveRefreshResponse(
+      resolveRefresh,
+      new Response(JSON.stringify({ user: { id: "u1", email: "u@example.com" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
 
     await firstRequest;
     await secondRequestPromise;

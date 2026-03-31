@@ -31,11 +31,24 @@ Available settings:
 - `clamp`: request proceeds with a lower output-token limit applied by the SDK.
 - `block`: request is denied before the provider call runs.
 
+When a block is returned, SDK instrumentation raises `RHEONICBlockedError` and includes:
+- `reason`
+- `retry_after_seconds`
+- `blocked_until`
+- `trace_id`
+- `request_id`
+
 ## What Can Trigger a Block
 - request cap breach,
 - token cap breach,
 - active cooldown after a previous block,
 - protect fail mode set to closed when the decision path is unavailable.
+
+Block reasons exposed to the app are:
+- `req_cap_breach`
+- `tok_cap_breach`
+- `cooldown_active`
+- `fail_closed`
 
 Behavioral anomaly incidents such as `retry_storm`, `loop_suspect`, and `token_explosion` are opened from ingest in both Observe and Protect modes. Protect itself only enforces caps and clamp decisions.
 

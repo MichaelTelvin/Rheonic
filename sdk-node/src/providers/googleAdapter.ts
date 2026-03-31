@@ -68,7 +68,7 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
     const protectDecision = await options.client.evaluateProtectDecision(protectPayload);
 
     if (protectDecision.decision === "block") {
-      throw new RHEONICBlockedError(protectDecision.reason);
+      throw new RHEONICBlockedError(protectDecision);
     }
     const callArgs = maybeApplyGoogleClamp(args, protectDecision);
     markClampAppliedIfChanged(protectDecision, extractMaxOutputTokens(args), extractMaxOutputTokens(callArgs));

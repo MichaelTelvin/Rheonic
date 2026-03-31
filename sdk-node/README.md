@@ -48,7 +48,19 @@ try {
   });
 } catch (error) {
   if (error instanceof RHEONICBlockedError) {
-    console.log("Blocked by protect preflight");
+    console.log(
+      JSON.stringify(
+        {
+          reason: error.reason,
+          retry_after_seconds: error.retry_after_seconds,
+          blocked_until: error.blocked_until,
+          trace_id: error.trace_id,
+          request_id: error.request_id,
+        },
+        null,
+        2,
+      ),
+    );
   }
 }
 ```
@@ -74,7 +86,13 @@ try {
   });
 } catch (error) {
   if (error instanceof RHEONICBlockedError) {
-    console.log("Blocked by protect preflight");
+    console.log(JSON.stringify({
+      reason: error.reason,
+      retry_after_seconds: error.retry_after_seconds,
+      blocked_until: error.blocked_until,
+      trace_id: error.trace_id,
+      request_id: error.request_id,
+    }, null, 2));
   }
 }
 ```
@@ -97,10 +115,24 @@ try {
   await model.generateContent("hello");
 } catch (error) {
   if (error instanceof RHEONICBlockedError) {
-    console.log("Blocked by protect preflight");
+    console.log(JSON.stringify({
+      reason: error.reason,
+      retry_after_seconds: error.retry_after_seconds,
+      blocked_until: error.blocked_until,
+      trace_id: error.trace_id,
+      request_id: error.request_id,
+    }, null, 2));
   }
 }
 ```
+
+`RHEONICBlockedError.reason` is meant to be operator-relevant. The main values are:
+- `tok_cap_breach`
+- `req_cap_breach`
+- `cooldown_active`
+- `fail_closed`
+
+If Protect is `fail_open`, timeout or availability problems stay internal and the provider call continues. If Protect is `fail_closed`, the SDK raises `RHEONICBlockedError` with the feedback fields shown above.
 
 Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all capture and instrumentation calls so Rheonic can avoid repeated protect cold-start latency.
 

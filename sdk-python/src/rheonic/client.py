@@ -8,6 +8,7 @@ import time
 from collections import deque
 from typing import Any, Literal, Protocol, cast
 from urllib import error, request
+from uuid import uuid4
 
 try:
     import httpx
@@ -325,9 +326,21 @@ class Client:
             return self._protect_engine.evaluate(context)
         except Exception:
             logger.exception("protect preflight failed unexpectedly", extra=build_log_extra(event="error"))
+            trace_id = generate_trace_id()
+            request_id = uuid4().hex
             if self.protect_fail_mode == "closed":
-                return {"decision": "block", "reason": "decision_unavailable"}
-            return {"decision": "allow", "reason": "decision_unavailable"}
+                return {
+                    "decision": "block",
+                    "reason": "fail_closed",
+                    "trace_id": trace_id,
+                    "request_id": request_id,
+                }
+            return {
+                "decision": "allow",
+                "reason": "decision_unavailable",
+                "trace_id": trace_id,
+                "request_id": request_id,
+            }
 
     def warm_connections(self) -> None:
         # Best-effort warmup of the shared backend HTTP connection and protect runtime config.

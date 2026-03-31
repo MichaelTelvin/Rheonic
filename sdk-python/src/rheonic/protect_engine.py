@@ -26,9 +26,23 @@ logger = get_logger(__name__)
 class RHEONICBlockedError(RuntimeError):
     # Raised when backend preflight blocks an outbound provider request.
 
-    def __init__(self, reason: str) -> None:
+    def __init__(
+        self,
+        reason: str,
+        *,
+        trace_id: str,
+        request_id: str,
+        blocked_until: str | None = None,
+        retry_after_seconds: int | None = None,
+        snapshot: dict[str, object] | None = None,
+    ) -> None:
         super().__init__(f"Request blocked by Rheonic: {reason}")
         self.reason = reason
+        self.trace_id = trace_id
+        self.request_id = request_id
+        self.blocked_until = blocked_until
+        self.retry_after_seconds = retry_after_seconds
+        self.snapshot = snapshot
 
 
 class RHEONICValidationError(Exception):
@@ -66,6 +80,8 @@ class ProtectEngine:
 
     def evaluate(self, context: dict[str, object]) -> dict[str, object]:
         # Return allow/clamp/block decision from backend with fail-mode fallback.
+        request_id = uuid4().hex
+        trace_id = generate_trace_id()
         now_ms = int(time.time() * 1000)
         if self._cooldown_until_ms is not None and now_ms < self._cooldown_until_ms:
             self._debug(
@@ -74,12 +90,18 @@ class ProtectEngine:
                 decision="block",
                 reason=self._cooldown_reason or "cooldown_active",
             )
-            return {"decision": "block", "reason": self._cooldown_reason or "cooldown_active"}
+            return {
+                "decision": "block",
+                "reason": self._cooldown_reason or "cooldown_active",
+                "trace_id": trace_id,
+                "request_id": request_id,
+                "blocked_until": _format_blocked_until_ms(self._cooldown_until_ms),
+                "retry_after_seconds": _to_retry_after_seconds(self._cooldown_until_ms, now_ms),
+            }
 
         timeout_s = max(self._decision_timeout_ms, 1) / 1000.0
         started_at = time.perf_counter()
-        request_id = uuid4().hex
-        context_tokens = bind_trace_context(trace_id=generate_trace_id())
+        context_tokens = bind_trace_context(trace_id=trace_id)
         try:
             response = self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision",
@@ -106,7 +128,7 @@ class ProtectEngine:
                     request_id=request_id,
                     trace_id=get_trace_id(),
                 )
-                return self._fallback_decision()
+                return self._fallback_decision(trace_id=trace_id, request_id=request_id)
             payload = self._parse_json_payload(response)
             decision = str(payload.get("decision") or "allow")
             reason = str(payload.get("reason") or "ok")
@@ -126,9 +148,20 @@ class ProtectEngine:
             if decision not in {"allow", "clamp", "block"}:
                 decision = "allow"
             result: dict[str, object] = {"decision": decision, "reason": reason}
+            result["trace_id"] = trace_id
+            result["request_id"] = request_id
+            blocked_until_value = payload.get("blocked_until")
+            if isinstance(blocked_until_value, str) and blocked_until_value.strip():
+                result["blocked_until"] = blocked_until_value
+            retry_after_seconds = payload.get("retry_after_seconds")
+            if isinstance(retry_after_seconds, int) and retry_after_seconds >= 0:
+                result["retry_after_seconds"] = retry_after_seconds
             apply_clamp_enabled = payload.get("apply_clamp_enabled")
             if isinstance(apply_clamp_enabled, bool):
                 result["apply_clamp_enabled"] = apply_clamp_enabled
+            snapshot_payload = payload.get("snapshot")
+            if isinstance(snapshot_payload, dict):
+                result["snapshot"] = snapshot_payload
             clamp_payload = payload.get("clamp")
             if isinstance(clamp_payload, dict):
                 recommended = clamp_payload.get("recommended_max_output_tokens")
@@ -177,7 +210,7 @@ class ProtectEngine:
                     request_id=request_id,
                     trace_id=get_trace_id(),
                 )
-            return self._fallback_decision()
+            return self._fallback_decision(trace_id=trace_id, request_id=request_id)
         finally:
             reset_trace_context(context_tokens)
 
@@ -252,11 +285,11 @@ class ProtectEngine:
                 return payload
         return {}
 
-    def _fallback_decision(self) -> dict[str, object]:
+    def _fallback_decision(self, *, trace_id: str, request_id: str) -> dict[str, object]:
         # Apply fail-open/fail-closed behavior when decision call fails.
         if self._fail_mode == "closed":
-            return {"decision": "block", "reason": "decision_unavailable"}
-        return {"decision": "allow", "reason": "decision_unavailable"}
+            return {"decision": "block", "reason": "fail_closed", "trace_id": trace_id, "request_id": request_id}
+        return {"decision": "allow", "reason": "decision_unavailable", "trace_id": trace_id, "request_id": request_id}
 
     def _is_timeout_error(self) -> bool:
         # Identify timeout failures from common SDK transports.
@@ -329,3 +362,15 @@ def _parse_blocked_until_ms(value: object) -> int | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return int(parsed.timestamp() * 1000)
+
+
+def _format_blocked_until_ms(value: int | None) -> str | None:
+    if value is None or value <= 0:
+        return None
+    return datetime.fromtimestamp(value / 1000.0, tz=timezone.utc).isoformat()
+
+
+def _to_retry_after_seconds(blocked_until_ms: int | None, now_ms: int) -> int | None:
+    if blocked_until_ms is None or blocked_until_ms <= now_ms:
+        return None
+    return max(0, int((blocked_until_ms - now_ms + 999) / 1000))

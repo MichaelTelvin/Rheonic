@@ -26,6 +26,7 @@ Enforcement follows Project mode in the dashboard (`Observe` / `Protect`).
 OpenAI:
 
 ```python
+import json
 import os
 from openai import OpenAI
 from rheonic import create_client, instrument_openai, RHEONICBlockedError
@@ -47,13 +48,20 @@ try:
         messages=[{"role": "user", "content": "hello"}],
         max_tokens=256,
     )
-except RHEONICBlockedError:
-    print("Blocked by protect preflight")
+except RHEONICBlockedError as error:
+    print(json.dumps({
+        "reason": error.reason,
+        "retry_after_seconds": error.retry_after_seconds,
+        "blocked_until": error.blocked_until,
+        "trace_id": error.trace_id,
+        "request_id": error.request_id,
+    }, indent=2))
 ```
 
 Anthropic:
 
 ```python
+import json
 import os
 from anthropic import Anthropic
 from rheonic import create_client, RHEONICBlockedError
@@ -72,13 +80,20 @@ try:
         max_tokens=256,
         messages=[{"role": "user", "content": "hello"}],
     )
-except RHEONICBlockedError:
-    print("Blocked by protect preflight")
+except RHEONICBlockedError as error:
+    print(json.dumps({
+        "reason": error.reason,
+        "retry_after_seconds": error.retry_after_seconds,
+        "blocked_until": error.blocked_until,
+        "trace_id": error.trace_id,
+        "request_id": error.request_id,
+    }, indent=2))
 ```
 
 Google:
 
 ```python
+import json
 import os
 import google.generativeai as genai
 from rheonic import create_client, RHEONICBlockedError
@@ -92,9 +107,23 @@ google_model = rheonic.instrument_google(genai.GenerativeModel("gemini-1.5-pro")
 
 try:
     google_model.generate_content("hello")
-except RHEONICBlockedError:
-    print("Blocked by protect preflight")
+except RHEONICBlockedError as error:
+    print(json.dumps({
+        "reason": error.reason,
+        "retry_after_seconds": error.retry_after_seconds,
+        "blocked_until": error.blocked_until,
+        "trace_id": error.trace_id,
+        "request_id": error.request_id,
+    }, indent=2))
 ```
+
+`RHEONICBlockedError.reason` is meant to be operator-relevant. The main values are:
+- `tok_cap_breach`
+- `req_cap_breach`
+- `cooldown_active`
+- `fail_closed`
+
+If Protect is `fail_open`, timeout or availability problems stay internal and the provider call continues. If Protect is `fail_closed`, the SDK raises `RHEONICBlockedError` with the feedback fields shown above.
 
 Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all capture and instrumentation calls so Rheonic can avoid repeated protect cold-start latency.
 

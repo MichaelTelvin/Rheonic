@@ -216,9 +216,12 @@ def test_preflight_block_prevents_provider_call() -> None:
     openai_client, calls = _make_openai_stub()
     instrument_openai(openai_client, client=client)
 
-    with pytest.raises(RHEONICBlockedError):
+    with pytest.raises(RHEONICBlockedError) as exc_info:
         openai_client.chat.completions.create(model="gpt-4o-mini")
     assert calls == []
+    assert exc_info.value.reason == "tok_limit"
+    assert isinstance(exc_info.value.trace_id, str) and exc_info.value.trace_id
+    assert isinstance(exc_info.value.request_id, str) and exc_info.value.request_id
     client.close()
 
 
@@ -244,11 +247,15 @@ def test_blocked_until_short_circuits_subsequent_decision_calls_locally() -> Non
 
     with pytest.raises(RHEONICBlockedError):
         openai_client.chat.completions.create(model="gpt-4o-mini")
-    with pytest.raises(RHEONICBlockedError):
+    with pytest.raises(RHEONICBlockedError) as exc_info:
         openai_client.chat.completions.create(model="gpt-4o-mini")
     decision_calls = [url for url in transport.calls if url.endswith("/api/v1/protect/decision")]
     assert len(decision_calls) == 1
     assert calls == []
+    assert exc_info.value.reason == "cooldown_active"
+    expected_blocked_until = datetime.fromtimestamp(int(blocked_until * 1000) / 1000, tz=timezone.utc).isoformat()
+    assert exc_info.value.blocked_until == expected_blocked_until
+    assert isinstance(exc_info.value.retry_after_seconds, int) and exc_info.value.retry_after_seconds > 0
     client.close()
 
 
@@ -915,9 +922,21 @@ def test_protect_engine_json_and_fallback_helpers_cover_invalid_shapes() -> None
 
     assert engine._parse_json_payload(object()) == {}
     assert engine._parse_json_payload(type("Response", (), {"json": lambda self: []})()) == {}
-    assert engine._fallback_decision() == {"decision": "block", "reason": "decision_unavailable"}
+    closed_fallback = engine._fallback_decision(trace_id="trace-1", request_id="request-1")
+    assert closed_fallback == {
+        "decision": "block",
+        "reason": "fail_closed",
+        "trace_id": "trace-1",
+        "request_id": "request-1",
+    }
     engine._fail_mode = "open"
-    assert engine._fallback_decision() == {"decision": "allow", "reason": "decision_unavailable"}
+    open_fallback = engine._fallback_decision(trace_id="trace-2", request_id="request-2")
+    assert open_fallback == {
+        "decision": "allow",
+        "reason": "decision_unavailable",
+        "trace_id": "trace-2",
+        "request_id": "request-2",
+    }
 
 
 def test_protect_engine_debug_uses_fallback_logger_when_debug_logger_fails(monkeypatch: pytest.MonkeyPatch) -> None:

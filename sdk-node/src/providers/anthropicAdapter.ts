@@ -69,7 +69,7 @@ export function instrumentAnthropic<T extends Record<string, any>>(
     const protectDecision = await options.client.evaluateProtectDecision(protectPayload);
 
     if (protectDecision.decision === "block") {
-      throw new RHEONICBlockedError(protectDecision.reason);
+      throw new RHEONICBlockedError(protectDecision);
     }
     const callArgs = maybeApplyAnthropicClamp(args, protectDecision);
     markClampAppliedIfChanged(protectDecision, extractMaxOutputTokens(args), extractMaxOutputTokens(callArgs));

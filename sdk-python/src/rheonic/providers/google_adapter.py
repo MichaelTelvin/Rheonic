@@ -62,7 +62,7 @@ def instrument_google(
                 feature=feature,
             )
             if protect_decision.get("decision") == "block":
-                raise RHEONICBlockedError(str(protect_decision.get("reason") or "blocked"))
+                raise _blocked_error_from_decision(protect_decision)
             call_args, call_kwargs = _apply_google_clamp(args, kwargs, protect_decision)
             try:
                 response = await original_generate(*call_args, **call_kwargs)
@@ -120,7 +120,7 @@ def instrument_google(
             feature=feature,
         )
         if protect_decision.get("decision") == "block":
-            raise RHEONICBlockedError(str(protect_decision.get("reason") or "blocked"))
+            raise _blocked_error_from_decision(protect_decision)
         call_args, call_kwargs = _apply_google_clamp(args, kwargs, protect_decision)
         try:
             response = original_generate(*call_args, **call_kwargs)
@@ -174,6 +174,22 @@ def _preflight(
             **({"input_tokens_estimate": estimated_input_tokens} if isinstance(estimated_input_tokens, int) else {}),
             "max_output_tokens": max_output_tokens,
         }
+    )
+
+
+def _blocked_error_from_decision(protect_decision: dict[str, object]) -> RHEONICBlockedError:
+    trace_id = protect_decision.get("trace_id")
+    request_id = protect_decision.get("request_id")
+    blocked_until = protect_decision.get("blocked_until")
+    retry_after_seconds = protect_decision.get("retry_after_seconds")
+    snapshot = protect_decision.get("snapshot")
+    return RHEONICBlockedError(
+        str(protect_decision.get("reason") or "blocked"),
+        trace_id=str(trace_id or ""),
+        request_id=str(request_id or ""),
+        blocked_until=blocked_until if isinstance(blocked_until, str) else None,
+        retry_after_seconds=retry_after_seconds if isinstance(retry_after_seconds, int) else None,
+        snapshot=snapshot if isinstance(snapshot, dict) else None,
     )
 
 
