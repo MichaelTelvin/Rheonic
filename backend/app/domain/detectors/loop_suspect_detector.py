@@ -36,8 +36,11 @@ class LoopSuspectDetector(Detector):
             )
             if event_signature != signature:
                 break
+            if event.error_type:
+                break
             if prev_ts is not None and (prev_ts - event_ts) > float(ctx.loop_max_gap_seconds):
                 break
+
             sequence_count += 1
             prev_ts = event_ts
 

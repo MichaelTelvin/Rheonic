@@ -20,7 +20,7 @@ import { InfoTooltip } from "../components/InfoTooltip";
 import { PulseMeter } from "../components/pulseMeter";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
-import { readProjectWarmState } from "../lib/projectWarmCache";
+import { mergeProjectWarmState, readProjectWarmState } from "../lib/projectWarmCache";
 
 function formatProviderLabel(provider: string): string {
   return provider
@@ -607,6 +607,12 @@ export function Dashboard(): JSX.Element {
         }
 
         setIncidents(data);
+        if (selectedProvider === "all") {
+          mergeProjectWarmState(projectId, {
+            providers,
+            incidents: data,
+          });
+        }
         setGlobalBanner(null);
         setLastIncidentsSuccessAt(new Date().toISOString());
       } catch (error) {

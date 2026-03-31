@@ -5,7 +5,7 @@ import { ApiError, fetchIncidents, fetchProjectProviders, resolveIncident, type 
 import { IncidentItem as IncidentRow } from "../components/IncidentItem";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
-import { readProjectWarmState } from "../lib/projectWarmCache";
+import { mergeProjectWarmState, readProjectWarmState } from "../lib/projectWarmCache";
 
 type IncidentsViewCacheState = {
   providers: string[];
@@ -65,6 +65,10 @@ function buildWarmIncidentsCache(
     providers: warm.providers ?? [],
     incidents: typeFiltered,
   };
+}
+
+function shouldRefreshProjectWarmIncidents(provider: string, status: string, type: string): boolean {
+  return provider === "all" && status === "open" && type === "all";
 }
 
 function formatProviderLabel(provider: string): string {
@@ -183,6 +187,12 @@ export function Incidents(): JSX.Element {
           providers,
           incidents: filteredRows,
         });
+        if (shouldRefreshProjectWarmIncidents(selectedProvider, selectedStatus, selectedType)) {
+          mergeProjectWarmState(projectId, {
+            providers,
+            incidents: rows,
+          });
+        }
         setWarning(null);
       } catch (error) {
         if (!cancelled) {
@@ -228,6 +238,12 @@ export function Incidents(): JSX.Element {
         providers,
         incidents: filteredRows,
       });
+      if (shouldRefreshProjectWarmIncidents(selectedProvider, selectedStatus, selectedType)) {
+        mergeProjectWarmState(projectId, {
+          providers,
+          incidents: updated,
+        });
+      }
       setWarning(null);
     } catch {
       setIncidents(previous);
