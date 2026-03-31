@@ -425,17 +425,6 @@ RHEONIC_BASE_URL=<value_shown_in_dashboard>`}
                 </div>
                 <CodeBlock code={protect} language={runtime === "node" ? "ts" : "python"} />
               </div>
-              <div className="quickstart-step-callout">
-                <p>
-                  On block, SDK instrumentation raises <code>RHEONICBlockedError</code> with agent-visible feedback:
-                  <code>reason</code>, <code>retry_after_seconds</code>, <code>blocked_until</code>, <code>trace_id</code>,
-                  and <code>request_id</code>.
-                </p>
-                <p>
-                  The main reasons are <code>tok_cap_breach</code>, <code>req_cap_breach</code>, <code>cooldown_active</code>,
-                  and <code>fail_closed</code>.
-                </p>
-              </div>
               <p className="quickstart-step-muted">
                 Keep one long-lived SDK client per app process. Initialize it during app startup and reuse it for all
                 capture and instrumentation calls so Rheonic can avoid repeated protect cold-start latency.
