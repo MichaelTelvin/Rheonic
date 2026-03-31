@@ -20,6 +20,7 @@ import { InfoTooltip } from "../components/InfoTooltip";
 import { PulseMeter } from "../components/pulseMeter";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
+import { readProjectWarmState } from "../lib/projectWarmCache";
 
 function formatProviderLabel(provider: string): string {
   return provider
@@ -67,7 +68,29 @@ type DashboardCachedState = {
 const dashboardMemoryCache = new Map<string, DashboardCachedState>();
 
 function buildInitialDashboardState(projectId: string | null | undefined): DashboardCachedState | null {
-  return projectId ? readDashboardCache(projectId) : null;
+  if (!projectId) {
+    return null;
+  }
+  const cached = readDashboardCache(projectId);
+  if (cached) {
+    return cached;
+  }
+  const warm = readProjectWarmState(projectId);
+  if (!warm) {
+    return null;
+  }
+  const setupSignalsResolved = typeof warm.hasIngestKey === "boolean" && Array.isArray(warm.providers);
+  return {
+    selectedProvider: "all",
+    hasIngestKey: warm.hasIngestKey ?? false,
+    hasEvents: (warm.providers?.length ?? 0) > 0,
+    setupStatusResolved: setupSignalsResolved,
+    metrics: null,
+    lastMetricsSuccessAt: null,
+    protectHealth: warm.protectHealth ?? null,
+    lastProtectHealthSuccessAt: warm.lastProtectHealthSuccessAt ?? null,
+    protectDecisionStats: warm.protectDecisionStats ?? null,
+  };
 }
 
 function readDashboardCache(projectId: string): DashboardCachedState | null {
@@ -82,6 +105,7 @@ export function Dashboard(): JSX.Element {
   const { loadingProjects, projects, projectId } = useProjectContext();
   const navigate = useNavigate();
   const initialDashboardState = buildInitialDashboardState(projectId);
+  const initialWarmState = readProjectWarmState(projectId);
 
   const [metrics, setMetrics] = useState<RealtimeMetrics | null>(initialDashboardState?.metrics ?? null);
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
@@ -101,7 +125,7 @@ export function Dashboard(): JSX.Element {
     blocked_60m: number | null;
   } | null>(initialDashboardState?.protectDecisionStats ?? null);
   const [globalBanner, setGlobalBanner] = useState<string | null>(null);
-  const [providers, setProviders] = useState<string[]>([]);
+  const [providers, setProviders] = useState<string[]>(initialWarmState?.providers ?? []);
   const [selectedProvider, setSelectedProvider] = useState<string>(initialDashboardState?.selectedProvider ?? "all");
   const providerRequestSeq = useRef<number>(0);
   const metricsRequestSeq = useRef<number>(0);
@@ -162,6 +186,7 @@ export function Dashboard(): JSX.Element {
 
   useLayoutEffect(() => {
     const cached = projectId ? readDashboardCache(projectId) : null;
+    const warm = readProjectWarmState(projectId);
     setMetrics(cached?.metrics ?? null);
     setIncidents([]);
     setRequestsSeries([]);
@@ -173,11 +198,11 @@ export function Dashboard(): JSX.Element {
     setProtectHealth(cached?.protectHealth ?? null);
     setLastProtectHealthSuccessAt(cached?.lastProtectHealthSuccessAt ?? null);
     setProtectHealthFetchFailed(false);
-    setProviders([]);
+    setProviders(warm?.providers ?? []);
     setSelectedProvider(cached?.selectedProvider ?? "all");
-    setHasIngestKey(cached?.hasIngestKey ?? false);
-    setHasEvents(cached?.hasEvents ?? false);
-    setSetupStatusResolved(cached?.setupStatusResolved ?? false);
+    setHasIngestKey(cached?.hasIngestKey ?? warm?.hasIngestKey ?? false);
+    setHasEvents(cached?.hasEvents ?? ((warm?.providers?.length ?? 0) > 0));
+    setSetupStatusResolved(cached?.setupStatusResolved ?? (typeof warm?.hasIngestKey === "boolean" && Array.isArray(warm?.providers)));
     setWebhookIssue(null);
     setWebhookIssueDismissedToken(null);
     setSetupBannerClosing(false);

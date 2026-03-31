@@ -14,31 +14,29 @@ import { InfoTooltip } from "../components/InfoTooltip";
 import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
+import { mergeProjectWarmState, readProjectWarmState } from "../lib/projectWarmCache";
 
 type ProtectCacheState = {
   protectSettings: ProjectProtectSettings | null;
 };
 
-function protectCacheKey(projectId: string): string {
-  return `rheonic:protect:${projectId}`;
-}
+const protectMemoryCache = new Map<string, ProtectCacheState>();
 
 function readProtectCache(projectId: string | null): ProtectCacheState | null {
   if (!projectId) {
     return null;
   }
-  try {
-    const raw = window.sessionStorage.getItem(protectCacheKey(projectId));
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as Partial<ProtectCacheState>;
-    return {
-      protectSettings: parsed.protectSettings ?? null,
-    };
-  } catch {
+  const cached = protectMemoryCache.get(projectId);
+  if (cached) {
+    return cached;
+  }
+  const warm = readProjectWarmState(projectId);
+  if (!warm) {
     return null;
   }
+  return {
+    protectSettings: warm.protectSettings ?? null,
+  };
 }
 
 export function Protect(): JSX.Element {
@@ -123,16 +121,9 @@ export function Protect(): JSX.Element {
     if (!projectId) {
       return;
     }
-    try {
-      window.sessionStorage.setItem(
-        protectCacheKey(projectId),
-        JSON.stringify({
-          protectSettings,
-        } satisfies ProtectCacheState),
-      );
-    } catch {
-      // Ignore cache write failures.
-    }
+    protectMemoryCache.set(projectId, {
+      protectSettings,
+    });
   }, [projectId, protectSettings]);
 
   const readinessItems = useMemo(
@@ -218,6 +209,7 @@ export function Protect(): JSX.Element {
           return;
         }
         setProtectSettings(settings);
+        mergeProjectWarmState(projectId, { protectSettings: settings });
         applyInputsFromSettings(settings);
         setProtectError(null);
       } catch (error) {
@@ -278,6 +270,7 @@ export function Protect(): JSX.Element {
         protect_max_req_per_min,
         protect_max_tok_per_min,
       });
+      mergeProjectWarmState(projectId, { protectSettings: updated });
 
       setProtectSettings(updated);
       applyInputsFromSettings(updated);

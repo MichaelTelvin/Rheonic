@@ -15,6 +15,7 @@ import { UnsavedChangesToast } from "../components/UnsavedChangesToast";
 import { useAuthContext } from "../context/AuthContext";
 import { useProjectContext } from "../context/ProjectContext";
 import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
+import { mergeProjectWarmState, readProjectWarmState } from "../lib/projectWarmCache";
 
 function formatDateTime(iso: string | null): string {
   if (!iso) {
@@ -70,7 +71,15 @@ export function Alerts(): JSX.Element {
   const { user } = useAuthContext();
   const webhookTestMarkerKey = projectId ? `rheonic:webhookTestAt:${projectId}` : null;
   const initialMemoryCache = readAlertsMemoryCache(projectId);
-  const initialCache = initialMemoryCache;
+  const initialWarmState = readProjectWarmState(projectId);
+  const initialCache = initialMemoryCache ?? (
+    initialWarmState
+      ? {
+          webhookSettings: initialWarmState.webhookSettings ?? null,
+          protectEnabled: Boolean(initialWarmState.protectSettings?.protect_enabled),
+        }
+      : null
+  );
 
   const [webhookSettings, setWebhookSettings] = useState<ProjectWebhookSettings | null>(initialCache?.webhookSettings ?? null);
   const [webhookEnabledInput, setWebhookEnabledInput] = useState<boolean>(initialCache?.webhookSettings?.enabled ?? false);
@@ -87,13 +96,14 @@ export function Alerts(): JSX.Element {
 
   useLayoutEffect(() => {
     const cached = readAlertsMemoryCache(projectId);
-    const cachedSettings = cached?.webhookSettings ?? null;
+    const warm = readProjectWarmState(projectId);
+    const cachedSettings = cached?.webhookSettings ?? warm?.webhookSettings ?? null;
     setWebhookSettings(cachedSettings);
     setWebhookEnabledInput(cachedSettings?.enabled ?? false);
     setEmailEnabledInput(Boolean(cachedSettings?.email_enabled));
     setWebhookUrlInput(cachedSettings?.url ?? "");
-    setProtectEnabled(cached?.protectEnabled ?? false);
-    setLoadingSettings(projectId ? cached === null : false);
+    setProtectEnabled(cached?.protectEnabled ?? Boolean(warm?.protectSettings?.protect_enabled));
+    setLoadingSettings(projectId ? cached === null && warm === null : false);
     setWebhookError(null);
   }, [projectId]);
 
@@ -118,6 +128,10 @@ export function Alerts(): JSX.Element {
       const [settings, protectSettings] = await Promise.all([fetchProjectWebhook(projectId), fetchProjectProtect(projectId)]);
       setWebhookSettings(settings);
       setProtectEnabled(Boolean(protectSettings.protect_enabled));
+      mergeProjectWarmState(projectId, {
+        webhookSettings: settings,
+        protectSettings,
+      });
       if (!preserveInputs) {
         setWebhookEnabledInput(settings.enabled);
         setEmailEnabledInput(Boolean(settings.email_enabled));
@@ -153,6 +167,10 @@ export function Alerts(): JSX.Element {
         }
         setWebhookSettings(settings);
         setProtectEnabled(Boolean(protectSettings.protect_enabled));
+        mergeProjectWarmState(projectId, {
+          webhookSettings: settings,
+          protectSettings,
+        });
         setWebhookEnabledInput(settings.enabled);
         setEmailEnabledInput(Boolean(settings.email_enabled));
         setWebhookUrlInput(settings.url ?? "");

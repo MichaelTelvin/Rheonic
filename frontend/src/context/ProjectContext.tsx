@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { fetchProjects, type ProjectItem } from "../api/client";
 import { frontendConfig } from "../config";
+import { prefetchProjectWarmState } from "../lib/projectWarmCache";
 
 interface ProjectContextValue {
   loadingProjects: boolean;
@@ -80,6 +81,13 @@ export function ProjectProvider({ children }: { children: ReactNode }): JSX.Elem
       cancelled = true;
     };
   }, [reloadProjects]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+    void prefetchProjectWarmState(projectId);
+  }, [projectId]);
 
   const value = useMemo<ProjectContextValue>(
     () => ({
