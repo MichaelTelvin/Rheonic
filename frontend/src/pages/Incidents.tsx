@@ -5,6 +5,7 @@ import { ApiError, fetchIncidents, fetchProjectProviders, resolveIncident, type 
 import { IncidentItem as IncidentRow } from "../components/IncidentItem";
 import { frontendConfig } from "../config";
 import { useProjectContext } from "../context/ProjectContext";
+import { readProjectWarmState } from "../lib/projectWarmCache";
 
 type IncidentsViewCacheState = {
   providers: string[];
@@ -40,6 +41,32 @@ function writeIncidentProvidersCache(projectId: string, providers: string[]): vo
   incidentProvidersCache.set(projectId, providers);
 }
 
+function buildWarmIncidentsCache(
+  projectId: string | null,
+  provider: string,
+  status: string,
+  type: string,
+): IncidentsViewCacheState | null {
+  if (!projectId || status !== "open") {
+    return null;
+  }
+  const warm = readProjectWarmState(projectId);
+  if (!warm?.incidents) {
+    return null;
+  }
+  const providerFiltered = provider === "all"
+    ? warm.incidents
+    : warm.incidents.filter((incident) => {
+        const evidenceProvider = incident.evidence?.provider;
+        return typeof evidenceProvider === "string" && evidenceProvider.toLowerCase() === provider;
+      });
+  const typeFiltered = type === "all" ? providerFiltered : providerFiltered.filter((incident) => incident.type === type);
+  return {
+    providers: warm.providers ?? [],
+    incidents: typeFiltered,
+  };
+}
+
 function formatProviderLabel(provider: string): string {
   return provider
     .split(/[_-]/g)
@@ -52,8 +79,18 @@ export function Incidents(): JSX.Element {
   const { projectId } = useProjectContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialProvider = (searchParams.get("provider") ?? "all").toLowerCase();
-  const initialCache = projectId ? readIncidentsCache(projectId, initialProvider, "open", "all") : null;
-  const initialProviders = projectId ? readIncidentProvidersCache(projectId) : [];
+  const initialCache = projectId
+    ? (readIncidentsCache(projectId, initialProvider, "open", "all") ?? buildWarmIncidentsCache(projectId, initialProvider, "open", "all"))
+    : null;
+  const initialProviders = projectId
+    ? (() => {
+        const cachedProviders = readIncidentProvidersCache(projectId);
+        if (cachedProviders.length > 0) {
+          return cachedProviders;
+        }
+        return initialCache?.providers ?? readProjectWarmState(projectId)?.providers ?? [];
+      })()
+    : [];
 
   const [providers, setProviders] = useState<string[]>(initialProviders.length > 0 ? initialProviders : (initialCache?.providers ?? []));
   const [selectedProvider, setSelectedProvider] = useState<string>(initialProvider);
@@ -76,9 +113,22 @@ export function Incidents(): JSX.Element {
     setSelectedStatus("open");
     setSelectedProvider((searchParams.get("provider") ?? "all").toLowerCase());
     const cache = projectId
-      ? readIncidentsCache(projectId, (searchParams.get("provider") ?? "all").toLowerCase(), "open", "all")
+      ? (
+        readIncidentsCache(projectId, (searchParams.get("provider") ?? "all").toLowerCase(), "open", "all")
+        ?? buildWarmIncidentsCache(projectId, (searchParams.get("provider") ?? "all").toLowerCase(), "open", "all")
+      )
       : null;
-    setProviders(projectId ? (readIncidentProvidersCache(projectId) ?? (cache?.providers ?? [])) : []);
+    setProviders(
+      projectId
+        ? (() => {
+            const cachedProviders = readIncidentProvidersCache(projectId);
+            if (cachedProviders.length > 0) {
+              return cachedProviders;
+            }
+            return cache?.providers ?? readProjectWarmState(projectId)?.providers ?? [];
+          })()
+        : [],
+    );
     setIncidents(cache?.incidents ?? []);
   }, [projectId, searchParams]);
 

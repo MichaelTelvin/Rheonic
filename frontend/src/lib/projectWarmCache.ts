@@ -1,10 +1,12 @@
 import {
+  fetchIncidents,
   fetchProjectProtect,
   fetchProjectProviders,
   fetchProjectWebhook,
   fetchProtectHealth,
   fetchProtectMetrics,
   listKeys,
+  type IncidentItem,
   type ProjectProtectSettings,
   type ProjectWebhookSettings,
   type ProtectHealthMetrics,
@@ -20,6 +22,7 @@ export type ProjectWarmState = {
   protectSettings?: ProjectProtectSettings | null;
   webhookSettings?: ProjectWebhookSettings | null;
   providers?: string[];
+  incidents?: IncidentItem[];
   hasIngestKey?: boolean;
   protectHealth?: ProtectHealthMetrics | null;
   lastProtectHealthSuccessAt?: string | null;
@@ -53,13 +56,14 @@ export async function prefetchProjectWarmState(projectId: string): Promise<void>
 
   const task = (async () => {
     const fetchedAt = new Date().toISOString();
-    const [protectResult, webhookResult, providersResult, keysResult, healthResult, metricsResult] = await Promise.allSettled([
+    const [protectResult, webhookResult, providersResult, keysResult, healthResult, metricsResult, incidentsResult] = await Promise.allSettled([
       fetchProjectProtect(projectId),
       fetchProjectWebhook(projectId),
       fetchProjectProviders(projectId),
       listKeys(projectId),
       fetchProtectHealth(projectId),
       fetchProtectMetrics(projectId),
+      fetchIncidents(projectId, undefined, "open"),
     ]);
 
     const patch: Partial<ProjectWarmState> = {};
@@ -71,6 +75,9 @@ export async function prefetchProjectWarmState(projectId: string): Promise<void>
     }
     if (providersResult.status === "fulfilled") {
       patch.providers = providersResult.value;
+    }
+    if (incidentsResult.status === "fulfilled") {
+      patch.incidents = incidentsResult.value;
     }
     if (keysResult.status === "fulfilled") {
       patch.hasIngestKey = keysResult.value.some((key) => key.status === "active");

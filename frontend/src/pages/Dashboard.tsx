@@ -132,6 +132,7 @@ export function Dashboard(): JSX.Element {
   const [selectedProvider, setSelectedProvider] = useState<string>(initialDashboardState?.selectedProvider ?? "all");
   const providerRequestSeq = useRef<number>(0);
   const metricsRequestSeq = useRef<number>(0);
+  const lastProtectHealthSuccessAtRef = useRef<string | null>(initialDashboardState?.lastProtectHealthSuccessAt ?? null);
   const activeMetricsScopeRef = useRef<string | null>(null);
   const seriesByScopeRef = useRef<Record<string, { requests: number[]; tokens: number[] }>>({});
   const [hasIngestKey, setHasIngestKey] = useState<boolean>(initialDashboardState?.hasIngestKey ?? false);
@@ -213,6 +214,10 @@ export function Dashboard(): JSX.Element {
     setWebhookIssueBannerClosing(false);
     setLastMetricsSuccessAt(cached?.lastMetricsSuccessAt ?? null);
   }, [projectId]);
+
+  useEffect(() => {
+    lastProtectHealthSuccessAtRef.current = lastProtectHealthSuccessAt;
+  }, [lastProtectHealthSuccessAt]);
 
   useEffect(() => {
     if (!projectId) {
@@ -472,9 +477,8 @@ export function Dashboard(): JSX.Element {
         setLastProtectHealthSuccessAt(new Date().toISOString());
       } catch {
         if (!cancelled) {
-          setProtectHealthFetchFailed(true);
           setProtectHealthResolved(true);
-          setProtectHealth(null);
+          setProtectHealthFetchFailed(lastProtectHealthSuccessAtRef.current === null);
         }
       }
     };
