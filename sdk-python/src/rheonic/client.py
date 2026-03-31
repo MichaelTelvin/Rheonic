@@ -1,5 +1,6 @@
 # SDK client with async fire-and-forget ingest queue.
 import atexit
+import importlib.util
 import json as json_lib
 import os
 import random
@@ -144,7 +145,23 @@ class _HttpxTransport:
     def __init__(self, timeout_s: float) -> None:
         if httpx is None:  # pragma: no cover
             raise RuntimeError("httpx transport requested but httpx is unavailable")
-        self._client = httpx.Client(timeout=timeout_s)
+        bounded_timeout = max(float(timeout_s), 0.1)
+        connect_timeout = min(bounded_timeout, 1.0)
+        self._client = httpx.Client(
+            timeout=httpx.Timeout(
+                timeout=bounded_timeout,
+                connect=connect_timeout,
+                pool=connect_timeout,
+                read=bounded_timeout,
+                write=bounded_timeout,
+            ),
+            limits=httpx.Limits(
+                max_connections=50,
+                max_keepalive_connections=20,
+                keepalive_expiry=30.0,
+            ),
+            http2=importlib.util.find_spec("h2") is not None,
+        )
 
     def post(
         self,

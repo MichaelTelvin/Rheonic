@@ -382,7 +382,7 @@ def test_late_block_decision_does_not_enqueue_protection_block_notifications(tmp
 
     def _fake_perf_counter() -> float:
         calls["count"] += 1
-        return 0.0 if calls["count"] == 1 else 0.2
+        return 0.0 if calls["count"] == 1 else 0.4
 
     monkeypatch.setattr(protect_api_module, "perf_counter", _fake_perf_counter)
 
@@ -1788,6 +1788,6 @@ def test_protect_config_returns_project_fail_mode_and_server_timeout(tmp_path) -
     assert response.status_code == 200
     assert response.json() == {
         "protect_fail_mode": "closed",
-        "protect_decision_timeout_ms": 160,
+        "protect_decision_timeout_ms": 300,
     }
     _cleanup_overrides()

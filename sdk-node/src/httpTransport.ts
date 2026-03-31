@@ -45,19 +45,19 @@ class BufferedJsonResponse implements JsonHttpResponse {
 }
 
 export async function requestJson(url: string, options: JsonRequestOptions): Promise<JsonHttpResponse> {
-  const mockedFetch = getMockedFetchOverride();
-  if (mockedFetch) {
-    const response = await mockedFetch(url, {
+  if (typeof globalThis.fetch === "function") {
+    const response = await globalThis.fetch(url, {
       method: options.method,
       headers: options.headers,
       body: options.body,
       signal: options.signal,
     });
-    return {
-      ok: response.ok,
-      status: response.status,
-      json: async () => await response.json(),
-    };
+    const textReader = (response as Response & { text?: () => Promise<string> }).text;
+    const payload =
+      typeof textReader === "function"
+        ? await textReader.call(response)
+        : await serializeFetchJson(response as Response & { json?: () => Promise<unknown> });
+    return new BufferedJsonResponse(response.status, payload);
   }
 
   const target = new URL(url);
@@ -118,13 +118,10 @@ function createAbortError(): Error {
   return error;
 }
 
-function getMockedFetchOverride(): typeof fetch | null {
-  if (typeof globalThis.fetch !== "function") {
-    return null;
+async function serializeFetchJson(response: Response & { json?: () => Promise<unknown> }): Promise<string> {
+  if (typeof response.json !== "function") {
+    return "";
   }
-  const source = Function.prototype.toString.call(globalThis.fetch);
-  if (source.includes("[native code]")) {
-    return null;
-  }
-  return globalThis.fetch.bind(globalThis);
+  const payload = await response.json();
+  return payload == null ? "" : JSON.stringify(payload);
 }

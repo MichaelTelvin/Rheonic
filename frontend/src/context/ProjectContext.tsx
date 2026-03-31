@@ -84,7 +84,7 @@ export function ProjectProvider({ children }: { children: ReactNode }): JSX.Elem
 
   useEffect(() => {
     if (!projectId) {
-      return;
+      return undefined;
     }
     let cancelled = false;
 

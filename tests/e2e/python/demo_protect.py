@@ -514,7 +514,7 @@ def main() -> None:
     scenario = (os.getenv("RHEONIC_SCENARIO") or "allow").strip().lower()
     env = (os.getenv("RHEONIC_ENVIRONMENT") or "").strip() or f"protect-{int(time.time())}"
     pause_ms = int(os.getenv("RHEONIC_STEP_SLEEP_MS", "200"))
-    decision_timeout_ms = int(os.getenv("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", "160"))
+    decision_timeout_ms = int(os.getenv("RHEONIC_PROTECT_DECISION_TIMEOUT_MS", "300"))
     project_id = os.getenv("RHEONIC_PROJECT_ID", "")
     auth_email = (os.getenv("RHEONIC_AUTH_EMAIL", "") or "").strip().lower()
     auth_password = os.getenv("RHEONIC_AUTH_PASSWORD", "")

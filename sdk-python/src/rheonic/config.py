@@ -11,7 +11,7 @@ class SDKConfig:
     default_flush_timeout_s: float = 0.5
     default_request_timeout_s: float = 1.0
     default_protect_fail_mode: str = "open"
-    internal_protect_decision_timeout_ms: int = 160
+    internal_protect_decision_timeout_ms: int = 300
     default_protect_report_timeout_min_s: float = 0.1
     retry_delay_min_s: float = 0.2
     retry_delay_max_s: float = 0.4
