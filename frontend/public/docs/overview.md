@@ -1,11 +1,11 @@
 # Rheonic Overview
 
-Rheonic helps you monitor and control LLM runtime risk across your application. It records provider activity, detects common failure patterns, and can optionally block or warn before a risky call goes out.
+Rheonic helps you monitor and control LLM runtime risk across your application. It records provider activity, detects common failure patterns, and can enforce preflight allow, clamp, or block decisions before a risky call goes out.
 
 ## What You Can Do
 - Track live request and token volume by project.
 - Review incidents such as `retry_storm`, `loop_suspect`, `token_explosion`, and `block`.
-- Enable Protect mode to warn or block when limits are about to be crossed.
+- Enable Protect mode to clamp or block when configured limits require enforcement.
 - Send alert notifications by email or webhook.
 - Instrument OpenAI, Anthropic, and Google calls from Node or Python.
 
@@ -13,7 +13,7 @@ Rheonic helps you monitor and control LLM runtime risk across your application. 
 - **Project**: your main workspace in Rheonic. Metrics, incidents, keys, protect settings, and alerts are configured per project.
 - **Ingest key**: the credential your SDK uses to send telemetry and request protect decisions.
 - **Observe mode**: records telemetry and incidents without changing runtime behavior.
-- **Protect mode**: evaluates requests before provider calls and can return `allow`, `warn`, or `block`.
+- **Protect mode**: evaluates requests before provider calls and can return `allow`, `clamp`, or `block`.
 - **Provider scope**: counters and protect decisions are tracked separately per provider inside a project.
 
 ## Product Areas

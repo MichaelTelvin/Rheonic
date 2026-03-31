@@ -34,8 +34,7 @@ Incident types are:
 
 ## Notifications
 - `incident.warn`
-- `protection.block`
-- `incident.resolved`
 - `protection.clamp_started`
 - `protection.block`
+- `incident.resolved`
 - `policy_gap.detected`

@@ -7,7 +7,7 @@ Protect mode adds a preflight decision before a provider call. It uses recent pr
 - telemetry is recorded,
 - incidents can still open,
 - provider calls are never blocked by Rheonic,
-- no runtime warn or block action is enforced.
+- no runtime protect action is enforced.
 
 ### Protect
 - telemetry is recorded,

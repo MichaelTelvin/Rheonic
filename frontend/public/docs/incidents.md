@@ -6,7 +6,7 @@ Incidents are the main way Rheonic surfaces risky runtime behavior. They are cre
 - `block`: Protect blocked a request because a configured request or token cap was already breached.
 - `retry_storm`: failed attempts are repeating fast enough to suggest an unhealthy retry loop; retry state by itself does not count as a failure.
 - `loop_suspect`: a rapid consecutive sequence with the same request signature suggests the app is stuck in a loop. Failed steps still count, and detection is suppressed when traffic looks highly concurrent.
-- `token_explosion`: request-context size is large, near a cap-driven threshold, or growing sharply once it has already become meaningfully large. Rheonic evaluates the same request-side signal in protect and observe so the behavior stays aligned across both pipelines. By default, only values `>= 1800` count toward growth, and `growth_count=2` means three valid points above that floor: `baseline -> spike -> confirmation`, for example `1900 -> 3230 -> 5500`. Growth-only detection is suppressed when traffic looks highly concurrent.
+- `token_explosion`: request-context size is unusually large or growing sharply for the same request signature. Detection is also suppressed when traffic looks highly concurrent.
 
 ## Where to Review Incidents
 Open `Incidents` in the dashboard. You can filter by:

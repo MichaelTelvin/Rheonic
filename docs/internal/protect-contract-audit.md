@@ -84,14 +84,14 @@ This is the most fragile path in the current design.
 | Scenario | SDK effective behavior | Backend protect metrics | Incident path | Current status |
 | --- | --- | --- | --- | --- |
 | preflight success + allow | allow provider call | allow counter increments | maybe none | mostly stable |
-| preflight success + warn | allow provider call + warn | warn counter increments | may also open incident later | mostly stable |
+| preflight success + clamp | allow provider call + clamp metadata | clamped counter increments | may still open ingest-side incident later | mostly stable |
 | preflight success + block | block provider call | block counter increments | usually no ingest event | mostly stable |
 | timeout + fail-open | allow provider call | increment allow + timeout | ingest may still open incident | covered |
 | timeout + fail-closed | block provider call | increment block + timeout | no ingest event | covered |
-| timeout, then late warn | effective outcome should remain fallback result | late warn must not survive | incident path independent | covered |
+| timeout, then late clamp | effective outcome should remain fallback result | late clamp must not survive | incident path independent | covered |
 | timeout, then late allow, fail-closed | effective outcome should remain block | allow must not survive | no ingest event | covered |
-| warn + clamp off | provider call allowed, no max-token rewrite | warn counter increments | ingest independent | covered |
-| warn + clamp on | provider call allowed, max-token rewrite | warn counter increments | ingest independent | covered |
+| clamp + apply_clamp off | provider call allowed, no max-token rewrite | clamped counter increments | ingest independent | covered |
+| clamp + apply_clamp on | provider call allowed, max-token rewrite | clamped counter increments | ingest independent | covered |
 | live block, then cooldown | first call blocks on live decision, repeated same-client call blocks locally, fresh client sees `cooldown_active` live | blocked counter increments only for live backend outcomes; `last.reason` ends as `cooldown_active` | no ingest event | covered |
 | backend unavailable at bootstrap | fallback uses cached bootstrap config | unavailable fallback finalizes one outcome | incident path depends on provider call | covered |
 | duplicated timeout report | should be idempotent | counters should not double count | none | covered |
@@ -169,7 +169,7 @@ The dashboard should show:
 
 Each protect-attempt should have one final normalized outcome:
 
-- `effective_decision`: `allow | warn | block`
+- `effective_decision`: `allow | clamp | block`
 - `source`: `live | timeout_fallback | unavailable_fallback`
 - `reason`
 - `fail_mode_used`

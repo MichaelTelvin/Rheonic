@@ -5,7 +5,7 @@ This page gives a product-level view of how Rheonic fits into your application. 
 ## System Flow
 1. Your app sends an instrumented provider call or a manual telemetry event.
 2. The SDK can request a protect decision before the provider call.
-3. The provider call runs if the decision is `allow` or `warn`.
+3. The provider call runs if the decision is `allow` or `clamp`.
 4. Rheonic ingests the event and updates project metrics.
 5. Incident detectors evaluate the event and open or update incidents when needed.
 6. Dashboard views, alerts, and delivery metrics are updated from the resulting state.
@@ -27,7 +27,7 @@ This page gives a product-level view of how Rheonic fits into your application. 
 ### Protect path
 - SDK calls `POST /api/v1/protect/decision`.
 - Rheonic evaluates current provider-scoped counters and protect settings.
-- The response tells the SDK to `allow`, `warn`, or `block`.
+- The response tells the SDK to `allow`, `clamp`, or `block`.
 
 ### Telemetry path
 - SDK or custom integration calls `POST /api/v1/events`.

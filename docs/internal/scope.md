@@ -18,4 +18,4 @@
 ## Out of Scope
 - preflight behavioral anomaly detection
 - clamp as an incident type
-- protect anomaly warn notifications
+- protect anomaly preflight notifications

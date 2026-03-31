@@ -190,8 +190,6 @@ def process_outbox_delivery(outbox_id: str, *, trace_id: str | None = None, span
 
 def _outbox_correlation_metadata(outbox: TransportOutbox) -> dict[str, object]:
     payload = dict(outbox.payload or {})
-    transport_meta_value = payload.get("__transport_meta")
-    transport_meta = transport_meta_value if isinstance(transport_meta_value, dict) else {}
     body_payload_value = payload.get("body")
     body_payload = body_payload_value if isinstance(body_payload_value, dict) else payload
     metadata: dict[str, object] = {}
