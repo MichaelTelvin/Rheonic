@@ -15,6 +15,14 @@ class LoopSuspectDetector(Detector):
         sequence_count = 0
         prev_ts = None
 
+        # do not detect loop if tokens are growing as in token explosion
+        if (
+            ctx.tok_cap is not None
+            and ctx.estimated_next_tokens is not None
+            and ctx.estimated_next_tokens > ctx.tok_cap * 0.5
+        ):
+            return []
+
         # Normalize ordering first because some repositories return descending
         # recent events while in-memory tests often preserve insertion order.
         ordered_events = sorted(ctx.recent_events, key=lambda event: event.created_at.timestamp(), reverse=True)
@@ -38,6 +46,7 @@ class LoopSuspectDetector(Detector):
                 break
             if prev_ts is not None and (prev_ts - event_ts) > float(ctx.loop_max_gap_seconds):
                 break
+            
             # distinguish loop suspect from retry storm
             http_status = event.http_status or 0
             status = (event.status or "").strip().lower()
