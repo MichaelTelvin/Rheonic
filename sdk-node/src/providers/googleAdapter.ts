@@ -22,20 +22,20 @@ export function __setInputTokenEstimatorForTests(
 }
 
 export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, options: GoogleInstrumentationOptions): T {
-  const targetGenerate = googleModel?.generateContent;
-  if (typeof targetGenerate !== "function") {
+  const targetGenerate = resolveGenerateTarget(googleModel);
+  if (!targetGenerate) {
     return googleModel;
   }
 
-  const originalGenerate = targetGenerate.bind(googleModel);
-  (googleModel as unknown as { generateContent: (...args: unknown[]) => Promise<unknown> }).generateContent = async (
+  const originalGenerate = targetGenerate.fn.bind(targetGenerate.owner);
+  targetGenerate.owner[targetGenerate.key] = async (
     ...args: unknown[]
   ) => {
     const traceId = generateTraceId();
     const spanId = generateSpanId();
     return bindTraceContext(traceId, spanId, async () => {
       const startedAt = Date.now();
-      const requestedModel = extractRequestedModel(googleModel);
+      const requestedModel = extractRequestedModel(googleModel, args);
       validateProviderModel("google", requestedModel);
       const requestPayload = extractRequestPayload(args, requestedModel);
       let estimatedInputTokens: number | null = null;
@@ -129,6 +129,31 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
   return googleModel;
 }
 
+function resolveGenerateTarget(
+  googleModel: Record<string, any>,
+): { owner: Record<string, any>; fn: (...args: unknown[]) => Promise<unknown>; key: "generateContent" } | null {
+  const directGenerate = googleModel?.generateContent;
+  if (typeof directGenerate === "function") {
+    return {
+      owner: googleModel,
+      fn: directGenerate as (...args: unknown[]) => Promise<unknown>,
+      key: "generateContent",
+    };
+  }
+
+  const models = googleModel?.models;
+  const nestedGenerate = models?.generateContent;
+  if (models && typeof nestedGenerate === "function") {
+    return {
+      owner: models as Record<string, any>,
+      fn: nestedGenerate as (...args: unknown[]) => Promise<unknown>,
+      key: "generateContent",
+    };
+  }
+
+  return null;
+}
+
 function extractRequestPayload(args: unknown[], model: string | null): Record<string, unknown> | null {
   const firstArg = args[0];
   if (typeof firstArg === "string") {
@@ -140,8 +165,13 @@ function extractRequestPayload(args: unknown[], model: string | null): Record<st
   return null;
 }
 
-function extractRequestedModel(googleModel: unknown): string | null {
+function extractRequestedModel(googleModel: unknown, args: unknown[]): string | null {
   if (!googleModel || typeof googleModel !== "object") {
+    const firstArg = args[0];
+    if (firstArg && typeof firstArg === "object" && "model" in firstArg) {
+      const payloadModel = (firstArg as { model?: unknown }).model;
+      return typeof payloadModel === "string" ? payloadModel : null;
+    }
     return null;
   }
   const withModel = googleModel as { model?: unknown; modelName?: unknown };
@@ -151,17 +181,42 @@ function extractRequestedModel(googleModel: unknown): string | null {
   if (typeof withModel.modelName === "string") {
     return withModel.modelName;
   }
+  const firstArg = args[0];
+  if (firstArg && typeof firstArg === "object" && "model" in firstArg) {
+    const payloadModel = (firstArg as { model?: unknown }).model;
+    return typeof payloadModel === "string" ? payloadModel : null;
+  }
   return null;
 }
 
 function extractMaxOutputTokens(args: unknown[]): number | undefined {
   const firstArg = args[0];
   if (!firstArg || typeof firstArg !== "object") {
-    return undefined;
+    const secondArg = args[1];
+    if (!secondArg || typeof secondArg !== "object") {
+      return undefined;
+    }
+    const options = secondArg as {
+      generationConfig?: { maxOutputTokens?: unknown };
+      config?: { maxOutputTokens?: unknown };
+    };
+    const optionsGenerationMax = options.generationConfig?.maxOutputTokens;
+    if (typeof optionsGenerationMax === "number") {
+      return optionsGenerationMax;
+    }
+    const optionsConfigMax = options.config?.maxOutputTokens;
+    return typeof optionsConfigMax === "number" ? optionsConfigMax : undefined;
   }
-  const payload = firstArg as { generationConfig?: { maxOutputTokens?: unknown } };
-  const maxOutput = payload.generationConfig?.maxOutputTokens;
-  return typeof maxOutput === "number" ? maxOutput : undefined;
+  const payload = firstArg as {
+    generationConfig?: { maxOutputTokens?: unknown };
+    config?: { maxOutputTokens?: unknown };
+  };
+  const generationMax = payload.generationConfig?.maxOutputTokens;
+  if (typeof generationMax === "number") {
+    return generationMax;
+  }
+  const configMax = payload.config?.maxOutputTokens;
+  return typeof configMax === "number" ? configMax : undefined;
 }
 
 function extractTotalTokens(response: unknown): number | undefined {
@@ -230,12 +285,14 @@ function maybeApplyGoogleClamp(args: unknown[], decision: ProtectEvaluation): un
   const firstArg = nextArgs[0];
   if (firstArg && typeof firstArg === "object") {
     const payload = { ...(firstArg as Record<string, unknown>) };
+    const useModernConfig = "config" in payload || "contents" in payload || "model" in payload;
+    const configKey = useModernConfig ? "config" : "generationConfig";
     const existingConfig =
-      payload.generationConfig && typeof payload.generationConfig === "object"
-        ? (payload.generationConfig as Record<string, unknown>)
+      payload[configKey] && typeof payload[configKey] === "object"
+        ? (payload[configKey] as Record<string, unknown>)
         : {};
     const existingMax = existingConfig.maxOutputTokens;
-    payload.generationConfig = {
+    payload[configKey] = {
       ...existingConfig,
       maxOutputTokens: typeof existingMax === "number" ? Math.min(existingMax, recommended) : recommended,
     };
@@ -244,16 +301,18 @@ function maybeApplyGoogleClamp(args: unknown[], decision: ProtectEvaluation): un
   }
 
   const secondArg = nextArgs[1];
-  const existingConfig =
+  const existingOptions =
     secondArg && typeof secondArg === "object" ? ({ ...(secondArg as Record<string, unknown>) } as Record<string, unknown>) : {};
+  const configKey =
+    existingOptions.config && typeof existingOptions.config === "object" ? "config" : "generationConfig";
   const generationConfig =
-    existingConfig.generationConfig && typeof existingConfig.generationConfig === "object"
-      ? ({ ...(existingConfig.generationConfig as Record<string, unknown>) } as Record<string, unknown>)
+    existingOptions[configKey] && typeof existingOptions[configKey] === "object"
+      ? ({ ...(existingOptions[configKey] as Record<string, unknown>) } as Record<string, unknown>)
       : {};
   const existingMax = generationConfig.maxOutputTokens;
   generationConfig.maxOutputTokens = typeof existingMax === "number" ? Math.min(existingMax, recommended) : recommended;
-  existingConfig.generationConfig = generationConfig;
-  nextArgs[1] = existingConfig;
+  existingOptions[configKey] = generationConfig;
+  nextArgs[1] = existingOptions;
   return nextArgs;
 }
 

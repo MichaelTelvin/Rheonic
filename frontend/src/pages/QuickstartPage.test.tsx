@@ -91,13 +91,16 @@ describe("QuickstartPage", () => {
     expect(screen.getAllByText(/gpt-4o-mini/i).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Anthropic" })[0]);
-    expect(screen.getByText(/rheonic\.instrumentAnthropic/i)).toBeDefined();
+    expect(screen.getByText(/instrumentAnthropic/i)).toBeDefined();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Google" })[0]);
-    expect(screen.getByText(/rheonic\.instrumentGoogle/i)).toBeDefined();
+    expect(screen.getByText(/GoogleGenAI/i)).toBeDefined();
+    expect(screen.getByText(/instrumentGoogle/i)).toBeDefined();
+    expect(screen.getByText(/models\.generateContent/i)).toBeDefined();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Python" })[1]);
     expect(screen.getByText(/instrument_google/i)).toBeDefined();
+    expect(screen.getByText(/models\.generate_content/i)).toBeDefined();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Anthropic" })[0]);
     expect(screen.getByText(/instrument_anthropic/i)).toBeDefined();

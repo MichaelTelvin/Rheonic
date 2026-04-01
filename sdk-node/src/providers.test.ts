@@ -81,6 +81,58 @@ test("google adapter injects generation_config clamp into dict payloads", async 
   setGoogleEstimatorForTests(null);
 });
 
+test("google adapter supports current GoogleGenAI client shape", async () => {
+  setGoogleEstimatorForTests(() => 66);
+  const client = makeClient({
+    decision: "clamp",
+    reason: "token_clamp",
+    applyClampEnabled: true,
+    clamp: { recommended_max_output_tokens: 20, applied: false },
+  });
+  const ai = {
+    models: {
+      generateContent: async (payload: { config?: { maxOutputTokens?: number }; [key: string]: unknown }) => {
+        assert.equal(payload.config?.maxOutputTokens, 20);
+        return { usageMetadata: { totalTokenCount: 11 } };
+      },
+    },
+  };
+
+  instrumentGoogle(ai, { client: client as any });
+  await ai.models.generateContent({
+    model: "gemini-1.5-pro",
+    contents: "hello",
+    config: { maxOutputTokens: 30 },
+  });
+  assert.equal((client.captured[0] as any).response.total_tokens, 11);
+  assert.equal((client.captured[0] as any).request.token_explosion_tokens, 66);
+  setGoogleEstimatorForTests(null);
+});
+
+test("google adapter injects config for current GoogleGenAI client when none exists", async () => {
+  const client = makeClient({
+    decision: "clamp",
+    reason: "token_clamp",
+    applyClampEnabled: true,
+    clamp: { recommended_max_output_tokens: 18, applied: false },
+  });
+  const ai = {
+    models: {
+      generateContent: async (payload: { config?: { maxOutputTokens?: number }; [key: string]: unknown }) => {
+        assert.equal(payload.config?.maxOutputTokens, 18);
+        return { usageMetadata: { totalTokenCount: 7 } };
+      },
+    },
+  };
+
+  instrumentGoogle(ai, { client: client as any });
+  await ai.models.generateContent({
+    model: "gemini-1.5-pro",
+    contents: "hello",
+  });
+  assert.equal((client.captured[0] as any).response.total_tokens, 7);
+});
+
 test("anthropic adapter captures failure status from response object", async () => {
   const client = makeClient({
     decision: "allow",

@@ -4,9 +4,13 @@ All notable changes to `@rheonic/sdk` will be documented in this file.
 
 ## Unreleased
 
+### Changed
+- Google provider instrumentation and examples now align with the current official Google Gen AI JavaScript SDK shape: `@google/genai` with `ai.models.generateContent({...})`.
+
 ### Fixed
 - SDK debug logs now always emit non-empty `trace_id` and `span_id`, including warmup, token-estimation, and protect preflight paths.
 - Provider instrumentation now keeps the full protected call lifecycle under one trace so SDK debug logs correlate cleanly with backend requests.
+- Quickstart and README examples now use the published `@rheonic/sdk` package name consistently and show the current Anthropic and Google instrumentation patterns.
 
 ## 0.1.0-beta.7
 

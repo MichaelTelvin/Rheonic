@@ -81,7 +81,7 @@ export function QuickstartPage(): JSX.Element {
   const ingest = useMemo(
     () =>
       runtime === "node"
-        ? `import { createClient, buildEvent } from "rheonic-node";
+        ? `import { createClient, buildEvent } from "@rheonic/sdk";
 
 const client = createClient({
   baseUrl: process.env.RHEONIC_BASE_URL!,
@@ -92,7 +92,7 @@ await client.captureEvent(
   buildEvent({
     provider: "${provider}",
     model: "${selectedModel}",
-    request: { endpoint: "${provider === "google" ? "/models/generateContent" : "/chat/completions"}", feature: "assistant", token_explosion_tokens: 64 },
+    request: { endpoint: "${provider === "google" ? "/v1beta/models/generateContent" : "/chat/completions"}", feature: "assistant", token_explosion_tokens: 64 },
     response: { total_tokens: 64, latency_ms: 120, http_status: 200 },
   }),
 );`
@@ -108,7 +108,7 @@ client.capture_event(
     build_event(
         provider="${provider}",
         model="${selectedModel}",
-        request={"endpoint": "${provider === "google" ? "/models/generateContent" : "/chat/completions"}", "feature": "assistant", "token_explosion_tokens": 64},
+        request={"endpoint": "${provider === "google" ? "/v1beta/models/generateContent" : "/chat/completions"}", "feature": "assistant", "token_explosion_tokens": 64},
         response={"total_tokens": 64, "latency_ms": 120, "http_status": 200},
     )
 )`,
@@ -119,7 +119,7 @@ client.capture_event(
     () => {
       if (runtime === "node" && provider === "openai") {
         return `import OpenAI from "openai";
-import { createClient, instrumentOpenAI, RHEONICBlockedError } from "rheonic-node";
+import { createClient, instrumentOpenAI, RHEONICBlockedError } from "@rheonic/sdk";
 
 const rheonic = createClient({
   baseUrl: process.env.RHEONIC_BASE_URL!,
@@ -152,14 +152,18 @@ try {
       }
       if (runtime === "node" && provider === "anthropic") {
         return `import Anthropic from "@anthropic-ai/sdk";
-import { createClient, RHEONICBlockedError } from "rheonic-node";
+import { createClient, instrumentAnthropic, RHEONICBlockedError } from "@rheonic/sdk";
 
 const rheonic = createClient({
   baseUrl: process.env.RHEONIC_BASE_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
-const anthropic = rheonic.instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }));
+const anthropic = instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }), {
+  client: rheonic,
+  endpoint: "/v1/messages",
+  feature: "assistant",
+});
 
 try {
   await anthropic.messages.create({
@@ -180,19 +184,28 @@ try {
 }`;
       }
       if (runtime === "node" && provider === "google") {
-        return `import { GoogleGenerativeAI } from "@google/generative-ai";
-import { createClient, RHEONICBlockedError } from "rheonic-node";
+        return `import { GoogleGenAI } from "@google/genai";
+import { createClient, instrumentGoogle, RHEONICBlockedError } from "@rheonic/sdk";
 
 const rheonic = createClient({
   baseUrl: process.env.RHEONIC_BASE_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-const model = rheonic.instrumentGoogle(genAI.getGenerativeModel({ model: "gemini-1.5-pro" }));
+const ai = instrumentGoogle(new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY! }), {
+  client: rheonic,
+  endpoint: "/v1beta/models/generateContent",
+  feature: "assistant",
+});
 
 try {
-  await model.generateContent("hello");
+  await ai.models.generateContent({
+    model: "gemini-1.5-pro",
+    contents: "hello",
+    config: {
+      maxOutputTokens: 256,
+    },
+  });
 } catch (error) {
   if (error instanceof RHEONICBlockedError) {
     console.log(JSON.stringify({
@@ -209,14 +222,17 @@ try {
         return `import json
 import os
 from anthropic import Anthropic
-from rheonic import create_client, RHEONICBlockedError
+from rheonic import create_client, instrument_anthropic, RHEONICBlockedError
 
 rheonic = create_client(
     base_url=os.environ["RHEONIC_BASE_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
 )
-anthropic_client = rheonic.instrument_anthropic(
-    Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+anthropic_client = instrument_anthropic(
+    Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]),
+    client=rheonic,
+    endpoint="/v1/messages",
+    feature="assistant",
 )
 
 try:
@@ -237,18 +253,27 @@ except RHEONICBlockedError as error:
       if (provider === "google") {
         return `import json
 import os
-import google.generativeai as genai
-from rheonic import create_client, RHEONICBlockedError
+from google import genai
+from google.genai import types
+from rheonic import create_client, instrument_google, RHEONICBlockedError
 
 rheonic = create_client(
     base_url=os.environ["RHEONIC_BASE_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
 )
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-google_model = rheonic.instrument_google(genai.GenerativeModel("gemini-1.5-pro"))
+google_client = instrument_google(
+    genai.Client(api_key=os.environ["GOOGLE_API_KEY"]),
+    client=rheonic,
+    endpoint="/v1beta/models/generateContent",
+    feature="assistant",
+)
 
 try:
-    google_model.generate_content("hello")
+    google_client.models.generate_content(
+        model="gemini-1.5-pro",
+        contents="hello",
+        config=types.GenerateContentConfig(max_output_tokens=256),
+    )
 except RHEONICBlockedError as error:
     print(json.dumps({
         "reason": error.reason,

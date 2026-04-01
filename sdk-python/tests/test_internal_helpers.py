@@ -277,7 +277,7 @@ def test_google_apply_clamp_covers_kwargs_args_and_default_paths() -> None:
         "clamp": {"recommended_max_output_tokens": 11, "applied": False},
     }
     _, kwargs = google._apply_google_clamp((), {}, decision)
-    assert kwargs["generation_config"]["max_output_tokens"] == 11
+    assert kwargs["config"]["max_output_tokens"] == 11
 
 
 def test_google_estimator_and_status_helpers_cover_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:

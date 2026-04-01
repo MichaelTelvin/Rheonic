@@ -1,5 +1,6 @@
 # Google provider instrumentation wrapper.
 import inspect
+from copy import copy
 from time import perf_counter
 from typing import Any
 
@@ -33,8 +34,8 @@ def instrument_google(
     if resolved_client is None:
         return google_model
 
-    original_generate = getattr(google_model, "generate_content", None)
-    if not callable(original_generate):
+    generate_owner, original_generate = _resolve_generate_target(google_model)
+    if generate_owner is None or not callable(original_generate):
         return google_model
 
     if inspect.iscoroutinefunction(original_generate):
@@ -101,7 +102,7 @@ def instrument_google(
             except Exception:
                 raise
 
-        google_model.generate_content = wrapped_generate_async
+        generate_owner.generate_content = wrapped_generate_async
         return google_model
 
     def wrapped_generate(*args: Any, **kwargs: Any) -> Any:
@@ -163,8 +164,21 @@ def instrument_google(
         finally:
             reset_trace_context(context_tokens)
 
-    google_model.generate_content = wrapped_generate
+    generate_owner.generate_content = wrapped_generate
     return google_model
+
+
+def _resolve_generate_target(google_model: Any) -> tuple[Any | None, Any | None]:
+    direct_generate = getattr(google_model, "generate_content", None)
+    if callable(direct_generate):
+        return google_model, direct_generate
+
+    models = getattr(google_model, "models", None)
+    nested_generate = getattr(models, "generate_content", None)
+    if models is not None and callable(nested_generate):
+        return models, nested_generate
+
+    return None, None
 
 
 def _preflight(
@@ -320,18 +334,27 @@ def _extract_request_payload(model: str | None, args: tuple[Any, ...], kwargs: d
 
 
 def _extract_max_output_tokens(args: tuple[Any, ...], kwargs: dict[str, Any]) -> int | None:
-    generation_config = kwargs.get("generation_config")
-    if isinstance(generation_config, dict):
-        max_out = generation_config.get("max_output_tokens")
+    for key in ("generation_config", "config"):
+        max_out = _extract_config_max_output_tokens(kwargs.get(key))
         if isinstance(max_out, int):
             return max_out
     first = args[0] if args else None
     if isinstance(first, dict):
-        config = first.get("generation_config")
-        if isinstance(config, dict):
-            max_out = config.get("max_output_tokens")
+        for key in ("generation_config", "config"):
+            max_out = _extract_config_max_output_tokens(first.get(key))
             if isinstance(max_out, int):
                 return max_out
+    return None
+
+
+def _extract_config_max_output_tokens(config: Any) -> int | None:
+    if isinstance(config, dict):
+        max_out = config.get("max_output_tokens")
+        if isinstance(max_out, int):
+            return max_out
+    max_out = getattr(config, "max_output_tokens", None)
+    if isinstance(max_out, int):
+        return max_out
     return None
 
 
@@ -400,13 +423,19 @@ def _apply_google_clamp(
     next_args = list(args)
     next_kwargs = dict(kwargs)
 
-    if isinstance(next_kwargs.get("generation_config"), dict):
-        generation_config = dict(next_kwargs["generation_config"])
-        if isinstance(generation_config.get("max_output_tokens"), int):
-            generation_config["max_output_tokens"] = min(int(generation_config["max_output_tokens"]), recommended)
-        else:
-            generation_config["max_output_tokens"] = recommended
-        next_kwargs["generation_config"] = generation_config
+    if "generation_config" in next_kwargs:
+        next_kwargs["generation_config"] = _apply_recommended_max_output_tokens(
+            next_kwargs.get("generation_config"), recommended
+        )
+        _mark_clamp_applied_if_changed(
+            protect_decision,
+            _extract_max_output_tokens(args, kwargs),
+            _extract_max_output_tokens(tuple(next_args), next_kwargs),
+        )
+        return tuple(next_args), next_kwargs
+
+    if "config" in next_kwargs:
+        next_kwargs["config"] = _apply_recommended_max_output_tokens(next_kwargs.get("config"), recommended)
         _mark_clamp_applied_if_changed(
             protect_decision,
             _extract_max_output_tokens(args, kwargs),
@@ -416,13 +445,8 @@ def _apply_google_clamp(
 
     if next_args and isinstance(next_args[0], dict):
         payload = dict(next_args[0])
-        payload_generation_config = payload.get("generation_config")
-        generation_config = dict(payload_generation_config) if isinstance(payload_generation_config, dict) else {}
-        if isinstance(generation_config.get("max_output_tokens"), int):
-            generation_config["max_output_tokens"] = min(int(generation_config["max_output_tokens"]), recommended)
-        else:
-            generation_config["max_output_tokens"] = recommended
-        payload["generation_config"] = generation_config
+        config_key = "config" if ("config" in payload or "model" in payload or "contents" in payload) else "generation_config"
+        payload[config_key] = _apply_recommended_max_output_tokens(payload.get(config_key), recommended)
         next_args[0] = payload
         _mark_clamp_applied_if_changed(
             protect_decision,
@@ -431,16 +455,34 @@ def _apply_google_clamp(
         )
         return tuple(next_args), next_kwargs
 
-    next_generation_config = next_kwargs.get("generation_config")
-    generation_config = dict(next_generation_config) if isinstance(next_generation_config, dict) else {}
-    generation_config["max_output_tokens"] = recommended
-    next_kwargs["generation_config"] = generation_config
+    next_kwargs["config"] = {"max_output_tokens": recommended}
     _mark_clamp_applied_if_changed(
         protect_decision,
         _extract_max_output_tokens(args, kwargs),
         _extract_max_output_tokens(tuple(next_args), next_kwargs),
     )
     return tuple(next_args), next_kwargs
+
+
+def _apply_recommended_max_output_tokens(config: Any, recommended: int) -> Any:
+    if isinstance(config, dict):
+        next_config = dict(config)
+        existing = next_config.get("max_output_tokens")
+        next_config["max_output_tokens"] = min(int(existing), recommended) if isinstance(existing, int) else recommended
+        return next_config
+    if config is not None and hasattr(config, "max_output_tokens"):
+        try:
+            next_config = copy(config)
+            existing = getattr(next_config, "max_output_tokens", None)
+            setattr(
+                next_config,
+                "max_output_tokens",
+                min(int(existing), recommended) if isinstance(existing, int) else recommended,
+            )
+            return next_config
+        except Exception:
+            return config
+    return {"max_output_tokens": recommended}
 
 
 def _mark_clamp_applied_if_changed(

@@ -255,6 +255,39 @@ def test_google_async_wrapper_supports_success_and_clamp() -> None:
     client.close()
 
 
+def test_google_wrapper_supports_current_genai_client_shape() -> None:
+    client = _client_with_decision(
+        {
+            "decision": "clamp",
+            "reason": "token_clamp",
+            "apply_clamp_enabled": True,
+            "clamp": {"recommended_max_output_tokens": 12, "applied": False},
+        }
+    )
+    calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+
+    class _Config:
+        def __init__(self, max_output_tokens: int) -> None:
+            self.max_output_tokens = max_output_tokens
+
+    class _Models:
+        def generate_content(self, *args: Any, **kwargs: Any) -> Any:
+            calls.append((args, kwargs))
+            usage_metadata = type("Usage", (), {"total_token_count": 14})()
+            return type("Response", (), {"usage_metadata": usage_metadata})()
+
+    google = type("GoogleClient", (), {"models": _Models()})()
+    instrument_google(google, client=client)
+
+    google.models.generate_content(
+        model="gemini-1.5-pro",
+        contents="hi",
+        config=_Config(max_output_tokens=30),
+    )
+    assert calls[0][1]["config"].max_output_tokens == 12
+    client.close()
+
+
 def test_google_async_wrapper_captures_failure() -> None:
     client = _client_with_decision({"decision": "allow", "reason": "ok"})
 

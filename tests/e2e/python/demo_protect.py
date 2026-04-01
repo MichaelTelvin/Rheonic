@@ -297,15 +297,16 @@ def _make_google_stub() -> Any:
     class GoogleResponse:
         usage_metadata = UsageMetadata()
 
-    class GoogleModelStub:
-        model_name = ""
-
+    class Models:
         @staticmethod
-        def generate_content(prompt: str | dict[str, Any]) -> Any:
-            payload = prompt if isinstance(prompt, dict) else {"prompt": prompt}
+        def generate_content(**payload: Any) -> Any:
             _notify_provider_call(payload)
             UsageMetadata.total_token_count = _resolve_simulated_total_tokens(payload)
             return GoogleResponse()
+
+    class GoogleModelStub:
+        model_name = ""
+        models = Models()
 
     return GoogleModelStub()
 
@@ -477,11 +478,10 @@ def _run_provider_call(
                 max_tokens=max_tokens,
             )
         elif provider == "google":
-            google.generate_content(
-                {
-                    "prompt": prompt_text,
-                    "generation_config": {"max_output_tokens": max_tokens},
-                }
+            google.models.generate_content(
+                model=model,
+                contents=prompt_text,
+                config={"max_output_tokens": max_tokens},
             )
         else:
             openai.chat.completions.create(

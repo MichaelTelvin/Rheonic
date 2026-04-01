@@ -64,14 +64,17 @@ Anthropic:
 import json
 import os
 from anthropic import Anthropic
-from rheonic import create_client, RHEONICBlockedError
+from rheonic import create_client, instrument_anthropic, RHEONICBlockedError
 
 rheonic = create_client(
     base_url=os.environ["RHEONIC_BASE_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
 )
-anthropic_client = rheonic.instrument_anthropic(
-    Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+anthropic_client = instrument_anthropic(
+    Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]),
+    client=rheonic,
+    endpoint="/v1/messages",
+    feature="assistant",
 )
 
 try:
@@ -95,18 +98,27 @@ Google:
 ```python
 import json
 import os
-import google.generativeai as genai
-from rheonic import create_client, RHEONICBlockedError
+from google import genai
+from google.genai import types
+from rheonic import create_client, instrument_google, RHEONICBlockedError
 
 rheonic = create_client(
     base_url=os.environ["RHEONIC_BASE_URL"],
     ingest_key=os.environ["RHEONIC_INGEST_KEY"],
 )
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-google_model = rheonic.instrument_google(genai.GenerativeModel("gemini-1.5-pro"))
+google_client = instrument_google(
+    genai.Client(api_key=os.environ["GOOGLE_API_KEY"]),
+    client=rheonic,
+    endpoint="/v1beta/models/generateContent",
+    feature="assistant",
+)
 
 try:
-    google_model.generate_content("hello")
+    google_client.models.generate_content(
+        model="gemini-1.5-pro",
+        contents="hello",
+        config=types.GenerateContentConfig(max_output_tokens=256),
+    )
 except RHEONICBlockedError as error:
     print(json.dumps({
         "reason": error.reason,

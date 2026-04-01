@@ -46,7 +46,7 @@ Node OpenAI:
 
 ```ts
 import OpenAI from "openai";
-import { createClient, instrumentOpenAI, RHEONICBlockedError } from "rheonic-node";
+import { createClient, instrumentOpenAI, RHEONICBlockedError } from "@rheonic/sdk";
 
 const rheonic = createClient({
   baseUrl: process.env.RHEONIC_BASE_URL!,
@@ -64,6 +64,80 @@ try {
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: "hello" }],
     max_tokens: 256,
+  });
+} catch (error) {
+  if (error instanceof RHEONICBlockedError) {
+    console.log(JSON.stringify({
+      reason: error.reason,
+      retry_after_seconds: error.retry_after_seconds,
+      blocked_until: error.blocked_until,
+      trace_id: error.trace_id,
+      request_id: error.request_id,
+    }, null, 2));
+  }
+}
+```
+
+Node Anthropic:
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+import { createClient, instrumentAnthropic, RHEONICBlockedError } from "@rheonic/sdk";
+
+const rheonic = createClient({
+  baseUrl: process.env.RHEONIC_BASE_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
+
+const anthropic = instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }), {
+  client: rheonic,
+  endpoint: "/v1/messages",
+  feature: "assistant",
+});
+
+try {
+  await anthropic.messages.create({
+    model: "claude-3-5-sonnet-latest",
+    max_tokens: 256,
+    messages: [{ role: "user", content: "hello" }],
+  });
+} catch (error) {
+  if (error instanceof RHEONICBlockedError) {
+    console.log(JSON.stringify({
+      reason: error.reason,
+      retry_after_seconds: error.retry_after_seconds,
+      blocked_until: error.blocked_until,
+      trace_id: error.trace_id,
+      request_id: error.request_id,
+    }, null, 2));
+  }
+}
+```
+
+Node Google:
+
+```ts
+import { GoogleGenAI } from "@google/genai";
+import { createClient, instrumentGoogle, RHEONICBlockedError } from "@rheonic/sdk";
+
+const rheonic = createClient({
+  baseUrl: process.env.RHEONIC_BASE_URL!,
+  ingestKey: process.env.RHEONIC_INGEST_KEY!,
+});
+
+const ai = instrumentGoogle(new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY! }), {
+  client: rheonic,
+  endpoint: "/v1beta/models/generateContent",
+  feature: "assistant",
+});
+
+try {
+  await ai.models.generateContent({
+    model: "gemini-1.5-pro",
+    contents: "hello",
+    config: {
+      maxOutputTokens: 256,
+    },
   });
 } catch (error) {
   if (error instanceof RHEONICBlockedError) {
@@ -102,6 +176,77 @@ try:
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": "hello"}],
         max_tokens=256,
+    )
+except RHEONICBlockedError as error:
+    print(json.dumps({
+        "reason": error.reason,
+        "retry_after_seconds": error.retry_after_seconds,
+        "blocked_until": error.blocked_until,
+        "trace_id": error.trace_id,
+        "request_id": error.request_id,
+    }, indent=2))
+```
+
+Python Anthropic:
+
+```python
+import json
+import os
+from anthropic import Anthropic
+from rheonic import create_client, instrument_anthropic, RHEONICBlockedError
+
+rheonic = create_client(
+    base_url=os.environ["RHEONIC_BASE_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
+)
+anthropic_client = instrument_anthropic(
+    Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]),
+    client=rheonic,
+    endpoint="/v1/messages",
+    feature="assistant",
+)
+
+try:
+    anthropic_client.messages.create(
+        model="claude-3-5-sonnet-latest",
+        max_tokens=256,
+        messages=[{"role": "user", "content": "hello"}],
+    )
+except RHEONICBlockedError as error:
+    print(json.dumps({
+        "reason": error.reason,
+        "retry_after_seconds": error.retry_after_seconds,
+        "blocked_until": error.blocked_until,
+        "trace_id": error.trace_id,
+        "request_id": error.request_id,
+    }, indent=2))
+```
+
+Python Google:
+
+```python
+import json
+import os
+from google import genai
+from google.genai import types
+from rheonic import create_client, instrument_google, RHEONICBlockedError
+
+rheonic = create_client(
+    base_url=os.environ["RHEONIC_BASE_URL"],
+    ingest_key=os.environ["RHEONIC_INGEST_KEY"],
+)
+google_client = instrument_google(
+    genai.Client(api_key=os.environ["GOOGLE_API_KEY"]),
+    client=rheonic,
+    endpoint="/v1beta/models/generateContent",
+    feature="assistant",
+)
+
+try:
+    google_client.models.generate_content(
+        model="gemini-1.5-pro",
+        contents="hello",
+        config=types.GenerateContentConfig(max_output_tokens=256),
     )
 except RHEONICBlockedError as error:
     print(json.dumps({
@@ -162,7 +307,7 @@ Use this only if you can't instrument a provider SDK or need custom events.
 Node:
 
 ```ts
-import { createClient, buildEvent } from "rheonic-node";
+import { createClient, buildEvent } from "@rheonic/sdk";
 
 const client = createClient({
   baseUrl: process.env.RHEONIC_BASE_URL!,

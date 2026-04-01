@@ -69,14 +69,18 @@ Anthropic:
 
 ```ts
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient, RHEONICBlockedError } from "@rheonic/sdk";
+import { createClient, instrumentAnthropic, RHEONICBlockedError } from "@rheonic/sdk";
 
 const rheonic = createClient({
   baseUrl: process.env.RHEONIC_BASE_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
-const anthropic = rheonic.instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }));
+const anthropic = instrumentAnthropic(new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }), {
+  client: rheonic,
+  endpoint: "/v1/messages",
+  feature: "assistant",
+});
 
 try {
   await anthropic.messages.create({
@@ -100,19 +104,28 @@ try {
 Google:
 
 ```ts
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { createClient, RHEONICBlockedError } from "@rheonic/sdk";
+import { GoogleGenAI } from "@google/genai";
+import { createClient, instrumentGoogle, RHEONICBlockedError } from "@rheonic/sdk";
 
 const rheonic = createClient({
   baseUrl: process.env.RHEONIC_BASE_URL!,
   ingestKey: process.env.RHEONIC_INGEST_KEY!,
 });
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-const model = rheonic.instrumentGoogle(genAI.getGenerativeModel({ model: "gemini-1.5-pro" }));
+const ai = instrumentGoogle(new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY! }), {
+  client: rheonic,
+  endpoint: "/v1beta/models/generateContent",
+  feature: "assistant",
+});
 
 try {
-  await model.generateContent("hello");
+  await ai.models.generateContent({
+    model: "gemini-1.5-pro",
+    contents: "hello",
+    config: {
+      maxOutputTokens: 256,
+    },
+  });
 } catch (error) {
   if (error instanceof RHEONICBlockedError) {
     console.log(JSON.stringify({

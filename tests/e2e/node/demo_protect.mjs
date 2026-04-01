@@ -246,9 +246,10 @@ async function runProviderCallWithPrompt(provider, model, maxTokens, promptText,
         max_tokens: maxTokens,
       });
     } else if (provider === "google") {
-      await googleModel.generateContent({
-        prompt: promptText,
-        generation_config: { max_output_tokens: maxTokens },
+      await googleModel.models.generateContent({
+        model,
+        contents: promptText,
+        config: { maxOutputTokens: maxTokens },
       });
     } else {
       await openai.chat.completions.create({
@@ -369,11 +370,11 @@ async function main() {
     },
   };
   const googleModel = {
-    model,
-    generateContent: async (payload) => {
-      const requestPayload = typeof payload === "string" ? { prompt: payload } : payload;
-      await callProviderStub(requestPayload);
-      return { response: { usageMetadata: { totalTokenCount: resolveSimulatedTotalTokens(requestPayload) } } };
+    models: {
+      generateContent: async (payload) => {
+        await callProviderStub(payload);
+        return { response: { usageMetadata: { totalTokenCount: resolveSimulatedTotalTokens(payload) } } };
+      },
     },
   };
 

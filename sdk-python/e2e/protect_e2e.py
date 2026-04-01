@@ -163,13 +163,15 @@ def run() -> None:
     class GoogleResponse:
         usage_metadata = GoogleUsage()
 
+    class Models:
+        @staticmethod
+        def generate_content(**payload):
+            httpx.post(f"{PROVIDER_STUB_URL}/call", json=payload, timeout=3.0).raise_for_status()
+            return GoogleResponse()
+
     class GoogleModelStub:
         model_name = "gemini-1.5-pro"
-
-        @staticmethod
-        def generate_content(prompt):
-            httpx.post(f"{PROVIDER_STUB_URL}/call", json={"prompt": prompt}, timeout=3.0).raise_for_status()
-            return GoogleResponse()
+        models = Models()
 
     openai = _make_openai_stub()
     anthropic = AnthropicStub()
@@ -184,7 +186,7 @@ def run() -> None:
         max_tokens=128,
         messages=[{"role": "user", "content": "anthropic e2e smoke"}],
     )
-    google_model.generate_content("google e2e smoke")
+    google_model.models.generate_content(model="gemini-1.5-pro", contents="google e2e smoke")
     assert _provider_count() - initial_provider_calls == 3
 
     ingest_response = httpx.post(

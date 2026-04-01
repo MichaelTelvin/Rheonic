@@ -107,14 +107,15 @@ async function main() {
     },
   };
   const googleModel = {
-    model: "gemini-1.5-pro",
-    generateContent: async (prompt) => {
-      await fetch(`${providerStubUrl}/call`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
-      return { usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 5, totalTokenCount: 12 } };
+    models: {
+      generateContent: async (payload) => {
+        await fetch(`${providerStubUrl}/call`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        return { usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 5, totalTokenCount: 12 } };
+      },
     },
   };
 
@@ -128,7 +129,10 @@ async function main() {
     max_tokens: 128,
     messages: [{ role: "user", content: "anthropic e2e smoke" }],
   });
-  await googleModel.generateContent("google e2e smoke");
+  await googleModel.models.generateContent({
+    model: "gemini-1.5-pro",
+    contents: "google e2e smoke",
+  });
   assert.equal((await providerCount()) - initialProviderCalls, 3);
 
   const nowIso = new Date().toISOString();

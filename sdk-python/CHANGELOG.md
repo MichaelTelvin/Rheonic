@@ -4,9 +4,13 @@ All notable changes to `rheonic-sdk` will be documented in this file.
 
 ## Unreleased
 
+### Changed
+- Google provider instrumentation and examples now align with the current official Google Gen AI Python SDK shape: `google.genai` with `client.models.generate_content(...)`.
+
 ### Fixed
 - SDK debug logs now always emit non-empty `trace_id` and `span_id`, including warmup, token-estimation, and protect preflight paths.
 - Provider instrumentation now keeps the full protected call lifecycle under one trace so SDK debug logs correlate cleanly with backend requests.
+- Quickstart and README examples now show the current Anthropic and Google instrumentation patterns consistently.
 
 ## 0.1.0b7
 
