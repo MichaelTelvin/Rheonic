@@ -163,7 +163,6 @@ export class ProtectEngine {
           );
           return this.fallbackEvaluation(traceId, requestId);
         }
-
       const parsed = (await response.json()) as ProtectDecisionResponse;
       const decision = parseDecision(parsed.decision);
 

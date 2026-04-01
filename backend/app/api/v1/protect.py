@@ -224,29 +224,36 @@ def protect_decision_timeout(
         provider = payload.provider or "unknown"
         resolved_request_id = request_id_header or payload.request_id
         fallback_decision = "block" if project.protect_fail_mode == "closed" else "allow"
-        finalized, replaced = protect_action_store.finalize_outcome(
-            project_id=scoped_project_provider_id(project.id, provider),
-            decision=fallback_decision,
-            reason="decision_timeout",
-            source=app_config.protect_outcome_source_timeout_fallback,
-            request_id=resolved_request_id,
-        )
-        if (
-            finalized
-            and fallback_decision == "allow"
-            and replaced is not None
-            and replaced.get("source") == app_config.protect_outcome_source_live
-            and replaced.get("decision") == "block"
-        ):
-            protect_action_store.clear_block_cooldown(
-                scoped_project_provider_id(project.id, provider),
+        scoped_id = scoped_project_provider_id(project.id, provider)
+        if project.protect_enabled:
+            finalized, replaced = protect_action_store.finalize_outcome(
+                project_id=scoped_id,
+                decision=fallback_decision,
+                reason="decision_timeout",
+                source=app_config.protect_outcome_source_timeout_fallback,
                 request_id=resolved_request_id,
             )
-            incident_manager.reconcile_timeout_superseded_live_block(
-                project_id=project.id,
-                provider=provider,
+            if (
+                finalized
+                and fallback_decision == "allow"
+                and replaced is not None
+                and replaced.get("source") == app_config.protect_outcome_source_live
+                and replaced.get("decision") == "block"
+            ):
+                protect_action_store.clear_block_cooldown(
+                    scoped_id,
+                    request_id=resolved_request_id,
+                )
+                incident_manager.reconcile_timeout_superseded_live_block(
+                    project_id=project.id,
+                    provider=provider,
+                    request_id=resolved_request_id,
+                    source=app_config.protect_outcome_source_timeout_fallback,
+                )
+        else:
+            protect_action_store.record_timeout_fallback(
+                project_id=scoped_id,
                 request_id=resolved_request_id,
-                source=app_config.protect_outcome_source_timeout_fallback,
             )
         logger.info(
             "Protect timeout fallback recorded",
@@ -264,7 +271,7 @@ def protect_decision_timeout(
                 },
             ),
         )
-        if project.protect_fail_mode == "closed":
+        if project.protect_enabled and project.protect_fail_mode == "closed":
             protect_service.report_fail_closed_block(
                 project_id=project.id,
                 provider=provider,
@@ -319,30 +326,32 @@ def protect_decision_unavailable(
         provider = payload.provider or "unknown"
         resolved_request_id = request_id_header or payload.request_id
         fallback_decision = "block" if project.protect_fail_mode == "closed" else "allow"
-        finalized, replaced = protect_action_store.finalize_outcome(
-            project_id=scoped_project_provider_id(project.id, provider),
-            decision=fallback_decision,
-            reason="decision_unavailable",
-            source=app_config.protect_outcome_source_unavailable_fallback,
-            request_id=resolved_request_id,
-        )
-        if (
-            finalized
-            and fallback_decision == "allow"
-            and replaced is not None
-            and replaced.get("source") == app_config.protect_outcome_source_live
-            and replaced.get("decision") == "block"
-        ):
-            protect_action_store.clear_block_cooldown(
-                scoped_project_provider_id(project.id, provider),
-                request_id=resolved_request_id,
-            )
-            incident_manager.reconcile_timeout_superseded_live_block(
-                project_id=project.id,
-                provider=provider,
-                request_id=resolved_request_id,
+        if project.protect_enabled:
+            scoped_id = scoped_project_provider_id(project.id, provider)
+            finalized, replaced = protect_action_store.finalize_outcome(
+                project_id=scoped_id,
+                decision=fallback_decision,
+                reason="decision_unavailable",
                 source=app_config.protect_outcome_source_unavailable_fallback,
+                request_id=resolved_request_id,
             )
+            if (
+                finalized
+                and fallback_decision == "allow"
+                and replaced is not None
+                and replaced.get("source") == app_config.protect_outcome_source_live
+                and replaced.get("decision") == "block"
+            ):
+                protect_action_store.clear_block_cooldown(
+                    scoped_id,
+                    request_id=resolved_request_id,
+                )
+                incident_manager.reconcile_timeout_superseded_live_block(
+                    project_id=project.id,
+                    provider=provider,
+                    request_id=resolved_request_id,
+                    source=app_config.protect_outcome_source_unavailable_fallback,
+                )
         logger.info(
             "Protect unavailable fallback recorded",
             extra=build_log_extra(
@@ -359,7 +368,7 @@ def protect_decision_unavailable(
                 },
             ),
         )
-        if project.protect_fail_mode == "closed":
+        if project.protect_enabled and project.protect_fail_mode == "closed":
             protect_service.report_fail_closed_block(
                 project_id=project.id,
                 provider=provider,

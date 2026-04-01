@@ -1485,6 +1485,48 @@ def test_unavailable_report_records_block_when_project_fail_mode_is_closed(tmp_p
     _cleanup_overrides()
 
 
+def test_observe_mode_timeout_report_does_not_increment_protect_decision_counters(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Observe Timeout No Counters")
+    _set_protect(client, project_id, protect_enabled=False, protect_fail_mode="open")
+
+    response = client.post(
+        "/api/v1/protect/decision-timeout",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={"environment": "dev", "provider": "openai", "request_id": "observe-timeout-1"},
+    )
+
+    assert response.status_code == 202
+    metrics = _protect_metrics(client, project_id)
+    assert metrics["allowed_60m"] == 0
+    assert metrics["clamped_60m"] == 0
+    assert metrics["blocked_60m"] == 0
+    assert metrics["decision_timeouts_60m"] == 1
+    assert metrics["last"] is None
+    _cleanup_overrides()
+
+
+def test_observe_mode_unavailable_report_does_not_increment_protect_decision_counters(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Observe Unavailable No Counters")
+    _set_protect(client, project_id, protect_enabled=False, protect_fail_mode="open")
+
+    response = client.post(
+        "/api/v1/protect/decision-unavailable",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={"environment": "dev", "provider": "openai", "request_id": "observe-unavailable-1"},
+    )
+
+    assert response.status_code == 202
+    metrics = _protect_metrics(client, project_id)
+    assert metrics["allowed_60m"] == 0
+    assert metrics["clamped_60m"] == 0
+    assert metrics["blocked_60m"] == 0
+    assert metrics["decision_timeouts_60m"] == 0
+    assert metrics["last"] is None
+    _cleanup_overrides()
+
+
 def test_unavailable_report_enqueues_fail_closed_protection_block_when_project_fail_mode_is_closed(tmp_path) -> None:
     dispatcher = FakeWebhookDispatcher()
     transport = FakeTransportService()

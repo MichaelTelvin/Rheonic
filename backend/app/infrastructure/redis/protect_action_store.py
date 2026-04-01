@@ -221,6 +221,19 @@ class ProtectActionStore:
             )
             return False
 
+    def record_timeout_fallback(self, *, project_id: str, request_id: str | None = None, ts: datetime | None = None) -> None:
+        # Record timeout health without counting an allow/clamp/block outcome.
+        try:
+            self._increment_with_ttl(_timeout_key(project_id))
+            if request_id:
+                timestamp = (ts or datetime.now(timezone.utc)).isoformat()
+                self._record_timeout_event(project_id=project_id, request_id=request_id, ts=timestamp)
+        except Exception:
+            logger.warning(
+                "Failed recording timeout fallback health",
+                extra={"project_id": project_id, "request_id": request_id},
+            )
+
     def get_health(self, project_id: str) -> dict[str, Any]:
         # Read 60-minute preflight latency percentiles and timeout counter.
         try:
