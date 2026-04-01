@@ -870,9 +870,9 @@ export function Dashboard(): JSX.Element {
                     <InfoTooltip
                       text={
                         <>
-                          Open episodes grouped by
+                          Open incidents grouped by
                           <br />
-                          active detection window
+                          pattern detection window
                         </>
                       }
                     />
@@ -892,7 +892,7 @@ export function Dashboard(): JSX.Element {
                     <span className="protect-decisions-value warned">{incidentSummary.token_explosion ?? 0}</span>
                   </div>
                   <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Block</span>
+                    <span className="protect-decisions-label">Block reasoning</span>
                     <span className="protect-decisions-value blocked">{incidentSummary.block ?? 0}</span>
                   </div>
                 </div>

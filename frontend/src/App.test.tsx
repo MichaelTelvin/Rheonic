@@ -266,6 +266,29 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Open navigation" })).toBeDefined();
   });
 
+  it("closes the mobile navigation drawer before opening feedback", async () => {
+    mockFetchCurrentUser.mockResolvedValueOnce({
+      id: "u1",
+      email: "persisted@example.com",
+      created_at: new Date().toISOString(),
+    });
+
+    render(
+      <TestRouter initialEntries={["/app"]}>
+        <App />
+      </TestRouter>,
+    );
+
+    expect(await screen.findByText("Dashboard Page")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+
+    expect(await screen.findByRole("dialog")).toBeDefined();
+    await waitFor(() => expect(document.querySelector(".mobile-nav-backdrop")).toBeNull());
+    expect(screen.getByRole("button", { name: "Open navigation" })).toBeDefined();
+  });
+
   it("restores authenticated session and signs out through backend logout", async () => {
     mockFetchCurrentUser.mockResolvedValueOnce({
       id: "u1",

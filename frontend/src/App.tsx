@@ -99,6 +99,11 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
   const [appVersion, setAppVersion] = useState<string>(frontendConfig.appVersion);
   const location = useLocation();
 
+  const openFeedbackModal = useCallback((): void => {
+    setMobileSidebarOpen(false);
+    setFeedbackModalOpen(true);
+  }, []);
+
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [location.pathname]);
@@ -127,7 +132,7 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
       <Sidebar
         userEmail={userEmail}
         onSignOut={onSignOut}
-        onSendFeedback={() => setFeedbackModalOpen(true)}
+        onSendFeedback={openFeedbackModal}
         isMobileOpen={mobileSidebarOpen}
         onRequestClose={() => setMobileSidebarOpen(false)}
       />

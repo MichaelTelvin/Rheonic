@@ -7480,12 +7480,18 @@ html {
 
 @media (max-width: 760px) {
 
-  .public-shell.public-shell--marketing,
-  .public-shell.public-shell--quickstart {
-    width: min(calc(100% - 20px), 100%);
-    margin: 12px auto;
+  .public-shell.public-shell--marketing {
+    width: min(calc(100% - 12px), 100%);
+    margin: 10px auto;
     border-radius: 20px;
-    padding: 14px 12px 30px;
+    padding: 14px 8px 30px;
+  }
+
+  .public-shell.public-shell--quickstart {
+    width: min(calc(100% - 12px), 100%);
+    margin: 10px auto;
+    border-radius: 20px;
+    padding: 14px 8px 30px;
   }
 
   .landing {
@@ -7649,11 +7655,16 @@ html {
     font-size: 0.5rem;
   }
 
-  .public-shell.public-shell--marketing,
+  .public-shell.public-shell--marketing {
+    width: min(calc(100% - 8px), 100%);
+    margin: 8px auto;
+    padding: 14px 6px 24px;
+  }
+
   .public-shell.public-shell--quickstart {
-    width: min(calc(100% - 10px), 100%);
-    margin: 10px auto;
-    padding: 14px 8px 24px;
+    width: min(calc(100% - 8px), 100%);
+    margin: 8px auto;
+    padding: 14px 6px 24px;
   }
 
   .landing-hero-copy h1 {
@@ -7709,11 +7720,16 @@ html {
     height: 20px;
   }
 
-  .public-shell.public-shell--marketing,
+  .public-shell.public-shell--marketing {
+    width: min(calc(100% - 6px), 100%);
+    margin: 6px auto;
+    padding: 12px 5px 20px;
+  }
+
   .public-shell.public-shell--quickstart {
-    width: min(calc(100% - 8px), 100%);
-    margin: 8px auto;
-    padding: 12px 6px 20px;
+    width: min(calc(100% - 6px), 100%);
+    margin: 6px auto;
+    padding: 12px 5px 20px;
   }
 
   .landing {
