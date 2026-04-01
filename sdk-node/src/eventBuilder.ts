@@ -15,6 +15,7 @@ export interface EventResponse {
   latency_ms?: number;
   total_tokens?: number;
   error_type?: string;
+  error_message?: string;
 }
 
 export interface EventPayload {

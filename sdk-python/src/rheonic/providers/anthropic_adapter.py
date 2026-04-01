@@ -293,6 +293,7 @@ def _capture_failure(
                 response={
                     "latency_ms": latency_ms,
                     "error_type": exc.__class__.__name__ or "unknown",
+                    "error_message": str(exc) or None,
                     "http_status": _extract_http_status(exc),
                 },
             )

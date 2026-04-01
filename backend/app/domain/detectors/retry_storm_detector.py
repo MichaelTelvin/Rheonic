@@ -64,7 +64,10 @@ def _is_failure(event: Event) -> bool:
         return True
 
     error_type = (event.error_type or "").strip().lower()
-    if any(token in error_type for token in ("timeout", "connection", "reset", "refused")):
+    if any(token in error_type for token in ("timed out", "timeout", "connection", "reset", "refused")):
+        return True
+    error_message = (event.error_message or "").strip().lower()
+    if any(token in error_message for token in ("timed out", "timeout", "connection", "reset", "refused")):
         return True
 
     return False

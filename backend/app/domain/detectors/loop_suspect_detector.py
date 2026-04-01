@@ -44,7 +44,7 @@ class LoopSuspectDetector(Detector):
                 break
             if prev_ts is not None and (prev_ts - event_ts) > float(ctx.loop_max_gap_seconds):
                 break
-            
+
             # distinguish loop suspect from retry storm
             http_status = event.http_status or 0
             status = (event.status or "").strip().lower()

@@ -109,6 +109,7 @@ def _build_event(*, provider: str = "openai", requested_model: str = "gpt-4o-new
         latency_ms=100,
         status="ok",
         error_type=None,
+        error_message=None,
         http_status=200,
         created_at=now,
     )

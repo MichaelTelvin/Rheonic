@@ -39,6 +39,7 @@ class EventResponseIn(BaseModel):
     latency_ms: int | None = None
     http_status: int | None = None
     error_type: str | None = None
+    error_message: str | None = None
 
 
 class EventIn(BaseModel):
@@ -56,6 +57,7 @@ class EventIn(BaseModel):
     latency_ms: int | None = None
     status: str | None = None
     error_type: str | None = None
+    error_message: str | None = None
     http_status: int | None = None
     request: EventRequestIn | None = None
     response: EventResponseIn | None = None
@@ -179,6 +181,11 @@ def ingest_event(
                 payload.response.error_type
                 if payload.response is not None and payload.response.error_type
                 else payload.error_type
+            ),
+            error_message=(
+                payload.response.error_message
+                if payload.response is not None and payload.response.error_message
+                else payload.error_message
             ),
             http_status=(
                 payload.response.http_status

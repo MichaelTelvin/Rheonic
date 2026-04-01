@@ -271,6 +271,7 @@ def _event(
     status: str = "ok",
     http_status: int = 200,
     error_type: str | None = None,
+    error_message: str | None = None,
     endpoint: str = "/chat/completions",
     feature: str | None = "demo",
     request_fingerprint: str | None = None,
@@ -292,6 +293,7 @@ def _event(
         token_explosion_tokens=token_explosion_tokens if token_explosion_tokens is not None else total_tokens,
         status=status,
         error_type=error_type,
+        error_message=error_message,
         http_status=http_status,
         request_endpoint=endpoint,
         request_feature=feature,
@@ -418,6 +420,37 @@ def test_retry_storm_does_not_double_count_retry_state_updates() -> None:
     assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
     assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
     assert [call["template"] for call in transport.calls] == ["incident_warn"]
+
+
+def test_retry_storm_detects_timeout_from_error_message_even_with_generic_error_type() -> None:
+    service, incidents, webhook, transport = _service(protect_enabled=True, retry_storm_count=2)
+    service.ingest(
+        _event(
+            "p1",
+            status="error",
+            http_status=200,
+            error_type="error",
+            error_message="Request timed out",
+            offset_seconds=0,
+        )
+    )
+    service.ingest(
+        _event(
+            "p1",
+            status="error",
+            http_status=200,
+            error_type="error",
+            error_message="Request timed out",
+            offset_seconds=1,
+        )
+    )
+
+    assert len(incidents.rows) == 1
+    row = incidents.rows[0]
+    assert row.incident_type == "retry_storm"
+    assert row.evidence.get("failure_count") == 2
+    assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
+    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
 
 
 def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_and_email() -> None:

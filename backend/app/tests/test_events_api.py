@@ -183,6 +183,7 @@ def test_ingest_event_maps_nested_response_failure_fields_to_domain_event() -> N
         "latency_ms": 321,
         "http_status": 503,
         "error_type": "provider_5xx",
+        "error_message": "Request timed out",
     }
 
     response = client.post(
@@ -198,6 +199,7 @@ def test_ingest_event_maps_nested_response_failure_fields_to_domain_event() -> N
     assert getattr(event, "latency_ms") == 321
     assert getattr(event, "http_status") == 503
     assert getattr(event, "error_type") == "provider_5xx"
+    assert getattr(event, "error_message") == "Request timed out"
     app.dependency_overrides.clear()
 
 

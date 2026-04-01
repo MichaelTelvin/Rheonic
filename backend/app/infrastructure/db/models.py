@@ -32,6 +32,7 @@ class EventRecord(Base):
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     error_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
     http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
     request_endpoint: Mapped[str | None] = mapped_column(String(255), nullable=True)
     request_feature: Mapped[str | None] = mapped_column(String(255), nullable=True)

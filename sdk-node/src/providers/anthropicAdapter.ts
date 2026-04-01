@@ -121,6 +121,7 @@ export function instrumentAnthropic<T extends Record<string, any>>(
           response: {
             latency_ms: Date.now() - startedAt,
             error_type: extractErrorType(error),
+            error_message: extractErrorMessage(error),
             http_status: extractHttpStatus(error),
           },
         }));
@@ -182,6 +183,16 @@ function extractErrorType(error: unknown): string {
     }
   }
   return "unknown";
+}
+
+function extractErrorMessage(error: unknown): string | undefined {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.length > 0) {
+      return message;
+    }
+  }
+  return undefined;
 }
 
 function extractHttpStatus(error: unknown): number | undefined {

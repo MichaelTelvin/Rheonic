@@ -19,6 +19,7 @@ class Event:
     latency_ms: int | None
     status: str | None
     error_type: str | None
+    error_message: str | None
     http_status: int | None
     created_at: datetime
     token_explosion_tokens: int | None = None

@@ -77,6 +77,7 @@ def upgrade() -> None:
         sa.Column("latency_ms", sa.Integer(), nullable=True),
         sa.Column("status", sa.String(length=32), nullable=True),
         sa.Column("error_type", sa.String(length=64), nullable=True),
+        sa.Column("error_message", sa.String(length=512), nullable=True),
         sa.Column("http_status", sa.Integer(), nullable=True),
         sa.Column("request_endpoint", sa.String(length=255), nullable=True),
         sa.Column("request_feature", sa.String(length=255), nullable=True),

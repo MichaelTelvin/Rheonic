@@ -304,6 +304,7 @@ def _event(
         token_explosion_tokens=token_explosion_tokens if token_explosion_tokens is not None else total_tokens,
         status=status,
         error_type="provider_error" if status == "error" else None,
+        error_message=None,
         http_status=http_status,
         created_at=created_at,
         request_endpoint=request_endpoint,

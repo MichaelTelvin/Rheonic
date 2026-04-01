@@ -1,6 +1,6 @@
 [project]
 name = "rheonic-sdk"
-version = "0.1.0b12"
+version = "0.1.0b13"
 description = "Python SDK for Rheonic observability and protect preflight enforcement."
 readme = "README.md"
 license = "MIT"
