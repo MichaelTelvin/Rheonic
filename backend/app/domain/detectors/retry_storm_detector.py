@@ -62,19 +62,11 @@ def _is_failure(event: Event) -> bool:
     status = (event.status or "").strip().lower()
     if status in {"error", "failed", "fail"}:
         return True
-    
-    if event.error_message:
-        msg = event.error_message.lower()
 
-        if any(x in msg for x in [
-            "timeout",
-            "timed out",
-            "connection",
-            "reset",
-            "refused",
-        ]):
-            return True
-        
+    error_type = (event.error_type or "").strip().lower()
+    if any(token in error_type for token in ("timeout", "connection", "reset", "refused")):
+        return True
+
     return False
 
 

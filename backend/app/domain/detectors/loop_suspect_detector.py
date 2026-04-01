@@ -15,12 +15,10 @@ class LoopSuspectDetector(Detector):
         sequence_count = 0
         prev_ts = None
 
-        # do not detect loop if tokens are growing as in token explosion
-        if (
-            ctx.tok_cap is not None
-            and ctx.estimated_next_tokens is not None
-            and ctx.estimated_next_tokens > ctx.tok_cap * 0.5
-        ):
+        # Suppress loop detection when the same request stream is clearly
+        # growing into a large expanding context, even before token explosion
+        # fully qualifies.
+        if _looks_like_token_context_growth(ctx):
             return []
 
         # Normalize ordering first because some repositories return descending
@@ -140,3 +138,26 @@ def _tags(ctx: DetectionContext) -> dict[str, str]:
     if ctx.requested_model:
         tags["requested_model"] = ctx.requested_model
     return tags
+
+
+def _looks_like_token_context_growth(ctx: DetectionContext) -> bool:
+    current_tokens = ctx.token_explosion_tokens
+    if current_tokens is None and ctx.current_event is not None:
+        current_tokens = ctx.current_event.token_explosion_tokens
+    if current_tokens is None:
+        current_tokens = ctx.estimated_next_tokens
+    if current_tokens is None and ctx.current_event is not None:
+        current_tokens = ctx.current_event.total_tokens
+    if current_tokens is None:
+        return False
+
+    growth_floor = int(ctx.token_explosion_growth_min_tokens)
+    current_tokens = max(int(current_tokens), 0)
+    if current_tokens < growth_floor:
+        return False
+
+    previous_tokens = ctx.previous_estimated_tokens
+    if previous_tokens is None:
+        # A first already-large request context is not a stable loop signal.
+        return True
+    return current_tokens > max(int(previous_tokens), 0)

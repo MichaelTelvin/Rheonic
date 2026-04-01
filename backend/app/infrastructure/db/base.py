@@ -125,4 +125,4 @@ def _is_expected_project_model_duplicate(exception_context) -> bool:  # type: ig
     if "project_models" not in statement:
         return False
     message = str(original_exception or sqlalchemy_exception)
-    return "uq_project_models_project_provider_model" in message
+    return "uq_project_models_project_provider_requested_model" in message

@@ -817,6 +817,45 @@ def test_token_explosion_incident_emits_warn_in_protect_mode() -> None:
     assert any(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
 
 
+def test_token_explosion_growth_does_not_also_open_loop_suspect() -> None:
+    service, incidents, webhook, transport = _service(
+        protect_enabled=True,
+        req_cap=None,
+        tok_cap=None,
+        loop_count=1,
+        token_explosion_abs=10_000,
+        token_explosion_growth_ratio=1.7,
+        token_explosion_growth_count=2,
+        token_explosion_growth_min_tokens=1_800,
+    )
+
+    service.ingest(_event("p1", total_tokens=1_900, feature="token-loop-overlap", offset_seconds=0))
+    service.ingest(_event("p1", total_tokens=3_230, feature="token-loop-overlap", offset_seconds=1))
+    service.ingest(_event("p1", total_tokens=5_500, feature="token-loop-overlap", offset_seconds=2))
+
+    incident_types = sorted(row.incident_type for row in incidents.rows)
+    assert incident_types == ["token_explosion"]
+    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
+    assert all(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
+
+
+def test_token_explosion_absolute_hit_does_not_also_open_loop_suspect() -> None:
+    service, incidents, webhook, transport = _service(
+        protect_enabled=True,
+        req_cap=None,
+        tok_cap=20_000,
+        loop_count=1,
+        token_explosion_abs=1_500,
+    )
+
+    service.ingest(_event("p1", total_tokens=1_800, feature="token-loop-absolute", offset_seconds=0))
+
+    incident_types = sorted(row.incident_type for row in incidents.rows)
+    assert incident_types == ["token_explosion"]
+    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
+    assert all(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
+
+
 def test_behavioral_retry_and_loop_suspect_can_coexist() -> None:
     service, incidents, _, _ = _service(
         protect_enabled=True, req_cap=None, tok_cap=None, retry_storm_count=1, loop_count=1
