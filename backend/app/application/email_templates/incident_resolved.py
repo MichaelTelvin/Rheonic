@@ -12,7 +12,7 @@ def render_incident_resolved(payload: dict[str, object]) -> dict[str, str]:
     created_at = format_timestamp(payload.get("created_at"))
     last_seen_at = format_timestamp(payload.get("last_seen_at"))
     provider = str(payload.get("provider") or "-")
-    model = str(payload.get("model") or "-")
+    requested_model = str(payload.get("requested_model") or "-")
     environment = str(payload.get("environment") or "-")
     sent_at = format_timestamp(payload.get("sent_at"))
 
@@ -29,7 +29,7 @@ def render_incident_resolved(payload: dict[str, object]) -> dict[str, str]:
             ("Created at", created_at),
             ("Last seen at", last_seen_at),
             ("Provider", provider),
-            ("Model", model),
+            ("Model", requested_model),
             ("Environment", environment),
             ("Sent at", sent_at),
         ],

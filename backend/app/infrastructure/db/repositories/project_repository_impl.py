@@ -164,11 +164,11 @@ class ProjectRepositoryImpl(ProjectRepository):
         *,
         project_id: str,
         provider: str,
-        model: str,
+        requested_model: str,
         first_seen_at: datetime,
     ) -> tuple[bool, bool]:
-        # Insert first-seen provider/model tuple for project and report whether
-        # the project already had baseline provider/model history beforehand.
+        # Insert first-seen provider/requested-model tuple for project and
+        # report whether the project already had baseline history beforehand.
         try:
             with self._session_factory.create_session() as session:
                 existing_count = int(
@@ -178,7 +178,7 @@ class ProjectRepositoryImpl(ProjectRepository):
                     id=str(uuid4()),
                     project_id=project_id,
                     provider=provider,
-                    model=model,
+                    requested_model=requested_model,
                     first_seen_at=first_seen_at,
                 )
                 session.add(record)
@@ -188,13 +188,13 @@ class ProjectRepositoryImpl(ProjectRepository):
             return False, True
         except Exception:
             logger.exception(
-                "Failed recording project model first seen",
-                extra={"project_id": project_id, "provider": provider, "model": model},
+                "Failed recording project requested model first seen",
+                extra={"project_id": project_id, "provider": provider, "requested_model": requested_model},
             )
             raise
 
     def count_project_models(self, project_id: str) -> int:
-        # Count distinct provider/model rows tracked for a project.
+        # Count distinct provider/requested-model rows tracked for a project.
         try:
             with self._session_factory.create_session() as session:
                 return int(

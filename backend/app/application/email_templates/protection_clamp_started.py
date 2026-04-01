@@ -6,7 +6,7 @@ from app.application.email_templates.base_layout import format_timestamp, humani
 def render_protection_clamp_started(payload: dict[str, object]) -> dict[str, str]:
     project_id = str(payload.get("project_id") or "-")
     provider = str(payload.get("provider") or "-")
-    model = str(payload.get("model") or "-")
+    requested_model = str(payload.get("requested_model") or "-")
     environment = str(payload.get("environment") or "-")
     reason = humanize_incident_type(payload.get("reason"))
     clamp_value = payload.get("clamp")
@@ -27,7 +27,7 @@ def render_protection_clamp_started(payload: dict[str, object]) -> dict[str, str
         fields=[
             ("Project ID", project_id),
             ("Provider", provider),
-            ("Model", model),
+            ("Model", requested_model),
             ("Environment", environment),
             ("Action", "Clamp"),
             ("Reason", reason),

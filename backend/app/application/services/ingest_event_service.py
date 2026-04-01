@@ -109,7 +109,7 @@ class IngestEventService:
             previous_estimated_tokens = resolve_previous_estimated_tokens(
                 recent_events=recent_events,
                 provider=provider,
-                model=event.model,
+                requested_model=event.requested_model,
                 request_endpoint=event.request_endpoint,
                 request_feature=event.request_feature,
                 current_event=event,
@@ -117,7 +117,8 @@ class IngestEventService:
             ctx = DetectionContext(
                 project_id=event.project_id,
                 provider=provider,
-                model=event.model,
+                requested_model=event.requested_model,
+                resolved_model=event.resolved_model,
                 environment=event.environment,
                 now=self._now_provider(),
                 current_requests_60s=requests_60s,
@@ -162,7 +163,8 @@ class IngestEventService:
             self._incident_manager.process_signals(
                 project_id=event.project_id,
                 provider=provider,
-                model=event.model,
+                requested_model=event.requested_model,
+                resolved_model=event.resolved_model,
                 environment=event.environment,
                 now=self._now_provider(),
                 signals=signals,
@@ -184,25 +186,26 @@ class IngestEventService:
         return False
 
     def _detect_policy_gap_if_needed(self, *, event: Event) -> None:
-        # Record first-seen project/provider/model tuples and emit one-time policy-gap webhook notification.
+        # Record first-seen project/provider/requested-model tuples and emit
+        # one-time policy-gap webhook notification.
         if self._project_repository is None:
             return
         provider = (event.provider or "").strip()
-        model = (event.model or "").strip()
-        if not provider or not model:
+        requested_model = (event.requested_model or "").strip()
+        if not provider or not requested_model:
             return
         first_seen_at = self._now_provider()
         try:
             is_new_combination, had_existing_models = self._project_repository.record_project_model_first_seen(
                 project_id=event.project_id,
                 provider=provider,
-                model=model,
+                requested_model=requested_model,
                 first_seen_at=first_seen_at,
             )
         except Exception:
             logger.exception(
-                "Failed recording provider/model first-seen tuple",
-                extra={"project_id": event.project_id, "provider": provider, "model": model},
+                "Failed recording provider/requested_model first-seen tuple",
+                extra={"project_id": event.project_id, "provider": provider, "requested_model": requested_model},
             )
             return
         if not is_new_combination:
@@ -210,11 +213,11 @@ class IngestEventService:
         if not had_existing_models:
             return
         logger.info(
-            "Policy gap detected: first-seen provider/model tuple",
+            "Policy gap detected: first-seen provider/requested_model tuple",
             extra={
                 "project_id": event.project_id,
                 "provider": provider,
-                "model": model,
+                "requested_model": requested_model,
                 "first_seen_at": first_seen_at.isoformat(),
             },
         )
@@ -228,7 +231,7 @@ class IngestEventService:
                         "event": "policy_gap.detected",
                         "project_id": event.project_id,
                         "provider": provider,
-                        "model": model,
+                        "requested_model": requested_model,
                         "first_seen_at": first_seen_at.isoformat(),
                         "sent_at": first_seen_at.isoformat(),
                     },

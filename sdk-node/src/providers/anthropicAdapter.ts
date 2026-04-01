@@ -55,7 +55,7 @@ export function instrumentAnthropic<T extends Record<string, any>>(
       });
       const protectPayload: {
         provider: string;
-        model: string | null;
+        requested_model: string | null;
         environment?: string;
         feature?: string;
         max_output_tokens?: number;
@@ -64,7 +64,7 @@ export function instrumentAnthropic<T extends Record<string, any>>(
         span_id?: string;
       } = {
         provider: "anthropic",
-        model: requestedModel,
+        requested_model: requestedModel,
         environment: options.environment ?? options.client.environment,
         feature: options.feature,
         max_output_tokens: extractMaxOutputTokens(args),
@@ -86,7 +86,8 @@ export function instrumentAnthropic<T extends Record<string, any>>(
         const response = await originalCreate(...callArgs);
         await options.client.captureEventAndFlush(buildEvent({
           provider: "anthropic",
-          model: extractResponseModel(response) ?? requestedModel,
+          requested_model: requestedModel,
+          resolved_model: extractResponseModel(response),
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,
@@ -106,7 +107,8 @@ export function instrumentAnthropic<T extends Record<string, any>>(
       } catch (error) {
         await options.client.captureEventAndFlush(buildEvent({
           provider: "anthropic",
-          model: requestedModel,
+          requested_model: requestedModel,
+          resolved_model: null,
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,

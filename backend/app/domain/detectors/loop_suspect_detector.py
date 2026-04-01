@@ -30,7 +30,7 @@ class LoopSuspectDetector(Detector):
             event_signature = _signature(
                 project_id=ctx.project_id,
                 provider=event.provider,
-                model=event.model,
+                requested_model=event.requested_model,
                 environment=event.environment,
                 event=event,
             )
@@ -66,7 +66,8 @@ class LoopSuspectDetector(Detector):
             return []
         evidence: dict[str, object] = {
             "provider": ctx.provider,
-            "model": ctx.model,
+            "requested_model": ctx.requested_model,
+            "resolved_model": ctx.resolved_model,
             "environment": ctx.environment,
             "requests_60s": ctx.current_requests_60s,
             "tokens_60s": ctx.current_tokens_60s,
@@ -97,19 +98,20 @@ def _signature(
     *,
     project_id: str,
     provider: str,
-    model: str | None,
+    requested_model: str | None,
     environment: str | None,
     event: Event | None,
 ) -> str:
     if event is None:
         return (
-            f"{project_id}:{provider}:{normalized_model_name(model) or 'na'}:{environment or 'na'}:na:unknown:unknown"
+            f"{project_id}:{provider}:{normalized_model_name(requested_model) or 'na'}:"
+            f"{environment or 'na'}:na:unknown:unknown"
         )
     endpoint = (event.request_endpoint or "na").strip()
     feature = (event.request_feature or "unknown").strip() or "unknown"
     fingerprint = (event.request_fingerprint or "unknown").strip() or "unknown"
     return (
-        f"{project_id}:{provider}:{normalized_model_name(model) or 'na'}:{environment or 'na'}:"
+        f"{project_id}:{provider}:{normalized_model_name(requested_model) or 'na'}:{environment or 'na'}:"
         f"{endpoint}:{feature}:{fingerprint}"
     )
 
@@ -119,13 +121,13 @@ def _context_signature(ctx: DetectionContext) -> str:
     feature = (ctx.request_feature or "unknown").strip() or "unknown"
     fingerprint = (ctx.request_fingerprint or "unknown").strip() or "unknown"
     return (
-        f"{ctx.project_id}:{ctx.provider}:{normalized_model_name(ctx.model) or 'na'}:"
+        f"{ctx.project_id}:{ctx.provider}:{normalized_model_name(ctx.requested_model) or 'na'}:"
         f"{ctx.environment or 'na'}:{endpoint}:{feature}:{fingerprint}"
     )
 
 
 def _tags(ctx: DetectionContext) -> dict[str, str]:
     tags: dict[str, str] = {}
-    if ctx.model:
-        tags["model"] = ctx.model
+    if ctx.requested_model:
+        tags["requested_model"] = ctx.requested_model
     return tags

@@ -38,7 +38,8 @@ Typical payload:
 {
   "ts": "2026-03-08T10:00:00Z",
   "provider": "openai",
-  "model": "gpt-4o-mini",
+  "requested_model": "gpt-4o-mini",
+  "resolved_model": "gpt-4o-mini-2024-07-18",
   "environment": "production",
   "request": {
     "endpoint": "/chat/completions",

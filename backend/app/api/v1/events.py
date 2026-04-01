@@ -47,7 +47,8 @@ class EventIn(BaseModel):
 
     ts: datetime
     provider: str
-    model: str | None = None
+    requested_model: str | None = None
+    resolved_model: str | None = None
     environment: str | None = None
     input_tokens: int = 0
     output_tokens: int = 0
@@ -161,7 +162,8 @@ def ingest_event(
             ts=payload.ts,
             project_id=project_id,
             provider=payload.provider,
-            model=payload.model,
+            requested_model=payload.requested_model,
+            resolved_model=payload.resolved_model,
             environment=payload.environment,
             input_tokens=input_tokens,
             output_tokens=output_tokens,

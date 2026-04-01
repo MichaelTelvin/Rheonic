@@ -20,7 +20,8 @@ export interface EventResponse {
 export interface EventPayload {
   ts: string;
   provider: string;
-  model: string | null;
+  requested_model: string | null;
+  resolved_model: string | null;
   environment: string;
   request: EventRequest;
   response: EventResponse;
@@ -28,7 +29,8 @@ export interface EventPayload {
 
 export interface BuildEventInput {
   provider: string;
-  model?: string | null;
+  requested_model?: string | null;
+  resolved_model?: string | null;
   environment?: string;
   ts?: string;
   request?: EventRequest;
@@ -39,7 +41,8 @@ export function buildEvent(input: BuildEventInput): EventPayload {
   return {
     ts: input.ts ?? new Date().toISOString(),
     provider: input.provider,
-    model: input.model ?? null,
+    requested_model: input.requested_model ?? null,
+    resolved_model: input.resolved_model ?? null,
     environment: input.environment ?? "dev",
     request: input.request ?? {},
     response: input.response ?? {},

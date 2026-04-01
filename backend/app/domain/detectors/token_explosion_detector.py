@@ -41,7 +41,7 @@ class TokenExplosionDetector(Detector):
             sequence = resolve_recent_token_explosion_sequence(
                 recent_events=ctx.recent_events,
                 provider=ctx.provider,
-                model=ctx.model,
+                requested_model=ctx.requested_model,
                 request_endpoint=ctx.request_endpoint,
                 request_feature=ctx.request_feature,
                 current_event=ctx.current_event,
@@ -83,7 +83,8 @@ class TokenExplosionDetector(Detector):
             return []
         evidence: dict[str, object] = {
             "provider": ctx.provider,
-            "model": ctx.model,
+            "requested_model": ctx.requested_model,
+            "resolved_model": ctx.resolved_model,
             "environment": ctx.environment,
             "requests_60s": ctx.current_requests_60s,
             "tokens_60s": ctx.current_tokens_60s,
@@ -107,7 +108,10 @@ class TokenExplosionDetector(Detector):
             Signal(
                 detector="token_explosion",
                 scope_provider=ctx.provider,
-                fingerprint=f"{ctx.project_id}:{ctx.provider}:token_explosion",
+                fingerprint=(
+                    f"{ctx.project_id}:{ctx.provider}:{normalized_model_name(ctx.requested_model) or 'na'}:"
+                    "token_explosion"
+                ),
                 evidence=evidence,
                 episode_window_seconds=60,
                 tags=_tags(ctx),
@@ -117,8 +121,8 @@ class TokenExplosionDetector(Detector):
 
 def _tags(ctx: DetectionContext) -> dict[str, str]:
     tags: dict[str, str] = {}
-    if ctx.model:
-        tags["model"] = ctx.model
+    if ctx.requested_model:
+        tags["requested_model"] = ctx.requested_model
     return tags
 
 
@@ -126,13 +130,13 @@ def resolve_previous_estimated_tokens(
     *,
     recent_events: list[Event],
     provider: str,
-    model: str | None,
+    requested_model: str | None,
     request_endpoint: str | None = None,
     request_feature: str | None = None,
     current_event: Event | None = None,
 ) -> int | None:
     current_event_id = current_event.id if current_event is not None else None
-    normalized_model = normalized_model_name(model)
+    normalized_requested_model = normalized_model_name(requested_model)
     expected_signature = _request_signature(request_endpoint=request_endpoint, request_feature=request_feature)
     # Normalize ordering here so growth compares against the latest matching event
     # regardless of whether the caller hands us newest-first repository rows or
@@ -141,7 +145,7 @@ def resolve_previous_estimated_tokens(
     for event in ordered_events:
         if event.provider != provider:
             continue
-        if normalized_model_name(event.model) != normalized_model:
+        if normalized_model_name(event.requested_model) != normalized_requested_model:
             continue
         if current_event_id is not None and event.id == current_event_id:
             continue
@@ -157,7 +161,7 @@ def resolve_recent_token_explosion_sequence(
     *,
     recent_events: list[Event],
     provider: str,
-    model: str | None,
+    requested_model: str | None,
     request_endpoint: str | None = None,
     request_feature: str | None = None,
     current_event: Event | None = None,
@@ -168,14 +172,14 @@ def resolve_recent_token_explosion_sequence(
     if required_points <= 1:
         return [current_tokens]
     current_event_id = current_event.id if current_event is not None else None
-    normalized_model = normalized_model_name(model)
+    normalized_requested_model = normalized_model_name(requested_model)
     expected_signature = _request_signature(request_endpoint=request_endpoint, request_feature=request_feature)
     ordered_events = sorted(recent_events, key=lambda event: event.ts.timestamp())
     sequence: list[int] = []
     for event in ordered_events:
         if event.provider != provider:
             continue
-        if normalized_model_name(event.model) != normalized_model:
+        if normalized_model_name(event.requested_model) != normalized_requested_model:
             continue
         if current_event_id is not None and event.id == current_event_id:
             continue

@@ -71,7 +71,8 @@ def _send_event(
 ) -> None:
     event = build_event(
         provider=provider,
-        model=model,
+        requested_model=model,
+        resolved_model=None,
         environment=environment,
         request={
             "endpoint": endpoint,

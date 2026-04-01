@@ -194,10 +194,10 @@ class FakeProjectRepository:
         return self.project if self.project.id == project_id else None
 
     def record_project_model_first_seen(
-        self, *, project_id: str, provider: str, model: str, first_seen_at: datetime
+        self, *, project_id: str, provider: str, requested_model: str, first_seen_at: datetime
     ) -> tuple[bool, bool]:
         _ = first_seen_at
-        key = (project_id, provider, model)
+        key = (project_id, provider, requested_model)
         if key in self.seen:
             return False, True
         had_existing_models = bool(self.seen)
@@ -264,7 +264,7 @@ class FakeProjectRepository:
 def _event(
     project_id: str,
     provider: str = "openai",
-    model: str = "gpt-4o-mini",
+    requested_model: str = "gpt-4o-mini",
     *,
     total_tokens: int = 100,
     token_explosion_tokens: int | None = None,
@@ -278,11 +278,12 @@ def _event(
 ) -> Event:
     now = datetime.now(timezone.utc) + timedelta(seconds=offset_seconds)
     return Event(
-        id=f"evt-{project_id}-{provider}-{model}-{offset_seconds}-{total_tokens}",
+        id=f"evt-{project_id}-{provider}-{requested_model}-{offset_seconds}-{total_tokens}",
         ts=now,
         project_id=project_id,
         provider=provider,
-        model=model,
+        requested_model=requested_model,
+        resolved_model=None,
         environment="dev",
         input_tokens=max(total_tokens // 2, 1),
         output_tokens=max(total_tokens // 2, 1),
@@ -458,7 +459,7 @@ def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_and_email() ->
     project_id, payload = warn_calls[0]
     assert project_id == "p1"
     assert payload["provider"] == "openai"
-    assert payload["model"] == "gpt-4o-mini"
+    assert payload["requested_model"] == "gpt-4o-mini"
     assert payload["environment"] == "dev"
     evidence = payload["evidence"]
     assert isinstance(evidence, dict)
@@ -470,7 +471,7 @@ def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_and_email() ->
     assert evidence["threshold_count"] == 3
     assert evidence["count"] == 1
     assert "provider" not in evidence
-    assert "model" not in evidence
+    assert "requested_model" not in evidence
     assert "environment" not in evidence
     assert "last_seen_at" not in evidence
     assert "reason" not in evidence
@@ -933,8 +934,10 @@ def test_active_block_incident_suppresses_retry_and_loop_in_same_window() -> Non
 
 def test_policy_gap_first_seen_baseline_sends_no_webhook_and_no_incident() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=True)
-    service.ingest(_event("p1", provider="openai", model="gpt-4o-mini", total_tokens=10, offset_seconds=0))
-    service.ingest(_event("p1", provider="openai", model="gpt-4o-mini", total_tokens=12, offset_seconds=30))
+    service.ingest(_event("p1", provider="openai", requested_model="gpt-4o-mini", total_tokens=10, offset_seconds=0))
+    service.ingest(
+        _event("p1", provider="openai", requested_model="gpt-4o-mini", total_tokens=12, offset_seconds=30)
+    )
 
     policy_gap_calls = [call for call in webhook.calls if call[1] == "policy_gap.detected"]
     assert len(policy_gap_calls) == 0
@@ -943,8 +946,10 @@ def test_policy_gap_first_seen_baseline_sends_no_webhook_and_no_incident() -> No
 
 def test_policy_gap_webhook_is_sent_only_after_project_has_baseline_history() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=False)
-    service.ingest(_event("p1", provider="openai", model="gpt-4o-mini", total_tokens=10, offset_seconds=0))
-    service.ingest(_event("p1", provider="google", model="gemini-1.5-pro", total_tokens=12, offset_seconds=30))
+    service.ingest(_event("p1", provider="openai", requested_model="gpt-4o-mini", total_tokens=10, offset_seconds=0))
+    service.ingest(
+        _event("p1", provider="google", requested_model="gemini-1.5-pro", total_tokens=12, offset_seconds=30)
+    )
 
     assert any(event_type == "policy_gap.detected" for _, event_type, _ in webhook.calls)
     assert incidents.rows == []

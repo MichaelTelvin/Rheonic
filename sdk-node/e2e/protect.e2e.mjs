@@ -72,7 +72,7 @@ async function main() {
     },
     body: JSON.stringify({
       provider: "openai",
-      model: "gpt-4o-mini",
+      requested_model: "gpt-4o-mini",
       environment: "dev",
       feature: "node-e2e",
       input_tokens_estimate: 12,
@@ -145,7 +145,8 @@ async function main() {
     body: JSON.stringify({
       ts: nowIso,
       provider: "openai",
-      model: "gpt-4o-mini",
+      requested_model: "gpt-4o-mini",
+      resolved_model: null,
       environment: "dev",
       response: { total_tokens: 49000 },
     }),

@@ -49,7 +49,8 @@ Sample payload for `protection.clamp_started`:
   "event": "protection.clamp_started",
   "project_id": "proj_123",
   "provider": "openai",
-  "model": "gpt-4o-mini",
+  "requested_model": "gpt-4o-mini",
+  "resolved_model": "gpt-4o-mini-2024-07-18",
   "environment": "staging",
   "reason": "token_clamp",
   "requests_60s": 12,
@@ -69,7 +70,8 @@ Field notes:
 - `event`: webhook event type
 - `project_id`: Rheonic project identifier
 - `provider`: provider associated with the decision/report
-- `model`: model associated with the request when available
+- `requested_model`: canonical requested model associated with the request when available
+- `resolved_model`: provider-returned model identifier when available for debugging
 - `environment`: environment associated with the request when available
 - `reason`: Protect enforcement reason such as `token_clamp` or `req_cap_breach`
 - `requests_60s`: rolling request count for the scoped `(project, provider)`

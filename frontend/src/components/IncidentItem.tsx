@@ -53,7 +53,7 @@ export function IncidentItem({ incident, resolving, onResolve }: IncidentItemPro
       </p>
       <p className="incident-meta">
         <span>Provider {(incident.evidence.provider as string | undefined) ?? "unknown"}</span>
-        <span>· Model {(incident.evidence.model as string | undefined) ?? "unknown"}</span>
+        <span>· Model {(incident.evidence.requested_model as string | undefined) ?? "unknown"}</span>
       </p>
 
       <div className="incident-actions">

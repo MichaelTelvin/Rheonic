@@ -9,6 +9,7 @@ import {
   RHEONICBlockedError,
   RHEONICValidationError,
 } from "./index.js";
+import { ProtectEngine } from "./protectEngine.js";
 import { validateProviderModel } from "./providerModelValidation.js";
 import { __setInputTokenEstimatorForTests as __setAnthropicEstimatorForTests } from "./providers/anthropicAdapter.js";
 import { __setInputTokenEstimatorForTests as __setGoogleEstimatorForTests } from "./providers/googleAdapter.js";
@@ -696,6 +697,56 @@ test("invalid JSON fail-closed blocks provider call", async () => {
     assert.equal(unavailableReports.length, 1);
     assert.equal(unavailableReports[0].provider, "openai");
     client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("protect engine normalizes invalid decision payload fields to safe defaults", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          decision: "mystery",
+          reason: 42,
+          fail_mode: "weird",
+          protect_decision_timeout_ms: -5,
+          blocked_until: "not-a-date",
+          retry_after_seconds: -1,
+          snapshot: [],
+          apply_clamp_enabled: "yes",
+          clamp: { recommended_max_output_tokens: 0, applied: "nope" },
+        }),
+      } as Response;
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const engine = new ProtectEngine({
+      baseUrl: "http://localhost:8000",
+      ingestKey: "k1",
+      environment: "dev",
+      fallbackRequestTimeoutMs: 500,
+      initialFailMode: "open",
+      initialDecisionTimeoutMs: 160,
+    });
+
+    const result = await engine.evaluate({
+      provider: "openai",
+      requested_model: "gpt-4o-mini",
+    });
+
+    assert.equal(result.decision, "allow");
+    assert.equal(result.reason, "ok");
+    assert.equal(result.blocked_until, "not-a-date");
+    assert.equal(result.retry_after_seconds, undefined);
+    assert.equal(result.snapshot, undefined);
+    assert.equal(result.applyClampEnabled, undefined);
+    assert.equal(result.clamp, undefined);
   } finally {
     globalThis.fetch = originalFetch;
   }

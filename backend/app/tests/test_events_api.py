@@ -70,7 +70,7 @@ def _payload() -> dict[str, object]:
     payload = EventIn(
         ts=datetime.now(timezone.utc),
         provider="openai",
-        model="gpt-4o-mini",
+        requested_model="gpt-4o-mini",
         environment="dev",
         response={"total_tokens": 10},
     )

@@ -125,7 +125,8 @@ async function printPhase(dashboardSession, phase, projectId, provider) {
 async function sendEvent(client, provider, model, endpoint, totalTokens, feature, options) {
   const event = buildEvent({
     provider,
-    model,
+    requested_model: model,
+    resolved_model: null,
     environment: client.environment,
     request: {
       endpoint,

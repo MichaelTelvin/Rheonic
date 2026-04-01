@@ -13,11 +13,11 @@ def _make_client() -> TestClient:
     return TestClient(app)
 
 
-def _event_payload(total_tokens: int, provider: str, model: str, env: str = "dev") -> dict[str, object]:
+def _event_payload(total_tokens: int, provider: str, requested_model: str, env: str = "dev") -> dict[str, object]:
     return {
         "ts": datetime.now(timezone.utc).isoformat(),
         "provider": provider,
-        "model": model,
+        "requested_model": requested_model,
         "environment": env,
         "response": {"total_tokens": total_tokens},
         "status": "error",
@@ -64,7 +64,7 @@ def test_incidents_provider_filter_returns_scoped_rows() -> None:
     for _ in range(6):
         r = client.post(
             "/api/v1/events",
-            json=_event_payload(50, provider="openai", model="gpt-4o-mini"),
+            json=_event_payload(50, provider="openai", requested_model="gpt-4o-mini"),
             headers={"X-Project-Ingest-Key": ingest_key},
         )
         assert r.status_code == 202
@@ -72,7 +72,7 @@ def test_incidents_provider_filter_returns_scoped_rows() -> None:
     for _ in range(6):
         r = client.post(
             "/api/v1/events",
-            json=_event_payload(60, provider="anthropic", model="claude-3-5-sonnet"),
+            json=_event_payload(60, provider="anthropic", requested_model="claude-3-5-sonnet"),
             headers={"X-Project-Ingest-Key": ingest_key},
         )
         assert r.status_code == 202
@@ -113,7 +113,7 @@ def test_incident_dedup_updates_existing_row_count() -> None:
     for _ in range(6):
         r = client.post(
             "/api/v1/events",
-            json=_event_payload(75, provider="openai", model="gpt-4o-mini"),
+            json=_event_payload(75, provider="openai", requested_model="gpt-4o-mini"),
             headers={"X-Project-Ingest-Key": ingest_key},
         )
         assert r.status_code == 202
@@ -145,7 +145,7 @@ def test_retry_storm_ingest_returns_202_and_incident_is_listed() -> None:
     for _ in range(6):
         response = client.post(
             "/api/v1/events",
-            json=_event_payload(55, provider="openai", model="gpt-4o-mini"),
+            json=_event_payload(55, provider="openai", requested_model="gpt-4o-mini"),
             headers={"X-Project-Ingest-Key": ingest_key},
         )
         assert response.status_code == 202

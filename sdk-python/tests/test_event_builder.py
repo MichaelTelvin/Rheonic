@@ -8,7 +8,8 @@ def test_build_event_schema_excludes_project_id() -> None:
     # Event payload should match backend schema and omit project_id.
     payload = build_event(
         provider="openai",
-        model="gpt-4o-mini",
+        requested_model="gpt-4o-mini",
+        resolved_model="gpt-4o-mini-2024-07-18",
         environment="dev",
         request={
             "endpoint": "/chat",
@@ -20,7 +21,8 @@ def test_build_event_schema_excludes_project_id() -> None:
     )
 
     assert payload["provider"] == "openai"
-    assert payload["model"] == "gpt-4o-mini"
+    assert payload["requested_model"] == "gpt-4o-mini"
+    assert payload["resolved_model"] == "gpt-4o-mini-2024-07-18"
     assert payload["environment"] == "dev"
     assert "project_id" not in payload
     assert isinstance(payload["request"], dict)
@@ -33,7 +35,8 @@ def test_event_builder_normalizes_optional_fields() -> None:
     payload = EventBuilder().build(
         {
             "provider": "openai",
-            "model": 123,
+            "requested_model": 123,
+            "resolved_model": 456,
             "request": "bad",
             "response": "bad",
             "ts": 42,
@@ -41,7 +44,8 @@ def test_event_builder_normalizes_optional_fields() -> None:
     )
 
     assert payload["provider"] == "openai"
-    assert payload["model"] is None
+    assert payload["requested_model"] is None
+    assert payload["resolved_model"] is None
     assert payload["environment"] == "dev"
     assert payload["request"] == {}
     assert payload["response"] == {}

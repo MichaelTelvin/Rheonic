@@ -20,7 +20,8 @@ class DetectionContext:
     # Shared detector input for one ingest or protect evaluation.
     project_id: str
     provider: str
-    model: str | None
+    requested_model: str | None
+    resolved_model: str | None
     environment: str | None
     now: datetime
     current_requests_60s: int

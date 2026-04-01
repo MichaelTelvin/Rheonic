@@ -54,7 +54,7 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
       });
       const protectPayload: {
         provider: string;
-        model: string | null;
+        requested_model: string | null;
         environment?: string;
         feature?: string;
         max_output_tokens?: number;
@@ -63,7 +63,7 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
         span_id?: string;
       } = {
         provider: "google",
-        model: requestedModel,
+        requested_model: requestedModel,
         environment: options.environment ?? options.client.environment,
         feature: options.feature,
         max_output_tokens: extractMaxOutputTokens(args),
@@ -85,7 +85,8 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
         const response = await originalGenerate(...callArgs);
         await options.client.captureEventAndFlush(buildEvent({
           provider: "google",
-          model: requestedModel,
+          requested_model: requestedModel,
+          resolved_model: extractResponseModel(response),
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,
@@ -105,7 +106,8 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
       } catch (error) {
         await options.client.captureEventAndFlush(buildEvent({
           provider: "google",
-          model: requestedModel,
+          requested_model: requestedModel,
+          resolved_model: null,
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,
@@ -240,6 +242,24 @@ function extractTotalTokens(response: unknown): number | undefined {
   const candidates = typeof usage.candidatesTokenCount === "number" ? usage.candidatesTokenCount : 0;
   const total = prompt + candidates;
   return total > 0 ? total : undefined;
+}
+
+function extractResponseModel(response: unknown): string | null {
+  if (!response || typeof response !== "object") {
+    return null;
+  }
+  const topLevelModel = (response as { model?: unknown }).model;
+  if (typeof topLevelModel === "string" && topLevelModel.trim()) {
+    return topLevelModel;
+  }
+  const nestedResponse = (response as { response?: { modelVersion?: unknown; model?: unknown } }).response;
+  if (typeof nestedResponse?.modelVersion === "string" && nestedResponse.modelVersion.trim()) {
+    return nestedResponse.modelVersion;
+  }
+  if (typeof nestedResponse?.model === "string" && nestedResponse.model.trim()) {
+    return nestedResponse.model;
+  }
+  return null;
 }
 
 function extractErrorType(error: unknown): string {

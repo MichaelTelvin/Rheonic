@@ -55,7 +55,7 @@ def _probe_once(
         f"{base_url.rstrip('/')}/api/v1/protect/decision",
         json={
             "provider": provider,
-            "model": model,
+            "requested_model": model,
             "environment": environment,
             "feature": feature,
             "input_tokens_estimate": 3,

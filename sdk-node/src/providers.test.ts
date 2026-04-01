@@ -304,7 +304,8 @@ test("anthropic adapter returns undefined totals and http status from statusCode
     max_tokens: 8,
   });
   assert.equal((successClient.captured[0] as any).response.total_tokens, undefined);
-  assert.equal((successClient.captured[0] as any).model, "claude-3-5-sonnet");
+  assert.equal((successClient.captured[0] as any).requested_model, "claude-3-5-sonnet");
+  assert.equal((successClient.captured[0] as any).resolved_model, null);
 
   const failureClient = makeClient({
     decision: "allow",

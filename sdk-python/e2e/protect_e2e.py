@@ -115,7 +115,7 @@ def run() -> None:
         f"{BACKEND_BASE_URL}/api/v1/protect/decision",
         json={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "python-e2e",
             "input_tokens_estimate": 12,
@@ -194,7 +194,8 @@ def run() -> None:
         json={
             "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
+            "resolved_model": None,
             "environment": "dev",
             "response": {"total_tokens": 49000},
         },

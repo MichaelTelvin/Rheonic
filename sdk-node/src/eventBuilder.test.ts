@@ -6,7 +6,8 @@ import { EventBuilder, buildEvent } from "./eventBuilder.js";
 test("buildEvent fills defaults", () => {
   const payload = buildEvent({ provider: "openai" });
   assert.equal(payload.provider, "openai");
-  assert.equal(payload.model, null);
+  assert.equal(payload.requested_model, null);
+  assert.equal(payload.resolved_model, null);
   assert.equal(payload.environment, "dev");
   assert.deepEqual(payload.request, {});
   assert.deepEqual(payload.response, {});
@@ -14,9 +15,10 @@ test("buildEvent fills defaults", () => {
 
 test("EventBuilder delegates to buildEvent", () => {
   const builder = new EventBuilder();
-  const payload = builder.build({ provider: "anthropic", model: "claude" });
+  const payload = builder.build({ provider: "anthropic", requested_model: "claude", resolved_model: "claude-v1" });
   assert.equal(payload.provider, "anthropic");
-  assert.equal(payload.model, "claude");
+  assert.equal(payload.requested_model, "claude");
+  assert.equal(payload.resolved_model, "claude-v1");
 });
 
 test("buildEvent preserves request fingerprint", () => {

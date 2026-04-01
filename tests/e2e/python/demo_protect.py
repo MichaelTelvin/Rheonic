@@ -335,7 +335,8 @@ def _send_ingest_event(
     payload = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "provider": provider,
-        "model": model,
+        "requested_model": model,
+        "resolved_model": None,
         "environment": environment,
         "latency_ms": 120,
         "http_status": http_status,

@@ -57,7 +57,8 @@ def format_evidence(value: object) -> str:
         "growth_threshold",
         "growth_hit",
         "provider",
-        "model",
+        "requested_model",
+        "resolved_model",
         "environment",
         "last_seen_at",
     ]

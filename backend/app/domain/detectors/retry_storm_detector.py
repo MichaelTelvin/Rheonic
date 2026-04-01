@@ -16,7 +16,7 @@ class RetryStormDetector(Detector):
             event
             for event in ctx.recent_events
             if event.provider == ctx.provider
-            and normalized_model_name(event.model) == normalized_model_name(ctx.model)
+            and normalized_model_name(event.requested_model) == normalized_model_name(ctx.requested_model)
             and event.created_at.timestamp() >= cutoff
             and _is_failure(event)
         ]
@@ -25,7 +25,8 @@ class RetryStormDetector(Detector):
             return []
         evidence: dict[str, object] = {
             "provider": ctx.provider,
-            "model": ctx.model,
+            "requested_model": ctx.requested_model,
+            "resolved_model": ctx.resolved_model,
             "environment": ctx.environment,
             "requests_60s": ctx.current_requests_60s,
             "tokens_60s": ctx.current_tokens_60s,
@@ -41,7 +42,9 @@ class RetryStormDetector(Detector):
             Signal(
                 detector="retry_storm",
                 scope_provider=ctx.provider,
-                fingerprint=f"{ctx.project_id}:{ctx.provider}:retry_storm",
+                fingerprint=(
+                    f"{ctx.project_id}:{ctx.provider}:{normalized_model_name(ctx.requested_model) or 'na'}:retry_storm"
+                ),
                 evidence=evidence,
                 episode_window_seconds=ctx.retry_storm_window_seconds,
                 tags=_tags(ctx),
@@ -64,6 +67,6 @@ def _is_failure(event: Event) -> bool:
 
 def _tags(ctx: DetectionContext) -> dict[str, str]:
     tags: dict[str, str] = {}
-    if ctx.model:
-        tags["model"] = ctx.model
+    if ctx.requested_model:
+        tags["requested_model"] = ctx.requested_model
     return tags

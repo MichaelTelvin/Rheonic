@@ -67,7 +67,8 @@ def upgrade() -> None:
         sa.Column("ts", sa.DateTime(timezone=True), nullable=False),
         sa.Column("project_id", sa.String(length=128), nullable=False),
         sa.Column("provider", sa.String(length=32), nullable=False),
-        sa.Column("model", sa.String(length=128), nullable=True),
+        sa.Column("requested_model", sa.String(length=128), nullable=True),
+        sa.Column("resolved_model", sa.String(length=128), nullable=True),
         sa.Column("environment", sa.String(length=32), nullable=True),
         sa.Column("input_tokens", sa.Integer(), nullable=False),
         sa.Column("output_tokens", sa.Integer(), nullable=False),
@@ -128,15 +129,20 @@ def upgrade() -> None:
         sa.Column("id", sa.String(length=64), nullable=False),
         sa.Column("project_id", sa.String(length=64), nullable=False),
         sa.Column("provider", sa.String(length=64), nullable=False),
-        sa.Column("model", sa.String(length=255), nullable=False),
+        sa.Column("requested_model", sa.String(length=255), nullable=False),
         sa.Column("first_seen_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["project_id"], ["projects.id"]),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("project_id", "provider", "model", name="uq_project_models_project_provider_model"),
+        sa.UniqueConstraint(
+            "project_id",
+            "provider",
+            "requested_model",
+            name="uq_project_models_project_provider_requested_model",
+        ),
     )
     op.create_index("ix_project_models_project_id", "project_models", ["project_id"], unique=False)
     op.create_index("ix_project_models_provider", "project_models", ["provider"], unique=False)
-    op.create_index("ix_project_models_model", "project_models", ["model"], unique=False)
+    op.create_index("ix_project_models_requested_model", "project_models", ["requested_model"], unique=False)
 
     op.create_table(
         "ingest_keys",
@@ -200,7 +206,7 @@ def downgrade() -> None:
     op.drop_index("ix_ingest_keys_project_id", table_name="ingest_keys")
     op.drop_table("ingest_keys")
 
-    op.drop_index("ix_project_models_model", table_name="project_models")
+    op.drop_index("ix_project_models_requested_model", table_name="project_models")
     op.drop_index("ix_project_models_provider", table_name="project_models")
     op.drop_index("ix_project_models_project_id", table_name="project_models")
     op.drop_table("project_models")

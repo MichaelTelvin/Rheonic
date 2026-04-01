@@ -10,7 +10,8 @@ class Event:
     ts: datetime
     project_id: str
     provider: str
-    model: str | None
+    requested_model: str | None
+    resolved_model: str | None
     environment: str | None
     input_tokens: int
     output_tokens: int

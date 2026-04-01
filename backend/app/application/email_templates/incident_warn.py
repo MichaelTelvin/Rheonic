@@ -13,7 +13,7 @@ def render_incident_warn(payload: dict[str, object]) -> dict[str, str]:
     incident_id = str(payload.get("incident_id") or "-")
     incident_type = humanize_incident_type(payload.get("incident_type"))
     provider = str(payload.get("provider") or "-")
-    model = str(payload.get("model") or "-")
+    requested_model = str(payload.get("requested_model") or "-")
     environment = str(payload.get("environment") or "-")
     created_at = format_timestamp(payload.get("created_at"))
     last_seen_at = format_timestamp(payload.get("last_seen_at"))
@@ -28,7 +28,7 @@ def render_incident_warn(payload: dict[str, object]) -> dict[str, str]:
             ("Incident ID", incident_id),
             ("Incident type", incident_type),
             ("Provider", provider),
-            ("Model", model),
+            ("Model", requested_model),
             ("Environment", environment),
             ("Created at", created_at),
             ("Last seen at", last_seen_at),

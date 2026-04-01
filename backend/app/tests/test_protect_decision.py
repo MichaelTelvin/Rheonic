@@ -268,7 +268,7 @@ def _decision(client: TestClient, ingest_key: str, body: dict[str, object] | Non
     response = client.post(
         "/api/v1/protect/decision",
         headers={"X-Project-Ingest-Key": ingest_key},
-        json=body or {"provider": "openai", "model": "gpt-4o-mini"},
+        json=body or {"provider": "openai", "requested_model": "gpt-4o-mini"},
     )
     assert response.status_code == 200
     return response.json()
@@ -277,8 +277,9 @@ def _decision(client: TestClient, ingest_key: str, body: dict[str, object] | Non
 def _event(
     project_id: str,
     provider: str,
-    model: str,
+    requested_model: str,
     *,
+    resolved_model: str | None = None,
     status: str,
     http_status: int,
     total_tokens: int,
@@ -289,11 +290,12 @@ def _event(
     request_fingerprint: str | None = None,
 ) -> Event:
     return Event(
-        id=f"evt-{project_id}-{provider}-{model}-{created_at.timestamp()}",
+        id=f"evt-{project_id}-{provider}-{requested_model}-{created_at.timestamp()}",
         ts=created_at,
         project_id=project_id,
         provider=provider,
-        model=model,
+        requested_model=requested_model,
+        resolved_model=resolved_model,
         environment="dev",
         input_tokens=max(total_tokens // 2, 1),
         output_tokens=max(total_tokens // 2, 1),
@@ -329,7 +331,7 @@ def test_protect_disabled_returns_allow_and_predictive_disabled(tmp_path) -> Non
     project_id, ingest_key = _create_project_and_key(client, "Protect Disabled")
     _set_protect(client, project_id, protect_enabled=False, protect_max_tok_per_min=100)
     decision = _decision(
-        client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 90}
+        client, ingest_key, body={"provider": "openai", "requested_model": "gpt-4o-mini", "input_tokens_estimate": 90}
     )
     assert decision["decision"] == "allow"
     assert decision["reason"] == "ok"
@@ -393,7 +395,7 @@ def test_late_block_decision_does_not_enqueue_protection_block_notifications(tmp
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
         },
     )
@@ -415,7 +417,7 @@ def test_clamp_decision_is_returned_when_predictive_budget_needs_reduction(tmp_p
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "input_tokens_estimate": 15,
             "max_output_tokens": 64,
         },
@@ -439,7 +441,7 @@ def test_clamp_decision_does_not_depend_on_recent_event_history(tmp_path) -> Non
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "input_tokens_estimate": 15,
             "max_output_tokens": 64,
         },
@@ -459,7 +461,7 @@ def test_clamp_decision_includes_apply_clamp_flag_when_enabled(tmp_path) -> None
     decision = _decision(
         client,
         ingest_key,
-        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 10, "max_output_tokens": 64},
+        body={"provider": "openai", "requested_model": "gpt-4o-mini", "input_tokens_estimate": 10, "max_output_tokens": 64},
     )
     assert decision["decision"] == "clamp"
     assert decision["reason"] == "token_clamp"
@@ -489,7 +491,7 @@ def test_clamp_decision_dispatches_clamp_started_webhook_when_enabled(tmp_path) 
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "input_tokens_estimate": 10,
             "max_output_tokens": 64,
@@ -514,7 +516,7 @@ def test_clamp_decision_dispatches_clamp_started_email(tmp_path) -> None:
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "input_tokens_estimate": 10,
             "max_output_tokens": 64,
@@ -541,7 +543,7 @@ def test_clamp_decision_allows_when_no_reduction_is_needed(tmp_path) -> None:
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "input_tokens_estimate": 10,
             "max_output_tokens": 32,
@@ -567,7 +569,7 @@ def test_clamp_decision_does_not_create_incident_from_preflight(tmp_path) -> Non
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "input_tokens_estimate": 10,
             "max_output_tokens": 64,
@@ -647,9 +649,9 @@ def test_retry_storm_does_not_trigger_preflight(tmp_path) -> None:
     _cleanup_overrides()
 
 
-def test_retry_storm_does_not_trigger_preflight_when_recent_events_use_resolved_model_name(tmp_path) -> None:
+def test_retry_storm_does_not_trigger_preflight_when_resolved_model_differs(tmp_path) -> None:
     client, _, events = _make_client(tmp_path)
-    project_id, ingest_key = _create_project_and_key(client, "Protect Retry Storm Resolved Model")
+    project_id, ingest_key = _create_project_and_key(client, "Protect Retry Storm Different Resolved Model")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
     now = datetime.now(timezone.utc)
@@ -658,7 +660,8 @@ def test_retry_storm_does_not_trigger_preflight_when_recent_events_use_resolved_
             _event(
                 project_id,
                 "openai",
-                "gpt-4o-mini-2024-07-18",
+                "gpt-4o-mini",
+                resolved_model="gpt-4o-mini-2024-07-18",
                 status="error",
                 http_status=http_status,
                 total_tokens=50,
@@ -671,7 +674,7 @@ def test_retry_storm_does_not_trigger_preflight_when_recent_events_use_resolved_
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
         },
     )
@@ -744,7 +747,7 @@ def test_loop_suspect_does_not_trigger_preflight_when_feature_matches(tmp_path) 
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "manual-protect-demo",
         },
@@ -754,9 +757,9 @@ def test_loop_suspect_does_not_trigger_preflight_when_feature_matches(tmp_path) 
     _cleanup_overrides()
 
 
-def test_loop_suspect_does_not_trigger_preflight_when_recent_events_use_resolved_model_name(tmp_path) -> None:
+def test_loop_suspect_does_not_trigger_preflight_when_resolved_model_differs(tmp_path) -> None:
     client, _, events = _make_client(tmp_path)
-    project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Resolved Model")
+    project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Different Resolved Model")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
 
     now = datetime.now(timezone.utc)
@@ -765,7 +768,8 @@ def test_loop_suspect_does_not_trigger_preflight_when_recent_events_use_resolved
             _event(
                 project_id,
                 "openai",
-                "gpt-4o-mini-2024-07-18",
+                "gpt-4o-mini",
+                resolved_model="gpt-4o-mini-2024-07-18",
                 status="ok",
                 http_status=200,
                 total_tokens=60,
@@ -779,7 +783,7 @@ def test_loop_suspect_does_not_trigger_preflight_when_recent_events_use_resolved
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "manual-protect-demo",
         },
@@ -814,7 +818,7 @@ def test_loop_suspect_preflight_ignores_error_sequence(tmp_path) -> None:
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "manual-protect-demo",
         },
@@ -854,7 +858,7 @@ def test_loop_suspect_preflight_is_suppressed_under_high_concurrency(tmp_path) -
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "manual-protect-demo",
         },
@@ -900,7 +904,7 @@ def test_token_explosion_growth_does_not_trigger_preflight(tmp_path) -> None:
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "manual-protect-demo",
             "input_tokens_estimate": 5_500,
@@ -924,7 +928,7 @@ def test_token_explosion_does_not_emit_preflight_webhook(tmp_path) -> None:
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "input_tokens_estimate": 240,
             "max_output_tokens": 0,
@@ -971,7 +975,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_without_live_current_
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "manual-protect-demo",
             "input_tokens_estimate": 5_500,
@@ -1019,7 +1023,7 @@ def test_token_explosion_growth_uses_latest_matching_event_in_preflight(tmp_path
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "manual-protect-demo",
             "input_tokens_estimate": 5_500,
@@ -1069,7 +1073,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_under_high_concurrenc
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "manual-protect-demo",
             "input_tokens_estimate": 5_500,
@@ -1106,7 +1110,7 @@ def test_token_explosion_growth_is_suppressed_in_preflight_for_tiny_requests(tmp
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "manual-protect-demo",
             "input_tokens_estimate": 363,
@@ -1168,7 +1172,7 @@ def test_token_explosion_growth_ignores_unrelated_feature_history_in_preflight(t
         ingest_key,
         body={
             "provider": "openai",
-            "model": "gpt-4o-mini",
+            "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "feature": "manual-protect-demo",
             "input_tokens_estimate": 5_500,
@@ -1189,7 +1193,7 @@ def test_protect_decision_records_allow_clamp_block_outcomes(tmp_path) -> None:
         client, allow_project_id, protect_enabled=True, protect_max_req_per_min=1000, protect_max_tok_per_min=1000
     )
     allow_before = int(_protect_metrics(client, allow_project_id)["allowed_60m"])
-    _decision(client, allow_ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    _decision(client, allow_ingest_key, body={"provider": "openai", "requested_model": "gpt-4o-mini"})
     allow_metrics = _protect_metrics(client, allow_project_id)
     allow_after = int(allow_metrics["allowed_60m"])
     assert allow_after == allow_before + 1
@@ -1209,7 +1213,7 @@ def test_protect_decision_records_allow_clamp_block_outcomes(tmp_path) -> None:
     _decision(
         client,
         clamp_ingest_key,
-        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 20, "max_output_tokens": 64},
+        body={"provider": "openai", "requested_model": "gpt-4o-mini", "input_tokens_estimate": 20, "max_output_tokens": 64},
     )
     clamp_metrics = _protect_metrics(client, clamp_project_id)
     clamp_after = int(clamp_metrics["clamped_60m"])
@@ -1229,7 +1233,7 @@ def test_protect_decision_records_allow_clamp_block_outcomes(tmp_path) -> None:
         project_id=scoped_project_provider_id(block_project_id, "openai"), total_tokens=1
     )
     block_before = int(_protect_metrics(client, block_project_id)["blocked_60m"])
-    _decision(client, block_ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    _decision(client, block_ingest_key, body={"provider": "openai", "requested_model": "gpt-4o-mini"})
     block_metrics = _protect_metrics(client, block_project_id)
     block_after = int(block_metrics["blocked_60m"])
     assert block_after == block_before + 1
@@ -1248,7 +1252,7 @@ def test_observe_mode_preflight_does_not_increment_protect_decision_counters(tmp
     _set_protect(client, project_id, protect_enabled=False, protect_max_req_per_min=1000, protect_max_tok_per_min=1000)
 
     before = _protect_metrics(client, project_id)
-    response = _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    response = _decision(client, ingest_key, body={"provider": "openai", "requested_model": "gpt-4o-mini"})
     after = _protect_metrics(client, project_id)
 
     assert response["decision"] == "allow"
@@ -1265,11 +1269,11 @@ def test_protect_metrics_support_provider_filter_with_same_schema(tmp_path) -> N
     project_id, ingest_key = _create_project_and_key(client, "Protect Metrics")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=200)
 
-    _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})  # allow
+    _decision(client, ingest_key, body={"provider": "openai", "requested_model": "gpt-4o-mini"})  # allow
     _decision(
         client,
         ingest_key,
-        body={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 180, "max_output_tokens": 64},
+        body={"provider": "openai", "requested_model": "gpt-4o-mini", "input_tokens_estimate": 180, "max_output_tokens": 64},
     )  # allow when clamp disabled
 
     _decision(
@@ -1277,7 +1281,7 @@ def test_protect_metrics_support_provider_filter_with_same_schema(tmp_path) -> N
         ingest_key,
         body={
             "provider": "anthropic",
-            "model": "claude-3-5-sonnet",
+            "requested_model": "claude-3-5-sonnet",
             "input_tokens_estimate": 180,
             "max_output_tokens": 64,
         },
@@ -1321,7 +1325,7 @@ def test_timeout_report_reconciles_late_warn_decision_metrics(tmp_path) -> None:
             "X-Project-Ingest-Key": ingest_key,
             "X-Rheonic-Protect-Request-Id": request_id,
         },
-        json={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 20},
+        json={"provider": "openai", "requested_model": "gpt-4o-mini", "input_tokens_estimate": 20},
     )
     assert decision_response.status_code == 200
     assert decision_response.json()["decision"] == "allow"
@@ -1414,7 +1418,7 @@ def test_timeout_report_enqueues_fail_closed_protection_block_when_project_fail_
     response = client.post(
         "/api/v1/protect/decision-timeout",
         headers={"X-Project-Ingest-Key": ingest_key},
-        json={"environment": "dev", "provider": "openai", "model": "gpt-4o-mini"},
+        json={"environment": "dev", "provider": "openai", "requested_model": "gpt-4o-mini"},
     )
 
     assert response.status_code == 202
@@ -1422,7 +1426,7 @@ def test_timeout_report_enqueues_fail_closed_protection_block_when_project_fail_
     assert dispatcher.calls[0][1] == "protection.block"
     assert dispatcher.calls[0][2]["reason"] == "fail_closed"
     assert dispatcher.calls[0][2]["detail_reason"] == "decision_timeout"
-    assert dispatcher.calls[0][2]["model"] == "gpt-4o-mini"
+    assert dispatcher.calls[0][2]["requested_model"] == "gpt-4o-mini"
     assert dispatcher.calls[0][2]["requests_60s"] == 0
     assert dispatcher.calls[0][2]["tokens_60s"] == 0
     assert dispatcher.calls[0][2]["req_cap"] is None
@@ -1443,7 +1447,7 @@ def test_unavailable_report_records_allow_when_project_fail_mode_is_open(tmp_pat
     response = client.post(
         "/api/v1/protect/decision-unavailable",
         headers={"X-Project-Ingest-Key": ingest_key},
-        json={"environment": "dev", "provider": "openai", "model": "gpt-4o-mini"},
+        json={"environment": "dev", "provider": "openai", "requested_model": "gpt-4o-mini"},
     )
 
     assert response.status_code == 202
@@ -1468,7 +1472,7 @@ def test_unavailable_report_records_block_when_project_fail_mode_is_closed(tmp_p
     response = client.post(
         "/api/v1/protect/decision-unavailable",
         headers={"X-Project-Ingest-Key": ingest_key},
-        json={"environment": "dev", "provider": "openai", "model": "gpt-4o-mini"},
+        json={"environment": "dev", "provider": "openai", "requested_model": "gpt-4o-mini"},
     )
 
     assert response.status_code == 202
@@ -1537,7 +1541,7 @@ def test_unavailable_report_enqueues_fail_closed_protection_block_when_project_f
     response = client.post(
         "/api/v1/protect/decision-unavailable",
         headers={"X-Project-Ingest-Key": ingest_key},
-        json={"environment": "dev", "provider": "openai", "model": "gpt-4o-mini"},
+        json={"environment": "dev", "provider": "openai", "requested_model": "gpt-4o-mini"},
     )
 
     assert response.status_code == 202
@@ -1545,7 +1549,7 @@ def test_unavailable_report_enqueues_fail_closed_protection_block_when_project_f
     assert dispatcher.calls[0][1] == "protection.block"
     assert dispatcher.calls[0][2]["reason"] == "fail_closed"
     assert dispatcher.calls[0][2]["detail_reason"] == "decision_unavailable"
-    assert dispatcher.calls[0][2]["model"] == "gpt-4o-mini"
+    assert dispatcher.calls[0][2]["requested_model"] == "gpt-4o-mini"
     assert dispatcher.calls[0][2]["requests_60s"] == 0
     assert dispatcher.calls[0][2]["tokens_60s"] == 0
     assert dispatcher.calls[0][2]["req_cap"] is None
@@ -1570,7 +1574,7 @@ def test_timeout_report_replaces_prior_allow_with_block_when_project_fail_mode_i
             "X-Project-Ingest-Key": ingest_key,
             "X-Rheonic-Protect-Request-Id": request_id,
         },
-        json={"provider": "openai", "model": "gpt-4o-mini", "input_tokens_estimate": 3},
+        json={"provider": "openai", "requested_model": "gpt-4o-mini", "input_tokens_estimate": 3},
     )
     assert decision_response.status_code == 200
     assert decision_response.json()["decision"] == "allow"
@@ -1620,7 +1624,7 @@ def test_late_live_decision_is_ignored_after_timeout_fallback_finalizes_request(
             "X-Project-Ingest-Key": ingest_key,
             "X-Rheonic-Protect-Request-Id": request_id,
         },
-        json={"provider": "openai", "model": "gpt-4o-mini"},
+        json={"provider": "openai", "requested_model": "gpt-4o-mini"},
     )
     assert decision_response.status_code == 200
     assert decision_response.json()["decision"] == "allow"
@@ -1662,7 +1666,7 @@ def test_late_live_decision_is_ignored_after_unavailable_fallback_finalizes_requ
             "X-Project-Ingest-Key": ingest_key,
             "X-Rheonic-Protect-Request-Id": request_id,
         },
-        json={"provider": "openai", "model": "gpt-4o-mini"},
+        json={"provider": "openai", "requested_model": "gpt-4o-mini"},
     )
     assert decision_response.status_code == 200
     assert decision_response.json()["decision"] == "allow"
@@ -1695,7 +1699,7 @@ def test_timeout_fallback_allow_reconciles_superseded_live_block_side_effects(tm
             "X-Project-Ingest-Key": ingest_key,
             "X-Rheonic-Protect-Request-Id": request_id,
         },
-        json={"provider": "openai", "model": "gpt-4o-mini"},
+        json={"provider": "openai", "requested_model": "gpt-4o-mini"},
     )
     assert decision_response.status_code == 200
     assert decision_response.json()["decision"] == "block"
@@ -1728,11 +1732,11 @@ def test_cooldown_active_finalizes_live_block_outcome(tmp_path) -> None:
     _set_protect(client, project_id, protect_enabled=True, protect_max_req_per_min=1, protect_max_tok_per_min=1000)
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=1)
 
-    first_decision = _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    first_decision = _decision(client, ingest_key, body={"provider": "openai", "requested_model": "gpt-4o-mini"})
     assert first_decision["decision"] == "block"
     assert first_decision["reason"] == "req_cap_breach"
 
-    second_decision = _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    second_decision = _decision(client, ingest_key, body={"provider": "openai", "requested_model": "gpt-4o-mini"})
     assert second_decision["decision"] == "block"
     assert second_decision["reason"] == "cooldown_active"
 
@@ -1766,7 +1770,7 @@ def test_timeout_fail_closed_updates_existing_block_incident(tmp_path) -> None:
     )
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=1)
 
-    first_decision = _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    first_decision = _decision(client, ingest_key, body={"provider": "openai", "requested_model": "gpt-4o-mini"})
     assert first_decision["decision"] == "block"
     assert first_decision["reason"] == "req_cap_breach"
 
@@ -1799,7 +1803,7 @@ def test_unavailable_fail_closed_updates_existing_block_incident(tmp_path) -> No
     )
     rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=1)
 
-    first_decision = _decision(client, ingest_key, body={"provider": "openai", "model": "gpt-4o-mini"})
+    first_decision = _decision(client, ingest_key, body={"provider": "openai", "requested_model": "gpt-4o-mini"})
     assert first_decision["decision"] == "block"
     assert first_decision["reason"] == "req_cap_breach"
 

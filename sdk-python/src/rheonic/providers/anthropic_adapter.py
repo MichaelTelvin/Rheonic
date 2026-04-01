@@ -180,7 +180,7 @@ def _preflight(
     return sdk_client.preflight_protect_decision(
         {
             "provider": "anthropic",
-            "model": requested_model,
+            "requested_model": requested_model,
             "environment": environment,
             "feature": feature,
             **({"input_tokens_estimate": estimated_input_tokens} if isinstance(estimated_input_tokens, int) else {}),
@@ -229,7 +229,8 @@ def _capture_success(
         sdk_client.capture_event_and_flush(
             build_event(
                 provider="anthropic",
-                model=response_model if isinstance(response_model, str) else requested_model,
+                requested_model=requested_model,
+                resolved_model=response_model if isinstance(response_model, str) else None,
                 environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,
@@ -272,7 +273,8 @@ def _capture_failure(
         sdk_client.capture_event_and_flush(
             build_event(
                 provider="anthropic",
-                model=requested_model,
+                requested_model=requested_model,
+                resolved_model=None,
                 environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,

@@ -51,7 +51,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
       });
       const protectPayload: {
         provider: string;
-        model: string | null;
+        requested_model: string | null;
         environment?: string;
         feature?: string;
         max_output_tokens?: number;
@@ -60,7 +60,7 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
         span_id?: string;
       } = {
         provider: "openai",
-        model,
+        requested_model: model,
         environment: options.environment ?? options.client.environment,
         feature: options.feature,
         max_output_tokens: extractMaxOutputTokens(args),
@@ -83,7 +83,8 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
         const response = await originalCreate(...callArgs);
         await options.client.captureEventAndFlush(buildEvent({
           provider: "openai",
-          model: extractResponseModel(response) ?? model,
+          requested_model: model,
+          resolved_model: extractResponseModel(response),
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,
@@ -102,7 +103,8 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
       } catch (error) {
         await options.client.captureEventAndFlush(buildEvent({
           provider: "openai",
-          model,
+          requested_model: model,
+          resolved_model: null,
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,

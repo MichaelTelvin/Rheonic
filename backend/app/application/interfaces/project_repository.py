@@ -68,16 +68,16 @@ class ProjectRepository(ABC):
         *,
         project_id: str,
         provider: str,
-        model: str,
+        requested_model: str,
         first_seen_at: datetime,
     ) -> tuple[bool, bool]:
-        # Insert first-seen provider/model tuple for project.
+        # Insert first-seen provider/requested-model tuple for project.
         # Returns (is_new_combination, had_existing_models_before_insert).
         raise NotImplementedError
 
     @abstractmethod
     def count_project_models(self, project_id: str) -> int:
-        # Return number of distinct provider/model rows already recorded for a project.
+        # Return number of distinct provider/requested-model rows already recorded for a project.
         raise NotImplementedError
 
     @abstractmethod

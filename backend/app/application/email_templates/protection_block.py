@@ -33,7 +33,7 @@ def _reason_copy(reason: str, detail_reason: str) -> tuple[str, str]:
 def render_protection_block(payload: dict[str, object]) -> dict[str, str]:
     project_id = str(payload.get("project_id") or "-")
     provider = str(payload.get("provider") or "").strip()
-    model = str(payload.get("model") or "").strip()
+    requested_model = str(payload.get("requested_model") or "").strip()
     environment = str(payload.get("environment") or "").strip()
     reason = str(payload.get("reason") or "-")
     detail_reason = str(payload.get("detail_reason") or "-")
@@ -60,8 +60,8 @@ def render_protection_block(payload: dict[str, object]) -> dict[str, str]:
     ]
     if provider:
         fields.append(("Provider", provider))
-    if model:
-        fields.append(("Model", model))
+    if requested_model:
+        fields.append(("Model", requested_model))
     if environment:
         fields.append(("Environment", environment))
     if isinstance(requests_60s, int):

@@ -22,7 +22,8 @@ class EventRecord(Base):
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     project_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     provider: Mapped[str] = mapped_column(String(32), nullable=False)
-    model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    requested_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    resolved_model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     environment: Mapped[str | None] = mapped_column(String(32), nullable=True)
     input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -95,16 +96,21 @@ class ProjectModelRecord(Base):
     # Persistence record for first-seen provider/model per project.
     __tablename__ = "project_models"
     __table_args__ = (
-        UniqueConstraint("project_id", "provider", "model", name="uq_project_models_project_provider_model"),
+        UniqueConstraint(
+            "project_id",
+            "provider",
+            "requested_model",
+            name="uq_project_models_project_provider_requested_model",
+        ),
         Index("ix_project_models_project_id", "project_id"),
         Index("ix_project_models_provider", "provider"),
-        Index("ix_project_models_model", "model"),
+        Index("ix_project_models_requested_model", "requested_model"),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     project_id: Mapped[str] = mapped_column(String(64), ForeignKey("projects.id"), nullable=False)
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
-    model: Mapped[str] = mapped_column(String(255), nullable=False)
+    requested_model: Mapped[str] = mapped_column(String(255), nullable=False)
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 

@@ -34,20 +34,22 @@ class IncidentManager:
         *,
         project_id: str,
         provider: str,
-        model: str | None,
+        requested_model: str | None,
+        resolved_model: str | None,
         environment: str | None,
         now: datetime,
         signals: list[Signal],
         mode: str,
     ) -> None:
         for signal in signals:
-            self.process_signal(
-                project_id=project_id,
-                provider=provider,
-                model=model,
-                environment=environment,
-                now=now,
-                signal=signal,
+                self.process_signal(
+                    project_id=project_id,
+                    provider=provider,
+                    requested_model=requested_model,
+                    resolved_model=resolved_model,
+                    environment=environment,
+                    now=now,
+                    signal=signal,
                 mode=mode,
             )
 
@@ -56,7 +58,8 @@ class IncidentManager:
         *,
         project_id: str,
         provider: str,
-        model: str | None,
+        requested_model: str | None,
+        resolved_model: str | None,
         environment: str | None,
         now: datetime,
         signal: Signal,
@@ -65,7 +68,8 @@ class IncidentManager:
         # Upsert one incident signal inside the dedup window.
         evidence = dict(signal.evidence)
         evidence["provider"] = provider
-        evidence["model"] = model
+        evidence["requested_model"] = requested_model
+        evidence["resolved_model"] = resolved_model
         evidence["environment"] = environment
         evidence["last_seen_at"] = now.isoformat()
         dedup_after = now - timedelta(
@@ -97,7 +101,8 @@ class IncidentManager:
                         "incident_id": open_incident.id,
                         "project_id": project_id,
                         "provider": provider,
-                        "model": model,
+                        "requested_model": requested_model,
+                        "resolved_model": resolved_model,
                         "environment": environment,
                         "incident_type": signal.detector,
                         "trigger": "detector",
@@ -131,7 +136,8 @@ class IncidentManager:
                     "incident_id": incident.id,
                     "project_id": project_id,
                     "provider": provider,
-                    "model": model,
+                    "requested_model": requested_model,
+                    "resolved_model": resolved_model,
                     "environment": environment,
                     "incident_type": signal.detector,
                     "trigger": "detector",
@@ -149,7 +155,8 @@ class IncidentManager:
         *,
         project_id: str,
         provider: str,
-        model: str | None,
+        requested_model: str | None,
+        resolved_model: str | None,
         environment: str | None,
         now: datetime,
         reason: str,
@@ -164,7 +171,8 @@ class IncidentManager:
     ) -> None:
         evidence: dict[str, object] = {
             "provider": provider,
-            "model": model,
+            "requested_model": requested_model,
+            "resolved_model": resolved_model,
             "environment": environment,
             "requests_60s": requests_60s,
             "tokens_60s": tokens_60s,
@@ -206,7 +214,8 @@ class IncidentManager:
                             "incident_id": open_incident.id,
                             "project_id": project_id,
                             "provider": provider,
-                            "model": model,
+                            "requested_model": requested_model,
+                            "resolved_model": resolved_model,
                             "environment": environment,
                             "incident_type": app_config.incident_type_block,
                             "trigger": "protect_decision",
@@ -239,7 +248,8 @@ class IncidentManager:
                         "incident_id": incident.id,
                         "project_id": project_id,
                         "provider": provider,
-                        "model": model,
+                        "requested_model": requested_model,
+                        "resolved_model": resolved_model,
                         "environment": environment,
                         "incident_type": app_config.incident_type_block,
                         "trigger": "protect_decision",
@@ -294,7 +304,8 @@ class IncidentManager:
                     "incident_id": open_incident.id,
                     "project_id": project_id,
                     "provider": provider,
-                    "model": model,
+                    "requested_model": requested_model,
+                    "resolved_model": resolved_model,
                     "environment": environment,
                     "incident_type": app_config.incident_type_block,
                     "trigger": "protect_decision",
@@ -358,7 +369,8 @@ class IncidentManager:
             "incident_id": incident.id,
             "incident_type": incident.incident_type,
             "provider": incident.provider,
-            "model": _string_or_none(incident.evidence.get("model")),
+            "requested_model": _string_or_none(incident.evidence.get("requested_model")),
+            "resolved_model": _string_or_none(incident.evidence.get("resolved_model")),
             "environment": _string_or_none(incident.evidence.get("environment")),
             "created_at": incident.created_at.isoformat(),
             "last_seen_at": (incident.last_seen_at.isoformat() if incident.last_seen_at is not None else None),
@@ -430,7 +442,7 @@ def _build_webhook_evidence(evidence: dict[str, object]) -> dict[str, object]:
     # Keep detailed detector context nested, but remove fields already
     # promoted to the top level.
     sanitized = dict(evidence)
-    for key in ("provider", "model", "environment", "last_seen_at", "reason"):
+    for key in ("provider", "requested_model", "resolved_model", "environment", "last_seen_at", "reason"):
         sanitized.pop(key, None)
     return sanitized
 

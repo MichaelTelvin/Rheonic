@@ -135,7 +135,9 @@ class ProtectEngine:
                 )
                 self._report_decision_unavailable_fire_and_forget(
                     provider=str(context.get("provider")) if isinstance(context.get("provider"), str) else None,
-                    model=str(context.get("model")) if isinstance(context.get("model"), str) else None,
+                    requested_model=str(context.get("requested_model"))
+                    if isinstance(context.get("requested_model"), str)
+                    else None,
                     request_id=request_id,
                     trace_id=get_trace_id(),
                 )
@@ -203,7 +205,9 @@ class ProtectEngine:
                 )
                 self._report_decision_timeout_fire_and_forget(
                     provider=str(provider) if isinstance(provider, str) else None,
-                    model=str(context.get("model")) if isinstance(context.get("model"), str) else None,
+                    requested_model=str(context.get("requested_model"))
+                    if isinstance(context.get("requested_model"), str)
+                    else None,
                     request_id=request_id,
                     trace_id=get_trace_id(),
                 )
@@ -217,7 +221,9 @@ class ProtectEngine:
                 )
                 self._report_decision_unavailable_fire_and_forget(
                     provider=str(provider) if isinstance(provider, str) else None,
-                    model=str(context.get("model")) if isinstance(context.get("model"), str) else None,
+                    requested_model=str(context.get("requested_model"))
+                    if isinstance(context.get("requested_model"), str)
+                    else None,
                     request_id=request_id,
                     trace_id=get_trace_id(),
                 )
@@ -312,13 +318,18 @@ class ProtectEngine:
         return False
 
     def _report_decision_timeout_fire_and_forget(
-        self, provider: str | None, model: str | None, request_id: str, trace_id: str | None
+        self, provider: str | None, requested_model: str | None, request_id: str, trace_id: str | None
     ) -> None:
         # Report decision timeout without blocking caller flow.
         try:
             self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision-timeout",
-                json={"environment": self._environment, "provider": provider, "model": model, "request_id": request_id},
+                json={
+                    "environment": self._environment,
+                    "provider": provider,
+                    "requested_model": requested_model,
+                    "request_id": request_id,
+                },
                 headers={
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
@@ -332,13 +343,18 @@ class ProtectEngine:
             return
 
     def _report_decision_unavailable_fire_and_forget(
-        self, provider: str | None, model: str | None, request_id: str, trace_id: str | None
+        self, provider: str | None, requested_model: str | None, request_id: str, trace_id: str | None
     ) -> None:
         # Report non-timeout preflight fallback without blocking caller flow.
         try:
             self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision-unavailable",
-                json={"environment": self._environment, "provider": provider, "model": model, "request_id": request_id},
+                json={
+                    "environment": self._environment,
+                    "provider": provider,
+                    "requested_model": requested_model,
+                    "request_id": request_id,
+                },
                 headers={
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,

@@ -193,7 +193,7 @@ def _preflight(
     return sdk_client.preflight_protect_decision(
         {
             "provider": "google",
-            "model": requested_model,
+            "requested_model": requested_model,
             "environment": environment,
             "feature": feature,
             **({"input_tokens_estimate": estimated_input_tokens} if isinstance(estimated_input_tokens, int) else {}),
@@ -234,7 +234,8 @@ def _capture_success(
         sdk_client.capture_event_and_flush(
             build_event(
                 provider="google",
-                model=requested_model,
+                requested_model=requested_model,
+                resolved_model=_extract_resolved_model(response),
                 environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,
@@ -277,7 +278,8 @@ def _capture_failure(
         sdk_client.capture_event_and_flush(
             build_event(
                 provider="google",
-                model=requested_model,
+                requested_model=requested_model,
+                resolved_model=None,
                 environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,
@@ -386,6 +388,21 @@ def _extract_total_tokens(response: Any) -> int | None:
     candidates = getattr(usage, "candidates_token_count", None)
     if isinstance(prompt, int) and isinstance(candidates, int):
         return prompt + candidates
+    return None
+
+
+def _extract_resolved_model(response: Any) -> str | None:
+    direct_model = getattr(response, "model", None)
+    if isinstance(direct_model, str) and direct_model.strip():
+        return direct_model
+    nested_response = getattr(response, "response", None)
+    if nested_response is not None:
+        nested_model_version = getattr(nested_response, "model_version", None)
+        if isinstance(nested_model_version, str) and nested_model_version.strip():
+            return nested_model_version
+        nested_model = getattr(nested_response, "model", None)
+        if isinstance(nested_model, str) and nested_model.strip():
+            return nested_model
     return None
 
 

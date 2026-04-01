@@ -78,7 +78,7 @@ class DetectIncidentsService:
     def _enqueue_incident_resolved_notifications(self, *, incident: Incident, resolved_by: str) -> None:
         # Resolution webhooks are part of the raw incident lifecycle in both modes.
         # Email remains protect-only.
-        provider, model, environment = _incident_dimensions(incident)
+        provider, requested_model, environment = _incident_dimensions(incident)
         resolved_at = incident.resolved_at or datetime.now(timezone.utc)
         payload: dict[str, object] = {
             "event": "incident.resolved",
@@ -90,7 +90,8 @@ class DetectIncidentsService:
             "created_at": incident.created_at.isoformat(),
             "last_seen_at": incident.last_seen_at.isoformat() if incident.last_seen_at is not None else None,
             "provider": provider,
-            "model": model,
+            "requested_model": requested_model,
+            "resolved_model": _incident_resolved_model(incident),
             "environment": environment,
             "sent_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -138,13 +139,19 @@ class DetectIncidentsService:
 
 
 def _incident_dimensions(incident: Incident) -> tuple[str | None, str | None, str | None]:
-    # Extract provider/model/environment from incident evidence when present.
+    # Extract provider/requested_model/environment from incident evidence when present.
     evidence = incident.evidence or {}
     provider = incident.provider or evidence.get("provider")
-    model = evidence.get("model")
+    requested_model = evidence.get("requested_model")
     environment = evidence.get("environment")
     return (
         str(provider) if isinstance(provider, str) else None,
-        str(model) if isinstance(model, str) else None,
+        str(requested_model) if isinstance(requested_model, str) else None,
         str(environment) if isinstance(environment, str) else None,
     )
+
+
+def _incident_resolved_model(incident: Incident) -> str | None:
+    evidence = incident.evidence or {}
+    resolved_model = evidence.get("resolved_model")
+    return str(resolved_model) if isinstance(resolved_model, str) else None

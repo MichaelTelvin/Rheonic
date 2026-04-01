@@ -34,7 +34,7 @@ router = APIRouter()
 class ProtectDecisionIn(BaseModel):
     # Preflight decision request payload.
     provider: str
-    model: str | None = None
+    requested_model: str | None = None
     environment: str | None = None
     feature: str | None = None
     max_output_tokens: int | None = None
@@ -82,7 +82,7 @@ class DecisionTimeoutIn(BaseModel):
     # Timeout report payload from SDK when decision preflight call times out.
     environment: str
     provider: str | None = None
-    model: str | None = None
+    requested_model: str | None = None
     request_id: str | None = None
 
 
@@ -90,7 +90,7 @@ class DecisionUnavailableIn(BaseModel):
     # Failure report payload from SDK when preflight fails without a timeout.
     environment: str
     provider: str | None = None
-    model: str | None = None
+    requested_model: str | None = None
     request_id: str | None = None
 
 
@@ -118,7 +118,7 @@ def protect_decision(
                 input_tokens_estimate=payload.input_tokens_estimate,
                 environment=payload.environment,
                 provider=payload.provider,
-                model=payload.model,
+                requested_model=payload.requested_model,
                 feature=payload.feature,
             ),
             emit_notifications=False,
@@ -175,7 +175,7 @@ def protect_decision(
                 metadata={
                     "project_id": project_id,
                     "provider": payload.provider,
-                    "model": payload.model,
+                    "requested_model": payload.requested_model,
                     "environment": payload.environment,
                     "request_id": request_id,
                     "decision": decision.decision,
@@ -262,7 +262,7 @@ def protect_decision_timeout(
                 metadata={
                     "project_id": project.id,
                     "provider": provider,
-                    "model": payload.model,
+                    "requested_model": payload.requested_model,
                     "environment": payload.environment,
                     "request_id": resolved_request_id,
                     "decision": fallback_decision,
@@ -275,7 +275,8 @@ def protect_decision_timeout(
             protect_service.report_fail_closed_block(
                 project_id=project.id,
                 provider=provider,
-                model=payload.model,
+                requested_model=payload.requested_model,
+                resolved_model=None,
                 environment=payload.environment,
                 detail_reason="decision_timeout",
                 source=app_config.protect_outcome_source_timeout_fallback,
@@ -284,7 +285,8 @@ def protect_decision_timeout(
             incident_manager.process_protect_block(
                 project_id=project.id,
                 provider=provider,
-                model=payload.model,
+                requested_model=payload.requested_model,
+                resolved_model=None,
                 environment=payload.environment,
                 now=datetime.now(timezone.utc),
                 reason="fail_closed",
@@ -359,7 +361,7 @@ def protect_decision_unavailable(
                 metadata={
                     "project_id": project.id,
                     "provider": provider,
-                    "model": payload.model,
+                    "requested_model": payload.requested_model,
                     "environment": payload.environment,
                     "request_id": resolved_request_id,
                     "decision": fallback_decision,
@@ -372,7 +374,8 @@ def protect_decision_unavailable(
             protect_service.report_fail_closed_block(
                 project_id=project.id,
                 provider=provider,
-                model=payload.model,
+                requested_model=payload.requested_model,
+                resolved_model=None,
                 environment=payload.environment,
                 detail_reason="decision_unavailable",
                 source=app_config.protect_outcome_source_unavailable_fallback,
@@ -381,7 +384,8 @@ def protect_decision_unavailable(
             incident_manager.process_protect_block(
                 project_id=project.id,
                 provider=provider,
-                model=payload.model,
+                requested_model=payload.requested_model,
+                resolved_model=None,
                 environment=payload.environment,
                 now=datetime.now(timezone.utc),
                 reason="fail_closed",
@@ -416,7 +420,8 @@ def _record_preflight_incident_if_needed(
     incident_manager.process_protect_block(
         project_id=project_id,
         provider=payload.provider,
-        model=payload.model,
+        requested_model=payload.requested_model,
+        resolved_model=None,
         environment=payload.environment,
         now=datetime.now(timezone.utc),
         reason=decision.reason,
@@ -454,7 +459,8 @@ def _postprocess_live_preflight_decision(
             service.enqueue_live_block_notifications(
                 project_id=project_id,
                 provider=payload.provider,
-                model=payload.model,
+                requested_model=payload.requested_model,
+                resolved_model=None,
                 environment=payload.environment,
                 detail_reason=decision.reason,
                 requests_60s=requests_60s or 0,
@@ -475,7 +481,8 @@ def _postprocess_live_preflight_decision(
                 project_id=project_id,
                 scoped_id=scoped_id,
                 provider=payload.provider,
-                model=payload.model,
+                requested_model=payload.requested_model,
+                resolved_model=None,
                 environment=payload.environment,
                 requests_60s=requests_60s or 0,
                 tokens_60s=tokens_60s or 0,
@@ -493,7 +500,8 @@ def _postprocess_live_preflight_decision(
                 project_id=project_id,
                 scoped_id=scoped_id,
                 provider=payload.provider,
-                model=payload.model,
+                requested_model=payload.requested_model,
+                resolved_model=None,
                 environment=payload.environment,
                 requests_60s=requests_60s or 0,
                 tokens_60s=tokens_60s or 0,

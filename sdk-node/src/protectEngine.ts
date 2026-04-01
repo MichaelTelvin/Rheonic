@@ -9,7 +9,7 @@ export type ProtectFailMode = "open" | "closed";
 
 export interface ProtectContext {
   provider: string;
-  model?: string | null;
+  requested_model?: string | null;
   feature?: string;
   max_output_tokens?: number;
   input_tokens_estimate?: number;
@@ -157,7 +157,7 @@ export class ProtectEngine {
           });
           void this.reportDecisionUnavailable(
             context.provider,
-            typeof context.model === "string" ? context.model : undefined,
+            typeof context.requested_model === "string" ? context.requested_model : undefined,
             requestId,
             traceId,
           );
@@ -211,7 +211,7 @@ export class ProtectEngine {
           });
           void this.reportDecisionTimeout(
             context.provider,
-            typeof context.model === "string" ? context.model : undefined,
+            typeof context.requested_model === "string" ? context.requested_model : undefined,
             requestId,
             traceId,
           );
@@ -223,7 +223,7 @@ export class ProtectEngine {
           });
           void this.reportDecisionUnavailable(
             context.provider,
-            typeof context.model === "string" ? context.model : undefined,
+            typeof context.requested_model === "string" ? context.requested_model : undefined,
             requestId,
             traceId,
           );
@@ -274,7 +274,7 @@ export class ProtectEngine {
 
   private async reportDecisionTimeout(
     provider: string | undefined,
-    model: string | undefined,
+    requestedModel: string | undefined,
     requestId: string,
     traceId: string,
   ): Promise<void> {
@@ -288,7 +288,12 @@ export class ProtectEngine {
           "X-Span-ID": generateSpanId(),
           "X-Rheonic-Protect-Request-Id": requestId,
         },
-        body: JSON.stringify({ environment: this.environment, provider, model, request_id: requestId }),
+        body: JSON.stringify({
+          environment: this.environment,
+          provider,
+          requested_model: requestedModel,
+          request_id: requestId,
+        }),
       });
     } catch {
       // Swallow timeout reporting errors; protect evaluation must never throw here.
@@ -297,7 +302,7 @@ export class ProtectEngine {
 
   private async reportDecisionUnavailable(
     provider: string | undefined,
-    model: string | undefined,
+    requestedModel: string | undefined,
     requestId: string,
     traceId: string,
   ): Promise<void> {
@@ -311,7 +316,12 @@ export class ProtectEngine {
           "X-Span-ID": generateSpanId(),
           "X-Rheonic-Protect-Request-Id": requestId,
         },
-        body: JSON.stringify({ environment: this.environment, provider, model, request_id: requestId }),
+        body: JSON.stringify({
+          environment: this.environment,
+          provider,
+          requested_model: requestedModel,
+          request_id: requestId,
+        }),
       });
     } catch {
       // Swallow unavailable reporting errors; protect evaluation must never throw here.
