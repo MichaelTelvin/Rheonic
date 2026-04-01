@@ -445,7 +445,9 @@ def _apply_google_clamp(
 
     if next_args and isinstance(next_args[0], dict):
         payload = dict(next_args[0])
-        config_key = "config" if ("config" in payload or "model" in payload or "contents" in payload) else "generation_config"
+        config_key = (
+            "config" if ("config" in payload or "model" in payload or "contents" in payload) else "generation_config"
+        )
         payload[config_key] = _apply_recommended_max_output_tokens(payload.get(config_key), recommended)
         next_args[0] = payload
         _mark_clamp_applied_if_changed(

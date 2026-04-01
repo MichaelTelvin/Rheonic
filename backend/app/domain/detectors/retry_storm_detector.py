@@ -59,7 +59,7 @@ def _is_failure(event: Event) -> bool:
     status = (event.status or "").strip().lower()
     if status in {"error", "failed", "fail"}:
         return True
-    return bool(event.error_type)
+    return False
 
 
 def _tags(ctx: DetectionContext) -> dict[str, str]:

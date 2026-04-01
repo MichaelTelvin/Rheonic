@@ -49,7 +49,7 @@ class LoopSuspectDetector(Detector):
             )
 
             if is_failure:
-                break
+                continue
 
             sequence_count += 1
             prev_ts = event_ts
