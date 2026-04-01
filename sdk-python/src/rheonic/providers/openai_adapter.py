@@ -217,11 +217,11 @@ def _capture_success(
         usage = getattr(response, "usage", None)
         total_tokens = getattr(usage, "total_tokens", None)
         sdk_client.capture_event_and_flush(
-                    build_event(
-                        provider="openai",
-                        requested_model=requested_model,
-                        resolved_model=response_model if isinstance(response_model, str) else None,
-                        environment=environment or sdk_client.environment,
+            build_event(
+                provider="openai",
+                requested_model=requested_model,
+                resolved_model=response_model if isinstance(response_model, str) else None,
+                environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,
                     "feature": feature,
@@ -260,11 +260,11 @@ def _capture_failure(
     try:
         http_status = _extract_http_status(exc)
         sdk_client.capture_event_and_flush(
-                    build_event(
-                        provider="openai",
-                        requested_model=requested_model,
-                        resolved_model=None,
-                        environment=environment or sdk_client.environment,
+            build_event(
+                provider="openai",
+                requested_model=requested_model,
+                resolved_model=None,
+                environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,
                     "feature": feature,

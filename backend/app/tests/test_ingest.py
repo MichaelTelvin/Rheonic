@@ -935,9 +935,7 @@ def test_active_block_incident_suppresses_retry_and_loop_in_same_window() -> Non
 def test_policy_gap_first_seen_baseline_sends_no_webhook_and_no_incident() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=True)
     service.ingest(_event("p1", provider="openai", requested_model="gpt-4o-mini", total_tokens=10, offset_seconds=0))
-    service.ingest(
-        _event("p1", provider="openai", requested_model="gpt-4o-mini", total_tokens=12, offset_seconds=30)
-    )
+    service.ingest(_event("p1", provider="openai", requested_model="gpt-4o-mini", total_tokens=12, offset_seconds=30))
 
     policy_gap_calls = [call for call in webhook.calls if call[1] == "policy_gap.detected"]
     assert len(policy_gap_calls) == 0

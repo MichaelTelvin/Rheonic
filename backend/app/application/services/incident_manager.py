@@ -42,14 +42,14 @@ class IncidentManager:
         mode: str,
     ) -> None:
         for signal in signals:
-                self.process_signal(
-                    project_id=project_id,
-                    provider=provider,
-                    requested_model=requested_model,
-                    resolved_model=resolved_model,
-                    environment=environment,
-                    now=now,
-                    signal=signal,
+            self.process_signal(
+                project_id=project_id,
+                provider=provider,
+                requested_model=requested_model,
+                resolved_model=resolved_model,
+                environment=environment,
+                now=now,
+                signal=signal,
                 mode=mode,
             )
 

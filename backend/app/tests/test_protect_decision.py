@@ -461,7 +461,12 @@ def test_clamp_decision_includes_apply_clamp_flag_when_enabled(tmp_path) -> None
     decision = _decision(
         client,
         ingest_key,
-        body={"provider": "openai", "requested_model": "gpt-4o-mini", "input_tokens_estimate": 10, "max_output_tokens": 64},
+        body={
+            "provider": "openai",
+            "requested_model": "gpt-4o-mini",
+            "input_tokens_estimate": 10,
+            "max_output_tokens": 64,
+        },
     )
     assert decision["decision"] == "clamp"
     assert decision["reason"] == "token_clamp"
@@ -1213,7 +1218,12 @@ def test_protect_decision_records_allow_clamp_block_outcomes(tmp_path) -> None:
     _decision(
         client,
         clamp_ingest_key,
-        body={"provider": "openai", "requested_model": "gpt-4o-mini", "input_tokens_estimate": 20, "max_output_tokens": 64},
+        body={
+            "provider": "openai",
+            "requested_model": "gpt-4o-mini",
+            "input_tokens_estimate": 20,
+            "max_output_tokens": 64,
+        },
     )
     clamp_metrics = _protect_metrics(client, clamp_project_id)
     clamp_after = int(clamp_metrics["clamped_60m"])
@@ -1273,7 +1283,12 @@ def test_protect_metrics_support_provider_filter_with_same_schema(tmp_path) -> N
     _decision(
         client,
         ingest_key,
-        body={"provider": "openai", "requested_model": "gpt-4o-mini", "input_tokens_estimate": 180, "max_output_tokens": 64},
+        body={
+            "provider": "openai",
+            "requested_model": "gpt-4o-mini",
+            "input_tokens_estimate": 180,
+            "max_output_tokens": 64,
+        },
     )  # allow when clamp disabled
 
     _decision(

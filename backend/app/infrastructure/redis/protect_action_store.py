@@ -221,7 +221,9 @@ class ProtectActionStore:
             )
             return False
 
-    def record_timeout_fallback(self, *, project_id: str, request_id: str | None = None, ts: datetime | None = None) -> None:
+    def record_timeout_fallback(
+        self, *, project_id: str, request_id: str | None = None, ts: datetime | None = None
+    ) -> None:
         # Record timeout health without counting an allow/clamp/block outcome.
         try:
             self._increment_with_ttl(_timeout_key(project_id))

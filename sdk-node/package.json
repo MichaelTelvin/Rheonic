@@ -1,6 +1,6 @@
 {
   "name": "@rheonic/sdk",
-  "version": "0.1.0-beta.11",
+  "version": "0.1.0-beta.12",
   "description": "Node.js SDK for Rheonic observability and protect preflight enforcement.",
   "author": "Rheonic <founder@rheonic.dev>",
   "license": "MIT",
@@ -48,7 +48,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@dqbd/tiktoken": "^1.0.22"
+    "@dqbd/tiktoken": "^1.0.22",
+    "@rheonic/sdk": "^0.1.0-beta.12"
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": ">=0.39.0",
