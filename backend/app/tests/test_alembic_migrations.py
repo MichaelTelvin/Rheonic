@@ -55,6 +55,7 @@ def test_alembic_upgrade_head_creates_current_schema_on_fresh_database() -> None
             assert "apply_clamp" in project_columns
             assert "provider" in incident_columns
             assert "token_explosion_tokens" in event_columns
+            assert "request_fingerprint" in event_columns
         finally:
             target_engine.dispose()
     finally:

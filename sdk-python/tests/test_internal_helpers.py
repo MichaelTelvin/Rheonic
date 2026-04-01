@@ -11,8 +11,38 @@ from rheonic.providers import openai_adapter as openai
 
 
 def test_extract_text_supports_messages_and_prompt_shapes() -> None:
-    assert te._extract_text({"messages": [{"content": "hello"}, {"content": [{"text": "world"}]}]}) == "hello\nworld"
+    message_text = te._extract_text({"messages": [{"content": "hello"}, {"content": [{"text": "world"}]}]})
+    assert isinstance(message_text, str)
+    assert '"content":"hello"' in message_text
+    assert '"text":"world"' in message_text
     assert te._extract_text({"prompt": "prompt-body"}) == "prompt-body"
+
+
+def test_estimate_input_tokens_counts_full_tool_message_payload() -> None:
+    tool_payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {
+                "role": "tool",
+                "tool_call_id": "call_123",
+                "content": "done",
+            }
+        ],
+    }
+    text_only_payload = {"model": "gpt-4o-mini", "prompt": "done"}
+
+    tool_estimate = te.estimate_input_tokens(tool_payload)
+    text_only_estimate = te.estimate_input_tokens(text_only_payload)
+
+    assert isinstance(tool_estimate, int)
+    assert isinstance(text_only_estimate, int)
+    assert tool_estimate > text_only_estimate
+
+
+def test_extract_text_falls_back_to_text_only_when_json_serialization_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(te.json, "dumps", lambda *_args, **_kwargs: (_ for _ in ()).throw(TypeError("boom")))
+    rendered = te._extract_text({"messages": [{"content": "hello"}, {"content": [{"text": "world"}]}]})
+    assert rendered == "hello\nworld"
 
 
 @pytest.mark.parametrize(
@@ -23,8 +53,25 @@ def test_extract_text_supports_messages_and_prompt_shapes() -> None:
         ({"messages": [{"content": 123}]},),
     ],
 )
-def test_extract_text_returns_none_for_unsupported_message_shapes(payload: dict[str, Any]) -> None:
+def test_extract_text_fallback_returns_none_for_invalid_message_shapes(
+    monkeypatch: pytest.MonkeyPatch, payload: dict[str, Any]
+) -> None:
+    monkeypatch.setattr(te.json, "dumps", lambda *_args, **_kwargs: (_ for _ in ()).throw(TypeError("boom")))
     assert te._extract_text(payload) is None
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected_fragment"),
+    [
+        ({"messages": ["bad"]}, '"bad"'),
+        ({"messages": [{"content": [123]}]}, "[123]"),
+        ({"messages": [{"content": 123}]}, '"content":123'),
+    ],
+)
+def test_extract_text_serializes_non_text_message_shapes(payload: dict[str, Any], expected_fragment: str) -> None:
+    rendered = te._extract_text(payload)
+    assert isinstance(rendered, str)
+    assert expected_fragment in rendered
 
 
 def test_get_encoder_handles_missing_tiktoken_and_caches(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -95,6 +142,21 @@ def test_estimate_input_tokens_falls_back_to_char_estimate_on_encoder_error(monk
     monkeypatch.setattr(te, "_get_encoder", lambda _model: BadEncoder())
     monkeypatch.setattr(te, "_estimate_by_chars", lambda text: len(text) + 1)
     assert te.estimate_input_tokens({"prompt": "abc"}) == 4
+
+
+def test_estimate_input_tokens_returns_none_without_supported_prompt_or_messages() -> None:
+    assert te.estimate_input_tokens({"model": "gpt-4o-mini"}) is None
+
+
+def test_estimate_input_tokens_uses_capped_char_fallback_when_encoder_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(te, "_get_encoder", lambda _model: None)
+    monkeypatch.setattr(te, "_estimate_by_chars", lambda _text: te.sdk_config.max_input_token_estimate + 100)
+    assert te.estimate_input_tokens({"prompt": "abc"}) == te.sdk_config.max_input_token_estimate
+
+
+def test_prewarm_token_estimator_swallows_encoder_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(te, "_get_encoder", lambda _model: (_ for _ in ()).throw(RuntimeError("boom")))
+    te.prewarm_token_estimator("gpt-4o-mini")
 
 
 def test_openai_extractors_cover_status_and_output_shapes() -> None:

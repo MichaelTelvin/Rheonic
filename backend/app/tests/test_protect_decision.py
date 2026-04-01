@@ -286,6 +286,7 @@ def _event(
     created_at: datetime,
     request_endpoint: str | None = "/chat/completions",
     request_feature: str = "manual-protect-demo",
+    request_fingerprint: str | None = None,
 ) -> Event:
     return Event(
         id=f"evt-{project_id}-{provider}-{model}-{created_at.timestamp()}",
@@ -305,6 +306,7 @@ def _event(
         created_at=created_at,
         request_endpoint=request_endpoint,
         request_feature=request_feature,
+        request_fingerprint=request_fingerprint,
     )
 
 

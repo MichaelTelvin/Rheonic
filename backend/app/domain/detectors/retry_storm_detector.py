@@ -50,9 +50,12 @@ class RetryStormDetector(Detector):
 
 
 def _is_failure(event: Event) -> bool:
+    retryable_status = {408, 429}
     http_status = event.http_status or 0
-    if isinstance(http_status, int) and http_status >= 500:
+
+    if isinstance(http_status, int) and (http_status >= 500 or http_status in retryable_status):
         return True
+
     status = (event.status or "").strip().lower()
     if status in {"error", "failed", "fail"}:
         return True

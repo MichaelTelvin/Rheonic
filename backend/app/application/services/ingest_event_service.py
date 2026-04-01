@@ -127,6 +127,7 @@ class IngestEventService:
                 protect_enabled=protect_enabled,
                 request_endpoint=event.request_endpoint,
                 request_feature=event.request_feature,
+                request_fingerprint=event.request_fingerprint,
                 estimated_next_tokens=event.total_tokens,
                 token_explosion_tokens=event.token_explosion_tokens,
                 previous_estimated_tokens=previous_estimated_tokens,
@@ -151,6 +152,7 @@ class IngestEventService:
                 signal.evidence.setdefault("trigger_event_ts", event.ts.isoformat())
                 signal.evidence.setdefault("trigger_request_endpoint", event.request_endpoint)
                 signal.evidence.setdefault("trigger_request_feature", event.request_feature)
+                signal.evidence.setdefault("trigger_request_fingerprint", event.request_fingerprint)
             if protect_enabled and self._has_active_block_incident(
                 project_id=event.project_id,
                 provider=provider,

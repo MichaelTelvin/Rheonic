@@ -23,3 +23,4 @@ class Event:
     token_explosion_tokens: int | None = None
     request_endpoint: str | None = None
     request_feature: str | None = None
+    request_fingerprint: str | None = None

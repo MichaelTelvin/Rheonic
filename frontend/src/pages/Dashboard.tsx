@@ -892,7 +892,7 @@ export function Dashboard(): JSX.Element {
                     <span className="protect-decisions-value warned">{incidentSummary.token_explosion ?? 0}</span>
                   </div>
                   <div className="protect-decisions-row">
-                    <span className="protect-decisions-label">Block reasoning</span>
+                    <span className="protect-decisions-label">Block reasons</span>
                     <span className="protect-decisions-value blocked">{incidentSummary.block ?? 0}</span>
                   </div>
                 </div>

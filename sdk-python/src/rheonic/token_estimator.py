@@ -1,6 +1,7 @@
 # Local input token estimation helpers for protect preflight.
 from __future__ import annotations
 
+import json
 from types import ModuleType
 from typing import Any
 
@@ -32,33 +33,36 @@ def estimate_input_tokens(payload: dict[str, Any]) -> int | None:
     try:
         encoder = _get_encoder(payload.get("model") if isinstance(payload.get("model"), str) else None)
         if encoder is None:
-            return _estimate_by_chars(text)
-        return len(encoder.encode(text))
+            return min(sdk_config.max_input_token_estimate, _estimate_by_chars(text))
+        return min(sdk_config.max_input_token_estimate, len(encoder.encode(text)))
     except Exception:
-        return _estimate_by_chars(text)
+        return min(sdk_config.max_input_token_estimate, _estimate_by_chars(text))
 
 
 def _extract_text(payload: dict[str, Any]) -> str | None:
     messages = payload.get("messages")
     if isinstance(messages, list):
         parts: list[str] = []
-        for message in messages:
-            if not isinstance(message, dict):
+        try:
+            return json.dumps(messages, ensure_ascii=False, separators=(",", ":"))
+        except Exception:
+            for message in messages:
+                if not isinstance(message, dict):
+                    return None
+                content = message.get("content")
+                if isinstance(content, str):
+                    parts.append(content)
+                    continue
+                if isinstance(content, list):
+                    for item in content:
+                        if not isinstance(item, dict):
+                            return None
+                        text = item.get("text")
+                        if isinstance(text, str):
+                            parts.append(text)
+                    continue
                 return None
-            content = message.get("content")
-            if isinstance(content, str):
-                parts.append(content)
-                continue
-            if isinstance(content, list):
-                for item in content:
-                    if not isinstance(item, dict):
-                        return None
-                    text = item.get("text")
-                    if isinstance(text, str):
-                        parts.append(text)
-                continue
-            return None
-        return "\n".join(parts)
+            return "\n".join(parts)
 
     prompt = payload.get("prompt")
     if isinstance(prompt, str):

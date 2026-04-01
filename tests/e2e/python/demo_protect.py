@@ -320,6 +320,7 @@ def _send_ingest_event(
     feature: str,
     environment: str,
     token_explosion_tokens: int | None = None,
+    request_fingerprint: str | None = None,
     status: str = "ok",
     http_status: int = 200,
     error_type: str | None = None,
@@ -342,6 +343,7 @@ def _send_ingest_event(
             "endpoint": endpoint,
             "feature": feature,
             "input_tokens": 1,
+            **({"request_fingerprint": request_fingerprint} if request_fingerprint else {}),
             **({"token_explosion_tokens": token_explosion_tokens} if isinstance(token_explosion_tokens, int) else {}),
         },
         "response": {
@@ -644,7 +646,7 @@ def main() -> None:
                 time.sleep(pause_ms / 1000)
             print(f"[STEP] req_cap_breach ingest events sent={count} (provider_calls_delta tracks provider calls only)")
         elif scenario == "retry_storm":
-            print("\n[STEP] Seed failed attempts for retry storm then expect incident")
+            print("\n[STEP] Seed failed provider attempts for retry storm then expect incident")
             count = int(os.getenv("RHEONIC_RETRY_STORM_COUNT", "5"))
             for i in range(count):
                 _send_ingest_event(
@@ -661,7 +663,7 @@ def main() -> None:
                 )
                 time.sleep(pause_ms / 1000)
         elif scenario == "loop_suspect":
-            print("\n[STEP] Seed a rapid repeated sequence for loop suspect then expect incident")
+            print("\n[STEP] Seed rapid repeated successful calls for loop suspect then expect incident")
             count = int(os.getenv("RHEONIC_LOOP_COUNT", "6"))
             for _ in range(count):
                 _send_ingest_event(
@@ -672,6 +674,9 @@ def main() -> None:
                     total_tokens=60,
                     feature="loop-fixed-signature",
                     environment=env,
+                    request_fingerprint="fp-loop-fixed",
+                    status="ok",
+                    http_status=200,
                 )
                 time.sleep(pause_ms / 1000)
         elif scenario == "token_explosion":

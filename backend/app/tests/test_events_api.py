@@ -210,7 +210,12 @@ def test_ingest_event_maps_token_explosion_tokens_to_domain_event() -> None:
     client = TestClient(app)
 
     payload = _payload()
-    payload["request"] = {"endpoint": "/chat/completions", "feature": "agent_test", "token_explosion_tokens": 222}
+    payload["request"] = {
+        "endpoint": "/chat/completions",
+        "feature": "agent_test",
+        "request_fingerprint": "hash:loop-123",
+        "token_explosion_tokens": 222,
+    }
 
     response = client.post(
         "/api/v1/events",
@@ -222,4 +227,5 @@ def test_ingest_event_maps_token_explosion_tokens_to_domain_event() -> None:
     assert len(ingest_service.ingested) == 1
     event = ingest_service.ingested[0]
     assert getattr(event, "token_explosion_tokens") == 222
+    assert getattr(event, "request_fingerprint") == "hash:loop-123"
     app.dependency_overrides.clear()

@@ -79,6 +79,7 @@ def upgrade() -> None:
         sa.Column("http_status", sa.Integer(), nullable=True),
         sa.Column("request_endpoint", sa.String(length=255), nullable=True),
         sa.Column("request_feature", sa.String(length=255), nullable=True),
+        sa.Column("request_fingerprint", sa.String(length=255), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )

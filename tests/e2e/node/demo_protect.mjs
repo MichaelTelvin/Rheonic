@@ -167,6 +167,9 @@ async function sendIngestEvent(ingestKey, provider, model, totalTokens, feature,
       endpoint,
       feature,
       input_tokens: 1,
+      ...(typeof options?.requestFingerprint === "string" && options.requestFingerprint
+        ? { request_fingerprint: options.requestFingerprint }
+        : {}),
       ...(typeof options?.tokenExplosionTokens === "number"
         ? { token_explosion_tokens: options.tokenExplosionTokens }
         : {}),
@@ -427,7 +430,7 @@ async function main() {
     console.log(`[STEP] req_cap_breach ingest events sent=${count} (provider_calls_delta tracks provider calls only)`);
   } else if (scenario === "retry_storm") {
     const count = envInt("RHEONIC_RETRY_STORM_COUNT", 5);
-    console.log("[STEP] Seed failed attempts for retry storm then expect incident");
+    console.log("[STEP] Seed failed provider attempts for retry storm then expect incident");
     for (let i = 0; i < count; i += 1) {
       await sendIngestEvent(ingestKey, provider, model, 50, `retry-${i + 1}`, env, {
         status: "error",
@@ -438,9 +441,13 @@ async function main() {
     }
   } else if (scenario === "loop_suspect") {
     const count = envInt("RHEONIC_LOOP_COUNT", 6);
-    console.log("[STEP] Seed a rapid repeated sequence for loop suspect then expect incident");
+    console.log("[STEP] Seed rapid repeated successful calls for loop suspect then expect incident");
     for (let i = 0; i < count; i += 1) {
-      await sendIngestEvent(ingestKey, provider, model, 60, "loop-fixed-signature", env);
+      await sendIngestEvent(ingestKey, provider, model, 60, "loop-fixed-signature", env, {
+        status: "ok",
+        httpStatus: 200,
+        requestFingerprint: "fp-loop-fixed",
+      });
       await sleep(pauseMs);
     }
   } else if (scenario === "token_explosion") {

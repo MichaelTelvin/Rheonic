@@ -64,6 +64,7 @@ def _send_event(
     environment: str,
     *,
     token_explosion_tokens: int | None = None,
+    request_fingerprint: str | None = None,
     status: str = "ok",
     http_status: int = 200,
     error_type: str | None = None,
@@ -76,6 +77,7 @@ def _send_event(
             "endpoint": endpoint,
             "input_tokens": 1,
             "feature": feature,
+            **({"request_fingerprint": request_fingerprint} if request_fingerprint else {}),
             **({"token_explosion_tokens": token_explosion_tokens} if isinstance(token_explosion_tokens, int) else {}),
         },
         response={
@@ -308,7 +310,7 @@ def main() -> None:
             )
 
         def run_retry_storm() -> None:
-            _log_verbose("\n[STEP] Retry storm from failed attempts")
+            _log_verbose("\n[STEP] Retry storm from failed provider attempts only")
             phase_started_at = datetime.now().astimezone()
             for i in range(retry_storm_count):
                 _send_event(
@@ -335,7 +337,7 @@ def main() -> None:
         def run_loop_suspect() -> None:
             seeded_events = loop_count + 1
             _log_verbose(
-                f"\n[STEP] Loop suspect from a rapid repeated sequence (events={seeded_events}, threshold={loop_count})"
+                f"\n[STEP] Loop suspect from rapid repeated successful calls (events={seeded_events}, threshold={loop_count})"
             )
             phase_started_at = datetime.now().astimezone()
             for _ in range(seeded_events):
@@ -346,6 +348,9 @@ def main() -> None:
                     60,
                     "loop-fixed-signature",
                     environment,
+                    request_fingerprint="fp-loop-fixed",
+                    status="ok",
+                    http_status=200,
                 )
                 time.sleep(step_sleep_ms / 1000)
             client.flush()

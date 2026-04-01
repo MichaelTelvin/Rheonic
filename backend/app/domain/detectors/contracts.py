@@ -30,6 +30,7 @@ class DetectionContext:
     protect_enabled: bool
     request_endpoint: str | None = None
     request_feature: str | None = None
+    request_fingerprint: str | None = None
     estimated_next_tokens: int | None = None
     token_explosion_tokens: int | None = None
     previous_estimated_tokens: int | None = None

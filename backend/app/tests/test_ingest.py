@@ -273,6 +273,7 @@ def _event(
     error_type: str | None = None,
     endpoint: str = "/chat/completions",
     feature: str | None = "demo",
+    request_fingerprint: str | None = None,
     offset_seconds: int = 0,
 ) -> Event:
     now = datetime.now(timezone.utc) + timedelta(seconds=offset_seconds)
@@ -293,6 +294,7 @@ def _event(
         http_status=http_status,
         request_endpoint=endpoint,
         request_feature=feature,
+        request_fingerprint=request_fingerprint,
         created_at=now,
     )
 
@@ -419,9 +421,33 @@ def test_retry_storm_does_not_double_count_retry_state_updates() -> None:
 
 def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_and_email() -> None:
     service, incidents, webhook, transport = _service(protect_enabled=False, loop_count=3)
-    service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=0))
-    service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=1))
-    service.ingest(_event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=2))
+    service.ingest(
+        _event(
+            "p1",
+            total_tokens=42,
+            feature="loop-fixed-signature",
+            request_fingerprint="fp-loop-fixed",
+            offset_seconds=0,
+        )
+    )
+    service.ingest(
+        _event(
+            "p1",
+            total_tokens=42,
+            feature="loop-fixed-signature",
+            request_fingerprint="fp-loop-fixed",
+            offset_seconds=1,
+        )
+    )
+    service.ingest(
+        _event(
+            "p1",
+            total_tokens=42,
+            feature="loop-fixed-signature",
+            request_fingerprint="fp-loop-fixed",
+            offset_seconds=2,
+        )
+    )
 
     assert len(incidents.rows) == 1
     assert incidents.rows[0].incident_type == "loop_suspect"
@@ -436,7 +462,8 @@ def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_and_email() ->
     assert payload["environment"] == "dev"
     evidence = payload["evidence"]
     assert isinstance(evidence, dict)
-    assert evidence["signature"] == "p1:openai:gpt-4o-mini:dev:/chat/completions:loop-fixed-signature"
+    assert evidence["signature"] == "p1:openai:gpt-4o-mini:dev:/chat/completions:loop-fixed-signature:fp-loop-fixed"
+    assert evidence["request_fingerprint"] == "fp-loop-fixed"
     assert evidence["window_seconds"] == 30
     assert evidence["sequence_count"] == 3
     assert evidence["max_gap_seconds"] == 2.0
@@ -451,7 +478,7 @@ def test_loop_suspect_opens_incident_in_observe_with_warn_webhook_and_email() ->
     assert [call["template"] for call in transport.calls] == ["incident_warn"]
 
 
-def test_loop_suspect_error_sequence_still_triggers_when_retry_storm_threshold_is_higher() -> None:
+def test_loop_suspect_error_sequence_does_not_trigger_on_failing_calls() -> None:
     service, incidents, webhook, transport = _service(protect_enabled=False, retry_storm_count=10, loop_count=3)
     for i in range(3):
         service.ingest(
@@ -465,16 +492,12 @@ def test_loop_suspect_error_sequence_still_triggers_when_retry_storm_threshold_i
             )
         )
 
-    assert len(incidents.rows) == 1
-    assert incidents.rows[0].incident_type == "loop_suspect"
-    assert incidents.rows[0].evidence.get("sequence_count") == 3
-    warn_calls = [payload for _, event_type, payload in webhook.calls if event_type == "incident.warn"]
-    assert len(warn_calls) == 1
-    assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
-    assert [call["template"] for call in transport.calls] == ["incident_warn"]
+    assert incidents.rows == []
+    assert _non_policy_gap_webhook_calls(webhook) == []
+    assert transport.calls == []
 
 
-def test_loop_suspect_and_retry_storm_can_both_open_for_error_sequence() -> None:
+def test_retry_storm_opens_without_loop_suspect_for_error_sequence() -> None:
     service, incidents, webhook, _ = _service(protect_enabled=True, retry_storm_count=3, loop_count=3)
     for i in range(3):
         service.ingest(
@@ -489,8 +512,8 @@ def test_loop_suspect_and_retry_storm_can_both_open_for_error_sequence() -> None
         )
 
     incident_types = sorted(row.incident_type for row in incidents.rows)
-    assert incident_types == ["loop_suspect", "retry_storm"]
-    assert sum(1 for _, event_type, _ in webhook.calls if event_type == "incident.warn") == 2
+    assert incident_types == ["retry_storm"]
+    assert sum(1 for _, event_type, _ in webhook.calls if event_type == "incident.warn") == 1
 
 
 def test_loop_suspect_requires_consecutive_sequence_not_scattered_repetition() -> None:
@@ -557,6 +580,29 @@ def test_loop_signature_is_scoped_by_feature() -> None:
     assert "feature-a" in str(loop_rows[0].evidence.get("signature"))
 
 
+def test_loop_signature_is_scoped_by_request_fingerprint() -> None:
+    service, incidents, webhook, transport = _service(
+        protect_enabled=False,
+        loop_count=3,
+        loop_concurrency_threshold=10,
+    )
+
+    service.ingest(_event("p1", feature="feature-a", request_fingerprint="fp-a", offset_seconds=0))
+    service.ingest(_event("p1", feature="feature-a", request_fingerprint="fp-b", offset_seconds=1))
+    service.ingest(_event("p1", feature="feature-a", request_fingerprint="fp-a", offset_seconds=2))
+    service.ingest(_event("p1", feature="feature-a", request_fingerprint="fp-a", offset_seconds=3))
+
+    assert incidents.rows == []
+    assert _non_policy_gap_webhook_calls(webhook) == []
+    assert transport.calls == []
+
+    service.ingest(_event("p1", feature="feature-a", request_fingerprint="fp-a", offset_seconds=4))
+
+    loop_rows = [row for row in incidents.rows if row.incident_type == "loop_suspect"]
+    assert len(loop_rows) == 1
+    assert str(loop_rows[0].evidence.get("signature")).endswith(":fp-a")
+
+
 def test_loop_suspect_opens_new_incident_after_episode_window_expires() -> None:
     clock, now_provider = _clock()
     service, incidents, webhook, _ = _service(
@@ -566,12 +612,60 @@ def test_loop_suspect_opens_new_incident_after_episode_window_expires() -> None:
         now_provider=now_provider,
     )
 
-    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=0))
-    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=1))
-    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=2))
-    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=35))
-    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=36))
-    _ingest_at(service, clock, _event("p1", total_tokens=42, feature="loop-fixed-signature", offset_seconds=37))
+    _ingest_at(
+        service,
+        clock,
+        _event(
+            "p1", total_tokens=42, feature="loop-fixed-signature", request_fingerprint="fp-loop-fixed", offset_seconds=0
+        ),
+    )
+    _ingest_at(
+        service,
+        clock,
+        _event(
+            "p1", total_tokens=42, feature="loop-fixed-signature", request_fingerprint="fp-loop-fixed", offset_seconds=1
+        ),
+    )
+    _ingest_at(
+        service,
+        clock,
+        _event(
+            "p1", total_tokens=42, feature="loop-fixed-signature", request_fingerprint="fp-loop-fixed", offset_seconds=2
+        ),
+    )
+    _ingest_at(
+        service,
+        clock,
+        _event(
+            "p1",
+            total_tokens=42,
+            feature="loop-fixed-signature",
+            request_fingerprint="fp-loop-fixed",
+            offset_seconds=35,
+        ),
+    )
+    _ingest_at(
+        service,
+        clock,
+        _event(
+            "p1",
+            total_tokens=42,
+            feature="loop-fixed-signature",
+            request_fingerprint="fp-loop-fixed",
+            offset_seconds=36,
+        ),
+    )
+    _ingest_at(
+        service,
+        clock,
+        _event(
+            "p1",
+            total_tokens=42,
+            feature="loop-fixed-signature",
+            request_fingerprint="fp-loop-fixed",
+            offset_seconds=37,
+        ),
+    )
 
     loop_rows = [row for row in incidents.rows if row.incident_type == "loop_suspect"]
     assert len(loop_rows) == 2

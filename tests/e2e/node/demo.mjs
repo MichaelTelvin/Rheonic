@@ -130,6 +130,9 @@ async function sendEvent(client, provider, model, endpoint, totalTokens, feature
     request: {
       endpoint,
       feature,
+      ...(typeof options?.requestFingerprint === "string" && options.requestFingerprint
+        ? { request_fingerprint: options.requestFingerprint }
+        : {}),
       ...(typeof options?.tokenExplosionTokens === "number"
         ? { token_explosion_tokens: options.tokenExplosionTokens }
         : {}),
@@ -221,7 +224,7 @@ async function runDemo() {
   };
 
   const runRetryStorm = async () => {
-    logVerbose("\n[STEP] Retry storm from failed attempts");
+    logVerbose("\n[STEP] Retry storm from failed provider attempts only");
     for (let i = 0; i < retryStormCount; i += 1) {
       await sendEvent(client, provider, model, endpoint, 50, `retry-${i + 1}`, {
         status: "error",
@@ -236,9 +239,13 @@ async function runDemo() {
 
   const runLoopSuspect = async () => {
     const seededEvents = loopCount + 1;
-    logVerbose(`\n[STEP] Loop suspect from a rapid repeated sequence (events=${seededEvents}, threshold=${loopCount})`);
+    logVerbose(`\n[STEP] Loop suspect from rapid repeated successful calls (events=${seededEvents}, threshold=${loopCount})`);
     for (let i = 0; i < seededEvents; i += 1) {
-      await sendEvent(client, provider, model, endpoint, 60, "loop-fixed-signature");
+      await sendEvent(client, provider, model, endpoint, 60, "loop-fixed-signature", {
+        status: "ok",
+        httpStatus: 200,
+        requestFingerprint: "fp-loop-fixed",
+      });
       await sleep(stepSleepMs);
     }
     await client.flush();

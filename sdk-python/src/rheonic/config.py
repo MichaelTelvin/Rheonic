@@ -17,6 +17,7 @@ class SDKConfig:
     retry_delay_max_s: float = 0.4
     default_log_format: str = "%(asctime)s %(levelname)s %(name)s %(message)s"
     default_tokenizer_encoding: str = "cl100k_base"
+    max_input_token_estimate: int = 50_000
     token_estimate_chars_per_token: int = 4
     supported_providers: tuple[str, ...] = ("openai", "anthropic", "google")
 

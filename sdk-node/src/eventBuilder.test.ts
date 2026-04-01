@@ -18,3 +18,15 @@ test("EventBuilder delegates to buildEvent", () => {
   assert.equal(payload.provider, "anthropic");
   assert.equal(payload.model, "claude");
 });
+
+test("buildEvent preserves request fingerprint", () => {
+  const payload = buildEvent({
+    provider: "openai",
+    request: {
+      endpoint: "/chat/completions",
+      feature: "loop-fixed-signature",
+      request_fingerprint: "fp-loop-fixed",
+    },
+  });
+  assert.equal(payload.request.request_fingerprint, "fp-loop-fixed");
+});

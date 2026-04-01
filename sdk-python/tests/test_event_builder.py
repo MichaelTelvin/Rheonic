@@ -10,7 +10,12 @@ def test_build_event_schema_excludes_project_id() -> None:
         provider="openai",
         model="gpt-4o-mini",
         environment="dev",
-        request={"endpoint": "/chat", "input_tokens": 3, "token_explosion_tokens": 5},
+        request={
+            "endpoint": "/chat",
+            "input_tokens": 3,
+            "token_explosion_tokens": 5,
+            "request_fingerprint": "fp-loop-fixed",
+        },
         response={"total_tokens": 10, "latency_ms": 42, "http_status": 200},
     )
 
@@ -21,6 +26,7 @@ def test_build_event_schema_excludes_project_id() -> None:
     assert isinstance(payload["request"], dict)
     assert isinstance(payload["response"], dict)
     assert payload["request"]["token_explosion_tokens"] == 5
+    assert payload["request"]["request_fingerprint"] == "fp-loop-fixed"
 
 
 def test_event_builder_normalizes_optional_fields() -> None:

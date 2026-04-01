@@ -34,6 +34,7 @@ class EventRecord(Base):
     http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
     request_endpoint: Mapped[str | None] = mapped_column(String(255), nullable=True)
     request_feature: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    request_fingerprint: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

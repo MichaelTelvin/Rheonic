@@ -1,6 +1,7 @@
 export interface EventRequest {
   endpoint?: string;
   feature?: string;
+  request_fingerprint?: string;
   input_tokens?: number;
   input_tokens_estimate?: number;
   token_explosion_tokens?: number;

@@ -38,6 +38,7 @@ class EventRepositoryImpl(EventRepository):
                     http_status=event.http_status,
                     request_endpoint=event.request_endpoint,
                     request_feature=event.request_feature,
+                    request_fingerprint=event.request_fingerprint,
                     created_at=event.created_at,
                 )
                 session.add(record)
@@ -72,6 +73,7 @@ class EventRepositoryImpl(EventRepository):
                     http_status=record.http_status,
                     request_endpoint=record.request_endpoint,
                     request_feature=record.request_feature,
+                    request_fingerprint=record.request_fingerprint,
                     created_at=record.created_at,
                 )
                 for record in records

@@ -38,6 +38,18 @@ class LoopSuspectDetector(Detector):
                 break
             if prev_ts is not None and (prev_ts - event_ts) > float(ctx.loop_max_gap_seconds):
                 break
+            # distinguish loop suspect from retry storm
+            http_status = event.http_status or 0
+            status = (event.status or "").strip().lower()
+
+            is_failure = (
+                (isinstance(http_status, int) and http_status >= 400)
+                or status in {"error", "failed", "fail"}
+                or bool(event.error_type)
+            )
+
+            if is_failure:
+                break
 
             sequence_count += 1
             prev_ts = event_ts
@@ -62,6 +74,7 @@ class LoopSuspectDetector(Detector):
             "tok_cap": ctx.tok_cap,
             "estimated_next_tokens": ctx.estimated_next_tokens,
             "signature": signature,
+            "request_fingerprint": ctx.request_fingerprint,
             "window_seconds": ctx.loop_window_seconds,
             "sequence_count": sequence_count,
             "max_gap_seconds": ctx.loop_max_gap_seconds,
@@ -89,18 +102,25 @@ def _signature(
     event: Event | None,
 ) -> str:
     if event is None:
-        return f"{project_id}:{provider}:{normalized_model_name(model) or 'na'}:{environment or 'na'}:na:unknown"
+        return (
+            f"{project_id}:{provider}:{normalized_model_name(model) or 'na'}:{environment or 'na'}:na:unknown:unknown"
+        )
     endpoint = (event.request_endpoint or "na").strip()
     feature = (event.request_feature or "unknown").strip() or "unknown"
-    return f"{project_id}:{provider}:{normalized_model_name(model) or 'na'}:{environment or 'na'}:{endpoint}:{feature}"
+    fingerprint = (event.request_fingerprint or "unknown").strip() or "unknown"
+    return (
+        f"{project_id}:{provider}:{normalized_model_name(model) or 'na'}:{environment or 'na'}:"
+        f"{endpoint}:{feature}:{fingerprint}"
+    )
 
 
 def _context_signature(ctx: DetectionContext) -> str:
     endpoint = (ctx.request_endpoint or "na").strip()
     feature = (ctx.request_feature or "unknown").strip() or "unknown"
+    fingerprint = (ctx.request_fingerprint or "unknown").strip() or "unknown"
     return (
         f"{ctx.project_id}:{ctx.provider}:{normalized_model_name(ctx.model) or 'na'}:"
-        f"{ctx.environment or 'na'}:{endpoint}:{feature}"
+        f"{ctx.environment or 'na'}:{endpoint}:{feature}:{fingerprint}"
     )
 
 
