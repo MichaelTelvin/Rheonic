@@ -4667,9 +4667,23 @@ pre {
     padding: 10px 12px 10px 14px;
   }
 
+  .dashboard-floating-banner,
+  .setup-banner,
+  .dashboard-alert-card,
+  .dashboard-alert-banner-layout,
+  .setup-banner .dashboard-alert-banner-layout,
+  .dashboard-alert-banner-title,
+  .dashboard-alert-banner-summary,
+  .dashboard-alert-banner-actions,
+  .setup-banner-actions {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .dashboard-alert-banner-summary,
   .setup-banner .dashboard-alert-banner-summary {
     white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .setup-banner-text br {
@@ -4686,6 +4700,14 @@ pre {
     width: 100%;
     justify-self: start;
     justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .dashboard-alert-card .modal-actions.form-actions .modal-button,
+  .setup-banner-actions .modal-button {
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 140px;
   }
 
   .form-card,
@@ -7480,14 +7502,14 @@ html {
 
 @media (max-width: 760px) {
 
-  .public-shell.public-shell--marketing {
+  .public-surface .public-shell.public-shell--marketing {
     width: min(calc(100% - 12px), 100%);
     margin: 10px auto;
     border-radius: 20px;
     padding: 14px 8px 30px;
   }
 
-  .public-shell.public-shell--quickstart {
+  .public-surface .public-shell.public-shell--quickstart {
     width: min(calc(100% - 12px), 100%);
     margin: 10px auto;
     border-radius: 20px;
@@ -7655,24 +7677,32 @@ html {
     font-size: 0.5rem;
   }
 
-  .public-shell.public-shell--marketing {
+  .public-surface .public-shell.public-shell--marketing {
     width: min(calc(100% - 8px), 100%);
     margin: 8px auto;
-    padding: 14px 6px 24px;
+    padding: 14px 10px 24px;
   }
 
-  .public-shell.public-shell--quickstart {
+  .public-surface .public-shell.public-shell--quickstart {
     width: min(calc(100% - 8px), 100%);
     margin: 8px auto;
-    padding: 14px 6px 24px;
+    padding: 14px 10px 24px;
   }
 
   .landing-hero-copy h1 {
     font-size: clamp(1.9rem, 11vw, 2.3rem);
+    padding-inline: 10px;
   }
 
   .landing-hero-copy p {
+    margin-top: 18px;
+    max-width: 30ch;
+    margin-left: auto;
+    margin-right: auto;
+    padding-inline: 12px;
     font-size: 0.95rem;
+    line-height: 1.65;
+    text-wrap: pretty;
   }
 
   .quickstart .quickstart-docs-content h1 {
@@ -7720,13 +7750,13 @@ html {
     height: 20px;
   }
 
-  .public-shell.public-shell--marketing {
+  .public-surface .public-shell.public-shell--marketing {
     width: min(calc(100% - 6px), 100%);
     margin: 6px auto;
     padding: 12px 5px 20px;
   }
 
-  .public-shell.public-shell--quickstart {
+  .public-surface .public-shell.public-shell--quickstart {
     width: min(calc(100% - 6px), 100%);
     margin: 6px auto;
     padding: 12px 5px 20px;
@@ -7739,6 +7769,13 @@ html {
   .landing h2 {
     max-width: none;
     font-size: clamp(1.24rem, 6.2vw, 1.42rem);
+  }
+
+  .landing-hero-copy p {
+    max-width: 28ch;
+    padding-inline: 10px;
+    font-size: 0.92rem;
+    line-height: 1.62;
   }
 
   .landing-hero-cta .landing-link-button {
@@ -7786,6 +7823,7 @@ html {
 @media (max-width: 320px) {
   .landing-hero-copy h1 {
     font-size: clamp(1.72rem, 10.8vw, 2rem);
+    padding-inline: 5px;
   }
 
   .landing-hero-copy p {
