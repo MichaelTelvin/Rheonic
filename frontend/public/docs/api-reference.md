@@ -48,10 +48,10 @@ Typical payload:
   },
   "response": {
     "output_tokens": 80,
-    "total_tokens": 200
-  },
-  "latency_ms": 320,
-  "http_status": 200
+    "total_tokens": 200,
+    "latency_ms": 320,
+    "http_status": 200
+  }
 }
 ```
 

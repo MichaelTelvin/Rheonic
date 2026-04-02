@@ -11,27 +11,20 @@ from typing import Any
 
 import httpx
 
-try:
-    from dashboard_session import DashboardSession
-    from rheonic.client import Client
-    from rheonic.protect_engine import RHEONICBlockedError
-    from rheonic.providers.anthropic_adapter import instrument_anthropic
-    from rheonic.providers.google_adapter import instrument_google
-    from rheonic.providers.openai_adapter import instrument_openai
-except ModuleNotFoundError:
-    repo_root = Path(__file__).resolve().parents[3]
-    sdk_src = repo_root / "sdk-python" / "src"
-    tests_src = repo_root / "tests" / "e2e" / "python"
-    if str(sdk_src) not in sys.path:
-        sys.path.insert(0, str(sdk_src))
-    if str(tests_src) not in sys.path:
-        sys.path.insert(0, str(tests_src))
-    from dashboard_session import DashboardSession
-    from rheonic.client import Client
-    from rheonic.protect_engine import RHEONICBlockedError
-    from rheonic.providers.anthropic_adapter import instrument_anthropic
-    from rheonic.providers.google_adapter import instrument_google
-    from rheonic.providers.openai_adapter import instrument_openai
+repo_root = Path(__file__).resolve().parents[3]
+sdk_src = repo_root / "sdk-python" / "src"
+tests_src = repo_root / "tests" / "e2e" / "python"
+if str(sdk_src) not in sys.path:
+    sys.path.insert(0, str(sdk_src))
+if str(tests_src) not in sys.path:
+    sys.path.insert(0, str(tests_src))
+
+from dashboard_session import DashboardSession  # noqa: E402
+from rheonic.client import Client  # noqa: E402
+from rheonic.protect_engine import RHEONICBlockedError  # noqa: E402
+from rheonic.providers.anthropic_adapter import instrument_anthropic  # noqa: E402
+from rheonic.providers.google_adapter import instrument_google  # noqa: E402
+from rheonic.providers.openai_adapter import instrument_openai  # noqa: E402
 
 BACKEND_BASE_URL = os.getenv("RHEONIC_BACKEND_URL", "http://localhost:8000")
 PROVIDER_STUB_URL = os.getenv("RHEONIC_PROVIDER_URL", "http://localhost:8099")
@@ -161,6 +154,20 @@ def _extract_used_max_tokens(payload: dict[str, Any] | None) -> int | None:
         return raw
     if isinstance(raw, float):
         return int(raw)
+    config = payload.get("config")
+    if isinstance(config, dict):
+        raw = config.get("max_output_tokens")
+        if isinstance(raw, int):
+            return raw
+        if isinstance(raw, float):
+            return int(raw)
+    generation_config_camel = payload.get("generationConfig")
+    if isinstance(generation_config_camel, dict):
+        raw = generation_config_camel.get("maxOutputTokens")
+        if isinstance(raw, int):
+            return raw
+        if isinstance(raw, float):
+            return int(raw)
     generation_config = payload.get("generation_config")
     if isinstance(generation_config, dict):
         raw = generation_config.get("max_output_tokens")
@@ -222,6 +229,10 @@ def _estimate_prompt_tokens(payload: dict[str, Any] | None) -> int:
 
 def _assert_line(label: str, passed: bool) -> None:
     print(f"[ASSERT] {label}" if passed else f"[ASSERT] {label} (FAILED)")
+
+
+def _assert_skipped(label: str, reason: str) -> None:
+    print(f"[ASSERT] {label} (SKIPPED: {reason})")
 
 
 def _assert_delivery(client: Client, *, expected_min_sent: int = 0) -> None:
@@ -338,9 +349,6 @@ def _send_ingest_event(
         "requested_model": model,
         "resolved_model": None,
         "environment": environment,
-        "latency_ms": 120,
-        "http_status": http_status,
-        **({"error_type": error_type} if error_type else {}),
         "request": {
             "endpoint": endpoint,
             "feature": feature,
@@ -389,6 +397,23 @@ def _list_open_incidents(
             )
             return []
         raise
+
+
+def _assert_no_active_block_incident(
+    dashboard_session: DashboardSession | None,
+    project_id: str,
+    provider: str,
+    auth_email: str,
+    scenario: str,
+) -> None:
+    if scenario not in {"retry_storm", "loop_suspect", "token_explosion"}:
+        return
+    incidents = _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+    if any(str(row.get("type")) == "block" for row in incidents):
+        raise RuntimeError(
+            f"Scenario {scenario} is suppressed while an open block incident exists for provider {provider}. "
+            "Resolve or wait for the block incident before verifying behavioral anomaly scenarios."
+        )
 
 
 def _print_incidents(
@@ -580,6 +605,7 @@ def main() -> None:
         environment=env,
         endpoint=decision_endpoint,
     )
+    _assert_no_active_block_incident(dashboard_session, project_id, provider, auth_email, scenario)
 
     try:
         _provider_reset()
@@ -597,7 +623,7 @@ def main() -> None:
 
         if scenario == "clamp":
             print("\n[STEP] Seed clamp traffic then expect clamp")
-            seed_tokens = int(os.getenv("RHEONIC_CLAMP_SEED_TOKENS", "1600"))
+            seed_tokens = int(os.getenv("RHEONIC_CLAMP_SEED_TOKENS", "1400"))
             _send_ingest_event(
                 transport,
                 ingest_key,
@@ -675,7 +701,6 @@ def main() -> None:
                     total_tokens=60,
                     feature="loop-fixed-signature",
                     environment=env,
-                    request_fingerprint="fp-loop-fixed",
                     status="ok",
                     http_status=200,
                 )
@@ -750,6 +775,7 @@ def main() -> None:
         print(f"[RESULT] blocked={blocked} provider_calls_delta={provider_calls_delta}")
         if scenario == "clamp":
             print(f"[CLAMP] recommended={clamp_recommended} applied={clamp_applied} used_max_tokens={used_max_tokens}")
+        can_verify_incidents = bool(project_id and dashboard_session is not None)
         if project_id and dashboard_session is not None:
             _print_incidents(dashboard_session, project_id, provider, auth_email)
         else:
@@ -781,24 +807,30 @@ def main() -> None:
                 "token cap breach blocked",
                 blocked and provider_calls_delta == 0 and decision_reason == "tok_cap_breach",
             )
-            _assert_line(
-                "block incident opened",
-                any(
-                    str(row.get("type")) == "block"
-                    for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
-                ),
-            )
+            if can_verify_incidents:
+                _assert_line(
+                    "block incident opened",
+                    any(
+                        str(row.get("type")) == "block"
+                        for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+                    ),
+                )
+            else:
+                _assert_skipped("block incident opened", "missing dashboard incident credentials")
         elif scenario == "req_cap_breach":
             _assert_line(
                 "req_cap breach blocked", blocked and provider_calls_delta == 0 and decision_reason == "req_cap_breach"
             )
-            _assert_line(
-                "block incident opened",
-                any(
-                    str(row.get("type")) == "block"
-                    for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
-                ),
-            )
+            if can_verify_incidents:
+                _assert_line(
+                    "block incident opened",
+                    any(
+                        str(row.get("type")) == "block"
+                        for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+                    ),
+                )
+            else:
+                _assert_skipped("block incident opened", "missing dashboard incident credentials")
             _assert_line(
                 "req_cap breach triggered block",
                 blocked and provider_calls_delta == 0,
@@ -808,37 +840,46 @@ def main() -> None:
                 "retry_storm stayed allowed at preflight",
                 decision_value == "allow" and not blocked,
             )
-            _assert_line(
-                "retry_storm incident opened",
-                any(
-                    str(row.get("type")) == "retry_storm"
-                    for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
-                ),
-            )
+            if can_verify_incidents:
+                _assert_line(
+                    "retry_storm incident opened",
+                    any(
+                        str(row.get("type")) == "retry_storm"
+                        for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+                    ),
+                )
+            else:
+                _assert_skipped("retry_storm incident opened", "missing dashboard incident credentials")
         elif scenario == "loop_suspect":
             _assert_line(
                 "loop_suspect stayed allowed at preflight",
                 decision_value == "allow" and not blocked,
             )
-            _assert_line(
-                "loop_suspect incident opened",
-                any(
-                    str(row.get("type")) == "loop_suspect"
-                    for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
-                ),
-            )
+            if can_verify_incidents:
+                _assert_line(
+                    "loop_suspect incident opened",
+                    any(
+                        str(row.get("type")) == "loop_suspect"
+                        for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+                    ),
+                )
+            else:
+                _assert_skipped("loop_suspect incident opened", "missing dashboard incident credentials")
         elif scenario == "token_explosion":
             _assert_line(
                 "token_explosion stayed allowed at preflight",
                 decision_value == "allow" and not blocked,
             )
-            _assert_line(
-                "token_explosion incident opened",
-                any(
-                    str(row.get("type")) == "token_explosion"
-                    for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
-                ),
-            )
+            if can_verify_incidents:
+                _assert_line(
+                    "token_explosion incident opened",
+                    any(
+                        str(row.get("type")) == "token_explosion"
+                        for row in _list_open_incidents(dashboard_session, project_id, provider, auth_email)
+                    ),
+                )
+            else:
+                _assert_skipped("token_explosion incident opened", "missing dashboard incident credentials")
         elif scenario == "cooldown":
             _assert_line("cooldown active", blocked and provider_calls_delta == 0)
             _assert_line(

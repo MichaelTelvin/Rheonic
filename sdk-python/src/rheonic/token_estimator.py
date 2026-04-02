@@ -67,6 +67,15 @@ def _extract_text(payload: dict[str, Any]) -> str | None:
     prompt = payload.get("prompt")
     if isinstance(prompt, str):
         return prompt
+
+    contents = payload.get("contents")
+    if isinstance(contents, str):
+        return contents
+    if isinstance(contents, list):
+        try:
+            return json.dumps(contents, ensure_ascii=False, separators=(",", ":"))
+        except Exception:
+            return None
     return None
 
 

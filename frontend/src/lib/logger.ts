@@ -18,13 +18,15 @@ export function emitFrontendLog(params: {
   traceId?: string;
   spanId?: string;
 }): void {
+  const traceId = params.traceId ?? generateFrontendTraceId();
+  const spanId = params.spanId ?? generateFrontendSpanId();
   const payload = {
     timestamp: new Date().toISOString(),
     level: params.level,
     service: "frontend",
     env: ((import.meta as { env?: { MODE?: string } }).env?.MODE ?? "dev").toLowerCase(),
-    trace_id: params.traceId ?? "",
-    span_id: params.spanId ?? "",
+    trace_id: traceId,
+    span_id: spanId,
     event: sanitizeEvent(params.event),
     message: params.message,
     metadata: sanitizeMetadata(params.metadata ?? {}),

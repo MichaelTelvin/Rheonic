@@ -113,9 +113,10 @@ class ProtectEngine:
         started_at = time.perf_counter()
         context_tokens = bind_trace_context(trace_id=trace_id, span_id=span_id)
         try:
+            request_body = _sanitize_protect_context(context)
             response = self._post_with_timeout(
                 f"{self._base_url}/api/v1/protect/decision",
-                json=context,
+                json=request_body,
                 headers={
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
@@ -238,8 +239,8 @@ class ProtectEngine:
                 f"{self._base_url}/api/v1/protect/config",
                 headers={
                     "X-Project-Ingest-Key": self._ingest_key,
-                    "X-Trace-ID": generate_trace_id(),
-                    "X-Span-ID": generate_span_id(),
+                    "X-Trace-ID": get_trace_id() or generate_trace_id(),
+                    "X-Span-ID": get_span_id() or generate_span_id(),
                 },
                 timeout_s=max(self._request_timeout_s, 0.1),
             )
@@ -334,7 +335,7 @@ class ProtectEngine:
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
                     "X-Trace-ID": trace_id or generate_trace_id(),
-                    "X-Span-ID": generate_span_id(),
+                    "X-Span-ID": get_span_id() or generate_span_id(),
                     "X-Rheonic-Protect-Request-Id": request_id,
                 },
                 timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),
@@ -359,7 +360,7 @@ class ProtectEngine:
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self._ingest_key,
                     "X-Trace-ID": trace_id or generate_trace_id(),
-                    "X-Span-ID": generate_span_id(),
+                    "X-Span-ID": get_span_id() or generate_span_id(),
                     "X-Rheonic-Protect-Request-Id": request_id,
                 },
                 timeout_s=max(self._request_timeout_s, sdk_config.default_protect_report_timeout_min_s),
@@ -401,3 +402,18 @@ def _to_retry_after_seconds(blocked_until_ms: int | None, now_ms: int) -> int | 
     if blocked_until_ms is None or blocked_until_ms <= now_ms:
         return None
     return max(0, int((blocked_until_ms - now_ms + 999) / 1000))
+
+
+def _sanitize_protect_context(context: dict[str, object]) -> dict[str, object]:
+    payload: dict[str, object] = {"provider": context.get("provider")}
+    for key in (
+        "requested_model",
+        "environment",
+        "feature",
+        "max_output_tokens",
+        "input_tokens_estimate",
+    ):
+        value = context.get(key)
+        if value is not None:
+            payload[key] = value
+    return payload

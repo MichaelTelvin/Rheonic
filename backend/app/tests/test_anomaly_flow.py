@@ -19,10 +19,12 @@ def _event_payload(total_tokens: int, provider: str, requested_model: str, env: 
         "provider": provider,
         "requested_model": requested_model,
         "environment": env,
-        "response": {"total_tokens": total_tokens},
+        "response": {
+            "total_tokens": total_tokens,
+            "http_status": 502,
+            "error_type": "provider_error",
+        },
         "status": "error",
-        "http_status": 502,
-        "error_type": "provider_error",
     }
 
 

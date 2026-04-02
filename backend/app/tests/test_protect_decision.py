@@ -274,6 +274,42 @@ def _decision(client: TestClient, ingest_key: str, body: dict[str, object] | Non
     return response.json()
 
 
+def test_protect_decision_rejects_unknown_field(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    _, ingest_key = _create_project_and_key(client, "Protect Validation Extra")
+
+    response = client.post(
+        "/api/v1/protect/decision",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={
+            "provider": "openai",
+            "requested_model": "gpt-4o-mini",
+            "environment": "dev",
+            "unexpected": "boom",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "bad_request"
+
+
+def test_protect_decision_rejects_missing_required_provider(tmp_path) -> None:
+    client, _, _ = _make_client(tmp_path)
+    _, ingest_key = _create_project_and_key(client, "Protect Validation Missing")
+
+    response = client.post(
+        "/api/v1/protect/decision",
+        headers={"X-Project-Ingest-Key": ingest_key},
+        json={
+            "requested_model": "gpt-4o-mini",
+            "environment": "dev",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "bad_request"
+
+
 def _event(
     project_id: str,
     provider: str,
@@ -655,7 +691,7 @@ def test_retry_storm_does_not_trigger_preflight(tmp_path) -> None:
     _cleanup_overrides()
 
 
-def test_retry_storm_does_not_trigger_preflight_when_resolved_model_differs(tmp_path) -> None:
+def test_retry_storm_does_not_trigger_preflight_when_only_resolved_model_differs(tmp_path) -> None:
     client, _, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Retry Storm Different Resolved Model")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)
@@ -763,7 +799,7 @@ def test_loop_suspect_does_not_trigger_preflight_when_feature_matches(tmp_path) 
     _cleanup_overrides()
 
 
-def test_loop_suspect_does_not_trigger_preflight_when_resolved_model_differs(tmp_path) -> None:
+def test_loop_suspect_does_not_trigger_preflight_when_only_resolved_model_differs(tmp_path) -> None:
     client, _, events = _make_client(tmp_path)
     project_id, ingest_key = _create_project_and_key(client, "Protect Loop Suspect Different Resolved Model")
     _set_protect(client, project_id, protect_enabled=True, protect_max_tok_per_min=100000)

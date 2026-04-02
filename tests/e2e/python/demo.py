@@ -6,19 +6,16 @@ from math import ceil, floor
 from pathlib import Path
 from typing import Any
 
-try:
-    from dashboard_session import DashboardSession
-    from rheonic import build_event, capture_event, create_client
-except ModuleNotFoundError:
-    repo_root = Path(__file__).resolve().parents[3]
-    sdk_src = repo_root / "sdk-python" / "src"
-    tests_src = repo_root / "tests" / "e2e" / "python"
-    if str(sdk_src) not in sys.path:
-        sys.path.insert(0, str(sdk_src))
-    if str(tests_src) not in sys.path:
-        sys.path.insert(0, str(tests_src))
-    from dashboard_session import DashboardSession
-    from rheonic import build_event, capture_event, create_client
+repo_root = Path(__file__).resolve().parents[3]
+sdk_src = repo_root / "sdk-python" / "src"
+tests_src = repo_root / "tests" / "e2e" / "python"
+if str(sdk_src) not in sys.path:
+    sys.path.insert(0, str(sdk_src))
+if str(tests_src) not in sys.path:
+    sys.path.insert(0, str(tests_src))
+
+from dashboard_session import DashboardSession  # noqa: E402
+from rheonic import build_event, capture_event, create_client  # noqa: E402
 
 VERBOSE = (os.getenv("RHEONIC_VERBOSE", "") or "").lower() in {"1", "true", "yes"}
 
@@ -71,9 +68,9 @@ def _send_event(
 ) -> None:
     event = build_event(
         provider=provider,
-        requested_model=model,
-        resolved_model=None,
+        model=model,
         environment=environment,
+        status=status,
         request={
             "endpoint": endpoint,
             "input_tokens": 1,
@@ -84,13 +81,10 @@ def _send_event(
         response={
             "output_tokens": 1,
             "total_tokens": total_tokens,
+            "http_status": http_status,
+            **({"error_type": error_type} if error_type else {}),
         },
     )
-    # Backend ingest reads status/http_status/error_type from top-level fields.
-    event["status"] = status
-    event["http_status"] = http_status
-    if error_type:
-        event["error_type"] = error_type
     capture_event(event)
 
 
@@ -143,6 +137,28 @@ def _print_incident_summary(
         counts[incident_type] = counts.get(incident_type, 0) + 1
     compact = ", ".join(f"{key}={counts[key]}" for key in sorted(counts)) if counts else "none"
     print(f"[OBSERVE] incidents open={len(incidents)} types={compact}")
+
+
+def _assert_no_active_block_incident(
+    dashboard_session: DashboardSession | None,
+    project_id: str,
+    provider: str,
+    demo_case: str,
+) -> None:
+    if dashboard_session is None or not project_id:
+        return
+    if demo_case not in {"retry_storm", "loop_suspect", "token_explosion", "all"}:
+        return
+    params = {"project_id": project_id, "status": "open"}
+    if provider != "all":
+        params["provider"] = provider
+    payload = dashboard_session.request("/api/v1/incidents", params=params)
+    incidents = payload if isinstance(payload, list) else []
+    if any(str(incident.get("type")) == "block" for incident in incidents if isinstance(incident, dict)):
+        raise RuntimeError(
+            f"Demo case {demo_case} is suppressed while an open block incident exists for provider {provider}. "
+            "Resolve or wait for the block incident before verifying behavioral anomaly scenarios."
+        )
 
 
 def _parse_incident_time(incident: dict[str, Any]) -> datetime | None:
@@ -287,6 +303,7 @@ def main() -> None:
             environment=environment,
             debug=os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"},
         )
+        _assert_no_active_block_incident(dashboard_session, project_id, provider, demo_case)
 
         _log(f"[DEMO] observe {demo_case} provider={provider} model={model} environment={environment}")
         _log_verbose(f"[DEMO] ingest_base_url={ingest_base_url}")
@@ -297,7 +314,7 @@ def main() -> None:
             f"step_sleep_ms={step_sleep_ms}"
         )
 
-        def run_steady() -> None:
+        def run_steady() -> int:
             _log_verbose("\n[STEP] Steady traffic / no anomaly")
             phase_started_at = datetime.now().astimezone()
             _send_event(provider, model, endpoint, 42, "steady-1", environment)
@@ -309,8 +326,9 @@ def main() -> None:
                 provider,
                 phase_started_at=phase_started_at,
             )
+            return 1
 
-        def run_retry_storm() -> None:
+        def run_retry_storm() -> int:
             _log_verbose("\n[STEP] Retry storm from failed provider attempts only")
             phase_started_at = datetime.now().astimezone()
             for i in range(retry_storm_count):
@@ -334,8 +352,9 @@ def main() -> None:
                 provider,
                 phase_started_at=phase_started_at,
             )
+            return retry_storm_count
 
-        def run_loop_suspect() -> None:
+        def run_loop_suspect() -> int:
             seeded_events = loop_count + 1
             _log_verbose(
                 f"\n[STEP] Loop suspect from rapid repeated successful calls (events={seeded_events}, threshold={loop_count})"
@@ -349,7 +368,6 @@ def main() -> None:
                     60,
                     "loop-fixed-signature",
                     environment,
-                    request_fingerprint="fp-loop-fixed",
                     status="ok",
                     http_status=200,
                 )
@@ -363,8 +381,9 @@ def main() -> None:
                 provider,
                 phase_started_at=phase_started_at,
             )
+            return seeded_events
 
-        def run_token_explosion() -> None:
+        def run_token_explosion() -> int:
             growth_steps = _token_explosion_growth_steps(token_explosion_tokens)
             _log_verbose(f"\n[STEP] Token explosion from repeated request-context growth (steps={growth_steps})")
             phase_started_at = datetime.now().astimezone()
@@ -388,36 +407,27 @@ def main() -> None:
                 provider,
                 phase_started_at=phase_started_at,
             )
+            return len(growth_steps)
 
+        expected_sent = 0
         if demo_case == "all":
-            run_steady()
-            run_retry_storm()
-            run_loop_suspect()
-            run_token_explosion()
+            expected_sent += run_steady()
+            expected_sent += run_retry_storm()
+            expected_sent += run_loop_suspect()
+            expected_sent += run_token_explosion()
         elif demo_case == "steady":
-            run_steady()
+            expected_sent = run_steady()
         elif demo_case == "retry_storm":
-            run_retry_storm()
+            expected_sent = run_retry_storm()
         elif demo_case == "loop_suspect":
-            run_loop_suspect()
+            expected_sent = run_loop_suspect()
         elif demo_case == "token_explosion":
-            run_token_explosion()
+            expected_sent = run_token_explosion()
         else:
             print(f"Unsupported RHEONIC_DEMO_CASE: {demo_case}")
             _usage()
             return
 
-        expected_sent = (
-            1 + retry_storm_count + (loop_count + 1) + 3
-            if demo_case == "all"
-            else retry_storm_count
-            if demo_case == "retry_storm"
-            else loop_count + 1
-            if demo_case == "loop_suspect"
-            else 3
-            if demo_case == "token_explosion"
-            else 1
-        )
         _assert_delivery(client, expected_min_sent=expected_sent)
         _log("[DONE] observe demo complete")
     finally:

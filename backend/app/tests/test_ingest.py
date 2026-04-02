@@ -312,7 +312,6 @@ def _service(
     loop_max_gap_seconds: float = 2.0,
     loop_concurrency_threshold: int = 5,
     token_explosion_abs: int = 10000,
-    token_explosion_ratio: float = 0.9,
     token_explosion_growth_ratio: float = 1.7,
     token_explosion_growth_count: int = 2,
     token_explosion_growth_min_tokens: int = 1800,
@@ -347,7 +346,6 @@ def _service(
         loop_max_gap_seconds=loop_max_gap_seconds,
         loop_concurrency_threshold=loop_concurrency_threshold,
         token_explosion_abs=token_explosion_abs,
-        token_explosion_ratio=token_explosion_ratio,
         token_explosion_growth_ratio=token_explosion_growth_ratio,
         token_explosion_growth_count=token_explosion_growth_count,
         token_explosion_growth_min_tokens=token_explosion_growth_min_tokens,
@@ -727,7 +725,7 @@ def test_token_explosion_opens_new_incident_after_episode_window_expires() -> No
     assert len(warn_calls) == 2
 
 
-def test_token_explosion_triggers_on_growth_without_absolute_or_ratio_hit() -> None:
+def test_token_explosion_triggers_on_growth_without_absolute_hit() -> None:
     service, incidents, webhook, transport = _service(
         protect_enabled=False,
         tok_cap=None,
@@ -753,7 +751,8 @@ def test_token_explosion_triggers_on_growth_without_absolute_or_ratio_hit() -> N
     assert row.evidence.get("growth_sequence_count") == 2
     assert row.evidence.get("growth_min_tokens") == 1_800
     assert row.evidence.get("absolute_hit") is False
-    assert row.evidence.get("ratio_hit") is False
+    assert "ratio_hit" not in row.evidence
+    assert "ratio_threshold_tokens" not in row.evidence
     assert webhook.calls
     assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
     assert [call["template"] for call in transport.calls] == ["incident_warn"]
@@ -792,6 +791,8 @@ def test_token_explosion_uses_dedicated_request_context_signal_on_ingest() -> No
     assert row.incident_type == "token_explosion"
     assert row.evidence.get("token_explosion_tokens") == 240
     assert row.evidence.get("absolute_hit") is True
+    assert "ratio_hit" not in row.evidence
+    assert "ratio_threshold_tokens" not in row.evidence
     assert webhook.calls
     assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
     assert [call["template"] for call in transport.calls] == ["incident_warn"]
@@ -872,7 +873,7 @@ def test_token_explosion_growth_does_not_also_open_loop_suspect() -> None:
     assert all(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
 
 
-def test_token_explosion_absolute_hit_does_not_also_open_loop_suspect() -> None:
+def test_token_explosion_absolute_hit_does_not_depend_on_tok_cap_or_open_loop_suspect() -> None:
     service, incidents, webhook, transport = _service(
         protect_enabled=True,
         req_cap=None,
@@ -885,6 +886,9 @@ def test_token_explosion_absolute_hit_does_not_also_open_loop_suspect() -> None:
 
     incident_types = sorted(row.incident_type for row in incidents.rows)
     assert incident_types == ["token_explosion"]
+    assert incidents.rows[0].evidence.get("absolute_hit") is True
+    assert "ratio_hit" not in incidents.rows[0].evidence
+    assert "ratio_threshold_tokens" not in incidents.rows[0].evidence
     assert [call["event_type"] for call in transport.calls] == ["incident.warn"]
     assert all(event_type == "incident.warn" for _, event_type, _ in webhook.calls)
 

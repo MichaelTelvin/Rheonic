@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator, Awaitable, Callable
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -124,6 +125,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return build_error_response(exc.status_code, code, message)
         message = str(exc.detail) if exc.detail else "request failed"
         return build_error_response(exc.status_code, default_code_for_status(exc.status_code), message)
+
+    @app.exception_handler(RequestValidationError)
+    async def request_validation_exception_handler(request: Request, exc: RequestValidationError) -> Response:
+        # Keep legacy 422 semantics for general API validation, while treating
+        # strict ingest/protect payload shape errors as bad requests.
+        details = exc.errors()
+        message = str(details[0].get("msg") if details else "invalid request payload")
+        status_code = (
+            400
+            if request.url.path.startswith("/api/v1/events") or request.url.path.startswith("/api/v1/protect")
+            else 422
+        )
+        logger.warning(
+            "Request validation failed",
+            extra=build_log_extra(
+                event="http_error",
+                metadata={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": status_code,
+                    "validation_error_count": len(details),
+                },
+                trace_id=getattr(request.state, "trace_id", None),
+                span_id=getattr(request.state, "span_id", None),
+            ),
+        )
+        return build_error_response(status_code, default_code_for_status(status_code), message)
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> Response:

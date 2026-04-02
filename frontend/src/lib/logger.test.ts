@@ -61,8 +61,10 @@ describe("emitFrontendLog", () => {
       span_id: string;
       metadata: Record<string, unknown>;
     };
-    expect(infoPayload.trace_id).toBe("");
-    expect(infoPayload.span_id).toBe("");
+    expect(infoPayload.trace_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+    expect(infoPayload.span_id).toMatch(/^[0-9a-f]{16}$/i);
     expect(infoPayload.metadata).toEqual({ maybe: null });
   });
 

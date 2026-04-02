@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.application.services.ingest_event_service import IngestEventService
 from app.application.services.ingest_key_service import IngestKeyService
@@ -21,18 +21,22 @@ router = APIRouter()
 
 class EventRequestIn(BaseModel):
     # Nested request payload tokens.
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     input_tokens: int | None = None
+    input_tokens_estimate: int | None = None
     token_explosion_tokens: int | None = None
+    max_output_tokens: int | None = None
     endpoint: str | None = None
     feature: str | None = None
     request_fingerprint: str | None = None
+    protect_decision: str | None = None
+    protect_reason: str | None = None
 
 
 class EventResponseIn(BaseModel):
     # Nested response payload tokens.
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     output_tokens: int | None = None
     total_tokens: int | None = None
@@ -44,21 +48,14 @@ class EventResponseIn(BaseModel):
 
 class EventIn(BaseModel):
     # Validated request body for event ingest.
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     ts: datetime
     provider: str
     requested_model: str | None = None
     resolved_model: str | None = None
     environment: str | None = None
-    input_tokens: int = 0
-    output_tokens: int = 0
-    total_tokens: int | None = Field(default=None)
-    latency_ms: int | None = None
     status: str | None = None
-    error_type: str | None = None
-    error_message: str | None = None
-    http_status: int | None = None
     request: EventRequestIn | None = None
     response: EventResponseIn | None = None
 
@@ -68,19 +65,15 @@ def _resolve_tokens(payload: EventIn) -> tuple[int, int, int]:
     request = payload.request
     response = payload.response
 
-    # compute normalized input/output fallback values
-    input_tokens = (request.input_tokens if request is not None else payload.input_tokens) or 0
-    output_tokens = (response.output_tokens if response is not None else payload.output_tokens) or 0
+    input_tokens = (request.input_tokens if request is not None else None) or 0
+    output_tokens = (response.output_tokens if response is not None else None) or 0
 
-    # apply precedence for total tokens
     if response is not None and response.total_tokens is not None:
         return input_tokens, output_tokens, response.total_tokens
 
-    # fallback to request + response tokens when nested values exist
     if request is not None and response is not None:
         return input_tokens, output_tokens, (request.input_tokens or 0) + (response.output_tokens or 0)
 
-    # final fallback
     return input_tokens, output_tokens, 0
 
 
@@ -175,23 +168,17 @@ def ingest_event(
                 if payload.request is not None and payload.request.token_explosion_tokens is not None
                 else None
             ),
-            latency_ms=(payload.response.latency_ms if payload.response is not None else payload.latency_ms),
+            latency_ms=(payload.response.latency_ms if payload.response is not None else None),
             status=payload.status,
             error_type=(
-                payload.response.error_type
-                if payload.response is not None and payload.response.error_type
-                else payload.error_type
+                payload.response.error_type if payload.response is not None and payload.response.error_type else None
             ),
             error_message=(
                 payload.response.error_message
                 if payload.response is not None and payload.response.error_message
-                else payload.error_message
+                else None
             ),
-            http_status=(
-                payload.response.http_status
-                if payload.response is not None and payload.response.http_status is not None
-                else payload.http_status
-            ),
+            http_status=(payload.response.http_status if payload.response is not None else None),
             request_endpoint=(payload.request.endpoint if payload.request is not None else None),
             request_feature=(payload.request.feature if payload.request is not None else None),
             request_fingerprint=(payload.request.request_fingerprint if payload.request is not None else None),

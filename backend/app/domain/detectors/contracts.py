@@ -43,7 +43,6 @@ class DetectionContext:
     loop_count: int = 6
     loop_max_gap_seconds: float = 2.0
     loop_concurrency_threshold: int = 30
-    token_explosion_ratio: float = 0.9
     token_explosion_abs: int = 10000
     token_explosion_growth_ratio: float = 1.7
     token_explosion_growth_count: int = 2

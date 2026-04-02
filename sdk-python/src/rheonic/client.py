@@ -17,6 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover
     httpx = None  # type: ignore[assignment]
 
 from rheonic.config import sdk_config
+from rheonic.event_builder import normalize_event_payload
 from rheonic.logger import (
     bind_trace_context,
     build_log_extra,
@@ -28,7 +29,7 @@ from rheonic.logger import (
     get_trace_id,
     reset_trace_context,
 )
-from rheonic.protect_engine import ProtectEngine
+from rheonic.protect_engine import ProtectEngine, RHEONICValidationError
 from rheonic.token_estimator import prewarm_token_estimator
 
 logger = get_logger(__name__)
@@ -48,6 +49,42 @@ def _resolve_environment(explicit_environment: str | None) -> str:
         or sdk_config.default_environment
     )
     return str(resolved).strip() or sdk_config.default_environment
+
+
+def _fail_client_validation(message: str) -> None:
+    raise RHEONICValidationError(message)
+
+
+def _validate_client_config(
+    *,
+    ingest_key: str,
+    base_url: str | None,
+    environment: str,
+    flush_interval_s: float,
+    max_queue_size: int,
+    overflow_policy: str,
+    request_timeout_s: float,
+    protect_fail_mode: str,
+    debug: bool,
+) -> None:
+    if not isinstance(ingest_key, str) or not ingest_key.strip():
+        _fail_client_validation("RHEONIC: ingest_key must be a non-empty string.")
+    if base_url is not None and (not isinstance(base_url, str) or not base_url.strip()):
+        _fail_client_validation("RHEONIC: base_url must be a non-empty string.")
+    if not isinstance(environment, str) or not environment.strip():
+        _fail_client_validation("RHEONIC: environment must be a non-empty string.")
+    if not isinstance(flush_interval_s, (int, float)) or float(flush_interval_s) <= 0:
+        _fail_client_validation("RHEONIC: flush_interval_s must be a positive number.")
+    if not isinstance(max_queue_size, int) or max_queue_size < 1:
+        _fail_client_validation("RHEONIC: max_queue_size must be a positive integer.")
+    if overflow_policy not in {"drop_oldest", "drop_newest"}:
+        _fail_client_validation("RHEONIC: overflow_policy must be 'drop_oldest' or 'drop_newest'.")
+    if not isinstance(request_timeout_s, (int, float)) or float(request_timeout_s) <= 0:
+        _fail_client_validation("RHEONIC: request_timeout_s must be a positive number.")
+    if protect_fail_mode not in {"open", "closed"}:
+        _fail_client_validation("RHEONIC: protect_fail_mode must be 'open' or 'closed'.")
+    if not isinstance(debug, bool):
+        _fail_client_validation("RHEONIC: debug must be a boolean.")
 
 
 class HttpResponse(Protocol):
@@ -202,6 +239,17 @@ class Client:
     ) -> None:
         # Initialize client queue, worker thread, and HTTP transport.
         try:
+            _validate_client_config(
+                ingest_key=ingest_key,
+                base_url=base_url,
+                environment=environment,
+                flush_interval_s=flush_interval_s,
+                max_queue_size=max_queue_size,
+                overflow_policy=overflow_policy,
+                request_timeout_s=request_timeout_s,
+                protect_fail_mode=protect_fail_mode,
+                debug=debug,
+            )
             resolved_environment = _resolve_environment(environment)
             env_debug = os.getenv("RHEONIC_DEBUG", "").lower() in {"1", "true", "yes"}
             self._debug_enabled = debug or env_debug
@@ -258,8 +306,8 @@ class Client:
                 "SDK client initialized",
                 extra=build_log_extra(
                     event="sdk_client_initialized",
-                    trace_id=generate_trace_id(),
-                    span_id=generate_span_id(),
+                    trace_id=get_trace_id() or generate_trace_id(),
+                    span_id=get_span_id() or generate_span_id(),
                 ),
             )
         except Exception:
@@ -269,7 +317,7 @@ class Client:
     def capture_event(self, event: dict[str, Any]) -> None:
         # Enqueue event without blocking provider call path.
         try:
-            normalized = dict(event)
+            normalized = normalize_event_payload(dict(event))
             normalized["environment"] = normalized.get("environment") or self.environment
             with self._lock:
                 if len(self._queue) >= self.max_queue_size:
@@ -280,9 +328,11 @@ class Client:
                         self._dropped += 1
                         return
                 self._queue.append(normalized)
+        except RHEONICValidationError:
+            raise
         except Exception:
             logger.exception("capture_event enqueue failed", extra=build_log_extra(event="error"))
-            return
+            raise RHEONICValidationError("RHEONIC: invalid event payload.")
 
     def capture_event_and_flush(self, event: dict[str, Any], timeout_s: float | None = None) -> None:
         self.capture_event(event)
@@ -372,11 +422,14 @@ class Client:
 
     def warm_connections(self) -> None:
         # Best-effort warmup of the shared backend HTTP connection and protect runtime config.
-        context_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+        context_tokens = bind_trace_context(
+            trace_id=get_trace_id() or generate_trace_id(),
+            span_id=get_span_id() or generate_span_id(),
+        )
         try:
             response = self._http_client.get(
                 f"{self.base_url}/health",
-                headers={"X-Trace-ID": get_trace_id(), "X-Span-ID": generate_span_id()},
+                headers={"X-Trace-ID": get_trace_id(), "X-Span-ID": get_span_id()},
                 timeout=min(self.request_timeout_s, 1.0),
             )
             status_code = int(getattr(response, "status_code", 0))
@@ -384,7 +437,10 @@ class Client:
         except Exception:
             self.debug_log("SDK connection warmup failed")
         try:
-            bootstrap_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+            bootstrap_tokens = bind_trace_context(
+                trace_id=get_trace_id() or generate_trace_id(),
+                span_id=get_span_id() or generate_span_id(),
+            )
             try:
                 self._protect_engine.bootstrap()
                 self.debug_log("SDK protect config bootstrap completed")
@@ -477,7 +533,10 @@ class Client:
 
     def _send_event_once(self, event: dict[str, Any]) -> tuple[bool, bool]:
         # Send one event and classify retry behavior.
-        context_tokens = bind_trace_context(trace_id=generate_trace_id())
+        context_tokens = bind_trace_context(
+            trace_id=get_trace_id() or generate_trace_id(),
+            span_id=get_span_id() or generate_span_id(),
+        )
         try:
             response = self._http_client.post(
                 f"{self.base_url}/api/v1/events",
@@ -486,7 +545,7 @@ class Client:
                     "Content-Type": "application/json",
                     "X-Project-Ingest-Key": self.ingest_key,
                     "X-Trace-ID": get_trace_id(),
-                    "X-Span-ID": generate_span_id(),
+                    "X-Span-ID": get_span_id(),
                 },
             )
             status_code = int(getattr(response, "status_code", 0))

@@ -72,6 +72,16 @@ function extractUsedMaxTokens(payload) {
   if (!payload) return null;
   const value = payload.max_tokens;
   if (typeof value === "number" && Number.isFinite(value)) return Math.floor(value);
+  const config = payload.config;
+  if (config && typeof config === "object") {
+    const maxOutput = config.maxOutputTokens;
+    if (typeof maxOutput === "number" && Number.isFinite(maxOutput)) return Math.floor(maxOutput);
+  }
+  const generationConfigCamel = payload.generationConfig;
+  if (generationConfigCamel && typeof generationConfigCamel === "object") {
+    const maxOutput = generationConfigCamel.maxOutputTokens;
+    if (typeof maxOutput === "number" && Number.isFinite(maxOutput)) return Math.floor(maxOutput);
+  }
   const generationConfig = payload.generation_config;
   if (generationConfig && typeof generationConfig === "object") {
     const maxOutput = generationConfig.max_output_tokens;
@@ -135,6 +145,10 @@ function assertLine(label, passed) {
   console.log(passed ? `[ASSERT] ${label}` : `[ASSERT] ${label} (FAILED)`);
 }
 
+function assertSkipped(label, reason) {
+  console.log(`[ASSERT] ${label} (SKIPPED: ${reason})`);
+}
+
 function assertDelivery(client, expectedMinSent = 0) {
   const stats = client.getStats();
   console.log("[DEMO] sdk delivery stats:", stats);
@@ -161,9 +175,6 @@ async function sendIngestEvent(ingestKey, provider, model, totalTokens, feature,
     requested_model: model,
     resolved_model: null,
     environment,
-    latency_ms: 120,
-    http_status: httpStatus,
-    ...(options?.errorType ? { error_type: options.errorType } : {}),
     request: {
       endpoint,
       feature,
@@ -207,6 +218,18 @@ async function listOpenIncidents(projectId, provider, dashboardSession) {
       return [];
     }
     throw error;
+  }
+}
+
+async function assertNoActiveBlockIncident(projectId, provider, dashboardSession, scenario) {
+  if (!projectId || !dashboardSession) return;
+  if (!["retry_storm", "loop_suspect", "token_explosion"].includes(scenario)) return;
+  const incidents = await listOpenIncidents(projectId, provider, dashboardSession);
+  if (incidents.some((incident) => incident?.type === "block")) {
+    throw new Error(
+      `Scenario ${scenario} is suppressed while an open block incident exists for provider ${provider}. ` +
+        "Resolve or wait for the block incident before verifying behavioral anomaly scenarios.",
+    );
   }
 }
 
@@ -394,6 +417,7 @@ async function main() {
   instrumentOpenAI(openai, { client, feature: decisionFeature, environment: env, endpoint: decisionEndpoint });
   instrumentAnthropic(anthropic, { client, feature: decisionFeature, environment: env, endpoint: decisionEndpoint });
   instrumentGoogle(googleModel, { client, feature: decisionFeature, environment: env, endpoint: decisionEndpoint });
+  await assertNoActiveBlockIncident(projectId, provider, dashboardSession, scenario);
 
   console.log(`[DEMO] provider=${provider} model=${model} scenario=${scenario}`);
   console.log(`[DEMO] environment=${env}`);
@@ -404,7 +428,7 @@ async function main() {
   console.log(`[DEMO] max_tokens(before call)=${maxTokens}`);
 
   if (scenario === "clamp") {
-    const seed = Number(process.env.RHEONIC_CLAMP_SEED_TOKENS ?? 1600);
+    const seed = Number(process.env.RHEONIC_CLAMP_SEED_TOKENS ?? 1400);
     console.log("[STEP] Seed clamp traffic then expect clamp");
     await sendIngestEvent(ingestKey, provider, model, seed, "clamp-seed", env);
     await sleep(pauseMs);
@@ -448,7 +472,6 @@ async function main() {
       await sendIngestEvent(ingestKey, provider, model, 60, "loop-fixed-signature", env, {
         status: "ok",
         httpStatus: 200,
-        requestFingerprint: "fp-loop-fixed",
       });
       await sleep(pauseMs);
     }
@@ -522,6 +545,7 @@ async function main() {
   }
 
   let incidentTypes = new Set();
+  const canVerifyIncidents = Boolean(projectId && dashboardSession);
   if (projectId && dashboardSession) {
     const incidents = await listOpenIncidents(projectId, provider, dashboardSession);
     const counts = new Map();
@@ -553,26 +577,46 @@ async function main() {
     }
   } else if (scenario === "tok_cap_breach") {
     assertLine("token cap breach blocked", blocked && providerCallsDelta === 0 && reason === "tok_cap_breach");
-    assertLine("block incident opened", incidentTypes.has("block"));
+    if (canVerifyIncidents) {
+      assertLine("block incident opened", incidentTypes.has("block"));
+    } else {
+      assertSkipped("block incident opened", "missing dashboard incident credentials");
+    }
   } else if (scenario === "req_cap_breach") {
     assertLine("req_cap breach blocked", blocked && providerCallsDelta === 0 && reason === "req_cap_breach");
-    assertLine("block incident opened", incidentTypes.has("block"));
+    if (canVerifyIncidents) {
+      assertLine("block incident opened", incidentTypes.has("block"));
+    } else {
+      assertSkipped("block incident opened", "missing dashboard incident credentials");
+    }
     assertLine("req_cap breach triggered block", blocked && providerCallsDelta === 0);
   } else if (scenario === "retry_storm") {
     assertLine(
       "retry_storm stayed allowed at preflight",
       !blocked && decision === "allow",
     );
-    assertLine("retry_storm incident opened", incidentTypes.has("retry_storm"));
+    if (canVerifyIncidents) {
+      assertLine("retry_storm incident opened", incidentTypes.has("retry_storm"));
+    } else {
+      assertSkipped("retry_storm incident opened", "missing dashboard incident credentials");
+    }
   } else if (scenario === "loop_suspect") {
     assertLine(
       "loop_suspect stayed allowed at preflight",
       !blocked && decision === "allow",
     );
-    assertLine("loop_suspect incident opened", incidentTypes.has("loop_suspect"));
+    if (canVerifyIncidents) {
+      assertLine("loop_suspect incident opened", incidentTypes.has("loop_suspect"));
+    } else {
+      assertSkipped("loop_suspect incident opened", "missing dashboard incident credentials");
+    }
   } else if (scenario === "token_explosion") {
     assertLine("token_explosion stayed allowed at preflight", !blocked && decision === "allow");
-    assertLine("token_explosion incident opened", incidentTypes.has("token_explosion"));
+    if (canVerifyIncidents) {
+      assertLine("token_explosion incident opened", incidentTypes.has("token_explosion"));
+    } else {
+      assertSkipped("token_explosion incident opened", "missing dashboard incident credentials");
+    }
   } else if (scenario === "cooldown") {
     assertLine("cooldown active", blocked && providerCallsDelta === 0);
     assertLine("cooldown active - repeated call blocked", blocked && providerCallsDelta === 0);

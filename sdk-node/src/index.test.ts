@@ -26,8 +26,8 @@ test("index wrappers return original anthropic/google objects without a default 
 });
 
 test("index wrappers honor an explicit client option", () => {
-  const anthropic = { messages: {} };
-  const google = { modelName: "gemini-1.5-pro" };
+  const anthropic = { messages: { create: async () => ({}) } };
+  const google = { modelName: "gemini-1.5-pro", generateContent: async () => ({}) };
   const client = makeClient();
 
   assert.equal(instrumentAnthropic(anthropic, { client: client as any }), anthropic);

@@ -1,13 +1,13 @@
 import { sdkNodeConfig } from "./config.js";
+import { normalizeEventPayload, type BuildEventInput, type EventPayload } from "./eventBuilder.js";
 import { requestJson } from "./httpTransport.js";
 import { bindTraceContext, emitLog, generateSpanId, generateTraceId, getSpanId, getTraceId } from "./logger.js";
 import { ProtectEngine, type ProtectContext, type ProtectEvaluation, type ProtectFailMode } from "./protectEngine.js";
+import { RHEONICValidationError } from "./providerModelValidation.js";
 import { instrumentAnthropic as instrumentAnthropicProvider, type AnthropicInstrumentationOptions } from "./providers/anthropicAdapter.js";
 import { instrumentGoogle as instrumentGoogleProvider, type GoogleInstrumentationOptions } from "./providers/googleAdapter.js";
 import { instrumentOpenAI as instrumentOpenAIProvider, type OpenAIInstrumentationOptions } from "./providers/openaiAdapter.js";
 import { prewarmTokenEstimator } from "./tokenEstimator.js";
-
-import type { EventPayload } from "./eventBuilder.js";
 
 export type OverflowPolicy = "drop_oldest" | "drop_newest";
 
@@ -33,6 +33,60 @@ export interface ClientConfig {
   debug?: boolean;
 }
 
+const CLIENT_CONFIG_KEYS = new Set([
+  "baseUrl",
+  "ingestKey",
+  "environment",
+  "flushIntervalMs",
+  "maxQueueSize",
+  "overflowPolicy",
+  "requestTimeoutMs",
+  "protectFailMode",
+  "debug",
+]);
+
+function failClientValidation(message: string): never {
+  throw new RHEONICValidationError(message, "client", "", []);
+}
+
+function validateClientConfig(config: ClientConfig): void {
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    failClientValidation("RHEONIC: createClient config must be an object.");
+  }
+  for (const key of Object.keys(config)) {
+    if (!CLIENT_CONFIG_KEYS.has(key)) {
+      failClientValidation(`RHEONIC: unexpected client config property: ${key}`);
+    }
+  }
+  if (typeof config.ingestKey !== "string" || config.ingestKey.trim().length === 0) {
+    failClientValidation("RHEONIC: ingestKey must be a non-empty string.");
+  }
+  if (config.baseUrl !== undefined && (typeof config.baseUrl !== "string" || config.baseUrl.trim().length === 0)) {
+    failClientValidation("RHEONIC: baseUrl must be a non-empty string.");
+  }
+  if (config.environment !== undefined && (typeof config.environment !== "string" || config.environment.trim().length === 0)) {
+    failClientValidation("RHEONIC: environment must be a non-empty string.");
+  }
+  if (config.flushIntervalMs !== undefined && (!Number.isFinite(config.flushIntervalMs) || config.flushIntervalMs <= 0)) {
+    failClientValidation("RHEONIC: flushIntervalMs must be a positive number.");
+  }
+  if (config.maxQueueSize !== undefined && (!Number.isInteger(config.maxQueueSize) || config.maxQueueSize < 1)) {
+    failClientValidation("RHEONIC: maxQueueSize must be a positive integer.");
+  }
+  if (config.overflowPolicy !== undefined && !["drop_oldest", "drop_newest"].includes(config.overflowPolicy)) {
+    failClientValidation("RHEONIC: overflowPolicy must be 'drop_oldest' or 'drop_newest'.");
+  }
+  if (config.requestTimeoutMs !== undefined && (!Number.isFinite(config.requestTimeoutMs) || config.requestTimeoutMs <= 0)) {
+    failClientValidation("RHEONIC: requestTimeoutMs must be a positive number.");
+  }
+  if (config.protectFailMode !== undefined && !["open", "closed"].includes(config.protectFailMode)) {
+    failClientValidation("RHEONIC: protectFailMode must be 'open' or 'closed'.");
+  }
+  if (config.debug !== undefined && typeof config.debug !== "boolean") {
+    failClientValidation("RHEONIC: debug must be a boolean.");
+  }
+}
+
 export class Client {
   public readonly baseUrl: string;
   public readonly ingestKey: string;
@@ -55,6 +109,7 @@ export class Client {
   private warmupCompleted = false;
 
   public constructor(config: ClientConfig) {
+    validateClientConfig(config);
     this.baseUrl = config.baseUrl ?? process.env.RHEONIC_BASE_URL ?? sdkNodeConfig.defaultBaseUrl;
     this.ingestKey = config.ingestKey;
     this.environment =
@@ -106,32 +161,29 @@ export class Client {
     });
   }
 
-  public async captureEvent(event: EventPayload): Promise<void> {
-    try {
-      if (this.queue.length >= this.maxQueueSize) {
-        if (this.overflowPolicy === "drop_oldest") {
-          this.queue.shift();
-          this.dropped += 1;
-        } else {
-          this.dropped += 1;
-          return;
-        }
-      }
-
-      if (this.isClosed) {
+  public async captureEvent(event: EventPayload | BuildEventInput): Promise<void> {
+    const normalizedEvent = normalizeEventPayload(event);
+    if (this.queue.length >= this.maxQueueSize) {
+      if (this.overflowPolicy === "drop_oldest") {
+        this.queue.shift();
+        this.dropped += 1;
+      } else {
+        this.dropped += 1;
         return;
       }
+    }
 
-      this.queue.push({
-        ...event,
-        environment: event.environment || this.environment,
-      });
-    } catch {
+    if (this.isClosed) {
       return;
     }
+
+    this.queue.push({
+      ...normalizedEvent,
+      environment: normalizedEvent.environment || this.environment,
+    });
   }
 
-  public async captureEventAndFlush(event: EventPayload): Promise<void> {
+  public async captureEventAndFlush(event: EventPayload | BuildEventInput): Promise<void> {
     await this.captureEvent(event);
     await this.flushWithTimeout();
   }

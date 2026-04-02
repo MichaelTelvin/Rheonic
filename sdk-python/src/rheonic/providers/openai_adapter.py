@@ -4,9 +4,17 @@ from time import perf_counter
 from typing import Any
 
 from rheonic.client import Client, get_default_client
-from rheonic.event_builder import build_event
-from rheonic.logger import bind_trace_context, generate_span_id, generate_trace_id, get_logger, reset_trace_context
-from rheonic.protect_engine import RHEONICBlockedError
+from rheonic.event_builder import build_internal_event
+from rheonic.logger import (
+    bind_trace_context,
+    generate_span_id,
+    generate_trace_id,
+    get_logger,
+    get_span_id,
+    get_trace_id,
+    reset_trace_context,
+)
+from rheonic.protect_engine import RHEONICBlockedError, RHEONICValidationError
 from rheonic.provider_model_validation import validate_provider_model
 from rheonic.token_estimator import estimate_input_tokens
 
@@ -37,14 +45,17 @@ def instrument_openai(
     completions = getattr(chat, "completions", None)
     original_create = getattr(completions, "create", None)
     if completions is None or not callable(original_create):
-        return openai_client
+        raise RHEONICValidationError("RHEONIC: instrument_openai requires a client exposing chat.completions.create.")
 
     if inspect.iscoroutinefunction(original_create):
 
         async def wrapped_create_async(*args: Any, **kwargs: Any) -> Any:
             # Async wrapper for AsyncOpenAI style clients.
             try:
-                context_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+                context_tokens = bind_trace_context(
+                    trace_id=get_trace_id() or generate_trace_id(),
+                    span_id=get_span_id() or generate_span_id(),
+                )
                 try:
                     started_at = perf_counter()
                     requested_model = _extract_requested_model(args, kwargs)
@@ -115,7 +126,10 @@ def instrument_openai(
 
     def wrapped_create(*args: Any, **kwargs: Any) -> Any:
         # Sync wrapper for OpenAI client.
-        context_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+        context_tokens = bind_trace_context(
+            trace_id=get_trace_id() or generate_trace_id(),
+            span_id=get_span_id() or generate_span_id(),
+        )
         try:
             started_at = perf_counter()
             requested_model = _extract_requested_model(args, kwargs)
@@ -217,7 +231,7 @@ def _capture_success(
         usage = getattr(response, "usage", None)
         total_tokens = getattr(usage, "total_tokens", None)
         sdk_client.capture_event_and_flush(
-            build_event(
+            build_internal_event(
                 provider="openai",
                 requested_model=requested_model,
                 resolved_model=response_model if isinstance(response_model, str) else None,
@@ -230,6 +244,9 @@ def _capture_success(
                         if isinstance(estimated_input_tokens, int)
                         else {}
                     ),
+                    "input_tokens_estimate": estimated_input_tokens
+                    if isinstance(estimated_input_tokens, int)
+                    else None,
                     "protect_decision": "clamp" if protect_decision == "clamp" else None,
                     "protect_reason": protect_reason if protect_decision != "allow" else None,
                 },
@@ -260,10 +277,9 @@ def _capture_failure(
     try:
         http_status = _extract_http_status(exc)
         sdk_client.capture_event_and_flush(
-            build_event(
+            build_internal_event(
                 provider="openai",
                 requested_model=requested_model,
-                resolved_model=None,
                 environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,
@@ -273,6 +289,9 @@ def _capture_failure(
                         if isinstance(estimated_input_tokens, int)
                         else {}
                     ),
+                    "input_tokens_estimate": estimated_input_tokens
+                    if isinstance(estimated_input_tokens, int)
+                    else None,
                     "protect_decision": "clamp" if protect_decision == "clamp" else None,
                     "protect_reason": protect_reason if protect_decision != "allow" else None,
                 },

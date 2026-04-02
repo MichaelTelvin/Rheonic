@@ -16,6 +16,7 @@ def test_extract_text_supports_messages_and_prompt_shapes() -> None:
     assert '"content":"hello"' in message_text
     assert '"text":"world"' in message_text
     assert te._extract_text({"prompt": "prompt-body"}) == "prompt-body"
+    assert te._extract_text({"contents": "google-body"}) == "google-body"
 
 
 def test_estimate_input_tokens_counts_full_tool_message_payload() -> None:
@@ -37,6 +38,12 @@ def test_estimate_input_tokens_counts_full_tool_message_payload() -> None:
     assert isinstance(tool_estimate, int)
     assert isinstance(text_only_estimate, int)
     assert tool_estimate > text_only_estimate
+
+
+def test_estimate_input_tokens_supports_google_contents_payload() -> None:
+    estimate = te.estimate_input_tokens({"model": "gemini-1.5-pro", "contents": "hello from google"})
+    assert isinstance(estimate, int)
+    assert estimate > 0
 
 
 def test_extract_text_falls_back_to_text_only_when_json_serialization_fails(monkeypatch: pytest.MonkeyPatch) -> None:

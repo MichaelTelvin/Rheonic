@@ -8,8 +8,7 @@ def test_build_event_schema_excludes_project_id() -> None:
     # Event payload should match backend schema and omit project_id.
     payload = build_event(
         provider="openai",
-        requested_model="gpt-4o-mini",
-        resolved_model="gpt-4o-mini-2024-07-18",
+        model="gpt-4o-mini",
         environment="dev",
         request={
             "endpoint": "/chat",
@@ -22,21 +21,21 @@ def test_build_event_schema_excludes_project_id() -> None:
 
     assert payload["provider"] == "openai"
     assert payload["requested_model"] == "gpt-4o-mini"
-    assert payload["resolved_model"] == "gpt-4o-mini-2024-07-18"
+    assert payload["resolved_model"] is None
     assert payload["environment"] == "dev"
     assert "project_id" not in payload
     assert isinstance(payload["request"], dict)
     assert isinstance(payload["response"], dict)
     assert payload["request"]["token_explosion_tokens"] == 5
     assert payload["request"]["request_fingerprint"] == "fp-loop-fixed"
+    assert "status" not in payload
 
 
 def test_event_builder_normalizes_optional_fields() -> None:
     payload = EventBuilder().build(
         {
             "provider": "openai",
-            "requested_model": 123,
-            "resolved_model": 456,
+            "model": 123,
             "request": "bad",
             "response": "bad",
             "ts": 42,
@@ -49,6 +48,24 @@ def test_event_builder_normalizes_optional_fields() -> None:
     assert payload["environment"] == "dev"
     assert payload["request"] == {}
     assert payload["response"] == {}
+
+
+def test_build_event_preserves_top_level_status_only() -> None:
+    payload = build_event(
+        provider="openai",
+        model="gpt-4o-mini",
+        status="error",
+        response={"http_status": 503, "error_type": "provider_5xx"},
+    )
+
+    assert payload["status"] == "error"
+    assert payload["response"]["http_status"] == 503
+    assert payload["response"]["error_type"] == "provider_5xx"
+
+
+def test_build_event_rejects_stale_top_level_http_status_alias() -> None:
+    with pytest.raises(Exception, match="unexpected event property: http_status"):
+        event_builder_module.normalize_event_payload({"provider": "openai", "http_status": 503})
 
 
 def test_event_builder_reraises_and_logs_when_build_fails(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -5,9 +5,17 @@ from time import perf_counter
 from typing import Any
 
 from rheonic.client import Client, get_default_client
-from rheonic.event_builder import build_event
-from rheonic.logger import bind_trace_context, generate_span_id, generate_trace_id, get_logger, reset_trace_context
-from rheonic.protect_engine import RHEONICBlockedError
+from rheonic.event_builder import build_internal_event
+from rheonic.logger import (
+    bind_trace_context,
+    generate_span_id,
+    generate_trace_id,
+    get_logger,
+    get_span_id,
+    get_trace_id,
+    reset_trace_context,
+)
+from rheonic.protect_engine import RHEONICBlockedError, RHEONICValidationError
 from rheonic.provider_model_validation import validate_provider_model
 from rheonic.token_estimator import estimate_input_tokens
 
@@ -36,13 +44,18 @@ def instrument_google(
 
     generate_owner, original_generate = _resolve_generate_target(google_model)
     if generate_owner is None or not callable(original_generate):
-        return google_model
+        raise RHEONICValidationError(
+            "RHEONIC: instrument_google requires a client exposing generate_content or models.generate_content."
+        )
 
     if inspect.iscoroutinefunction(original_generate):
 
         async def wrapped_generate_async(*args: Any, **kwargs: Any) -> Any:
             try:
-                context_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+                context_tokens = bind_trace_context(
+                    trace_id=get_trace_id() or generate_trace_id(),
+                    span_id=get_span_id() or generate_span_id(),
+                )
                 try:
                     started_at = perf_counter()
                     requested_model = _extract_requested_model(google_model, args, kwargs)
@@ -106,7 +119,10 @@ def instrument_google(
         return google_model
 
     def wrapped_generate(*args: Any, **kwargs: Any) -> Any:
-        context_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+        context_tokens = bind_trace_context(
+            trace_id=get_trace_id() or generate_trace_id(),
+            span_id=get_span_id() or generate_span_id(),
+        )
         try:
             started_at = perf_counter()
             requested_model = _extract_requested_model(google_model, args, kwargs)
@@ -232,7 +248,7 @@ def _capture_success(
 ) -> None:
     try:
         sdk_client.capture_event_and_flush(
-            build_event(
+            build_internal_event(
                 provider="google",
                 requested_model=requested_model,
                 resolved_model=_extract_resolved_model(response),
@@ -276,10 +292,9 @@ def _capture_failure(
 ) -> None:
     try:
         sdk_client.capture_event_and_flush(
-            build_event(
+            build_internal_event(
                 provider="google",
                 requested_model=requested_model,
-                resolved_model=None,
                 environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,

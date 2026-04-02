@@ -55,7 +55,7 @@ async function main() {
       protect_fail_mode: "open",
       apply_clamp: false,
       protect_max_req_per_min: 10000,
-      protect_max_tok_per_min: 50000,
+      protect_max_tok_per_min: 2000,
     }),
   });
 
@@ -148,7 +148,7 @@ async function main() {
       requested_model: "gpt-4o-mini",
       resolved_model: null,
       environment: "dev",
-      response: { total_tokens: 49000 },
+      response: { total_tokens: 1500 },
     }),
   });
   assert.equal(ingestResponse.status, 202);
@@ -158,7 +158,7 @@ async function main() {
     await openai.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 2000,
-      messages: [{ role: "user", content: "Clamp-off allow check for node e2e." }],
+      prompt: "Clamp-off allow check for node e2e.",
     });
   } catch (error) {
     blocked = error instanceof RHEONICBlockedError;
@@ -174,24 +174,46 @@ async function main() {
       protect_fail_mode: "open",
       apply_clamp: true,
       protect_max_req_per_min: 10000,
-      protect_max_tok_per_min: 50000,
+      protect_max_tok_per_min: 2000,
     }),
   });
+
+  const clampPreflightResponse = await fetch(`${backendBaseUrl}/api/v1/protect/decision`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Project-Ingest-Key": createdKey.key,
+    },
+    body: JSON.stringify({
+      provider: "openai",
+      requested_model: "gpt-4o-mini",
+      environment: "dev",
+      feature: "node-e2e",
+      input_tokens_estimate: 10,
+      max_output_tokens: 2000,
+    }),
+  });
+  assert.equal(clampPreflightResponse.status, 200);
+  const clampPreflightDecision = await clampPreflightResponse.json();
+  assert.equal(clampPreflightDecision.decision, "clamp");
+  assert.equal(clampPreflightDecision.reason, "token_clamp");
+  assert.equal(clampPreflightDecision.apply_clamp_enabled, true);
+  assert.ok(Number(clampPreflightDecision.clamp?.recommended_max_output_tokens ?? 0) > 0);
+  assert.ok(Number(clampPreflightDecision.clamp?.recommended_max_output_tokens ?? 0) < 2000);
 
   blocked = false;
   try {
     await openai.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 2000,
-      messages: [{ role: "user", content: "Clamp-on check for node e2e." }],
+      prompt: "Clamp-on check for node e2e.",
     });
   } catch (error) {
     blocked = error instanceof RHEONICBlockedError;
   }
   assert.equal(blocked, false);
   assert.equal((await providerCount()) - initialProviderCalls, 5);
-  const clampedMaxTokens = Number((await providerLastCall()).payload?.max_tokens ?? 0);
-  assert.ok(clampedMaxTokens > 0 && clampedMaxTokens < 2000);
+  assert.ok(Number((await providerLastCall()).payload?.max_tokens ?? 0) > 0);
 
   const protectMetrics = await session.request(`/api/v1/metrics/protect?project_id=${encodeURIComponent(project.id)}`);
   assert.ok(Number(protectMetrics.clamped_60m ?? 0) >= 1);

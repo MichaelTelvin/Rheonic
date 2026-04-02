@@ -117,6 +117,20 @@ async function fetchIncidentSummary(dashboardSession, projectId, provider) {
   logVerbose(`[OBSERVE] incidents open=${incidents.length} types=${compact || "none"}`);
 }
 
+async function assertNoActiveBlockIncident(dashboardSession, projectId, provider, demoCase) {
+  if (!dashboardSession || !projectId) return;
+  if (!["retry_storm", "loop_suspect", "token_explosion", "all"].includes(demoCase)) return;
+  const params = new URLSearchParams({ project_id: projectId, status: "open" });
+  if (provider !== "all") params.set("provider", provider);
+  const incidents = await dashboardSession.request(`/api/v1/incidents?${params.toString()}`);
+  if (Array.isArray(incidents) && incidents.some((incident) => incident?.type === "block")) {
+    throw new Error(
+      `Demo case ${demoCase} is suppressed while an open block incident exists for provider ${provider}. ` +
+        "Resolve or wait for the block incident before verifying behavioral anomaly scenarios.",
+    );
+  }
+}
+
 async function printPhase(dashboardSession, phase, projectId, provider) {
   await fetchRealtimeSnapshot(dashboardSession, projectId, provider, phase);
   await fetchIncidentSummary(dashboardSession, projectId, provider);
@@ -125,9 +139,9 @@ async function printPhase(dashboardSession, phase, projectId, provider) {
 async function sendEvent(client, provider, model, endpoint, totalTokens, feature, options) {
   const event = buildEvent({
     provider,
-    requested_model: model,
-    resolved_model: null,
+    model,
     environment: client.environment,
+    status: options?.status ?? "ok",
     request: {
       endpoint,
       feature,
@@ -141,13 +155,10 @@ async function sendEvent(client, provider, model, endpoint, totalTokens, feature
     response: {
       latency_ms: 120,
       total_tokens: totalTokens,
+      http_status: options?.httpStatus ?? 200,
+      ...(options?.errorType ? { error_type: options.errorType } : {}),
     },
   });
-  event.status = options?.status ?? "ok";
-  event.http_status = options?.httpStatus ?? 200;
-  if (options?.errorType) {
-    event.error_type = options.errorType;
-  }
   await client.captureEvent(event);
 }
 
@@ -207,10 +218,12 @@ async function runDemo() {
   }
 
   const client = createClient({
+    baseUrl: (process.env.RHEONIC_BASE_URL ?? "").trim() || backendBaseUrl,
     ingestKey,
     environment,
     debug: process.env.RHEONIC_DEBUG === "1" || process.env.RHEONIC_DEBUG === "true",
   });
+  await assertNoActiveBlockIncident(dashboardSession, projectId, provider, demoCase);
 
   log(`[DEMO] observe ${demoCase} provider=${provider} model=${model} environment=${environment}`);
   logVerbose(
@@ -222,6 +235,7 @@ async function runDemo() {
     await sendEvent(client, provider, model, endpoint, 42, "steady-1");
     await client.flush();
     await printPhase(dashboardSession, "steady", projectId, provider);
+    return 1;
   };
 
   const runRetryStorm = async () => {
@@ -236,6 +250,7 @@ async function runDemo() {
     }
     await client.flush();
     await printPhase(dashboardSession, "retry_storm", projectId, provider);
+    return retryStormCount;
   };
 
   const runLoopSuspect = async () => {
@@ -245,13 +260,13 @@ async function runDemo() {
       await sendEvent(client, provider, model, endpoint, 60, "loop-fixed-signature", {
         status: "ok",
         httpStatus: 200,
-        requestFingerprint: "fp-loop-fixed",
       });
       await sleep(stepSleepMs);
     }
     await client.flush();
     await sleep(stepSleepMs);
     await printPhase(dashboardSession, "loop_suspect", projectId, provider);
+    return seededEvents;
   };
 
   const runTokenExplosion = async () => {
@@ -266,21 +281,23 @@ async function runDemo() {
     await client.flush();
     await sleep(stepSleepMs);
     await printPhase(dashboardSession, "token_explosion", projectId, provider);
+    return growthSteps.length;
   };
 
+  let expectedSent = 0;
   if (demoCase === "all") {
-    await runSteady();
-    await runRetryStorm();
-    await runLoopSuspect();
-    await runTokenExplosion();
+    expectedSent += await runSteady();
+    expectedSent += await runRetryStorm();
+    expectedSent += await runLoopSuspect();
+    expectedSent += await runTokenExplosion();
   } else if (demoCase === "steady") {
-    await runSteady();
+    expectedSent = await runSteady();
   } else if (demoCase === "retry_storm") {
-    await runRetryStorm();
+    expectedSent = await runRetryStorm();
   } else if (demoCase === "loop_suspect") {
-    await runLoopSuspect();
+    expectedSent = await runLoopSuspect();
   } else if (demoCase === "token_explosion") {
-    await runTokenExplosion();
+    expectedSent = await runTokenExplosion();
   } else {
     console.error(`Unsupported RHEONIC_DEMO_CASE: ${demoCase}`);
     printUsageExamples();
@@ -289,16 +306,6 @@ async function runDemo() {
     return;
   }
 
-  const expectedSent =
-    demoCase === "all"
-      ? 1 + retryStormCount + (loopCount + 1) + 3
-      : demoCase === "retry_storm"
-        ? retryStormCount
-        : demoCase === "loop_suspect"
-          ? loopCount + 1
-          : demoCase === "token_explosion"
-            ? 3
-            : 1;
   await assertDelivery(client, expectedSent);
   log("[DONE] observe demo complete");
   client.close();

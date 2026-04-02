@@ -209,7 +209,7 @@ describe("Dashboard", () => {
       </TestRouter>,
     );
     await screen.findByText("Incident episodes");
-    expect(screen.getByText("Block reasons")).toBeDefined();
+    expect(screen.getByText("Cap breach")).toBeDefined();
     expect(screen.getByText("Retry storm")).toBeDefined();
   });
 

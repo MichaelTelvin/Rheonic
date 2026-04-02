@@ -15,10 +15,10 @@ test("buildEvent fills defaults", () => {
 
 test("EventBuilder delegates to buildEvent", () => {
   const builder = new EventBuilder();
-  const payload = builder.build({ provider: "anthropic", requested_model: "claude", resolved_model: "claude-v1" });
+  const payload = builder.build({ provider: "anthropic", model: "claude" });
   assert.equal(payload.provider, "anthropic");
   assert.equal(payload.requested_model, "claude");
-  assert.equal(payload.resolved_model, "claude-v1");
+  assert.equal(payload.resolved_model, null);
 });
 
 test("buildEvent preserves request fingerprint", () => {
@@ -31,4 +31,26 @@ test("buildEvent preserves request fingerprint", () => {
     },
   });
   assert.equal(payload.request.request_fingerprint, "fp-loop-fixed");
+});
+
+test("buildEvent preserves top-level status only", () => {
+  const payload = buildEvent({
+    provider: "openai",
+    status: "error",
+    response: {
+      http_status: 503,
+      error_type: "provider_5xx",
+    },
+  });
+
+  assert.equal(payload.status, "error");
+  assert.equal(payload.response.http_status, 503);
+  assert.equal(payload.response.error_type, "provider_5xx");
+});
+
+test("buildEvent rejects stale top-level http_status aliases", () => {
+  assert.throws(
+    () => buildEvent({ provider: "openai", http_status: 503 } as never),
+    /unexpected event property: http_status/,
+  );
 });

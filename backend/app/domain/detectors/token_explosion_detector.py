@@ -7,7 +7,7 @@ from app.domain.models.event import Event
 class TokenExplosionDetector(Detector):
     # Detect unusually large request-context growth using a dedicated signal that
     # can be computed before a call and then echoed back on ingest, keeping
-    # protect and observe aligned without conflating pattern detection with spend.
+    # protect and observe aligned without tying anomaly detection to project caps.
     def detect(self, ctx: DetectionContext) -> list[Signal]:
         token_explosion_tokens = ctx.token_explosion_tokens
         if token_explosion_tokens is None and ctx.current_event is not None:
@@ -19,11 +19,6 @@ class TokenExplosionDetector(Detector):
         if token_explosion_tokens is None:
             return []
 
-        ratio_threshold = None
-        ratio_hit = False
-        if ctx.tok_cap is not None and ctx.tok_cap > 0:
-            ratio_threshold = float(ctx.tok_cap) * float(ctx.token_explosion_ratio)
-            ratio_hit = float(token_explosion_tokens) >= ratio_threshold
         abs_hit = int(token_explosion_tokens) >= int(ctx.token_explosion_abs)
 
         # Growth detection only starts once the current request-context signal is
@@ -79,7 +74,7 @@ class TokenExplosionDetector(Detector):
         ):
             growth_hit = False
 
-        if not (ratio_hit or abs_hit or growth_hit):
+        if not (abs_hit or growth_hit):
             return []
         evidence: dict[str, object] = {
             "provider": ctx.provider,
@@ -92,14 +87,12 @@ class TokenExplosionDetector(Detector):
             "tok_cap": ctx.tok_cap,
             "token_explosion_tokens": token_explosion_tokens,
             "previous_token_explosion_tokens": ctx.previous_estimated_tokens,
-            "ratio_threshold_tokens": ratio_threshold,
             "absolute_threshold_tokens": ctx.token_explosion_abs,
             "growth_ratio": growth_ratio,
             "growth_threshold": ctx.token_explosion_growth_ratio,
             "growth_sequence_count": growth_sequence_count,
             "growth_required_count": ctx.token_explosion_growth_count,
             "growth_min_tokens": ctx.token_explosion_growth_min_tokens,
-            "ratio_hit": ratio_hit,
             "absolute_hit": abs_hit,
             "growth_hit": growth_hit,
             "reason": "token_explosion",

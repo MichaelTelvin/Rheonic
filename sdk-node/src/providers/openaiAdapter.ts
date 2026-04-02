@@ -1,7 +1,7 @@
-import { buildEvent } from "../eventBuilder.js";
-import { bindTraceContext, generateSpanId, generateTraceId } from "../logger.js";
+import { buildInternalEvent } from "../eventBuilder.js";
+import { bindTraceContext, generateSpanId, generateTraceId, getSpanId, getTraceId } from "../logger.js";
 import { RHEONICBlockedError, type ProtectEvaluation } from "../protectEngine.js";
-import { validateProviderModel } from "../providerModelValidation.js";
+import { RHEONICValidationError, validateProviderModel } from "../providerModelValidation.js";
 import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
 
 import type { Client } from "../client.js";
@@ -24,14 +24,19 @@ export function __setInputTokenEstimatorForTests(
 export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T, options: OpenAIInstrumentationOptions): T {
   const targetCreate = openaiClient?.chat?.completions?.create;
   if (typeof targetCreate !== "function") {
-    return openaiClient;
+    throw new RHEONICValidationError(
+      "RHEONIC: instrumentOpenAI requires a client exposing chat.completions.create.",
+      "openai",
+      "",
+      ["openai"],
+    );
   }
 
   const originalCreate = targetCreate.bind(openaiClient.chat.completions);
 
   openaiClient.chat.completions.create = async (...args: unknown[]) => {
-    const traceId = generateTraceId();
-    const spanId = generateSpanId();
+    const traceId = getTraceId() || generateTraceId();
+    const spanId = getSpanId() || generateSpanId();
     return bindTraceContext(traceId, spanId, async () => {
       const startedAt = Date.now();
       const model = extractRequestedModel(args);
@@ -81,15 +86,15 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
 
       try {
         const response = await originalCreate(...callArgs);
-        await options.client.captureEventAndFlush(buildEvent({
+        const event = buildInternalEvent({
           provider: "openai",
           requested_model: model,
-          resolved_model: extractResponseModel(response),
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,
             feature: options.feature,
             token_explosion_tokens: typeof estimatedInputTokens === "number" ? estimatedInputTokens : undefined,
+            input_tokens_estimate: typeof estimatedInputTokens === "number" ? estimatedInputTokens : undefined,
             protect_decision: protectDecision.decision !== "allow" ? protectDecision.decision : undefined,
             protect_reason: protectDecision.decision !== "allow" ? protectDecision.reason : undefined,
           },
@@ -98,18 +103,20 @@ export function instrumentOpenAI<T extends Record<string, any>>(openaiClient: T,
             total_tokens: extractTotalTokens(response),
             http_status: 200,
           },
-        }));
+        });
+        event.resolved_model = extractResponseModel(response);
+        await options.client.captureEventAndFlush(event);
         return response;
       } catch (error) {
-        await options.client.captureEventAndFlush(buildEvent({
+        await options.client.captureEventAndFlush(buildInternalEvent({
           provider: "openai",
           requested_model: model,
-          resolved_model: null,
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,
             feature: options.feature,
             token_explosion_tokens: typeof estimatedInputTokens === "number" ? estimatedInputTokens : undefined,
+            input_tokens_estimate: typeof estimatedInputTokens === "number" ? estimatedInputTokens : undefined,
             protect_decision: protectDecision.decision !== "allow" ? protectDecision.decision : undefined,
             protect_reason: protectDecision.decision !== "allow" ? protectDecision.reason : undefined,
           },

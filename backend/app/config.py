@@ -30,7 +30,6 @@ class AppConfig:
     loop_count: int = 6
     loop_max_gap_seconds: float = 2.0
     loop_concurrency_threshold: int = 30
-    token_explosion_ratio: float = 0.9
     token_explosion_abs: int = 10000
     token_explosion_growth_ratio: float = 1.7
     token_explosion_growth_count: int = 2
@@ -126,7 +125,6 @@ class Settings(BaseSettings):
     loop_count: int = app_config.loop_count
     loop_max_gap_seconds: float = app_config.loop_max_gap_seconds
     loop_concurrency_threshold: int = app_config.loop_concurrency_threshold
-    token_explosion_ratio: float = app_config.token_explosion_ratio
     token_explosion_abs: int = app_config.token_explosion_abs
     token_explosion_growth_ratio: float = app_config.token_explosion_growth_ratio
     token_explosion_growth_count: int = app_config.token_explosion_growth_count

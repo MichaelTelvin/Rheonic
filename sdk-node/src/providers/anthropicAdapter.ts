@@ -1,7 +1,7 @@
-import { buildEvent } from "../eventBuilder.js";
-import { bindTraceContext, generateSpanId, generateTraceId } from "../logger.js";
+import { buildInternalEvent } from "../eventBuilder.js";
+import { bindTraceContext, generateSpanId, generateTraceId, getSpanId, getTraceId } from "../logger.js";
 import { RHEONICBlockedError, type ProtectEvaluation } from "../protectEngine.js";
-import { validateProviderModel } from "../providerModelValidation.js";
+import { RHEONICValidationError, validateProviderModel } from "../providerModelValidation.js";
 import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
 
 import type { Client } from "../client.js";
@@ -27,13 +27,18 @@ export function instrumentAnthropic<T extends Record<string, any>>(
 ): T {
   const targetCreate = anthropicClient?.messages?.create;
   if (typeof targetCreate !== "function") {
-    return anthropicClient;
+    throw new RHEONICValidationError(
+      "RHEONIC: instrumentAnthropic requires a client exposing messages.create.",
+      "anthropic",
+      "",
+      ["anthropic"],
+    );
   }
 
   const originalCreate = targetCreate.bind(anthropicClient.messages);
   anthropicClient.messages.create = async (...args: unknown[]) => {
-    const traceId = generateTraceId();
-    const spanId = generateSpanId();
+    const traceId = getTraceId() || generateTraceId();
+    const spanId = getSpanId() || generateSpanId();
     return bindTraceContext(traceId, spanId, async () => {
       const startedAt = Date.now();
       const requestPayload = extractRequestPayload(args);
@@ -84,10 +89,9 @@ export function instrumentAnthropic<T extends Record<string, any>>(
 
       try {
         const response = await originalCreate(...callArgs);
-        await options.client.captureEventAndFlush(buildEvent({
+        const event = buildInternalEvent({
           provider: "anthropic",
           requested_model: requestedModel,
-          resolved_model: extractResponseModel(response),
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,
@@ -102,13 +106,14 @@ export function instrumentAnthropic<T extends Record<string, any>>(
             total_tokens: extractTotalTokens(response),
             http_status: 200,
           },
-        }));
+        });
+        event.resolved_model = extractResponseModel(response);
+        await options.client.captureEventAndFlush(event);
         return response;
       } catch (error) {
-        await options.client.captureEventAndFlush(buildEvent({
+        await options.client.captureEventAndFlush(buildInternalEvent({
           provider: "anthropic",
           requested_model: requestedModel,
-          resolved_model: null,
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,

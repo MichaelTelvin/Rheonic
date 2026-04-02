@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from time import perf_counter
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.application.provider_scope import scoped_project_provider_id
 from app.application.services.incident_manager import IncidentManager
@@ -33,6 +33,8 @@ router = APIRouter()
 
 class ProtectDecisionIn(BaseModel):
     # Preflight decision request payload.
+    model_config = ConfigDict(extra="forbid")
+
     provider: str
     requested_model: str | None = None
     environment: str | None = None
@@ -71,6 +73,8 @@ class ProtectRuntimeConfigOut(BaseModel):
 
 class ProjectProtectIn(BaseModel):
     # Project protect settings update payload.
+    model_config = ConfigDict(extra="forbid")
+
     protect_enabled: bool
     protect_fail_mode: str = Field(pattern="^(open|closed)$")
     apply_clamp: bool = False
@@ -80,6 +84,8 @@ class ProjectProtectIn(BaseModel):
 
 class DecisionTimeoutIn(BaseModel):
     # Timeout report payload from SDK when decision preflight call times out.
+    model_config = ConfigDict(extra="forbid")
+
     environment: str
     provider: str | None = None
     requested_model: str | None = None
@@ -88,6 +94,8 @@ class DecisionTimeoutIn(BaseModel):
 
 class DecisionUnavailableIn(BaseModel):
     # Failure report payload from SDK when preflight fails without a timeout.
+    model_config = ConfigDict(extra="forbid")
+
     environment: str
     provider: str | None = None
     requested_model: str | None = None

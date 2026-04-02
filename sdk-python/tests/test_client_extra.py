@@ -1,7 +1,9 @@
 from typing import Any
 
+import pytest
 from rheonic import client as client_module
 from rheonic.client import Client, _SimpleResponse, _UrllibTransport, capture_event, create_client, get_default_client
+from rheonic.protect_engine import RHEONICValidationError
 
 
 class FakeResponse:
@@ -163,7 +165,7 @@ def test_capture_event_without_default_client_is_noop() -> None:
     assert get_default_client() is None
 
 
-def test_capture_event_handles_unserializable_mapping_gracefully() -> None:
+def test_capture_event_rejects_invalid_mapping() -> None:
     fake_http = RecordingHttpClient()
     client = Client(
         ingest_key="p1",
@@ -176,9 +178,38 @@ def test_capture_event_handles_unserializable_mapping_gracefully() -> None:
         def keys(self) -> list[str]:
             raise RuntimeError("boom")
 
-    client.capture_event(BadMapping())  # type: ignore[arg-type]
+    with pytest.raises(RHEONICValidationError):
+        client.capture_event(BadMapping())  # type: ignore[arg-type]
     assert client.stats()["queued"] == 0
     client.close()
+
+
+def test_capture_event_rejects_unknown_public_event_property() -> None:
+    fake_http = RecordingHttpClient()
+    client = Client(
+        ingest_key="p1",
+        base_url="http://localhost:8000",
+        flush_interval_s=30.0,
+        http_client=fake_http,  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(RHEONICValidationError):
+        client.capture_event({"provider": "openai", "environment": "dev", "request": {}, "response": {}, "extra": 1})
+    assert client.stats()["queued"] == 0
+    client.close()
+
+
+def test_create_client_rejects_invalid_config() -> None:
+    with pytest.raises(RHEONICValidationError):
+        create_client(ingest_key="")
+
+    with pytest.raises(RHEONICValidationError):
+        Client(
+            ingest_key="p1",
+            base_url="http://localhost:8000",
+            flush_interval_s=30.0,
+            overflow_policy="wrong",  # type: ignore[arg-type]
+        )
 
 
 def test_flush_deadline_can_short_circuit_before_send() -> None:

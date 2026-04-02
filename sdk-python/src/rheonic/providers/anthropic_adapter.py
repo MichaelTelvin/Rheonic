@@ -4,9 +4,17 @@ from time import perf_counter
 from typing import Any
 
 from rheonic.client import Client, get_default_client
-from rheonic.event_builder import build_event
-from rheonic.logger import bind_trace_context, generate_span_id, generate_trace_id, get_logger, reset_trace_context
-from rheonic.protect_engine import RHEONICBlockedError
+from rheonic.event_builder import build_internal_event
+from rheonic.logger import (
+    bind_trace_context,
+    generate_span_id,
+    generate_trace_id,
+    get_logger,
+    get_span_id,
+    get_trace_id,
+    reset_trace_context,
+)
+from rheonic.protect_engine import RHEONICBlockedError, RHEONICValidationError
 from rheonic.provider_model_validation import validate_provider_model
 from rheonic.token_estimator import estimate_input_tokens
 
@@ -36,13 +44,16 @@ def instrument_anthropic(
     messages = getattr(anthropic_client, "messages", None)
     original_create = getattr(messages, "create", None)
     if messages is None or not callable(original_create):
-        return anthropic_client
+        raise RHEONICValidationError("RHEONIC: instrument_anthropic requires a client exposing messages.create.")
 
     if inspect.iscoroutinefunction(original_create):
 
         async def wrapped_create_async(*args: Any, **kwargs: Any) -> Any:
             try:
-                context_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+                context_tokens = bind_trace_context(
+                    trace_id=get_trace_id() or generate_trace_id(),
+                    span_id=get_span_id() or generate_span_id(),
+                )
                 try:
                     started_at = perf_counter()
                     request_payload = _extract_request_payload(args, kwargs)
@@ -106,7 +117,10 @@ def instrument_anthropic(
         return anthropic_client
 
     def wrapped_create(*args: Any, **kwargs: Any) -> Any:
-        context_tokens = bind_trace_context(trace_id=generate_trace_id(), span_id=generate_span_id())
+        context_tokens = bind_trace_context(
+            trace_id=get_trace_id() or generate_trace_id(),
+            span_id=get_span_id() or generate_span_id(),
+        )
         try:
             started_at = perf_counter()
             request_payload = _extract_request_payload(args, kwargs)
@@ -227,7 +241,7 @@ def _capture_success(
             if isinstance(input_tokens, int) and isinstance(output_tokens, int):
                 total_tokens = input_tokens + output_tokens
         sdk_client.capture_event_and_flush(
-            build_event(
+            build_internal_event(
                 provider="anthropic",
                 requested_model=requested_model,
                 resolved_model=response_model if isinstance(response_model, str) else None,
@@ -271,10 +285,9 @@ def _capture_failure(
 ) -> None:
     try:
         sdk_client.capture_event_and_flush(
-            build_event(
+            build_internal_event(
                 provider="anthropic",
                 requested_model=requested_model,
-                resolved_model=None,
                 environment=environment or sdk_client.environment,
                 request={
                     "endpoint": endpoint,

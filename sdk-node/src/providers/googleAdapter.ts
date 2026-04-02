@@ -1,7 +1,7 @@
-import { buildEvent } from "../eventBuilder.js";
-import { bindTraceContext, generateSpanId, generateTraceId } from "../logger.js";
+import { buildInternalEvent } from "../eventBuilder.js";
+import { bindTraceContext, generateSpanId, generateTraceId, getSpanId, getTraceId } from "../logger.js";
 import { RHEONICBlockedError, type ProtectEvaluation } from "../protectEngine.js";
-import { validateProviderModel } from "../providerModelValidation.js";
+import { RHEONICValidationError, validateProviderModel } from "../providerModelValidation.js";
 import { estimateInputTokensFromRequest } from "../tokenEstimator.js";
 
 import type { Client } from "../client.js";
@@ -24,15 +24,20 @@ export function __setInputTokenEstimatorForTests(
 export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, options: GoogleInstrumentationOptions): T {
   const targetGenerate = resolveGenerateTarget(googleModel);
   if (!targetGenerate) {
-    return googleModel;
+    throw new RHEONICValidationError(
+      "RHEONIC: instrumentGoogle requires a client exposing generateContent or models.generateContent.",
+      "google",
+      "",
+      ["google"],
+    );
   }
 
   const originalGenerate = targetGenerate.fn.bind(targetGenerate.owner);
   targetGenerate.owner[targetGenerate.key] = async (
     ...args: unknown[]
   ) => {
-    const traceId = generateTraceId();
-    const spanId = generateSpanId();
+    const traceId = getTraceId() || generateTraceId();
+    const spanId = getSpanId() || generateSpanId();
     return bindTraceContext(traceId, spanId, async () => {
       const startedAt = Date.now();
       const requestedModel = extractRequestedModel(googleModel, args);
@@ -83,10 +88,9 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
 
       try {
         const response = await originalGenerate(...callArgs);
-        await options.client.captureEventAndFlush(buildEvent({
+        const event = buildInternalEvent({
           provider: "google",
           requested_model: requestedModel,
-          resolved_model: extractResponseModel(response),
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,
@@ -101,13 +105,14 @@ export function instrumentGoogle<T extends Record<string, any>>(googleModel: T, 
             total_tokens: extractTotalTokens(response),
             http_status: 200,
           },
-        }));
+        });
+        event.resolved_model = extractResponseModel(response);
+        await options.client.captureEventAndFlush(event);
         return response;
       } catch (error) {
-        await options.client.captureEventAndFlush(buildEvent({
+        await options.client.captureEventAndFlush(buildInternalEvent({
           provider: "google",
           requested_model: requestedModel,
-          resolved_model: null,
           environment: options.environment ?? options.client.environment,
           request: {
             endpoint: options.endpoint,

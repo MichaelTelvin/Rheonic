@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 from rheonic.client import Client
-from rheonic.protect_engine import RHEONICBlockedError
+from rheonic.protect_engine import RHEONICBlockedError, RHEONICValidationError
 from rheonic.providers.anthropic_adapter import instrument_anthropic
 from rheonic.providers.google_adapter import instrument_google
 from rheonic.providers.openai_adapter import instrument_openai
@@ -57,11 +57,19 @@ def test_openai_clamp_applies_recommended_max_tokens_and_marks_applied() -> None
             return type("Response", (), {"model": "gpt-4o-mini", "usage": usage})()
 
     openai = type("OpenAI", (), {"chat": type("Chat", (), {"completions": _Completions()})()})()
+    import rheonic.providers.openai_adapter as openai_adapter
+
+    openai_adapter._set_token_estimator_for_tests(lambda _payload: 91)
     instrument_openai(openai, client=client)
 
     openai.chat.completions.create(model="gpt-4o-mini", max_tokens=128)
 
     assert calls[0]["max_tokens"] == 32
+    client.flush(timeout_s=0.5)
+    fake_http = client._http_client
+    assert fake_http.posts[-1]["json"]["request"]["token_explosion_tokens"] == 91
+    assert fake_http.posts[-1]["json"]["request"]["input_tokens_estimate"] == 91
+    openai_adapter._set_token_estimator_for_tests(None)
     client.close()
 
 
@@ -140,6 +148,14 @@ def test_openai_async_wrapper_captures_failure() -> None:
     client.close()
 
 
+def test_openai_instrumentation_rejects_invalid_client_shape() -> None:
+    client = _client_with_decision({"decision": "allow", "reason": "ok"})
+
+    with pytest.raises(RHEONICValidationError):
+        instrument_openai(object(), client=client)
+    client.close()
+
+
 def test_anthropic_async_wrapper_blocks_and_supports_clamp() -> None:
     client = _client_with_decision(
         {
@@ -190,6 +206,14 @@ def test_anthropic_block_raises_blocked_error() -> None:
     assert exc_info.value.trace_id == "trace-test"
     assert exc_info.value.request_id == "request-test"
     assert exc_info.value.retry_after_seconds == 60
+    client.close()
+
+
+def test_anthropic_instrumentation_rejects_invalid_client_shape() -> None:
+    client = _client_with_decision({"decision": "allow", "reason": "ok"})
+
+    with pytest.raises(RHEONICValidationError):
+        instrument_anthropic(object(), client=client)
     client.close()
 
 
@@ -312,6 +336,14 @@ def test_google_async_wrapper_captures_failure() -> None:
 
     client.flush(timeout_s=0.5)
     assert client.stats()["sent"] == 1
+    client.close()
+
+
+def test_google_instrumentation_rejects_invalid_client_shape() -> None:
+    client = _client_with_decision({"decision": "allow", "reason": "ok"})
+
+    with pytest.raises(RHEONICValidationError):
+        instrument_google(object(), client=client)
     client.close()
 
 

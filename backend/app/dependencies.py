@@ -125,7 +125,6 @@ def get_ingest_event_service() -> IngestEventService:
             loop_count=get_settings().loop_count,
             loop_max_gap_seconds=get_settings().loop_max_gap_seconds,
             loop_concurrency_threshold=get_settings().loop_concurrency_threshold,
-            token_explosion_ratio=get_settings().token_explosion_ratio,
             token_explosion_abs=get_settings().token_explosion_abs,
             token_explosion_growth_ratio=get_settings().token_explosion_growth_ratio,
             token_explosion_growth_count=get_settings().token_explosion_growth_count,

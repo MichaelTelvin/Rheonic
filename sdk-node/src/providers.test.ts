@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { RHEONICValidationError } from "./providerModelValidation.js";
 import { __setInputTokenEstimatorForTests as setAnthropicEstimatorForTests, instrumentAnthropic } from "./providers/anthropicAdapter.js";
 import { __setInputTokenEstimatorForTests as setGoogleEstimatorForTests, instrumentGoogle } from "./providers/googleAdapter.js";
 import { __setInputTokenEstimatorForTests as setOpenAIEstimatorForTests, instrumentOpenAI } from "./providers/openaiAdapter.js";
@@ -26,6 +27,7 @@ function makeClient(decision: Record<string, unknown>) {
 }
 
 test("openai adapter clamps max_tokens and captures provider failures", async () => {
+  setOpenAIEstimatorForTests(() => 91);
   const client = makeClient({
     decision: "clamp",
     reason: "token_clamp",
@@ -49,11 +51,17 @@ test("openai adapter clamps max_tokens and captures provider failures", async ()
   await assert.rejects(async () => await openai.chat.completions.create({ model: "gpt-4o-mini", max_tokens: 128 }));
   assert.equal(client.captured.length, 1);
   assert.equal((client.captured[0] as any).response.http_status, 429);
+  assert.equal((client.captured[0] as any).request.token_explosion_tokens, 91);
+  assert.equal((client.captured[0] as any).request.input_tokens_estimate, 91);
+  setOpenAIEstimatorForTests(null);
 });
 
-test("anthropic adapter returns original client when messages.create is missing", () => {
+test("anthropic adapter rejects invalid clients when messages.create is missing", () => {
   const anthropic = {};
-  assert.equal(instrumentAnthropic(anthropic, { client: makeClient({ decision: "allow", reason: "ok" }) as any }), anthropic);
+  assert.throws(
+    () => instrumentAnthropic(anthropic, { client: makeClient({ decision: "allow", reason: "ok" }) as any }),
+    (error: unknown) => error instanceof RHEONICValidationError,
+  );
 });
 
 test("google adapter injects generation_config clamp into dict payloads", async () => {
@@ -248,14 +256,20 @@ test("anthropic adapter applies clamp when max_tokens is missing and sums token 
   setAnthropicEstimatorForTests(null);
 });
 
-test("google adapter returns original object when generateContent is missing", () => {
+test("google adapter rejects invalid objects when generateContent is missing", () => {
   const google = { modelName: "gemini-1.5-pro" };
-  assert.equal(instrumentGoogle(google, { client: makeClient({ decision: "allow", reason: "ok" }) as any }), google);
+  assert.throws(
+    () => instrumentGoogle(google, { client: makeClient({ decision: "allow", reason: "ok" }) as any }),
+    (error: unknown) => error instanceof RHEONICValidationError,
+  );
 });
 
-test("openai adapter returns original object when completions.create is missing", () => {
+test("openai adapter rejects invalid objects when completions.create is missing", () => {
   const openai = { chat: { completions: {} } };
-  assert.equal(instrumentOpenAI(openai, { client: makeClient({ decision: "allow", reason: "ok" }) as any }), openai);
+  assert.throws(
+    () => instrumentOpenAI(openai, { client: makeClient({ decision: "allow", reason: "ok" }) as any }),
+    (error: unknown) => error instanceof RHEONICValidationError,
+  );
 });
 
 test("openai adapter injects recommended max_tokens when no output limit exists", async () => {

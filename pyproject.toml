@@ -32,14 +32,11 @@ mypy_path = ["backend", "sdk-python/src"]
 [[tool.mypy.overrides]]
 module = [
   "jose",
-  "jose.*",
   "rq",
   "rq.*",
   "rq_scheduler",
-  "rq_scheduler.*",
   "redis",
   "redis.*",
   "tiktoken",
-  "google.generativeai",
 ]
 ignore_missing_imports = true

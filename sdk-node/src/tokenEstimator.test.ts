@@ -23,3 +23,13 @@ test("estimateInputTokensFromRequest counts full tool message payload", () => {
   assert.equal(typeof textOnlyEstimate, "number");
   assert.ok((toolEstimate ?? 0) > (textOnlyEstimate ?? 0));
 });
+
+test("estimateInputTokensFromRequest supports google contents payloads", () => {
+  const contentsEstimate = estimateInputTokensFromRequest({
+    model: "gemini-1.5-pro",
+    contents: "hello from google",
+  });
+
+  assert.equal(typeof contentsEstimate, "number");
+  assert.ok((contentsEstimate ?? 0) > 0);
+});

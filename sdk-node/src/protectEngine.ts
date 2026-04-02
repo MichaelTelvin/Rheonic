@@ -135,6 +135,7 @@ export class ProtectEngine {
       const startedAt = Date.now();
 
       try {
+        const requestBody = sanitizeProtectContext(context);
         const response = await requestJson(`${this.baseUrl}/api/v1/protect/decision`, {
           method: "POST",
           headers: {
@@ -144,7 +145,7 @@ export class ProtectEngine {
             "X-Span-ID": getSpanId(),
             "X-Rheonic-Protect-Request-Id": requestId,
           },
-          body: JSON.stringify(context),
+          body: JSON.stringify(requestBody),
           signal: controller.signal,
         });
 
@@ -327,6 +328,23 @@ export class ProtectEngine {
       // Swallow unavailable reporting errors; protect evaluation must never throw here.
     }
   }
+}
+
+function sanitizeProtectContext(context: ProtectContext): Record<string, unknown> {
+  const payload: Record<string, unknown> = { provider: context.provider };
+  if (context.requested_model != null) {
+    payload.requested_model = context.requested_model;
+  }
+  if (context.feature != null) {
+    payload.feature = context.feature;
+  }
+  if (context.max_output_tokens != null) {
+    payload.max_output_tokens = context.max_output_tokens;
+  }
+  if (context.input_tokens_estimate != null) {
+    payload.input_tokens_estimate = context.input_tokens_estimate;
+  }
+  return payload;
 }
 
 function parseClamp(value: unknown): { recommended_max_output_tokens: number; applied: boolean } | undefined {

@@ -203,6 +203,58 @@ def test_ingest_event_maps_nested_response_failure_fields_to_domain_event() -> N
     app.dependency_overrides.clear()
 
 
+def test_ingest_event_accepts_internal_request_metadata_fields() -> None:
+    ingest_service = FakeIngestService()
+    key_service = FakeIngestKeyService()
+    app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
+    app.dependency_overrides[get_ingest_key_service] = lambda: key_service
+    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev")
+    client = TestClient(app)
+
+    payload = _payload()
+    payload["request"] = {
+        "endpoint": "/chat/completions",
+        "feature": "agent_test",
+        "input_tokens": 12,
+        "input_tokens_estimate": 14,
+        "max_output_tokens": 64,
+        "protect_decision": "clamp",
+        "protect_reason": "tok_cap_near",
+    }
+    payload["response"] = {"output_tokens": 2, "total_tokens": 14, "latency_ms": 120, "http_status": 200}
+
+    response = client.post(
+        "/api/v1/events",
+        json=payload,
+        headers={"X-Project-Ingest-Key": "active-test-key"},
+    )
+
+    assert response.status_code == 202
+    assert len(ingest_service.ingested) == 1
+    app.dependency_overrides.clear()
+
+
+def test_ingest_event_rejects_stale_top_level_http_status_alias() -> None:
+    ingest_service = FakeIngestService()
+    key_service = FakeIngestKeyService()
+    app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
+    app.dependency_overrides[get_ingest_key_service] = lambda: key_service
+    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev")
+    client = TestClient(app)
+
+    payload = _payload()
+    payload["http_status"] = 503
+
+    response = client.post(
+        "/api/v1/events",
+        json=payload,
+        headers={"X-Project-Ingest-Key": "active-test-key"},
+    )
+
+    assert response.status_code == 400
+    app.dependency_overrides.clear()
+
+
 def test_ingest_event_maps_token_explosion_tokens_to_domain_event() -> None:
     ingest_service = FakeIngestService()
     key_service = FakeIngestKeyService()
@@ -230,4 +282,46 @@ def test_ingest_event_maps_token_explosion_tokens_to_domain_event() -> None:
     event = ingest_service.ingested[0]
     assert getattr(event, "token_explosion_tokens") == 222
     assert getattr(event, "request_fingerprint") == "hash:loop-123"
+    app.dependency_overrides.clear()
+
+
+def test_ingest_event_rejects_unknown_top_level_field_with_bad_request() -> None:
+    ingest_service = FakeIngestService()
+    key_service = FakeIngestKeyService()
+    app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
+    app.dependency_overrides[get_ingest_key_service] = lambda: key_service
+    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev")
+    client = TestClient(app)
+
+    payload = _payload()
+    payload["unexpected"] = "boom"
+    response = client.post(
+        "/api/v1/events",
+        json=payload,
+        headers={"X-Project-Ingest-Key": "active-test-key"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "bad_request"
+    app.dependency_overrides.clear()
+
+
+def test_ingest_event_rejects_missing_required_field_with_bad_request() -> None:
+    ingest_service = FakeIngestService()
+    key_service = FakeIngestKeyService()
+    app.dependency_overrides[get_ingest_event_service] = lambda: ingest_service
+    app.dependency_overrides[get_ingest_key_service] = lambda: key_service
+    app.dependency_overrides[get_settings] = lambda: Settings(app_env="dev")
+    client = TestClient(app)
+
+    payload = _payload()
+    del payload["provider"]
+    response = client.post(
+        "/api/v1/events",
+        json=payload,
+        headers={"X-Project-Ingest-Key": "active-test-key"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "bad_request"
     app.dependency_overrides.clear()

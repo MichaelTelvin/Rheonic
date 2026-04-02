@@ -41,7 +41,6 @@ class IngestEventService:
         loop_count: int = app_config.loop_count,
         loop_max_gap_seconds: float = app_config.loop_max_gap_seconds,
         loop_concurrency_threshold: int = app_config.loop_concurrency_threshold,
-        token_explosion_ratio: float = app_config.token_explosion_ratio,
         token_explosion_abs: int = app_config.token_explosion_abs,
         token_explosion_growth_ratio: float = app_config.token_explosion_growth_ratio,
         token_explosion_growth_count: int = app_config.token_explosion_growth_count,
@@ -58,7 +57,6 @@ class IngestEventService:
         self._loop_count = loop_count
         self._loop_max_gap_seconds = loop_max_gap_seconds
         self._loop_concurrency_threshold = loop_concurrency_threshold
-        self._token_explosion_ratio = token_explosion_ratio
         self._token_explosion_abs = token_explosion_abs
         self._token_explosion_growth_ratio = token_explosion_growth_ratio
         self._token_explosion_growth_count = token_explosion_growth_count
@@ -140,7 +138,6 @@ class IngestEventService:
                 loop_count=self._loop_count,
                 loop_max_gap_seconds=self._loop_max_gap_seconds,
                 loop_concurrency_threshold=self._loop_concurrency_threshold,
-                token_explosion_ratio=self._token_explosion_ratio,
                 token_explosion_abs=self._token_explosion_abs,
                 token_explosion_growth_ratio=self._token_explosion_growth_ratio,
                 token_explosion_growth_count=self._token_explosion_growth_count,

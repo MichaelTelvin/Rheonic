@@ -31,7 +31,7 @@ export function estimateInputTokensFromRequest(payload: unknown): number | null 
   }
 }
 
-function extractTextForEstimation(request: { messages?: unknown; prompt?: unknown }): string | null {
+function extractTextForEstimation(request: { messages?: unknown; prompt?: unknown; contents?: unknown }): string | null {
   if (Array.isArray(request.messages)) {
     try {
       return JSON.stringify(request.messages);
@@ -42,6 +42,18 @@ function extractTextForEstimation(request: { messages?: unknown; prompt?: unknow
 
   if (typeof request.prompt === "string") {
     return request.prompt;
+  }
+
+  if (typeof request.contents === "string") {
+    return request.contents;
+  }
+
+  if (Array.isArray(request.contents)) {
+    try {
+      return JSON.stringify(request.contents);
+    } catch {
+      return null;
+    }
   }
 
   return null;

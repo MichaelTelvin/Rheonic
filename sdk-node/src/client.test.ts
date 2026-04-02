@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { Client, captureEvent, createClient, instrumentOpenAI } from "./index.js";
+import { Client, captureEvent, createClient, instrumentOpenAI, RHEONICValidationError } from "./index.js";
 
 function makeFetchStub() {
   const calls: Array<{ url: string; body?: string }> = [];
@@ -70,7 +70,7 @@ test("Client drops oldest events when the queue overflows", async () => {
 });
 
 test("captureEvent helper is a no-op without a default client and instrumentOpenAI returns original client", async () => {
-  await captureEvent({ provider: "openai", requested_model: null, resolved_model: null, environment: "dev" });
+  await captureEvent({ provider: "openai", model: null, environment: "dev" });
   const openai = { chat: { completions: { create: async () => ({}) } } };
   assert.equal(instrumentOpenAI(openai), openai);
 });
@@ -83,7 +83,7 @@ test("createClient replaces the default client and captureEvent sends built payl
     const first = createClient({ ingestKey: "k1", flushIntervalMs: 30_000 });
     const second = createClient({ ingestKey: "k2", flushIntervalMs: 30_000 });
     assert.notEqual(first, second);
-    await captureEvent({ provider: "openai", requested_model: "gpt-4o-mini", resolved_model: null, environment: "dev" });
+    await captureEvent({ provider: "openai", model: "gpt-4o-mini", environment: "dev" });
     await second.flush();
     second.close();
     assert.ok(calls.some((call) => call.url.endsWith("/api/v1/events")));
@@ -122,6 +122,30 @@ test("Client does not queue events after close", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("captureEvent rejects unexpected public event properties", async () => {
+  const client = new Client({ ingestKey: "k1", flushIntervalMs: 30_000 });
+  await assert.rejects(
+    async () => await client.captureEvent({ provider: "openai", environment: "dev", unexpected: true } as any),
+    (error: unknown) => error instanceof RHEONICValidationError,
+  );
+  client.close();
+});
+
+test("createClient rejects invalid config", async () => {
+  await assert.rejects(
+    async () => new Client({ ingestKey: "", flushIntervalMs: 30_000 }),
+    (error: unknown) => error instanceof RHEONICValidationError,
+  );
+  await assert.rejects(
+    async () => new Client({ ingestKey: "k1", overflowPolicy: "wrong" as any }),
+    (error: unknown) => error instanceof RHEONICValidationError,
+  );
+  await assert.rejects(
+    async () => new Client({ ingestKey: "k1", extra: true } as any),
+    (error: unknown) => error instanceof RHEONICValidationError,
+  );
 });
 
 test("Client counts non-retryable event delivery failures once", async () => {
