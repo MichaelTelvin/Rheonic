@@ -55,6 +55,8 @@ Behavioral anomaly incidents such as `retry_storm`, `loop_suspect`, and `token_e
 ## Auto Token Clamp
 When `Auto token clamp` is enabled, Rheonic can return a recommended lower output token limit in the decision payload. SDKs can apply that value before the provider request is sent.
 
+Clamp starts before the hard token cap is reached. Rheonic uses staged projected-token pressure bands that begin around `70%` of the configured token cap and tighten every `5%` band until `95%`. Near the cap, the recommended output-token limit becomes progressively smaller.
+
 ## Fail Modes
 - `open`: if the protect decision is unavailable, allow the request.
 - `closed`: if the protect decision is unavailable, block the request.

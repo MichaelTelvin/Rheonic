@@ -58,7 +58,8 @@ class ProtectService:
         transport_service: TransportService | None = None,
         now_provider: Callable[[], datetime] | None = None,
         protect_decision_timeout_ms: int | None = None,
-        protect_clamp_factor: float = app_config.protect_clamp_factor,
+        protect_clamp_pressure_thresholds: tuple[float, ...] = app_config.protect_clamp_pressure_thresholds,
+        protect_clamp_output_ratios: tuple[float, ...] = app_config.protect_clamp_output_ratios,
     ) -> None:
         self._ingest_key_service = ingest_key_service
         self._realtime_counters = realtime_counters
@@ -78,7 +79,10 @@ class ProtectService:
             if protect_decision_timeout_ms is not None
             else Settings().protect_decision_timeout_ms
         )
-        self._protect_clamp_factor = protect_clamp_factor
+        self._protect_clamp_pressure_thresholds = tuple(float(value) for value in protect_clamp_pressure_thresholds)
+        self._protect_clamp_output_ratios = tuple(float(value) for value in protect_clamp_output_ratios)
+        if len(self._protect_clamp_pressure_thresholds) != len(self._protect_clamp_output_ratios):
+            raise ValueError("protect clamp stage thresholds and output ratios must have the same length")
 
     def evaluate_decision(
         self,
@@ -237,7 +241,6 @@ class ProtectService:
             output_estimate = max(ctx.max_output_tokens, 0) if isinstance(ctx.max_output_tokens, int) else 0
             estimated_next_tokens = input_estimate + output_estimate
         clamp = self._build_clamp(
-            clamp_factor=self._protect_clamp_factor,
             max_tok=max_tok,
             current_tokens_60s=tokens_60s,
             max_output_tokens=ctx.max_output_tokens,
@@ -779,7 +782,6 @@ class ProtectService:
     def _build_clamp(
         self,
         *,
-        clamp_factor: float,
         max_tok: int | None,
         current_tokens_60s: int,
         max_output_tokens: int | None,
@@ -792,17 +794,27 @@ class ProtectService:
         if not isinstance(estimated_next_tokens, int):
             return None
         projected_tokens = current_tokens_60s + estimated_next_tokens
-        if projected_tokens < int(max_tok * clamp_factor):
+        clamp_ratio = self._resolve_clamp_output_ratio(projected_tokens=projected_tokens, max_tok=max_tok)
+        if clamp_ratio is None:
             return None
         input_estimate = estimated_next_tokens - max_output_tokens
         if input_estimate < 0:
             input_estimate = 0
         available_for_output = max_tok - current_tokens_60s - input_estimate
-        if available_for_output < 1:
-            recommended = 1
-        else:
-            recommended = min(max_output_tokens, available_for_output)
+        stage_output_limit = max(1, int(max_output_tokens * clamp_ratio))
+        recommended = max(1, min(max_output_tokens, stage_output_limit, available_for_output))
         return {
             "recommended_max_output_tokens": int(recommended),
             "applied": False,
         }
+
+    def _resolve_clamp_output_ratio(self, *, projected_tokens: int, max_tok: int) -> float | None:
+        selected_ratio: float | None = None
+        for pressure_threshold, output_ratio in zip(
+            self._protect_clamp_pressure_thresholds,
+            self._protect_clamp_output_ratios,
+            strict=False,
+        ):
+            if projected_tokens >= int(max_tok * pressure_threshold):
+                selected_ratio = output_ratio
+        return selected_ratio

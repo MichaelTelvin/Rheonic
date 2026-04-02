@@ -521,6 +521,40 @@ def test_clamp_decision_includes_apply_clamp_flag_when_enabled(tmp_path) -> None
     _cleanup_overrides()
 
 
+def test_clamp_decision_uses_staged_output_ladder_every_five_percent(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    stage_expectations = [
+        (30, 90),
+        (40, 80),
+        (50, 70),
+        (60, 55),
+        (70, 40),
+        (80, 25),
+    ]
+
+    for offset, (rolling_tokens, expected_output_tokens) in enumerate(stage_expectations, start=1):
+        project_id, ingest_key = _create_project_and_key(client, f"Protect Clamp Stage {offset}")
+        _set_protect(client, project_id, protect_enabled=True, apply_clamp=True, protect_max_tok_per_min=200)
+        rolling_window.increment_project_60s(
+            project_id=scoped_project_provider_id(project_id, "openai"),
+            total_tokens=rolling_tokens,
+        )
+
+        decision = _decision(
+            client,
+            ingest_key,
+            body={
+                "provider": "openai",
+                "requested_model": "gpt-4o-mini",
+                "input_tokens_estimate": 10,
+                "max_output_tokens": 100,
+            },
+        )
+        assert decision["decision"] == "clamp"
+        assert int(decision["clamp"]["recommended_max_output_tokens"]) == expected_output_tokens
+    _cleanup_overrides()
+
+
 def test_clamp_decision_dispatches_clamp_started_webhook_when_enabled(tmp_path) -> None:
     dispatcher = FakeWebhookDispatcher()
     client, rolling_window, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher)
@@ -572,13 +606,13 @@ def test_clamp_decision_dispatches_clamp_started_email(tmp_path) -> None:
     _cleanup_overrides()
 
 
-def test_clamp_decision_allows_when_no_reduction_is_needed(tmp_path) -> None:
+def test_clamp_decision_allows_below_first_stage_threshold(tmp_path) -> None:
     dispatcher = FakeWebhookDispatcher()
     transport = FakeTransportService()
     client, rolling_window, _ = _make_client(tmp_path, webhook_dispatcher=dispatcher, transport_service=transport)
-    project_id, ingest_key = _create_project_and_key(client, "Protect Near Cap Clamp No Reduction")
-    _set_protect(client, project_id, protect_enabled=True, apply_clamp=True, protect_max_tok_per_min=300)
-    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=230)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Clamp Below First Stage")
+    _set_protect(client, project_id, protect_enabled=True, apply_clamp=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=29)
 
     decision = _decision(
         client,
@@ -588,7 +622,7 @@ def test_clamp_decision_allows_when_no_reduction_is_needed(tmp_path) -> None:
             "requested_model": "gpt-4o-mini",
             "environment": "dev",
             "input_tokens_estimate": 10,
-            "max_output_tokens": 32,
+            "max_output_tokens": 100,
         },
     )
     assert decision["decision"] == "allow"
@@ -597,6 +631,28 @@ def test_clamp_decision_allows_when_no_reduction_is_needed(tmp_path) -> None:
     event_types = [event_type for _, event_type, _ in dispatcher.calls]
     assert "protection.clamp_started" not in event_types
     assert transport.calls == []
+    _cleanup_overrides()
+
+
+def test_clamp_decision_still_respects_remaining_output_budget(tmp_path) -> None:
+    client, rolling_window, _ = _make_client(tmp_path)
+    project_id, ingest_key = _create_project_and_key(client, "Protect Clamp Remaining Budget")
+    _set_protect(client, project_id, protect_enabled=True, apply_clamp=True, protect_max_tok_per_min=200)
+    rolling_window.increment_project_60s(project_id=scoped_project_provider_id(project_id, "openai"), total_tokens=160)
+
+    decision = _decision(
+        client,
+        ingest_key,
+        body={
+            "provider": "openai",
+            "requested_model": "gpt-4o-mini",
+            "input_tokens_estimate": 30,
+            "max_output_tokens": 100,
+        },
+    )
+
+    assert decision["decision"] == "clamp"
+    assert int(decision["clamp"]["recommended_max_output_tokens"]) == 10
     _cleanup_overrides()
 
 

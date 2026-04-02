@@ -35,7 +35,8 @@ class AppConfig:
     token_explosion_growth_count: int = 2
     token_explosion_growth_min_tokens: int = 1800
     token_explosion_concurrency_threshold: int = 8
-    protect_clamp_factor: float = 0.85
+    protect_clamp_pressure_thresholds: tuple[float, ...] = (0.70, 0.75, 0.80, 0.85, 0.90, 0.95)
+    protect_clamp_output_ratios: tuple[float, ...] = (0.90, 0.80, 0.70, 0.55, 0.40, 0.25)
     protect_action_counter_ttl_seconds: int = 3600
     webhook_retry_max_attempts: int = 3
     webhook_retry_intervals_seconds: tuple[int, int, int] = (5, 20, 60)
@@ -130,7 +131,8 @@ class Settings(BaseSettings):
     token_explosion_growth_count: int = app_config.token_explosion_growth_count
     token_explosion_growth_min_tokens: int = app_config.token_explosion_growth_min_tokens
     token_explosion_concurrency_threshold: int = app_config.token_explosion_concurrency_threshold
-    protect_clamp_factor: float = app_config.protect_clamp_factor
+    protect_clamp_pressure_thresholds: tuple[float, ...] = app_config.protect_clamp_pressure_thresholds
+    protect_clamp_output_ratios: tuple[float, ...] = app_config.protect_clamp_output_ratios
     incident_auto_close_seconds: int = 3600
     auto_close_run_interval_seconds: int = 60
     event_retention_days: int = 30

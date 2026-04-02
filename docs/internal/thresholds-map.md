@@ -36,9 +36,18 @@ This file documents the current behavior after the protect/observe separation re
 - Protect does not evaluate behavioral anomaly detectors anymore.
 
 ### Clamp
-- internal calculation input still uses the projected-budget clamp factor
-- runtime setting:
-  - `protect_clamp_factor`
+- internal calculation uses a staged projected-pressure ladder
+- runtime settings:
+  - `protect_clamp_pressure_thresholds`
+  - `protect_clamp_output_ratios`
+- default stages:
+  - `70%` -> allow up to `90%` of requested output
+  - `75%` -> allow up to `80%` of requested output
+  - `80%` -> allow up to `70%` of requested output
+  - `85%` -> allow up to `55%` of requested output
+  - `90%` -> allow up to `40%` of requested output
+  - `95%` -> allow up to `25%` of requested output
+- final recommendation is still bounded by the real remaining token budget for the request
 - clamp decision reason:
   - `token_clamp`
 

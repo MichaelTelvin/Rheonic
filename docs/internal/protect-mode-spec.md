@@ -12,8 +12,14 @@ Protect preflight returns one of:
 1. If cooldown is active, return `block(reason="cooldown_active")`.
 2. If request cap is already breached, return `block(reason="req_cap_breach")`.
 3. If token cap is already breached, return `block(reason="tok_cap_breach")`.
-4. If clamp is enabled and the projected output budget requires reduction, return `clamp(reason="token_clamp")`.
+4. If clamp is enabled and projected token pressure reaches the staged clamp ladder, return `clamp(reason="token_clamp")` with a reduced output-token recommendation.
 5. Otherwise return `allow(reason="ok")`.
+
+## Clamp Ladder
+- clamp starts at roughly `70%` projected token pressure
+- clamp strength increases every `5%` band until `95%`
+- each stage reduces the allowed output-token share more aggressively
+- the final recommendation is capped both by the active stage and by the actual remaining token budget
 
 ## Protect Scope
 - no behavioral anomaly detection in preflight

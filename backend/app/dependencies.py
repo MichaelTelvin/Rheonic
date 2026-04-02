@@ -216,7 +216,8 @@ def get_protect_service() -> ProtectService:
             project_repository=ProjectRepositoryImpl(session_factory=get_db_session_factory()),
             incident_dedup_window_seconds=get_settings().incident_dedup_window_seconds,
             protect_decision_timeout_ms=get_settings().protect_decision_timeout_ms,
-            protect_clamp_factor=get_settings().protect_clamp_factor,
+            protect_clamp_pressure_thresholds=get_settings().protect_clamp_pressure_thresholds,
+            protect_clamp_output_ratios=get_settings().protect_clamp_output_ratios,
             webhook_dispatcher=get_webhook_dispatcher(),
             transport_service=get_transport_service(),
         )
