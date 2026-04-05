@@ -127,6 +127,8 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
     };
   }, []);
 
+  const isDashboardHome = location.pathname === "/app" || location.pathname === "/app/";
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -170,7 +172,7 @@ function AuthenticatedAppLayout({ userEmail, onSignOut }: AuthenticatedAppLayout
           </Routes>
         </div>
       </div>
-      {appVersion ? <div className="app-version-badge">v{appVersion}</div> : null}
+      {appVersion && isDashboardHome ? <div className="app-version-badge">v{appVersion}</div> : null}
       <AppToastHost />
       <FeedbackModal open={feedbackModalOpen} onClose={() => setFeedbackModalOpen(false)} />
     </div>

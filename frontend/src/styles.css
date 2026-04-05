@@ -4225,7 +4225,7 @@ pre {
 .unsaved-changes-toast {
   position: fixed;
   right: max(56px, calc(var(--app-shell-gutter) + 44px));
-  top: 116px;
+  top: 100px;
   z-index: 70;
   display: flex;
   align-items: center;
@@ -4322,7 +4322,7 @@ pre {
   .unsaved-changes-toast {
     left: 50%;
     right: auto;
-    top: 72px;
+    top: 60px;
     transform: translateX(-50%);
     width: min(360px, calc(100vw - 24px));
     flex-wrap: wrap;

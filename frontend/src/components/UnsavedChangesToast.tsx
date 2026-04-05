@@ -4,6 +4,7 @@ interface UnsavedChangesToastProps {
   busy?: boolean;
   onSave?: () => void;
   onDiscard?: () => void;
+  className?: string;
 }
 
 export function UnsavedChangesToast({
@@ -12,13 +13,14 @@ export function UnsavedChangesToast({
   busy = false,
   onSave,
   onDiscard,
+  className = "",
 }: UnsavedChangesToastProps): JSX.Element | null {
   if (!open) {
     return null;
   }
 
   return (
-    <div className="unsaved-changes-toast" role="status" aria-live="polite">
+    <div className={`unsaved-changes-toast ${className}`.trim()} role="status" aria-live="polite">
       <span>{message}</span>
       {onSave && onDiscard ? (
         <div className="unsaved-changes-actions">
