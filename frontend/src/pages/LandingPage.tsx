@@ -56,7 +56,7 @@ export function LandingPage(): JSX.Element {
       <section className="landing-marketing landing" ref={rootRef}>
         <section className="landing-hero reveal-on-scroll">
           <div className="landing-hero-copy">
-            <h1>Control your agent traffic before it controls your bill.</h1>
+            <h1>Control your agent execution before it controls your bill.</h1>
             <p>
               Monitor request and token usage per provider,
               <br />
@@ -139,7 +139,7 @@ export function LandingPage(): JSX.Element {
         </section>
 
         <section className="landing-section reveal-on-scroll">
-          <h2>Agentic systems don’t fail quietly</h2>
+          <h2>Agentic systems don’t stop on their own</h2>
           <div className="landing-pain-grid">
             <article className="landing-pain-timeline">
               <p className="landing-pain-kicker">Failure sequence</p>
@@ -184,7 +184,7 @@ export function LandingPage(): JSX.Element {
                 <p className="landing-pain-compare-label">Without a control layer</p>
                 <h3>Logs</h3>
                 <p>You see it after the damage.</p>
-                <p>Incidents show up when costs already landed.</p>
+                <p>The cost is already spent.</p>
                 <p>You can’t stop the next call.</p>
               </div>
               <div className="landing-pain-compare-block is-positive">

@@ -102,7 +102,7 @@ describe("App", () => {
         <App />
       </TestRouter>,
     );
-    expect(screen.getByRole("heading", { name: "Control your agent traffic before it controls your bill." })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Control your agent execution before it controls your bill." })).toBeDefined();
     expect(screen.getAllByRole("link", { name: "Quickstart" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: "Sign in" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Privacy" }).getAttribute("href")).toBe("/privacy");
@@ -180,7 +180,7 @@ describe("App", () => {
       </TestRouter>,
     );
 
-    expect(await screen.findByRole("heading", { name: "Control your agent traffic before it controls your bill." })).toBeDefined();
+    expect(await screen.findByRole("heading", { name: "Control your agent execution before it controls your bill." })).toBeDefined();
     expect(mockFetchCurrentUser).not.toHaveBeenCalled();
   });
 
