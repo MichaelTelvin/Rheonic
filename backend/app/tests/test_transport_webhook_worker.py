@@ -1,4 +1,5 @@
 import json
+import socket
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -8,6 +9,7 @@ from app.infrastructure.db.base import DatabaseSessionFactory
 from app.infrastructure.db.models import Base, ProjectRecord, TransportOutboxRecord
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.infrastructure.jobs import transport_job
+from app.security import webhook_urls
 
 
 class _FakeOkResponse:
@@ -236,6 +238,44 @@ def test_process_outbox_delivery_webhook_does_not_add_signature_header(
 
     assert len(captured) == 1
     assert "X-RHEONIC-Signature" not in captured[0]["headers"]
+
+
+def test_process_outbox_delivery_webhook_rejects_hostname_resolving_to_private_ip(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_url = f"sqlite:///{tmp_path}/transport_webhook_private_hostname.db"
+    session_factory = DatabaseSessionFactory(database_url=db_url)
+    Base.metadata.create_all(bind=session_factory.engine)
+    _seed_project(session_factory, "p-private-host")
+
+    with session_factory.create_session() as session:
+        record = session.query(ProjectRecord).filter(ProjectRecord.id == "p-private-host").first()
+        assert record is not None
+        record.webhook_url = "https://public-looking.example/hook"
+        session.add(record)
+        session.commit()
+
+    outbox_id = _enqueue_webhook_outbox(session_factory, "p-private-host")
+
+    settings = transport_job.Settings(database_url=db_url, redis_url="redis://localhost:6379/15")
+    monkeypatch.setattr(transport_job, "Settings", lambda: settings)
+    monkeypatch.setattr(transport_job, "DatabaseSessionFactory", lambda: DatabaseSessionFactory(database_url=db_url))
+    monkeypatch.setattr(
+        webhook_urls.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443))],
+    )
+    monkeypatch.setattr(transport_job.httpx, "Client", lambda timeout: _FakeOkClient())
+    monkeypatch.setattr(transport_job, "Queue", lambda *args, **kwargs: _FakeQueue())
+
+    transport_job.process_outbox_delivery(outbox_id)
+
+    with session_factory.create_session() as session:
+        row = session.query(TransportOutboxRecord).filter(TransportOutboxRecord.id == outbox_id).first()
+        assert row is not None
+        assert row.status == "failed"
+        assert row.last_error_code == "delivery_failed"
+        assert row.last_error_message == "422: Webhook URL host is not allowed"
 
 
 def test_process_outbox_delivery_webhook_failure_retries_then_dead_letters(

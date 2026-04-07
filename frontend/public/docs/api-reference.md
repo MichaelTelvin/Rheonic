@@ -55,6 +55,8 @@ Typical payload:
 }
 ```
 
+This is the raw backend ingest shape. SDK helper builders use user-facing `model` and map it internally to `requested_model`.
+
 ## Metrics
 - `GET /api/v1/metrics/realtime?project_id=...&provider=...`
 - `GET /api/v1/metrics/protect?project_id=...&provider=...`

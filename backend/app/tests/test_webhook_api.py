@@ -1,3 +1,4 @@
+import socket
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -19,6 +20,7 @@ from app.infrastructure.db.models import Base, TransportOutboxRecord
 from app.infrastructure.db.repositories.project_repository_impl import ProjectRepositoryImpl
 from app.infrastructure.db.repositories.transport_outbox_repository_impl import TransportOutboxRepositoryImpl
 from app.main import app
+from app.security import webhook_urls
 
 
 def _cleanup_overrides() -> None:
@@ -204,6 +206,26 @@ def test_project_webhook_rejects_private_hosts(tmp_path) -> None:
     )
     assert private_host.status_code == 422
     assert localhost_test.status_code == 422
+    _cleanup_overrides()
+
+
+def test_project_webhook_rejects_hostname_resolving_to_private_ip(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _make_client(tmp_path)
+    project_id = client.post("/api/v1/projects", json={"name": "Resolved Unsafe Host Validation"}).json()["id"]
+    _set_protect_enabled(client, project_id)
+
+    monkeypatch.setattr(
+        webhook_urls.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443))],
+    )
+
+    response = client.put(
+        f"/api/v1/projects/{project_id}/webhook",
+        json={"enabled": True, "url": "https://public-looking.example/hook"},
+    )
+
+    assert response.status_code == 422
     _cleanup_overrides()
 
 

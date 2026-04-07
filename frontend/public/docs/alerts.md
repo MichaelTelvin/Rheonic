@@ -38,7 +38,7 @@ Rheonic can notify you about incident lifecycle and Protect reporting events. Al
 Protect email and Protect webhook carry the same core reporting semantics. Webhook remains machine-readable; email is the operator-facing route.
 
 ## Testing Webhooks
-Use the `Test webhook` action from the dashboard. Rheonic queues a test payload and shows the result as a toast. `Last live webhook delivery` reflects real runtime delivery only, not test sends.
+Use the `Test webhook` action from the dashboard. Rheonic sends the test request immediately and shows the real result as a toast. `Last live webhook delivery` reflects real runtime delivery only, not test sends.
 
 Raw webhooks always send the canonical Rheonic payload in MVP. Human-facing provider formatting such as Telegram or Slack is planned as a V2 integration layer rather than a raw webhook editor.
 

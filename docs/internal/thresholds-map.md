@@ -21,7 +21,6 @@ This file documents the current behavior after the protect/observe separation re
 
 ### Token Explosion
 - signal: `token_explosion_tokens`
-- `token_explosion_ratio`
 - `token_explosion_abs`
 - `token_explosion_growth_ratio`
 - `token_explosion_growth_count`

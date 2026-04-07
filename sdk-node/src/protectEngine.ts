@@ -10,6 +10,7 @@ export type ProtectFailMode = "open" | "closed";
 export interface ProtectContext {
   provider: string;
   requested_model?: string | null;
+  environment?: string;
   feature?: string;
   max_output_tokens?: number;
   input_tokens_estimate?: number;
@@ -334,6 +335,9 @@ function sanitizeProtectContext(context: ProtectContext): Record<string, unknown
   const payload: Record<string, unknown> = { provider: context.provider };
   if (context.requested_model != null) {
     payload.requested_model = context.requested_model;
+  }
+  if (context.environment != null) {
+    payload.environment = context.environment;
   }
   if (context.feature != null) {
     payload.feature = context.feature;

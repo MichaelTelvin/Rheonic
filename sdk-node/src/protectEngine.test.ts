@@ -128,6 +128,47 @@ test("token estimation is evaluated before protect decision request", async () =
   }
 });
 
+test("protect decision request preserves environment in node sdk payload", async () => {
+  const originalFetch = globalThis.fetch;
+  let decisionCalls = 0;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/api/v1/protect/decision")) {
+      decisionCalls += 1;
+      const parsed = init?.body
+        ? (JSON.parse(String(init.body)) as {
+            environment?: unknown;
+          })
+        : {};
+      assert.equal(parsed.environment, "staging");
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ decision: "allow", reason: "ok" }),
+      } as Response;
+    }
+    if (url.endsWith("/api/v1/events")) {
+      return { ok: true, status: 202, json: async () => ({ status: "accepted" }) } as Response;
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const client = createClient({ ingestKey: "k1", environment: "staging", flushIntervalMs: 30_000 });
+    const { openai, calls } = makeOpenAIStub();
+    instrumentOpenAI(openai, { client, environment: "staging" });
+    await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "hello" }],
+    });
+    await client.flush();
+    assert.equal(calls.length, 1);
+    assert.equal(decisionCalls, 1);
+    client.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("decision block prevents provider call", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async () =>
