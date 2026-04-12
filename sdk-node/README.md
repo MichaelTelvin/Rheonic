@@ -1,3 +1,12 @@
+# ⚠️ Status: Development paused.
+
+Rheonic was built as an LLM API layer for cost control and observability in agentic workflows.
+
+The project is currently paused after initial validation attempts.
+The system is fully functional, but did not reach product-market fit.
+The hosted service is no longer active.
+Maintenance has been discontinued for this SDK.
+
 # Rheonic Node SDK
 
 Rheonic captures provider telemetry and applies protect preflight decisions before provider calls.
