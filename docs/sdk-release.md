@@ -2,7 +2,7 @@
 
 ## Source of truth
 
-- Root version file: [`VERSION`](VERSION)
+- Root version file: [`VERSION`](../VERSION)
 - Sync metadata before building or publishing:
 
 ```bash
@@ -16,7 +16,7 @@ Version mapping:
 
 ## Checklist
 
-- Update [`VERSION`](VERSION)
+- Update [`VERSION`](../VERSION)
 - Run:
 
 ```bash
@@ -26,8 +26,8 @@ make test-sdk-python
 ```
 
 - Review:
-  - [`sdk-node/CHANGELOG.md`](sdk-node/CHANGELOG.md)
-  - [`sdk-python/CHANGELOG.md`](sdk-python/CHANGELOG.md)
+  - [`sdk-node/CHANGELOG.md`](../sdk-node/CHANGELOG.md)
+  - [`sdk-python/CHANGELOG.md`](../sdk-python/CHANGELOG.md)
 - Build dry runs:
 
 ```bash

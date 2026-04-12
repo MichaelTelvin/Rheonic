@@ -1,6 +1,6 @@
 # Staging Deployment
 
-> Superseded by [`/DEPLOY.md`](../DEPLOY.md) for the current beta-production topology. Keep this file only for older staging setup notes.
+> Superseded by [`/docs/deploy.md`](./deploy.md) for the current beta-production topology. Keep this file only for older staging setup notes.
 
 ## Prerequisites
 - VPS with Docker + Docker Compose plugin.

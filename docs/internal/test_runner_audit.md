@@ -4,7 +4,7 @@ This document is the source of truth for automated test entrypoints.
 
 All `make test-*` targets now run through the same isolated Docker test stack:
 
-- compose file: `docker-compose.test.yml`
+- compose file: `deploy/docker-compose.test.yml`
 - compose project: `rheonic_test`
 - config source: explicit test-only container environment declared in the compose file
 
@@ -21,7 +21,7 @@ No automated test target depends on repo `.env` files.
   - `redis_test`
   - `db_init_test`
 - Config source:
-  - explicit test env in `docker-compose.test.yml`
+  - explicit test env in `deploy/docker-compose.test.yml`
 - Code path exercised:
   - FastAPI backend
   - DB/repository layer
@@ -55,7 +55,7 @@ No automated test target depends on repo `.env` files.
 - Compose target:
   - `frontend_test`
 - Config source:
-  - explicit frontend test env in `docker-compose.test.yml`
+  - explicit frontend test env in `deploy/docker-compose.test.yml`
   - `VITE_API_BASE_URL=https://example.invalid/api`
   - `VITE_PUBLIC_CONTACT_EMAIL=contact@rheonic.dev`
   - `VITE_APP_VERSION=test`
@@ -78,7 +78,7 @@ No automated test target depends on repo `.env` files.
   - `backend_test`
   - `provider_stub_test`
 - Config source:
-  - explicit test env in `docker-compose.test.yml`
+  - explicit test env in `deploy/docker-compose.test.yml`
 - Code path exercised:
   - backend + DB + Redis + provider stub
   - SDK end-to-end protect flow against a live test stack
@@ -94,5 +94,5 @@ make down-test
 Explicit cleanup including volumes:
 
 ```bash
-docker compose -p rheonic_test -f docker-compose.test.yml down -v
+docker compose -p rheonic_test -f deploy/docker-compose.test.yml down -v
 ```

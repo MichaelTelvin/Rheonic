@@ -29,7 +29,7 @@ export APP_VERSION="$version_value"
 export VITE_APP_VERSION="$version_value"
 
 doppler run --token "$DOPPLER_TOKEN" --project "$project" --config "$config" -- \
-  docker compose -p rheonic_prod -f docker-compose.prod.yml up -d postgres redis
+  docker compose -p rheonic_prod -f deploy/docker-compose.prod.yml up -d postgres redis
 
 doppler run --token "$DOPPLER_TOKEN" --project "$project" --config "$config" -- \
-  docker compose -p rheonic_prod -f docker-compose.prod.yml run --rm db_init
+  docker compose -p rheonic_prod -f deploy/docker-compose.prod.yml run --rm db_init

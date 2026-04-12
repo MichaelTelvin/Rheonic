@@ -53,10 +53,10 @@
     - [`backend/.dockerignore`](/Users/mike/Projects/Rheonic/backend/.dockerignore)
     - [`frontend/.dockerignore`](/Users/mike/Projects/Rheonic/frontend/.dockerignore)
   - updated compose files:
-    - [`docker-compose.yml`](/Users/mike/Projects/Rheonic/docker-compose.yml) (queue env consistency)
-    - [`docker-compose.test.yml`](/Users/mike/Projects/Rheonic/docker-compose.test.yml) (backend build args + readiness healthcheck)
-    - [`docker-compose.prod.yml`](/Users/mike/Projects/Rheonic/docker-compose.prod.yml) (no DB/Redis host port exposure, proxy headers, readiness healthcheck, production frontend Dockerfile)
-    - added [`docker-compose.staging.yml`](/Users/mike/Projects/Rheonic/docker-compose.staging.yml)
+    - [`docker-compose.yml`](/Users/mike/Projects/Rheonic/deploy/docker-compose.yml) (queue env consistency)
+    - [`docker-compose.test.yml`](/Users/mike/Projects/Rheonic/deploy/docker-compose.test.yml) (backend build args + readiness healthcheck)
+    - [`docker-compose.prod.yml`](/Users/mike/Projects/Rheonic/deploy/docker-compose.prod.yml) (no DB/Redis host port exposure, proxy headers, readiness healthcheck, production frontend Dockerfile)
+    - added [`docker-compose.staging.yml`](/Users/mike/Projects/Rheonic/deploy/docker-compose.staging.yml)
 - Secrets/config hygiene:
   - sanitized tracked [`/.env`](/Users/mike/Projects/Rheonic/.env) to remove sensitive values
   - updated [`/.env.example`](/Users/mike/Projects/Rheonic/.env.example) for staging/prod-safe defaults

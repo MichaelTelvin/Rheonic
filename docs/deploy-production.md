@@ -1,6 +1,6 @@
 # Production Deployment
 
-> Superseded by [`/DEPLOY.md`](../DEPLOY.md) for the current single-VPS beta-production topology. Keep this file only for older production notes.
+> Superseded by [`/docs/deploy.md`](./deploy.md) for the current single-VPS beta-production topology. Keep this file only for older production notes.
 
 ## Prerequisites
 - VPS with Docker + Docker Compose plugin.

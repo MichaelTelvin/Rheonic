@@ -32,7 +32,7 @@ This repo is already environment-driven, so integration should happen outside ap
 - Typical pattern:
   - store all env vars in a Doppler project/config,
   - provide `DOPPLER_TOKEN` from CI or the server,
-  - run Compose through `doppler run --project rheonic --config stg -- docker compose -f docker-compose.staging.yml up -d --build`.
+  - run Compose through `doppler run --project rheonic --config stg -- docker compose -f deploy/docker-compose.staging.yml up -d --build`.
 - In this repo, staging Compose no longer needs a persisted app `.env` file when run this way.
 
 ### 1Password

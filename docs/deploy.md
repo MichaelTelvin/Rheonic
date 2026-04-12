@@ -15,9 +15,9 @@ Domains:
 
 ## Compose split
 
-- Staging app stack: [`docker-compose.staging.yml`](docker-compose.staging.yml)
-- Production app stack: [`docker-compose.prod.yml`](docker-compose.prod.yml)
-- Shared edge proxy: [`docker-compose.proxy.yml`](docker-compose.proxy.yml)
+- Staging app stack: [`deploy/docker-compose.staging.yml`](../deploy/docker-compose.staging.yml)
+- Production app stack: [`deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml)
+- Shared edge proxy: [`deploy/docker-compose.proxy.yml`](../deploy/docker-compose.proxy.yml)
 
 Isolation:
 - compose projects: `rheonic_staging`, `rheonic_prod`, `rheonic_proxy`
@@ -84,10 +84,10 @@ This starts prod Postgres/Redis if needed and then runs `db_init` as a one-off m
 ## Caddy routing
 
 Shared Caddy config:
-- [`deploy/Caddyfile`](deploy/Caddyfile)
+- [`deploy/Caddyfile`](../deploy/Caddyfile)
 
 Shared Caddy service:
-- [`docker-compose.proxy.yml`](docker-compose.proxy.yml)
+- [`deploy/docker-compose.proxy.yml`](../deploy/docker-compose.proxy.yml)
 
 Caddy reaches app services over the explicit edge-network aliases:
 - `staging-backend`, `staging-frontend`
@@ -107,10 +107,10 @@ Backend checks:
 ## Production-only logging
 
 Promtail config:
-- [`deploy/promtail-config.prod.yml`](deploy/promtail-config.prod.yml)
+- [`deploy/promtail-config.prod.yml`](../deploy/promtail-config.prod.yml)
 
 Promtail compose path:
-- [`deploy/docker-compose.promtail.yml`](deploy/docker-compose.promtail.yml)
+- [`deploy/docker-compose.promtail.yml`](../deploy/docker-compose.promtail.yml)
 
 Start prod-only promtail:
 

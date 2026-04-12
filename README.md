@@ -27,16 +27,16 @@ curl -fsS http://localhost:8000/ready
 ```
 
 ## Deployment docs
-- Release: [`RELEASE.md`](RELEASE.md)
-- Deploy: [`DEPLOY.md`](DEPLOY.md)
-- SDK release: [`SDK_RELEASE.md`](SDK_RELEASE.md)
+- Release: [`docs/RELEASE.md`](docs/RELEASE.md)
+- Deploy: [`docs/deploy.md`](docs/deploy.md)
+- SDK release: [`docs/sdk-release.md`](docs/sdk-release.md)
 - Audit: [`docs/deploy-readiness-audit.md`](docs/deploy-readiness-audit.md)
 - Legacy staging guide: [`docs/deploy-staging.md`](docs/deploy-staging.md)
 - Legacy production guide: [`docs/deploy-production.md`](docs/deploy-production.md)
 - Rollback details: [`docs/rollback.md`](docs/rollback.md)
 
 ## Transport notifications
-- Notification catalog: [`NOTIFICATION_CATALOG.md`](NOTIFICATION_CATALOG.md)
+- Notification catalog: [`docs/NOTIFICATION_CATALOG.md`](docs/NOTIFICATION_CATALOG.md)
 
 ## License
 MIT
