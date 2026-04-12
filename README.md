@@ -15,6 +15,13 @@ Rheonic is a runtime safety layer for LLM applications with:
 - React/Vite frontend
 - unified outbox-based transport hub for webhook + email delivery
 
+## SDKs
+
+- Node: https://www.npmjs.com/package/@rheonic/sdk
+- Python: https://pypi.org/project/rheonic-sdk/
+
+⚠️ Deprecated. No longer maintained.
+
 ## Local development
 1. Start local stack through Doppler:
 ```bash
