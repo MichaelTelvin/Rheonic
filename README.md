@@ -1,10 +1,20 @@
-# ⚠️ Status: Development paused.
+# Status: Development paused.
 
 Rheonic was built as an LLM API layer for cost control and observability in agentic workflows.
 
 The project is currently paused after initial validation attempts.
 The system is fully functional, but did not reach product-market fit.
 The hosted service is no longer active.
+
+<p align="center">
+  <img src="./screenshots/landing.png" width="900" alt="Rheonic landing page">
+</p>
+<p align="center">
+  <img src="./screenshots/incidents.png" width="900" alt="Rheonic Incidents List">
+</p>
+<p align="center">
+  <img src="./screenshots/dashboard.png" width="900" alt="Rheonic Dashboard">
+</p>
 
 # Rheonic
 
